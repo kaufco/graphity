@@ -1,0 +1,56 @@
+{
+  "name": "full-big-graph",
+  "description": "Large-graph matrix: only Graphity + WebGraph at 1M/10M nodes.",
+  "jmh": {
+    "forks": 1,
+    "warmup_iterations": 1,
+    "warmup_time": "1s",
+    "measurement_iterations": 3,
+    "measurement_time": "1s",
+    "jvm_stack": "-Xss16m"
+  },
+  "cases": [
+    {
+      "name": "build-big",
+      "libraries": ["graphity", "webgraph"],
+      "algorithms": ["build"],
+      "params": {
+        "nodeCount": [1000000, 10000000],
+        "shape": ["GNP_SPARSE", "GNP_DENSE", "GNP_DENSE_SHUFFLED"]
+      }
+    },
+    {
+      "name": "scc-big",
+      "libraries": ["graphity", "webgraph"],
+      "algorithms": ["scc"],
+      "params": {
+        "nodeCount": [1000000, 10000000],
+        "shape": ["GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "GNP_DENSE_SHUFFLED"]
+      }
+    },
+    {
+      "name": "toporder-big",
+      "libraries": ["graphity", "webgraph"],
+      "algorithms": ["toporder"],
+      "params": {
+        "nodeCount": [1000000, 10000000],
+        "shape": ["DAG_GNP_SPARSE", "DAG_GNP_DENSE", "DAG_GNP_DENSE_SHUFFLED"]
+      }
+    },
+    {
+      "name": "dfs-analysis-big",
+      "libraries": ["graphity", "webgraph"],
+      "algorithms": ["backedges", "edgetypes"],
+      "params": {
+        "nodeCount": [1000000, 10000000],
+        "shape": ["GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "GNP_DENSE_SHUFFLED"]
+      }
+    }
+  ],
+  "mem": {
+    "enabled": true,
+    "nodes": [1000000, 10000000],
+    "shapes": ["GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "GNP_DENSE_SHUFFLED", "CHAIN_OF_CLIQUES_SHUFFLED"],
+    "libraries": ["graphity", "webgraph"]
+  }
+}

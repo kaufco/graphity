@@ -1,0 +1,79 @@
+# Builds the graphity-core Javadoc and deploys it to GitHub Pages.
+#
+# This workflow is intentionally limited to the public release repository
+# (kobayami/graphity) via `if: github.repository == 'kobayami/graphity'`.
+# In the private kaufco/graphity mirror the workflow file is present but
+# the job is skipped — Pages is not configured there.
+#
+# Two triggers:
+#   * workflow_dispatch — manual run, used before 1.0.0 to populate
+#     https://kobayami.github.io/graphity/ from main HEAD so the page is
+#     not blank.
+#   * push.tags 'v*.*.*' — automatic run on release tags. For 1.0/1.1
+#     the published Javadoc is the tag's snapshot at Pages root; a
+#     versioned layout (/javadoc/<version>/, /javadoc/latest/) can be
+#     introduced later without changing the trigger model.
+#
+# GitHub Pages source must be set to "GitHub Actions" in the repository
+# settings — this workflow uses actions/deploy-pages, not a gh-pages
+# branch.
+#
+# See internal/RELEASES.md §C for the broader context.
+
+name: Deploy Javadoc
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Pages allows only one concurrent deployment. Don't cancel an in-flight
+# deploy — let it finish so we never leave Pages in a half-updated state.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build & deploy Javadoc
+    if: github.repository == 'kobayami/graphity'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Build Javadoc
+        # javadoc:javadoc on graphity-core only; -am pulls in the parent POM.
+        # doclint=all + failOnWarnings is configured in the parent POM, so a
+        # broken Javadoc build fails this job.
+        run: mvn -B -ntp -pl graphity-core -am javadoc:javadoc
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Javadoc artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: graphity-core/target/reports/apidocs
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

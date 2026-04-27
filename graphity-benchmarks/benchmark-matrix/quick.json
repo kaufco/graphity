@@ -1,0 +1,74 @@
+{
+  "name": "quick",
+  "description": "Developer quick loop (~minutes): focused matrix with all four libraries on 10k/100k.",
+  "jmh": {
+    "forks": 0,
+    "warmup_iterations": 1,
+    "warmup_time": "300ms",
+    "measurement_iterations": 3,
+    "measurement_time": "500ms",
+    "jvm_stack": "-Xss16m"
+  },
+  "cases": [
+    {
+      "name": "build",
+      "libraries": ["graphity", "jgrapht", "guava", "webgraph"],
+      "algorithms": ["build"],
+      "params": {
+        "nodeCount": [10000, 100000],
+        "shape": ["PATH", "GNP_SPARSE", "GNP_DENSE", "PATH_SHUFFLED", "GNP_DENSE_SHUFFLED"]
+      }
+    },
+    {
+      "name": "scc",
+      "libraries": ["graphity", "jgrapht", "guava", "webgraph"],
+      "algorithms": ["scc"],
+      "params": {
+        "nodeCount": [10000, 100000],
+        "shape": ["PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "PATH_SHUFFLED", "GNP_DENSE_SHUFFLED"]
+      }
+    },
+    {
+      "name": "toporder",
+      "libraries": ["graphity", "jgrapht", "guava", "webgraph"],
+      "algorithms": ["toporder"],
+      "params": {
+        "nodeCount": [10000, 100000],
+        "shape": ["PATH", "TREE", "DAG_GNP_SPARSE", "DAG_GNP_DENSE", "PATH_SHUFFLED", "DAG_GNP_DENSE_SHUFFLED"]
+      }
+    },
+    {
+      "name": "dfs-analysis",
+      "libraries": ["graphity", "jgrapht", "guava", "webgraph"],
+      "algorithms": ["backedges", "edgetypes"],
+      "params": {
+        "nodeCount": [10000, 100000],
+        "shape": ["PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "PATH_SHUFFLED", "GNP_DENSE_SHUFFLED"]
+      }
+    },
+    {
+      "name": "components-graphity",
+      "libraries": ["graphity"],
+      "algorithms": ["wcc", "ccs"],
+      "params": {
+        "nodeCount": [10000, 100000],
+        "shape": ["PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES"]
+      }
+    },
+    {
+      "name": "toporder-levels-graphity",
+      "libraries": ["graphity"],
+      "algorithms": ["toporderandlevels"],
+      "params": {
+        "nodeCount": [10000, 100000],
+        "shape": ["PATH", "TREE", "DAG_GNP_SPARSE", "DAG_GNP_DENSE", "DAG_GNP_DENSE_SHUFFLED"]
+      }
+    }
+  ],
+  "mem": {
+    "enabled": true,
+    "nodes": [10000, 100000],
+    "shapes": ["PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "PATH_SHUFFLED", "GNP_DENSE_SHUFFLED"],
+    "libraries": ["graphity", "jgrapht", "guava", "webgraph"]
+  }
+}

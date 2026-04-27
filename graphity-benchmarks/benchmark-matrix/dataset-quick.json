@@ -1,0 +1,28 @@
+{
+  "name": "dataset-quick",
+  "description": "Quick dataset smoke profile (real-world edge lists from ../datasets).",
+  "jmh": {
+    "forks": 0,
+    "warmup_iterations": 1,
+    "warmup_time": "300ms",
+    "measurement_iterations": 3,
+    "measurement_time": "500ms",
+    "jvm_stack": "-Xss16m"
+  },
+  "cases": [
+    {
+      "name": "snap-general",
+      "libraries": ["graphity", "jgrapht", "guava", "webgraph"],
+      "algorithms": ["scc", "backedges", "edgetypes"],
+      "dataset": {
+        "dag": false,
+        "files": [
+          "../datasets/snap/web-Google.txt"
+        ]
+      }
+    }
+  ],
+  "mem": {
+    "enabled": false
+  }
+}

@@ -1,0 +1,50 @@
+# Continuous integration: build + tests on every push to the main release branch
+# and on every pull request.
+#
+# This workflow file is shared across both the private development repository
+# (kaufco/graphity) and the public release repository (kobayami/graphity).
+# Build and tests run on both — failures should be visible as early as possible,
+# regardless of which repo received the push. Deploy-style workflows (Javadoc
+# to GitHub Pages, Maven Central release) are kobayami-only and gate themselves
+# with `if: github.repository == 'kobayami/graphity'`.
+#
+# See internal/RELEASES.md for the broader release workflow context.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel superseded runs for the same ref (e.g. force-pushes to a PR branch) to
+# save Action minutes and keep the queue snappy.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build & test (JDK 21)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Build and test
+        # -B: batch mode (no interactive prompts, terse output)
+        # -ntp: suppress transfer progress logs (cleaner CI output)
+        # verify runs the full reactor: compile, test, package, javadoc-jar.
+        run: mvn -B -ntp verify

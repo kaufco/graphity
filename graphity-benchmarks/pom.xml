@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.kobayami</groupId>
+    <artifactId>graphity-parent</artifactId>
+    <version>1.0.0</version>
+  </parent>
+
+  <artifactId>graphity-benchmarks</artifactId>
+
+  <name>graphity-benchmarks</name>
+  <description>
+    JMH-based benchmarks for Graphity and peer graph libraries.
+    Packaged as an executable uber-jar (java -jar graphity-benchmarks.jar ...).
+    Not part of the released core library; excluded from JaCoCo coverage.
+  </description>
+
+  <properties>
+    <uberjar.name>graphity-benchmarks</uberjar.name>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.kobayami</groupId>
+      <artifactId>graphity-core</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.openjdk.jmh</groupId>
+      <artifactId>jmh-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.openjdk.jmh</groupId>
+      <artifactId>jmh-generator-annprocess</artifactId>
+      <scope>provided</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.openjdk.jol</groupId>
+      <artifactId>jol-core</artifactId>
+    </dependency>
+
+    <!-- Peer libraries for comparison benchmarks.
+         Compile scope (not test) because benchmark code is in src/main/java. -->
+    <dependency>
+      <groupId>org.jgrapht</groupId>
+      <artifactId>jgrapht-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.google.guava</groupId>
+      <artifactId>guava</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>it.unimi.dsi</groupId>
+      <artifactId>webgraph</artifactId>
+    </dependency>
+    <!-- WebGraph/dsiutils log via SLF4J; silence to keep benchmark stderr clean. -->
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-nop</artifactId>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <finalName>${uberjar.name}</finalName>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <!-- Explicitly wire the JMH annotation processor so Maven always runs it,
+               independent of classpath processor discovery. -->
+          <annotationProcessorPaths>
+            <path>
+              <groupId>org.openjdk.jmh</groupId>
+              <artifactId>jmh-generator-annprocess</artifactId>
+              <version>${jmh.version}</version>
+            </path>
+          </annotationProcessorPaths>
+        </configuration>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals><goal>shade</goal></goals>
+            <configuration>
+              <finalName>${uberjar.name}</finalName>
+              <!-- This module is a runnable benchmarks JAR, never consumed as
+                   a Maven dependency. Suppress the reduced-POM artifact that
+                   Shade would otherwise emit alongside the JAR. -->
+              <createDependencyReducedPom>false</createDependencyReducedPom>
+              <transformers>
+                <transformer
+                    implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                  <mainClass>com.kobayami.graphity.benchmarks.Main</mainClass>
+                </transformer>
+              </transformers>
+              <filters>
+                <filter>
+                  <artifact>*:*</artifact>
+                  <excludes>
+                    <exclude>META-INF/*.SF</exclude>
+                    <exclude>META-INF/*.DSA</exclude>
+                    <exclude>META-INF/*.RSA</exclude>
+                  </excludes>
+                </filter>
+              </filters>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+
+</project>

@@ -1,0 +1,24 @@
+Graphity
+Copyright 2025-2026 Marco Kaufmann
+
+This product includes software developed by Marco Kaufmann
+(https://github.com/kobayami/graphity).
+
+Forks and derivative works are welcome under the Apache License, Version 2.0.
+The name "Graphity" refers to the original project; please choose a different
+name for any redistributed version.
+
+-------------------------------------------------------------------------------
+Third-party software included in graphity-core (runtime dependencies):
+
+  * fastutil — Copyright (C) 2002-2024 Sebastiano Vigna
+    Apache License, Version 2.0
+    https://fastutil.di.unimi.it/
+
+  * JSpecify — Copyright The JSpecify Authors
+    Apache License, Version 2.0
+    https://jspecify.dev/
+
+Neither dependency ships an upstream NOTICE file with required attribution
+content; the entries above are provided for transparency and are not required
+under Apache License 2.0 §4(d).

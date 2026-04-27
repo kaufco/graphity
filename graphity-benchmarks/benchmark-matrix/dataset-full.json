@@ -1,0 +1,30 @@
+{
+  "name": "dataset-full",
+  "description": "Extended real-world dataset profile (SNAP edge lists from ../datasets).",
+  "jmh": {
+    "forks": 1,
+    "warmup_iterations": 1,
+    "warmup_time": "1s",
+    "measurement_iterations": 3,
+    "measurement_time": "1s",
+    "jvm_stack": "-Xss16m"
+  },
+  "cases": [
+    {
+      "name": "general-datasets",
+      "libraries": ["graphity", "jgrapht", "guava", "webgraph"],
+      "algorithms": ["scc", "backedges", "edgetypes"],
+      "dataset": {
+        "dag": false,
+        "files": [
+          "../datasets/snap/web-Google.txt",
+          "../datasets/snap/wiki-Talk.txt",
+          "../datasets/snap/soc-LiveJournal1.txt"
+        ]
+      }
+    }
+  ],
+  "mem": {
+    "enabled": false
+  }
+}

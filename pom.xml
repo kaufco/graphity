@@ -1,0 +1,266 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.kobayami</groupId>
+  <artifactId>graphity-parent</artifactId>
+  <version>1.0.0</version>
+  <packaging>pom</packaging>
+
+  <name>graphity (parent)</name>
+  <description>Aggregator POM for Graphity: core library and benchmarks.</description>
+  <url>https://github.com/kobayami/graphity</url>
+  <inceptionYear>2025</inceptionYear>
+
+  <licenses>
+    <license>
+      <name>Apache License, Version 2.0</name>
+      <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+
+  <organization>
+    <name>kobayami</name>
+    <url>https://github.com/kobayami</url>
+  </organization>
+
+  <developers>
+    <developer>
+      <id>kobayami</id>
+      <name>Marco Kaufmann</name>
+      <url>https://github.com/kobayami</url>
+      <roles>
+        <role>author</role>
+        <role>maintainer</role>
+      </roles>
+      <timezone>Europe/Berlin</timezone>
+    </developer>
+  </developers>
+
+  <scm>
+    <connection>scm:git:https://github.com/kobayami/graphity.git</connection>
+    <developerConnection>scm:git:git@github.com:kobayami/graphity.git</developerConnection>
+    <url>https://github.com/kobayami/graphity</url>
+    <tag>HEAD</tag>
+  </scm>
+
+  <!-- No <distributionManagement> on purpose. Sonatype OSSRH was sunset in
+       mid-2025; Maven Central now publishes via the Central Publisher Portal,
+       which uses a dedicated deploy plugin (e.g. central-publishing-maven-plugin)
+       instead of a <distributionManagement>/<repository> entry. The plugin
+       configuration plus credentials/GPG land here ahead of the first
+       release-tag deploy — see internal/RELEASES.md §B for the open items. -->
+  <issueManagement>
+    <system>GitHub Issues</system>
+    <url>https://github.com/kobayami/graphity/issues</url>
+  </issueManagement>
+
+  <modules>
+    <module>graphity-core</module>
+    <module>graphity-benchmarks</module>
+  </modules>
+
+  <properties>
+    <maven.compiler.source>21</maven.compiler.source>
+    <maven.compiler.target>21</maven.compiler.target>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+    <fastutil.version>8.5.17</fastutil.version>
+    <jspecify.version>1.0.0</jspecify.version>
+    <junit.version>5.11.3</junit.version>
+    <assertj.version>3.26.3</assertj.version>
+    <jgrapht.version>1.5.2</jgrapht.version>
+    <guava.version>33.5.0-jre</guava.version>
+    <webgraph.version>3.6.12</webgraph.version>
+    <slf4j.version>2.0.16</slf4j.version>
+    <jmh.version>1.37</jmh.version>
+    <jol.version>0.17</jol.version>
+
+    <compiler-plugin.version>3.11.0</compiler-plugin.version>
+    <surefire.version>3.5.2</surefire.version>
+    <jacoco.version>0.8.13</jacoco.version>
+    <shade-plugin.version>3.5.3</shade-plugin.version>
+    <javadoc-plugin.version>3.11.2</javadoc-plugin.version>
+    <source-plugin.version>3.3.1</source-plugin.version>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>it.unimi.dsi</groupId>
+        <artifactId>fastutil</artifactId>
+        <version>${fastutil.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.jspecify</groupId>
+        <artifactId>jspecify</artifactId>
+        <version>${jspecify.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>com.kobayami</groupId>
+        <artifactId>graphity-core</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.junit.jupiter</groupId>
+        <artifactId>junit-jupiter</artifactId>
+        <version>${junit.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.assertj</groupId>
+        <artifactId>assertj-core</artifactId>
+        <version>${assertj.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.jgrapht</groupId>
+        <artifactId>jgrapht-core</artifactId>
+        <version>${jgrapht.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.google.guava</groupId>
+        <artifactId>guava</artifactId>
+        <version>${guava.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>it.unimi.dsi</groupId>
+        <artifactId>webgraph</artifactId>
+        <version>${webgraph.version}</version>
+        <exclusions>
+          <!-- webgraph 3.6.x declares logback as a runtime dependency and JUNG as compile-
+               scope. We don't need either: slf4j-nop provides a silent logger, and JUNG
+               would only bloat the shade-jar. Excluding them avoids a second SLF4J binding
+               that would otherwise beat slf4j-nop in the service-provider lottery. -->
+          <exclusion>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-core</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>net.sf.jung</groupId>
+            <artifactId>jung-api</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>net.sf.jung</groupId>
+            <artifactId>jung-io</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>net.sf.jung</groupId>
+            <artifactId>jung-algorithms</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <!-- WebGraph / dsiutils log through SLF4J; silence the output to keep benchmark
+           stderr clean. Using slf4j-nop avoids a real binding entirely. -->
+      <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>slf4j-nop</artifactId>
+        <version>${slf4j.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.openjdk.jmh</groupId>
+        <artifactId>jmh-core</artifactId>
+        <version>${jmh.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.openjdk.jmh</groupId>
+        <artifactId>jmh-generator-annprocess</artifactId>
+        <version>${jmh.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.openjdk.jol</groupId>
+        <artifactId>jol-core</artifactId>
+        <version>${jol.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-compiler-plugin</artifactId>
+          <version>${compiler-plugin.version}</version>
+          <configuration>
+            <release>21</release>
+          </configuration>
+        </plugin>
+
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-surefire-plugin</artifactId>
+          <version>${surefire.version}</version>
+          <configuration>
+            <!-- @{argLine} late-binds the JaCoCo javaagent set by jacoco:prepare-agent.
+                 -Xss16m: documented safety margin for the recursive DFS traverser; users with
+                 very deep graphs must configure this themselves (see Traverser.md
+                 "Recursion and Stack Depth"). -->
+            <argLine>@{argLine} -ea -Xss16m</argLine>
+          </configuration>
+        </plugin>
+
+        <plugin>
+          <groupId>org.jacoco</groupId>
+          <artifactId>jacoco-maven-plugin</artifactId>
+          <version>${jacoco.version}</version>
+          <executions>
+            <execution>
+              <id>prepare-agent</id>
+              <goals><goal>prepare-agent</goal></goals>
+            </execution>
+            <execution>
+              <id>report</id>
+              <phase>test</phase>
+              <goals><goal>report</goal></goals>
+            </execution>
+          </executions>
+        </plugin>
+
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-shade-plugin</artifactId>
+          <version>${shade-plugin.version}</version>
+        </plugin>
+
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-source-plugin</artifactId>
+          <version>${source-plugin.version}</version>
+        </plugin>
+
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-javadoc-plugin</artifactId>
+          <version>${javadoc-plugin.version}</version>
+          <configuration>
+            <source>${maven.compiler.source}</source>
+            <encoding>${project.build.sourceEncoding}</encoding>
+            <docencoding>UTF-8</docencoding>
+            <charset>UTF-8</charset>
+            <!-- doclint=all enforces HTML correctness, valid @link/@see references,
+                 well-formed tags AND missing tags (@param, @return, @throws). The
+                 coverage sweep is done; keep this strict so CI catches new lapses. -->
+            <doclint>all</doclint>
+            <failOnWarnings>true</failOnWarnings>
+            <notimestamp>true</notimestamp>
+            <quiet>true</quiet>
+            <doctitle>${project.name} ${project.version} API</doctitle>
+            <windowtitle>${project.name} ${project.version} API</windowtitle>
+            <bottom><![CDATA[Copyright &#169; {inceptionYear}&#x2013;{currentYear} Marco Kaufmann. Apache License 2.0.]]></bottom>
+          </configuration>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+  </build>
+
+</project>
