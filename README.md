@@ -1,5 +1,11 @@
 # Graphity
 
+[![Maven Central](https://img.shields.io/maven-central/v/com.kobayami/graphity-core?label=Maven%20Central)](https://central.sonatype.com/artifact/com.kobayami/graphity-core)
+[![Javadoc](https://img.shields.io/badge/Javadoc-online-blue)](https://kaufco.github.io/graphity/)
+[![CI](https://github.com/kaufco/graphity/actions/workflows/ci.yml/badge.svg)](https://github.com/kaufco/graphity/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
+[![JDK](https://img.shields.io/badge/JDK-21%2B-blue)](https://adoptium.net/temurin/releases/?version=21)
+
 Graphity is a compact, high-performance Java library for analyzing directed and undirected graphs. It is built for compiler and analysis pipelines — abstract syntax trees, control- and data-flow graphs, dependency graphs — and more generally for anywhere you build a graph from your domain model, run analyses on it, and use the results.
 
 Graphity stores graphs in a CSR layout and returns algorithm results as typed, immutable value objects with useful follow-up APIs. On the algorithms covered by [JGraphT](https://jgrapht.org/) and [Guava Graph](https://github.com/google/guava/wiki/GraphsExplained), Graphity is **8×–79× faster** and uses **17×–55× less memory per (node + edge)**. [WebGraph](https://webgraph.di.unimi.it/) (LAW Milano), a specialist for compressed billion-node web crawls, beats Graphity on raw memory compactness (see [Limitations](#limitations)); on runtime, Graphity is faster across all measured shapes and sizes (2.4×–21×).
