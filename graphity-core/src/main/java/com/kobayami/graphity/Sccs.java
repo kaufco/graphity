@@ -6,7 +6,7 @@ import java.util.Objects;
  * Strongly connected components of a directed {@link Graph}.
  * <p>
  * Each node belongs to exactly one SCC, identified by an SCC ID in {@code 0..groupCount()-1}.
- * Trivial SCCs (single node, no self-loop) are included — use {@link #sizeOf(int)} to
+ * Trivial SCCs (single node, no self-loop) are included - use {@link #containsCycle(int)} to
  * distinguish trivial from non-trivial components.
  * <p>
  * SCC IDs are assigned in <strong>reverse topological order</strong> of the component DAG:

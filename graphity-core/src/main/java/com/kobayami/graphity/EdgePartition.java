@@ -6,8 +6,8 @@ import java.util.Objects;
  * Bidirectional partition of edges into disjoint groups, with efficient reverse lookup.
  * <p>
  * Used for many-to-one edge mappings, such as condensation: multiple original edges
- * may map to a single condensed edge. Intra-group edges (self-edges in the condensation)
- * are unmapped ({@code get(edgeIndex) == -1}).
+ * may map to a single condensed edge. Intra-group edges (edges within a single group,
+ * omitted from the condensation graph) are unmapped ({@code get(edgeIndex) == -1}).
  * <p>
  * The forward direction (original edge → condensed edge) is inherited from
  * {@link IndexMapping#get(int)}. The reverse direction (condensed edge → original edges)
@@ -32,7 +32,7 @@ import java.util.Objects;
  * @see IndexPartition
  * @see Graphs#edgePartition(Graph, Graph, NodePartition)
  */
-public non-sealed class EdgePartition extends EdgeMapping implements IndexPartition {
+public final class EdgePartition extends IndexMapping implements IndexPartition {
 
   /** CSR values: original edge indices of all group members, grouped by condensed edge. */
   private final int[] members;
@@ -54,8 +54,6 @@ public non-sealed class EdgePartition extends EdgeMapping implements IndexPartit
     this.members = members;
     this.memberStart = memberStart;
   }
-
-  // ---- IndexPartition implementation ----
 
   /**
    * Returns the number of groups (condensed edges).
@@ -107,15 +105,13 @@ public non-sealed class EdgePartition extends EdgeMapping implements IndexPartit
     return memberStart[groupId + 1] - memberStart[groupId];
   }
 
-  // ---- Domain-specific convenience (delegate to IndexPartition) ----
-
   /**
    * Returns the total number of original edges.
    * Equivalent to {@link #indexCount()}.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @return original edge count, summed over all condensed edges
+   * @return original edge count
    */
   public int edgeCount() {
     return indexCount();
@@ -135,17 +131,4 @@ public non-sealed class EdgePartition extends EdgeMapping implements IndexPartit
     return indicesOf(groupId);
   }
 
-  // ---- Override ----
-
-  /**
-   * Always throws — a partition mapping is many-to-one and cannot be inverted
-   * to an {@link EdgeMapping}. Use {@link #edgesOf(int)} for the reverse direction.
-   *
-   * @throws IllegalArgumentException always
-   */
-  @Override
-  public EdgeMapping inverse() {
-    throw new IllegalArgumentException(
-        "Cannot invert a partition mapping (many-to-one). Use edgesOf() for the reverse direction.");
-  }
 }

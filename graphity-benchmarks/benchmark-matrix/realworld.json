@@ -1,0 +1,66 @@
+{
+  "name": "realworld",
+  "description": "Extended real-world dataset profile (SNAP edge lists from ../datasets): web-Google, wiki-Talk, soc-LiveJournal1, cit-Patents, cit-HepPh. Each traversal algorithm additionally runs on a DFS-preorder reordered copy (graphity-reordered pseudo-lib -> 'Graphity (reordered)' column), and the one-time reorder cost is captured by the graphity-only 'reorder' algorithm. Perf-only: real-world allocation/memory footprint is out of scope here (footprint is topology-independent and already covered by the synthetic profiles). NOTE on jvm_stack/jvm_heap: the peer libraries use recursive DFS (JGraphT's Kosaraju, Guava port, and WebGraph's own StronglyConnectedComponents, whose Javadoc literally advises a large stack). On soc-LiveJournal1 (4.8M nodes, the largest of the five) they overflow the default stack; measured minimum -Xss to complete SCC is 256m (WebGraph) / 512m (Guava), while Graphity's iterative cores need none of this. -Xss512m + -Xmx64g clear all four libraries on all five datasets (combined cross-validation peaks at ~38 GB RSS on soc-LiveJournal1; the other four are all smaller and need less). Graphity alone would run at the default -Xss16m.",
+  "jmh": {
+    "forks": 1,
+    "warmup_iterations": 1,
+    "warmup_time": "1s",
+    "measurement_iterations": 3,
+    "measurement_time": "1s",
+    "jvm_stack": "-Xss512m",
+    "jvm_heap": "-Xmx64g"
+  },
+  "cases": [
+    {
+      "name": "general-datasets",
+      "libraries": ["graphity", "jgrapht", "guava", "webgraph"],
+      "algorithms": ["scc", "backedges", "edgetypes"],
+      "phases": ["perf"],
+      "dataset": {
+        "dag": false,
+        "files": [
+          "../datasets/snap/web-Google.txt",
+          "../datasets/snap/wiki-Talk.txt",
+          "../datasets/snap/soc-LiveJournal1.txt",
+          "../datasets/snap/cit-Patents.txt",
+          "../datasets/snap/cit-HepPh.txt"
+        ]
+      }
+    },
+    {
+      "name": "general-datasets-reordered",
+      "libraries": ["graphity-reordered"],
+      "algorithms": ["scc", "backedges", "edgetypes"],
+      "phases": ["perf"],
+      "dataset": {
+        "dag": false,
+        "files": [
+          "../datasets/snap/web-Google.txt",
+          "../datasets/snap/wiki-Talk.txt",
+          "../datasets/snap/soc-LiveJournal1.txt",
+          "../datasets/snap/cit-Patents.txt",
+          "../datasets/snap/cit-HepPh.txt"
+        ]
+      }
+    },
+    {
+      "name": "reorder-cost-datasets",
+      "libraries": ["graphity"],
+      "algorithms": ["reorder"],
+      "phases": ["perf"],
+      "dataset": {
+        "dag": false,
+        "files": [
+          "../datasets/snap/web-Google.txt",
+          "../datasets/snap/wiki-Talk.txt",
+          "../datasets/snap/soc-LiveJournal1.txt",
+          "../datasets/snap/cit-Patents.txt",
+          "../datasets/snap/cit-HepPh.txt"
+        ]
+      }
+    }
+  ],
+  "mem": {
+    "enabled": false
+  }
+}

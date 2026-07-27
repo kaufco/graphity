@@ -1,14 +1,5 @@
-# Continuous integration: build + tests on every push to the main release branch
-# and on every pull request.
-#
-# This workflow file is shared across both the private development repository
-# (kaufco/graphity) and the public release repository (kobayami/graphity).
-# Build and tests run on both — failures should be visible as early as possible,
-# regardless of which repo received the push. Deploy-style workflows (Javadoc
-# to GitHub Pages, Maven Central release) are kobayami-only and gate themselves
-# with `if: github.repository == 'kobayami/graphity'`.
-#
-# See internal/RELEASES.md for the broader release workflow context.
+# Continuous integration: build + tests on every push to main and on every
+# pull request.
 
 name: CI
 

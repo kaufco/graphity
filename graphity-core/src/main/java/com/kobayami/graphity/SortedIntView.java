@@ -25,8 +25,11 @@ import org.jspecify.annotations.Nullable;
  * Sub-range slicing and equality checks operate without copying data.
  * <p>
  * Implements {@link IntList} for API compatibility but does not support mutation.
+ * <p>
+ * <strong>Memory:</strong> O(1) - holds only a reference to the shared array plus the two
+ * {@code int} bounds ({@link #fromIndex}, {@link #toIndex}).
  */
-public final class SortedIntView extends AbstractIntList implements IntList, RandomAccess, Cloneable, java.io.Serializable {
+public final class SortedIntView extends AbstractIntList implements IntList, RandomAccess, Cloneable {
 
   /** Canonical empty view. Immutable and safely shared. */
   public static final SortedIntView EMPTY = new SortedIntView(new int[0], 0, 0);
@@ -189,7 +192,8 @@ public final class SortedIntView extends AbstractIntList implements IntList, Ran
    * Copies this view's contents into {@code dest}, or allocates a new array if
    * {@code dest} is {@code null} or too small.
    * <p>
-   * <strong>Time:</strong> O(n).
+   * <strong>Time:</strong> O(n).<br>
+   * <strong>Memory:</strong> 4 x n bytes if {@code dest} is {@code null} or too small; none otherwise.
    */
   @Override
   public int[] toArray(@Nullable int[] dest) {

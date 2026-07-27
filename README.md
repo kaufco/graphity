@@ -1,14 +1,12 @@
 # Graphity
 
-Graphity is a lightweight, high-performance Java library for analyzing directed and undirected graphs. It is built for analysis tools that work with structured graphs like abstract syntax trees, data- and control-flow graphs, dependency graphs, and related shapes. More broadly, anywhere you build a graph from your domain model, run analyses on it, and use the results.
+Graphity is a compact, high-performance Java library for analyzing directed and undirected graphs. It is built for compiler and analysis pipelines — abstract syntax trees, control- and data-flow graphs, dependency graphs — and more generally for anywhere you build a graph from your domain model, run analyses on it, and use the results.
 
-Graphity stores graphs in a compact CSR layout and returns algorithm results as typed, immutable value objects with useful follow-up APIs. On the algorithms covered by [JGraphT](https://jgrapht.org/) or [Guava Graph](https://github.com/google/guava/wiki/GraphsExplained), Graphity is **2×–50× faster** and uses **17×–55× less memory per (node + edge)**. [WebGraph](https://webgraph.di.unimi.it/) (LAW Milano), a specialist for compressed billion-node web crawls, beats Graphity on raw memory compactness and on sparse graphs above 10⁶ nodes (see [Limitations](#limitations)).
+Graphity stores graphs in a CSR layout and returns algorithm results as typed, immutable value objects with useful follow-up APIs. On the algorithms covered by [JGraphT](https://jgrapht.org/) and [Guava Graph](https://github.com/google/guava/wiki/GraphsExplained), Graphity is **8×–79× faster** and uses **17×–55× less memory per (node + edge)**. [WebGraph](https://webgraph.di.unimi.it/) (LAW Milano), a specialist for compressed billion-node web crawls, beats Graphity on raw memory compactness (see [Limitations](#limitations)); on runtime, Graphity is faster across all measured shapes and sizes (2.4×–21×).
 
-> **Status:** first public snapshot. The 1.0.0 release is not yet published to Maven Central — the snippets below show the planned coordinates.
+Speed and footprint come from the same constraint: Graphity models topology only. Nodes are integer IDs, edges are integer pairs, and labels or weights live in arrays you own, indexed by node or edge ID. The graph itself stays a flat `int[]`.
 
 ## Installation
-
-The Maven Central coordinates below are final. The artifact is published with the 1.0.0 release; until then, build from source (see [Building, testing, and benchmarking from source](#building-testing-and-benchmarking-from-source)).
 
 ### Maven
 
@@ -16,7 +14,7 @@ The Maven Central coordinates below are final. The artifact is published with th
 <dependency>
     <groupId>com.kobayami</groupId>
     <artifactId>graphity-core</artifactId>
-    <version>1.0.0</version>
+    <version>2.0.0</version>
 </dependency>
 ```
 
@@ -24,7 +22,7 @@ The Maven Central coordinates below are final. The artifact is published with th
 
 ```groovy
 dependencies {
-    implementation 'com.kobayami:graphity-core:1.0.0'
+    implementation 'com.kobayami:graphity-core:2.0.0'
 }
 ```
 
@@ -32,7 +30,7 @@ dependencies {
 
 ```kotlin
 dependencies {
-    implementation("com.kobayami:graphity-core:1.0.0")
+    implementation("com.kobayami:graphity-core:2.0.0")
 }
 ```
 
@@ -82,6 +80,8 @@ The result types are themselves graphs or partitions backed by CSR — they comp
 double[] weights = new double[graph.edgeCount()];
 ```
 
+**Direction is an interpretation, not a type.** Edges are stored as directed pairs, but nothing commits a graph to one reading. Where the distinction matters, both variants are available — `Components.sccsOf` reads the graph as directed, `Components.ccsOf` as undirected. An AST that is a tree for one analysis and a dependency graph for the next needs no conversion and no second copy.
+
 **`BiAdjacentGraph` for O(1) bidirectional access.** Opt-in via `graph.biAdjacentGraph()`. Doubles the storage to 8 B per (node + edge) and gives constant-time access in both directions — useful for Kahn's topological order, bidirectional BFS, and weakly-connected-component detection.
 
 **Algorithm results as first-class typed values.** Where other libraries hand you `Set<Set<V>>` or `Map<V, Integer>` and let you figure out the rest, Graphity returns a domain object with useful follow-ups:
@@ -102,34 +102,53 @@ These types compose. `sccs.condense()` returns a `Graph` plus a `NodeMapping` fr
 
 **Immutable graphs, safe to share across threads.** Once built, a `Graph` never changes. The same instance can be passed to multiple algorithms or threads without locking or defensive copying. Mutation happens exclusively through transformations (`subgraph`, `remap`, `condense`) that produce new graphs. The immutability is what makes the zero-copy result types and shared-graph parallelism safe by construction, not by convention.
 
+**Iterative algorithms — no recursion, no stack ceiling.** Every DFS-based algorithm (`Sccs`, `TopOrder`, `BackEdges`, `EdgeTypes`, the shape predicates, node reindexing) runs on an explicit heap-allocated stack, not the JVM call stack. They complete on arbitrarily deep graphs — verified at a DFS depth of 1M — under the default `-Xss`, with zero JVM tuning. This is a real differentiator: JGraphT, Guava, and WebGraph (built for billion-node web crawls) all use recursive DFS. On a 4.8M-node graph like `soc-LiveJournal1`, JGraphT's and WebGraph's SCC overflow the default stack and only complete once `-Xss` is raised to 256–512 MB (WebGraph's own SCC Javadoc advises setting "a large stack size"); on deeper topologies they fail regardless of `-Xss`. Graphity just runs.
+
 ## Performance and memory at a glance
 
-Selected results at n = 100 000, measured on an AMD Ryzen 9 9950X with OpenJDK 25. Times in milliseconds; the parenthesised factor is relative to Graphity (bigger = slower / more memory).
+Measured on an AMD Ryzen 9 9950X with OpenJDK 25. The parenthesised factor is relative to Graphity.
 
-### Strongly connected components
+### SCC (Strongly connected components) on synthetic graphs
 
-| Shape             | Graphity | JGraphT          | Guava            | WebGraph         |
-|-------------------|---------:|-----------------:|-----------------:|-----------------:|
-| GNP_SPARSE        | 4.84 ms  | 103.0 ms (21.3×) | 106.4 ms (22.0×) | 10.27 ms (2.12×) |
-| GNP_DENSE         | 10.23 ms | 440.4 ms (43.1×) | —                | 35.07 ms (3.43×) |
-| TREE              | 11.30 ms | 39.23 ms (3.47×) | 38.47 ms (3.40×) | 5.65 ms (0.50×)  |
+#### Times @ 100k nodes (ms/op, lower is better)
 
-### Topological order
+| Shape            | Graphity | JGraphT         | Guava           | WebGraph        |
+|------------------|---------:|----------------:|----------------:|----------------:|
+| Tree             | 2.24 ms  | 42.50 ms (19×)  | 41.79 ms (19×)  | 5.66 ms (2.5×)  |
+| GNP sparse       | 4.33 ms  | 109.1 ms (25×)  | 103.4 ms (24×)  | 10.40 ms (2.4×) |
+| GNP dense        | 7.39 ms  | 493.6 ms (67×)  | 428.8 ms (58×)  | 35.66 ms (4.8×) |
+| Chain of cliques | 2.62 ms  | 185.5 ms (71×)  | 112.8 ms (43×)  | 36.60 ms (14×)  |
 
-| Shape             | Graphity | JGraphT          | Guava            | WebGraph         |
-|-------------------|---------:|-----------------:|-----------------:|-----------------:|
-| DAG_GNP_SPARSE    | 9.52 ms  | 60.53 ms (6.36×) | 53.83 ms (5.66×) | 16.67 ms (1.75×) |
-| DAG_GNP_DENSE    | 6.25 ms  | 263.5 ms (42.1×) | 264.1 ms (42.2×) | 24.09 ms (3.85×) |
+#### Throughput @ 100k nodes (higher is better)
 
-### Memory — bytes per (node + edge)
+![SCC at n = 100k](graphity-benchmarks/reports/summary/fig/synthetic-ubuntu-ryzen-9950x/1-2-2-scc-n-100-000.svg)
 
-| Shape             | Graphity | JGraphT          | Guava            | WebGraph         |
-|-------------------|---------:|-----------------:|-----------------:|-----------------:|
-| GNP_SPARSE        | 4.00 B   | 212.40 B (53.1×) | 120.65 B (30.2×) | 2.38 B (0.59×)   |
-| GNP_DENSE         | 4.00 B   | 219.51 B (54.9×) | 108.63 B (27.2×) | 2.07 B (0.52×)   |
-| TREE              | 4.00 B   | 208.34 B (52.1×) | 137.73 B (34.4×) | 1.86 B (0.46×)   |
+### SCC on real-world graphs (SNAP datasets)
 
-For full results — all algorithms (`Build`, `Sccs`, `Wccs`, `Ccs`, `TopOrder`, `TopOrderAndLevels`, `BackEdges`, `EdgeTypes`), additional graph sizes, allocation counts per operation, shuffled variants, and confidence-interval analysis — see the v1.0 baseline report at [`graphity-benchmarks/baselines/1.0.md`](graphity-benchmarks/baselines/1.0.md).
+#### Times (ms/op, lower is better)
+
+| Dataset                                  | Graphity | JGraphT          | Guava            | WebGraph        |
+|------------------------------------------|---------:|-----------------:|-----------------:|----------------:|
+| web-Google (875k nodes, 5.1M edges)      | 41.0 ms  | 1265 ms (31×)    | 796 ms (19×)     | 235 ms (5.7×)   |
+| wiki-Talk (2.4M nodes, 5M edges)         | 59.8 ms  | 1539 ms (26×)    | 1556 ms (26×)    | 162 ms (2.7×)   |
+| soc-LiveJournal1 (4.8M nodes, 69M edges) | 1021 ms  | 23 907 ms (23×)  | 16 502 ms (16×)  | 4033 ms (4.0×)  |
+
+#### Throughput (higher is better)
+
+![SCC on real-world graphs](graphity-benchmarks/reports/summary/fig/realworld-ubuntu-ryzen-9950x/1-1-scc-real-world-graphs.svg)
+
+### Memory — bytes per node + edge (lower is better)
+
+| Shape      | Graphity | JGraphT          | Guava            | WebGraph         |
+|------------|---------:|-----------------:|-----------------:|-----------------:|
+| GNP sparse | 4.00 B   | 212.40 B (53×)   | 120.65 B (30×)   | 2.38 B (0.60×)   |
+| GNP dense  | 4.00 B   | 219.51 B (55×)   | 108.63 B (27×)   | 2.07 B (0.52×)   |
+| Tree       | 4.00 B   | 208.34 B (52×)   | 137.73 B (34×)   | 1.86 B (0.47×)   |
+
+For full results — all algorithms (`Build`, `Sccs`, `Wccs`, `Ccs`, `TopOrder`, `TopOrderAndLevels`, `BackEdges`, `EdgeTypes`), graph sizes from 10k to 100M nodes, allocation counts, shuffled variants, and confidence-interval analysis — see the benchmark reports:
+
+- **Synthetic:** [`graphity-benchmarks/reports/summary/synthetic-ubuntu-ryzen-9950x.md`](graphity-benchmarks/reports/summary/synthetic-ubuntu-ryzen-9950x.md)
+- **Real-world (SNAP datasets):** [`graphity-benchmarks/reports/summary/realworld-ubuntu-ryzen-9950x.md`](graphity-benchmarks/reports/summary/realworld-ubuntu-ryzen-9950x.md)
 
 ## Algorithms
 
@@ -148,20 +167,22 @@ Graphity ships the following algorithms out of the box. All of them return typed
 | Condensation DAG                                                | `sccs.condense()`             |
 | Subgraph extraction and node remapping                          | `Graphs.remapped(...)`        |
 
-For custom traversals, subclass `DfsTraverser` (or `BiAdjacentDfsTraverser` for combined in/out access). Multiple `run()` calls accumulate visited state, so two-phase walks compose without external bookkeeping.
+For custom traversals, subclass `IterativeDfsTraverser` (or `BiAdjacentDfsTraverser` for combined in/out access) — it keeps its DFS stack on the heap, so it handles arbitrarily deep graphs without any `-Xss` tuning. Override `enterNode(int)` for preorder and `leaveNode(int)` for postorder; return `false` from `enterNode` to prune a subtree. For edge-centric algorithms that must inspect back edges directly (e.g. a custom variant of Tarjan), use the recursive `DfsTraverser` instead. Multiple `run()` calls accumulate visited state, so two-phase walks compose without external bookkeeping.
 
 ## Limitations
 
-**DFS-based algorithms have a stack-size ceiling around n = 10⁶.** `Sccs`, `TopOrder`, `BackEdges`, `EdgeTypes` and the public `DfsTraverser` are recursive in 1.0. On long-DFS-path topologies (paths, deep trees) at n in the millions, the JVM stack overflows; the JVM `-Xss` cap (~1 GB) is not enough for the worst cases. Replacing recursion with explicit stacks — both internally and in a new iterative public traverser API — is the headline item for 1.1. Until then, treat 10⁶ as the upper safe range for DFS-driven analysis. GNP-shaped graphs at that size are fine because their recursion depth is logarithmic.
+**Scope: structural analysis, not weighted optimization.** Graphity works on pure topology — components, ordering, edge classification, condensation, remapping. Weights and capacities are deliberately outside the data model, and with them the optimization domains built on top: flows and cuts, matching and assignment, TSP, colouring. For those, JGraphT is the right tool and a good one.
 
-**On sparse graphs above 10⁶ nodes, WebGraph overtakes on runtime.** At n = 1 000 000 on `GNP_SPARSE`, WebGraph's SCC is roughly 1.8× faster than Graphity's, and topological order is roughly tied. The cross-over is real and is driven by `bytes/edge` cache traffic — WebGraph's compressed BVGraph format pays off above a certain density and node count. Graphity 1.0 does not optimise for this corner; whether 1.1 should is on the open agenda. On dense graphs at 10⁶ Graphity still wins comfortably.
+**Memory compactness: WebGraph uses less memory.** Graphity stores 4 B per (node + edge) — constant regardless of topology. WebGraph's compressed BVGraph format achieves 0.9–2.4 B per element by exploiting locality and delta coding. On memory-limited machines with very large graphs, that difference matters. Graphity does not target this corner; its CSR layout is optimised for fast random access, not compression.
 
 ## Documentation
 
-This README is the primary user-facing documentation for 1.0 and 1.1; the API reference is a Javadoc site.
+This README is the primary user-facing documentation. The API reference is a Javadoc site.
 
-- **API reference (Javadoc):** [kobayami.github.io/graphity](https://kobayami.github.io/graphity/). Currently tracks `main`; from 1.0.0 onward each release tag updates the published Javadoc.
-- **Benchmark baseline (v1.0):** [`graphity-benchmarks/baselines/1.0.md`](graphity-benchmarks/baselines/1.0.md) — per-shape, per-algorithm performance, memory and allocation tables against JGraphT, Guava and WebGraph, with confidence-interval data.
+- **API reference (Javadoc):** [kaufco.github.io/graphity](https://kaufco.github.io/graphity/). Tracks `main`; every release tag republishes it.
+- **Synthetic benchmark report:** [`graphity-benchmarks/reports/summary/synthetic-ubuntu-ryzen-9950x.md`](graphity-benchmarks/reports/summary/synthetic-ubuntu-ryzen-9950x.md) — per-shape, per-algorithm timings and throughput against JGraphT, Guava and WebGraph, plus memory and allocation chapters, with bar charts and a column per measured version.
+- **Real-world benchmark report:** [`graphity-benchmarks/reports/summary/realworld-ubuntu-ryzen-9950x.md`](graphity-benchmarks/reports/summary/realworld-ubuntu-ryzen-9950x.md) — SCC, BackEdges and EdgeTypes across five SNAP datasets up to 4.8M nodes.
+- **Changelog:** [CHANGELOG.md](CHANGELOG.md)
 
 ## Building, testing, and benchmarking from source
 
@@ -185,13 +206,52 @@ mvn test
 
 ### Benchmarks
 
+The benchmark runner is a single script with a three-step workflow: **clean → run → report**. All commands are subcommands of `run-benchmarks.sh`; run `./run-benchmarks.sh --help` for the full reference.
+
 ```bash
 mvn package -DskipTests
-./graphity-benchmarks/run-benchmarks.sh all quick
-./graphity-benchmarks/run-benchmarks.sh all full
+cd graphity-benchmarks
+
+# 1 — clear scratch output from previous runs
+./run-benchmarks.sh clean
+
+# 2 — run the benchmarks (synthetic and/or real-world).
+#     Pass a single library or 'all'. Running one library at a time means a
+#     slow or crashing peer can never block the whole run.
+./run-benchmarks.sh synthetic all          # all libraries, synthetic graphs
+./run-benchmarks.sh realworld all          # all libraries, real-world graphs
+./run-benchmarks.sh synthetic graphity     # graphity only, synthetic graphs
+
+#     To run all benchmarks (~3 h total):
+./run-benchmarks.sh bench
+
+# 3 — report measured results into the versioned reports/ folder
+./run-benchmarks.sh report                 # report as current graphity version
+./run-benchmarks.sh report 2.1.0           # report as a specific version
 ```
 
-`quick` is a minute-scale developer loop, `full` runs the full synthetic matrix and is hours-scale. For all profiles, JMH parameters, dataset support and the matrix schema, see [`graphity-benchmarks/README.md`](graphity-benchmarks/README.md).
+`synthetic` and `realworld` accept a library (`graphity`, `graphity-reordered`, `jgrapht`, `guava`, `webgraph`) or `all`. Each run writes JSON artifacts to `graphity-benchmarks/measurements/` (gitignored); `report` merges them, promotes to `reports/versions/<version>-<kind>-<machine>.md`, and regenerates the combined summary.
+
+**Profiles.** By default `synthetic` uses the `full` matrix (n = 10k and 100k, all libraries; hours-scale) and `realworld` uses `realworld`. Override with `--profile`:
+
+```bash
+./run-benchmarks.sh synthetic all --profile quick           # minute-scale dev loop
+./run-benchmarks.sh synthetic all --profile big             # n = 1M, 10M, 100M (sparse)
+./run-benchmarks.sh realworld all --profile realworld-quick # web-Google only, smoke run
+```
+
+- **`big`** covers n = 1M, 10M and (sparse-only) 100M and is **Graphity-only**: at n ≥ 1M the generalist peers' object graphs and WebGraph's in-RAM build path run out of memory or overflow the stack, whereas Graphity's algorithm cores are iterative.
+- Each traversal algorithm is additionally run on a DFS-preorder reordered copy of the graph — reported as the **`Graphity (reordered)`** column — and the one-time reorder cost is captured by the graphity-only `reorder` algorithm.
+
+**Real-world datasets** are not versioned in git; fetch them once before the first `realworld` run:
+
+```bash
+./datasets/download-datasets.sh   # web-Google, wiki-Talk, soc-LiveJournal1, …
+```
+
+**Reports.** Promoted results land in `reports/versions/` as `<version>-<kind>-<machine>.md` source files. The summary view (`reports/summary/<kind>-<machine>.md`) is regenerated automatically from all source files present — historical data from previous versions is never lost. Both reports and chart SVGs are committed to the repository.
+
+For JMH parameters, dataset support and the matrix schema, see [`graphity-benchmarks/README.md`](graphity-benchmarks/README.md).
 
 ## License
 
@@ -199,4 +259,4 @@ Graphity is licensed under the [Apache License, Version 2.0](LICENSE).
 
 Copyright 2025–2026 Marco Kaufmann.
 
-Forks and modifications are welcome under the terms of the license. The name "Graphity" refers to the original project at https://github.com/kobayami/graphity; please pick a different name for any redistributed version. See [`NOTICE`](NOTICE).
+Forks and modifications are welcome under the terms of the license. The name "Graphity" refers to the original project at https://github.com/kaufco/graphity; please pick a different name for any redistributed version. See [`NOTICE`](NOTICE).

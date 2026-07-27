@@ -133,6 +133,10 @@ public final class ValidateMain {
       case "build" -> {
         // No semantic output to cross-validate here.
       }
+      case "reorder" -> {
+        // Pure structural transform; correctness of dfsReordered is covered by the
+        // NodeMapping/Graphs unit tests. Nothing to cross-validate here.
+      }
       case "scc" -> validateScc(libraries, template, wgTmpRoot);
       case "wcc" -> validateWcc(template);
       case "ccs" -> validateCcs(template);

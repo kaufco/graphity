@@ -12,64 +12,94 @@ From the repository root:
 
 ```bash
 mvn package -DskipTests
-./graphity-benchmarks/run-benchmarks.sh all quick
+cd graphity-benchmarks
+./run-benchmarks.sh clean                        # start from a clean measurements/ dir
+./run-benchmarks.sh synthetic all --profile quick
+./run-benchmarks.sh report                       # → measurements/report-synthetic-*.md, then promoted to reports/
 ```
 
-This builds the benchmark JAR and runs the smallest shipped profile (`quick`, minute-scale) end to end through all four phases. Output is stored in `graphity-benchmarks/results/`.
+This builds the benchmark JAR and runs the smallest synthetic profile (`quick`, minute-scale) through all measurement phases, aggregates a Markdown report, and updates the versioned baseline archive. Output is stored in `graphity-benchmarks/measurements/` (gitignored scratch) and `graphity-benchmarks/reports/` (versioned).
 
-Requires JDK 21 or newer (same as the main library), Maven, and `python3` on `PATH` (used by the runner for matrix validation and JMH-JSON aggregation).
+Requires JDK 21 or newer (same as the main library), Maven, and `python3` on `PATH` (used by the runner for matrix validation, JMH-JSON aggregation, and report post-processing).
 
 ## What gets measured
 
-A benchmark run is divided into four phases. The `all` subcommand runs them in sequence; each can also be invoked on its own.
+Each run command executes several measurement phases per matrix case:
 
 | Phase    | Tool             | Output         | What it captures                                          |
 |----------|------------------|----------------|-----------------------------------------------------------|
 | `perf`   | JMH              | `perf-*.json`  | Wall-time per operation, with confidence intervals        |
 | `alloc`  | JMH (`-prof gc`) | `alloc-*.json` | Allocations per operation (bytes, GC-profiler-sampled)    |
 | `mem`    | JOL              | `mem-*.csv`    | Retained heap footprint of a built graph object           |
-| `report` | aggregator       | `report-*.md`  | Combines the latest `perf` / `alloc` / `mem` to Markdown  |
 
-Performance and allocation runs are intentionally separate: the `-prof gc` instrumentation distorts wall-time numbers, so it is never enabled during `perf`. Memory measurement uses [JOL](https://github.com/openjdk/jol) for precise retained-size accounting and runs in its own JVM.
+Performance and allocation are measured separately: the `-prof gc` instrumentation distorts wall-time numbers, so it is never enabled during `perf`. Memory measurement uses [JOL](https://github.com/openjdk/jol) for precise retained-size accounting and runs in its own JVM. Which phases a case runs is declared in the matrix (`"phases"`); the real-world dataset profiles are perf-only.
 
 Both `perf` and `alloc` are preceded by a fail-fast `validate` phase that rejects invalid library / algorithm / shape combinations. Long runs never start on a broken matrix.
 
-## Subcommands
+## Commands
+
+The runner is a single script with a three-step workflow — **clean → run → report**:
 
 ```text
-./run-benchmarks.sh <subcommand> <profile>
+./run-benchmarks.sh <command> [args]
 ```
 
-| Subcommand | Effect                                                              |
-|------------|---------------------------------------------------------------------|
-| `perf`     | Runtime measurement (JMH) for all matrix cases                      |
-| `alloc`    | Allocation measurement (JMH `-prof gc`)                             |
-| `mem`      | Memory footprint measurement (JOL)                                  |
-| `report`   | Aggregate the latest existing `perf` / `alloc` / `mem` outputs to Markdown |
-| `all`      | `perf` → `alloc` → `mem` → `report`, in that order                  |
+| Command                        | Effect                                                                                              |
+|--------------------------------|-----------------------------------------------------------------------------------------------------|
+| `clean`                        | Delete run artifacts (JSON/CSV/MD/log) from `measurements/`                                              |
+| `bench`                        | Run all phases in sequence: `synthetic full` → `synthetic big` → `realworld` (~3 h total).         |
+|                                | Skips realworld if no dataset files are found under `datasets/`.                                    |
+| `synthetic <lib\|all>`         | `perf`+`alloc`+`mem` on synthetic graphs (default profile: `full`)                                  |
+| `realworld <lib\|all>`         | `perf` on real-world SNAP datasets (default profile: `realworld`)                                   |
+| `report [version] [machine]`   | Merge JSON → times Markdown → promote to `reports/versions/` → regenerate summary report + chart SVGs.    |
+|                                | Version defaults to the `pom.xml` value (SNAPSHOT suffix stripped); machine is auto-derived.        |
 
-The `report` subcommand does not re-run benchmarks; it requires that at least one upstream phase has already produced output for the given profile.
+`report` does not re-run benchmarks; it aggregates whatever JSON is present in `measurements/`. Because it merges per benchmark (newest run wins), running libraries separately and then calling `report` once produces a single combined report. `report` then copies the result into the versioned `reports/` archive and regenerates the per-machine combined Markdown with embedded Times and Ops tables and chart SVGs.
+
+### Running one library at a time
+
+`synthetic` and `realworld` take a single library or `all`. Running peers one at a time means a single slow or crashing library can never block the whole run — useful on large real-world graphs where the recursive peers can be orders of magnitude slower than Graphity, or overflow the stack entirely. (A crashing library no longer blocks anything even within a single `all` run — see [Resuming after a crash or interruption](#resuming-after-a-crash-or-interruption) — but splitting by library is still the only way to avoid *waiting* on a much slower peer.)
+
+```bash
+./run-benchmarks.sh realworld graphity            # plain Graphity + reorder cost
+./run-benchmarks.sh realworld graphity-reordered  # the "Graphity (reordered)" column
+./run-benchmarks.sh realworld webgraph            # then each peer on its own
+./run-benchmarks.sh realworld jgrapht
+./run-benchmarks.sh report                        # merges all of the above into one report
+```
+
+Supported libraries: `graphity`, `graphity-reordered`, `jgrapht`, `guava`, `webgraph`, or `all`. The value matches library tokens exactly, so `graphity` runs the plain-Graphity cases (and, in the dataset profiles, the `reorder`-cost case) but **not** the reordered variant — pass `graphity-reordered` for the `Graphity (reordered)` column. `all` runs everything in one go.
 
 ## Built-in profiles
 
-`<profile>` is resolved as `benchmark-matrix/<profile>.json` (a name) or as a path to any JSON file (relative or absolute). The shipped profiles cover the common scopes:
+By default `synthetic` uses `full` and `realworld` uses `realworld`. Override with `--profile <name>`, resolved as `benchmark-matrix/<name>.json` (a name) or as a path to any JSON file. The shipped profiles cover the common scopes:
 
-| Profile          | Scope                                              | Typical wall time |
-|------------------|----------------------------------------------------|-------------------|
-| `quick`          | small synthetic loop, n = 10⁴ and 10⁵              | minutes           |
-| `full`           | full synthetic matrix, all shapes and sizes        | hours             |
-| `full-big-graph` | n = 10⁶ and 10⁷, `graphity` + `webgraph` only      | hours             |
-| `dataset-quick`  | smoke run on a small SNAP dataset                  | minutes           |
-| `dataset-full`   | broader real-world SNAP coverage                   | hours             |
+| Profile           | Command                                                 | Libraries             | n-values / scope                  | Phases     | Typical wall time |
+|-------------------|---------------------------------------------------------|-----------------------|-----------------------------------|------------|-------------------|
+| `quick`           | `synthetic all --profile quick`                         | all                   | 10⁴, 10⁵                          | perf+alloc | minutes           |
+| `full`            | `synthetic all`                                         | all                   | 10⁴, 10⁵                          | perf+alloc | hours             |
+| `big`             | `synthetic all --profile big`                           | Graphity + reordered  | 10⁶, 10⁷, (sparse-only) 10⁸       | perf       | hours             |
+| `realworld-quick` | `realworld all --profile realworld-quick`               | all                   | web-Google only                   | perf       | minutes           |
+| `realworld`       | `realworld all`                                         | all                   | broader SNAP coverage             | perf       | hours             |
 
-Above roughly n = 10⁶, only `graphity` and `webgraph` finish in reasonable time on input volume alone; the large profiles default to that pairing.
+A **complete baseline** for one machine requires two synthetic profiles plus the real-world run:
+
+```
+full  →  n = 10⁴/10⁵, all libraries, perf + alloc + mem
+big   →  n = 10⁶/10⁷/10⁸, Graphity + reordered only, perf
+```
+
+Use `bench` to run all three in one go (see [Commands](#commands)).
+
+- **`big`** is Graphity-only: at n ≥ 10⁶ the generalist peers (JGraphT/Guava object graphs) and WebGraph's in-RAM `ArrayListMutableGraph` build path run out of memory, and the peers' recursive DFS reference wrappers overflow the stack, whereas Graphity's algorithm cores are iterative. The 10⁸ tier is sparse-only because Graphity's int-indexed CSR caps out-adjacency at ~2.1 B edges. Each traversal algorithm is also run on a DFS-preorder reordered copy (see [Reordering](#reordering-graphity-reordered-and-reorder)).
+- **`realworld` / `realworld-quick`** run on real-world edge lists — see [Real-world graphs](#real-world-graphs-a-separate-run).
 
 ## Custom matrices
 
-A matrix is plain JSON. Pass an explicit path to use a custom one:
+A matrix is plain JSON. Pass an explicit path via `--profile` to use a custom one:
 
 ```bash
-./run-benchmarks.sh all ./graphity-benchmarks/benchmark-matrix/my-profile.json
+./run-benchmarks.sh synthetic all --profile ./benchmark-matrix/my-profile.json
 ```
 
 Minimal example:
@@ -125,13 +155,15 @@ Dataset paths support `~` expansion and `${ENV}` variables; relative paths resol
 
 ### Supported strings
 
-| Field        | Values                                                                                  |
-|--------------|-----------------------------------------------------------------------------------------|
-| `libraries`  | `graphity`, `jgrapht`, `guava`, `webgraph`                                              |
-| `algorithms` | `build`, `scc`, `wcc`, `ccs`, `toporder`, `toporderandlevels`, `backedges`, `edgetypes` |
-| `shape`      | see [Shapes](#shapes) below                                                             |
+| Field        | Values                                                                                            |
+|--------------|---------------------------------------------------------------------------------------------------|
+| `libraries`  | `graphity`, `graphity-reordered`, `jgrapht`, `guava`, `webgraph`                                   |
+| `algorithms` | `build`, `scc`, `wcc`, `ccs`, `toporder`, `toporderandlevels`, `backedges`, `edgetypes`, `reorder` |
+| `shape`      | see [Shapes](#shapes) below                                                                        |
 
-Algorithm coverage is asymmetric: only `graphity` implements `wcc`, `ccs` and `toporderandlevels` natively. The matrix validator rejects unsupported library / algorithm pairings before any run starts.
+Algorithm coverage is asymmetric: only `graphity` (and its `graphity-reordered` variant) implements `wcc`, `ccs` and `toporderandlevels` natively; `reorder` is `graphity`-only. `graphity-reordered` supports the traversal algorithms but not `build`. The matrix validator rejects unsupported library / algorithm pairings before any run starts.
+
+See [Reordering](#reordering-graphity-reordered-and-reorder) for what `graphity-reordered` and `reorder` mean.
 
 ### Shapes
 
@@ -160,8 +192,18 @@ Shuffled variants (`*_SHUFFLED`) take the corresponding base shape and randomise
 | `measurement_iterations` | Iterations the score is averaged over                  |
 | `measurement_time`       | Time per measurement iteration (e.g. `2s`)             |
 | `jvm_stack`              | `-Xss` value passed to the JMH JVM (e.g. `-Xss16m`)    |
+| `jvm_heap`               | optional `-Xmx` value passed to the JVM (e.g. `-Xmx64g`) |
 
 Practical defaults: `forks = 0` and short windows for fast feedback during development; `forks = 1` (or higher) and longer windows when comparing libraries.
+
+## Reordering (`graphity-reordered` and `reorder`)
+
+Graphity can permute node IDs into DFS-preorder (`Graphs.dfsReordered(graph)`), which gives cache-friendly adjacency for the random `state[v]` accesses that dominate DFS-based algorithms. The benchmark suite measures this in two ways:
+
+- **`graphity-reordered`** is a *pseudo-library*: it runs the identical Graphity algorithm on a reordered copy of the graph and appears as a separate **`Graphity (reordered)`** column next to `Graphity`. Its ratio is relative to the `Graphity` baseline, so `0.50×` means the reordered run is twice as fast. It is kept as a dedicated JMH state so reordered and as-built runs never warm each other up; the one-time reordering itself is excluded from the measured algorithm.
+- **`reorder`** is a `graphity`-only algorithm that measures exactly that one-time cost (`Graphs.dfsReordered`), reported in its own subsection. Compare it against the per-algorithm savings to judge amortization: reordering only pays off when the layout is poor *and* the graph is traversed several times.
+
+Reordering is a no-op on already ID-local shapes (`PATH`, `TREE`, `CHAIN_OF_CLIQUES`) and helps most on `GNP_*` and `*_SHUFFLED`. To keep runtime in check, the `big` profile restricts the reordered/`reorder` cases to two representative shapes (`GNP_SPARSE`, `GNP_DENSE_SHUFFLED`).
 
 ## Datasets
 
@@ -178,29 +220,84 @@ Common sources:
 - [SNAP](https://snap.stanford.edu/data/) — Stanford Network Analysis Platform datasets
 - [LAW / WebGraph](http://law.di.unimi.it/datasets.php) — large web graphs
 
-The shipped `dataset-quick` and `dataset-full` profiles reference SNAP files under `datasets/`. Quick setup from the module directory:
+### Real-world graphs (a separate run)
+
+Real-world benchmarking is its own run via the `realworld` command, independent of the synthetic profiles. The shipped `realworld-quick` and `realworld` profiles reference SNAP files under `datasets/`. The datasets are not versioned in git; fetch them once, then run:
 
 ```bash
 cd graphity-benchmarks
-./datasets/download-datasets.sh
-./run-benchmarks.sh all dataset-quick
+./datasets/download-datasets.sh          # web-Google, wiki-Talk, soc-LiveJournal1, cit-Patents, cit-HepPh
+./run-benchmarks.sh realworld all        # or: realworld all --profile realworld-quick (web-Google only)
+./run-benchmarks.sh report
 ```
 
-The shipped dataset profiles intentionally exclude `toporder` and `toporderandlevels` — public SNAP graphs are typically not acyclic after normalization, so DAG-only algorithms cannot be measured on them without further preprocessing.
+The `realworld` profile runs `scc`, `backedges` and `edgetypes` across all libraries on all five datasets, plus the `Graphity (reordered)` column and the `reorder` cost (see [Reordering](#reordering-graphity-reordered-and-reorder)) — so the reordering payoff can be read directly on irregular real inputs, where node IDs are typically not ID-local. `realworld-quick` runs the same cases restricted to `web-Google` only, as a fast smoke test. In the aggregated report the real-world results form their own chapter, with one row per dataset (instead of per shape). The run writes to `measurements/report-realworld-*.md` (times) and is promoted to `reports/versions/` by `report`.
+
+The shipped dataset profiles intentionally exclude `toporder` and `toporderandlevels` — public SNAP graphs are typically not acyclic after normalization, so DAG-only algorithms cannot be measured on them without further preprocessing. This applies to all five datasets, including the two citation networks (`cit-Patents`, `cit-HepPh`), which are close to a DAG by construction (papers/patents only cite earlier ones) but are not guaranteed acyclic after ID normalization — they are still run with `dag: false` and excluded from the DAG-only algorithms.
+
+#### Peer stack sizes on large graphs (`jvm_stack` / `jvm_heap`)
+
+The peer libraries use **recursive** DFS — JGraphT's `KosarajuStrongConnectivityInspector`, the Guava SCC port, and WebGraph's own `StronglyConnectedComponents` (whose Javadoc literally advises setting "a large stack size"). On a deep, large graph like `soc-LiveJournal1` (4.8M nodes) they overflow the default JVM stack. Graphity's cores are iterative and need none of this, but a mixed-library run has to satisfy the peers. Measured minimums to complete SCC on `soc-LiveJournal1`:
+
+| Library  | min `-Xss` | notes                                   |
+|----------|-----------:|-----------------------------------------|
+| Graphity | (default)  | iterative — stack-safe at any depth     |
+| JGraphT  | 16m        | recursive, but shallower recursion here |
+| WebGraph | 256m       | recursive; overflows ≤ 128m             |
+| Guava    | 512m       | recursive; overflows ≤ 256m             |
+
+`realworld` therefore ships with `jvm_stack: -Xss512m` and `jvm_heap: -Xmx64g` (the combined four-library cross-validation of `soc-LiveJournal1`, the largest of the five datasets, peaks at ~38 GB RSS). `realworld-quick` (only `web-Google`) stays at the default `-Xss16m`. For even deeper graphs the recursive peers fail at any `-Xss`, while Graphity keeps running — see the iterative-algorithms note in the main [`README.md`](../README.md#what-graphity-gives-you).
 
 ## Output and reports
 
-All output is stored in `graphity-benchmarks/results/` with the filename pattern `<phase>-<profile>-<timestamp>`. The aggregated report (`report-*.md`) contains:
+There are two levels of output: the **scratch** `measurements/` directory (gitignored) and the **curated** `reports/` directory (versioned, committed).
+
+### Scratch: `measurements/`
+
+`synthetic`/`realworld` runs land in `graphity-benchmarks/measurements/` as one file per matrix case: `<phase>-<profile>@<case>__<algorithm>__<libraries>.json` (and one `mem-<profile>@<libraries>.csv` per `mem` run) — no timestamp in these filenames; see [Resuming after a crash or interruption](#resuming-after-a-crash-or-interruption) below for why. `report` reads all of a profile's case files and turns them into a times Markdown report, `report-<profile>-<ts>.md` — this one *is* timestamped, with the time `report` itself was run. The times report contains:
 
 - an environment header (host, kernel, JVM, CPU, RAM, JMH parameters)
-- a performance section per algorithm — rows are graph shapes, columns are libraries
+- a performance section per algorithm — rows are graph shapes, columns are libraries (with a separate `Graphity (reordered)` column when the matrix runs `graphity-reordered`)
+- a separate real-world chapter for dataset runs, with one row per dataset instead of per shape
 - a memory-footprint section in *bytes per (node + edge)*
 - an allocation section in bytes per call
 - a precision summary that lists relative confidence-interval widths, sorted by descending error
 
-Numbers in cells follow the format `value (factor×)`, where the factor is relative to Graphity. Larger factors mean slower or heavier than Graphity in that cell.
+Numbers in cells follow the format `value (factor×)`, where the factor is relative to Graphity.
 
-Reports are not committed to the Graphity repository; they are produced on demand and live in the local `results/` directory.
+### Resuming after a crash or interruption
+
+`synthetic` and `realworld` runs are resumable at the granularity of a matrix **case** (the same unit the matrix file itself is organized into — e.g. `full.json`'s "build" case covers one algorithm across all its libraries and shapes/nodeCounts in a single JMH invocation, exactly as before this feature existed). The rule is simple: **a case whose JSON file already exists in `measurements/` is skipped; only cases without a file there actually run.** There is no separate cache directory — the files in `measurements/` themselves are both the result and the "already done" record.
+
+This only works because the filename is stable across invocations (`<phase>-<profile>@<case>__<algorithm>__<libraries>.json` — no timestamp, no run ID) and because it only ever appears once the case is actually finished: the `java` invocation writes to a temp path first, and only a successful run gets renamed into that final name. A killed process (crash, OOM, `Ctrl-C`) never leaves a half-written file under the name that resume logic checks for.
+
+In practice:
+
+- Interrupting a multi-hour `bench` run and re-running the same command later only redoes whatever file is still missing — not the whole run.
+- A crashing or OOM-killed library no longer aborts the rest of the run: that one case is marked failed and the run continues with everything else. `run-benchmarks.sh` lists every failed case at the end and exits non-zero, but only after attempting all of them.
+- Deleting a specific case's JSON file by hand (e.g. because you suspect it's stale) makes exactly that case rerun next time; everything else is left alone.
+- **A full rerun from scratch requires `clean` first.** Nothing detects "the matrix or its `jmh` settings changed since last time" — if you edit a profile's `forks`/`warmup`/`measurement`/`stack`/`heap` (or its cases) between two runs and don't `clean`, the leftover files from the old settings are silently reused as "already done". `measurements/` is scratch and gitignored specifically so `clean` is always a cheap, safe reset.
+
+Each case's JSON file carries a `measuredAt` (ISO 8601 UTC) field on every entry, added right before the atomic rename — the filename itself has no timestamp, but the data does. (`mem`'s CSV output has no equivalent column; the CSV file's own mtime is the only provenance there.) The date shown in a generated report's header is unrelated to this: it's simply when `report` itself was run.
+
+Caveat: the filename also encodes the library filter actually used for that invocation (see [Running one library at a time](#running-one-library-at-a-time)). Running a case as `all` and later re-running it with a narrower `--lib`/positional filter (or vice versa) produces a differently-named file and reruns rather than reusing a partial match — keep the library filter consistent across resume attempts of what's meant to be "the same" run.
+
+### Curated: `reports/`
+
+`report [version]` copies the newest `measurements/` report into the versioned archive, auto-deriving the machine slug from the report's CPU/OS header (override with a second argument):
+
+- synthetic runs → `reports/versions/<version>-synthetic-<machine>.md`
+- real-world runs → `reports/versions/<version>-realworld-<machine>.md`
+
+It then immediately regenerates the per-machine combined report:
+
+- `reports/summary/synthetic-<machine>.md` — comparison across all Graphity versions and peers, with per-subsection **Times (ms/op)** and **Throughput (op/s)** tables plus bar-chart SVGs; includes memory and allocation chapters
+- `reports/summary/realworld-<machine>.md` — same layout for real-world graphs (datasets as rows; performance only)
+- `reports/summary/fig/<kind>-<machine>/` — chart SVGs linked from the combined Markdown
+
+Previous versions' data is never lost: the combined report is generated from all `<version>-<machine>.md` source files present in the directory, so adding a new version just adds columns.
+
+Only `reports/` is committed; `measurements/` is scratch and gitignored.
 
 ## Variance at large n
 

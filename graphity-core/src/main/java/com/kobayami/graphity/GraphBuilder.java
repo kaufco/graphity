@@ -18,7 +18,7 @@ import java.util.Arrays;
  * {@link Graphs#remapped(Graph, NodeMapping)} with {@link NodeMapping#forSubgraph(java.util.BitSet)}.
  * <p>
  * Calling {@link #build()} produces an immutable {@link Graph} with sorted, deduplicated
- * adjacency lists. The builder is <strong>not consumed</strong> — further modifications and
+ * adjacency lists. The builder is <strong>not consumed</strong> - further modifications and
  * subsequent builds are allowed.
  *
  * <pre>{@code
@@ -36,17 +36,9 @@ import java.util.Arrays;
  * int off2 = merger.addGraph(graph2);
  * merger.addEdge(off1 + nodeA, off2 + nodeB);
  * Graph merged = merger.build();
- *
- * // Copy edges from existing graph (zero-copy via IntList)
- * var builder = new GraphBuilder();
- * builder.addNodes(oldGraph.nodeCount());
- * for (int node = 0; node < oldGraph.nodeCount(); node++) {
- *     builder.addEdges(node, oldGraph.outNodes(node));
- * }
- * Graph copy = builder.build();
  * }</pre>
  *
- * <p>Edge node references are validated via {@code assert} statements — enable assertions
+ * <p>Edge node references are validated via {@code assert} statements - enable assertions
  * ({@code -ea}) during development to catch invalid node references. In production,
  * assertions are disabled and validation has zero cost.
  *
@@ -67,13 +59,13 @@ public final class GraphBuilder {
     this.edgeTargets = new IntArrayList();
   }
 
-  // ---- Nodes ----
-
   /**
    * Adds a single node and returns its ID.
    * Node IDs are assigned sequentially starting from 0.
+   * <p>
+   * <strong>Time:</strong> O(1).
    *
-   * @return the ID of the new node
+   * @return new node ID
    */
   public int addNode() {
     return nodeCount++;
@@ -82,9 +74,11 @@ public final class GraphBuilder {
   /**
    * Adds {@code count} nodes and returns the ID of the first added node.
    * The added nodes have IDs {@code firstId..firstId+count-1}.
+   * <p>
+   * <strong>Time:</strong> O(1).
    *
    * @param count number of nodes to add (must be ≥ 0)
-   * @return the ID of the first added node
+   * @return first added node ID
    * @throws IllegalArgumentException if {@code count} is negative
    */
   public int addNodes(int count) {
@@ -94,14 +88,14 @@ public final class GraphBuilder {
     return firstId;
   }
 
-  // ---- Edges ----
-
   /**
    * Adds a directed edge from {@code source} to {@code target}.
    * Both nodes must already exist (checked via assertions).
    * <p>
-   * Duplicate edges are allowed during building — they are deduplicated when
+   * Duplicate edges are allowed during building - they are deduplicated when
    * {@link #build()} is called.
+   * <p>
+   * <strong>Time:</strong> O(1) amortized.
    *
    * @param source source node ID
    * @param target target node ID
@@ -120,7 +114,9 @@ public final class GraphBuilder {
    * All nodes must already exist (checked via assertions).
    * <p>
    * Accepts any {@link IntList}, including {@link SortedIntView} from
-   * {@link Graph#outNodes(int)} — enabling zero-copy edge transfer from existing graphs.
+   * {@link Graph#outNodes(int)} - enabling zero-copy edge transfer from existing graphs.
+   * <p>
+   * <strong>Time:</strong> O(k) where k = {@code targets.size()}.
    *
    * @param source  source node ID
    * @param targets list of target node IDs
@@ -139,8 +135,6 @@ public final class GraphBuilder {
       edgeTargets.add(target);
     }
   }
-
-  // ---- Graph import ----
 
   /**
    * Adds all nodes and edges of the given graph to this builder.
@@ -177,16 +171,14 @@ public final class GraphBuilder {
     return offset;
   }
 
-  // ---- Build ----
-
   /**
    * Builds an immutable {@link Graph} from the current state.
    * <p>
    * Adjacency lists are sorted ascending and deduplicated (duplicate edges are silently
-   * removed). The builder is not consumed — further modifications and subsequent builds
+   * removed). The builder is not consumed - further modifications and subsequent builds
    * are allowed.
    * <p>
-   * <strong>Time:</strong> O(nodeCount + edgeCount × log d̄) where d̄ is the average
+   * <strong>Time:</strong> O(nodeCount + edgeCount x log d̄) where d̄ is the average
    * out-degree (sorting per node).<br>
    * <strong>Memory:</strong> O(nodeCount + edgeCount) for the result.
    *

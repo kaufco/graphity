@@ -6,22 +6,23 @@ import java.util.Arrays;
  * Abstract base for unidirectional index mappings between two ID spaces.
  * <p>
  * Maps source indices to target indices. A target value of {@code -1} indicates that
- * the source index has no mapping (partial mapping). Use {@link #inverse()} to create
- * the reverse mapping.
+ * the source index has no mapping (partial mapping). Inversion is defined only on the
+ * invertible subclasses ({@link NodeMapping#inverse()}, {@link EdgeMapping#inverse()}),
+ * not on partitions, which are many-to-one.
  * <p>
- * Concrete subclasses provide domain-specific semantics:
- * <ul>
- *   <li>{@link NodeMapping} — maps between node ID spaces</li>
- *   <li>{@link EdgeMapping} — maps between edge index spaces</li>
- * </ul>
+ * {@link NodeMapping} and {@link EdgeMapping} specialize this base with one-to-one,
+ * invertible mapping semantics, for node ID spaces and edge index spaces respectively.
+ * {@link NodePartition} and {@link EdgePartition} specialize it with many-to-one
+ * partition semantics instead, and additionally implement {@link IndexPartition} for
+ * reverse (group → indices) lookup.
  * <p>
- * For partition mappings (many-to-one), see {@link IndexPartition}.
+ * <strong>Memory:</strong> 4 x (source space size) bytes for the backing {@link #mapping} array.
  *
  * @see NodeMapping
  * @see EdgeMapping
  * @see IndexPartition
  */
-public abstract sealed class IndexMapping permits NodeMapping, EdgeMapping {
+public abstract sealed class IndexMapping permits NodeMapping, EdgeMapping, NodePartition, EdgePartition {
 
   /** Source-to-target mapping. {@code mapping[sourceId] = targetId}, or {@code -1} if unmapped. */
   final int[] mapping;
@@ -32,7 +33,7 @@ public abstract sealed class IndexMapping permits NodeMapping, EdgeMapping {
   /**
    * Package-private constructor. Used by factory methods and subclasses.
    *
-   * @param mapping    the mapping array (not copied — caller must not retain a reference)
+   * @param mapping    the mapping array (not copied - caller must not retain a reference)
    * @param validCount number of non-negative entries in {@code mapping}
    * @param partial    whether the mapping contains unmapped entries ({@code -1})
    */
@@ -41,8 +42,6 @@ public abstract sealed class IndexMapping permits NodeMapping, EdgeMapping {
     this.validCount = validCount;
     this.partial = partial;
   }
-
-  // ---- Read-only API ----
 
   /**
    * Returns the target index for the given source index, or {@code -1} if unmapped.
@@ -93,25 +92,10 @@ public abstract sealed class IndexMapping permits NodeMapping, EdgeMapping {
     return validCount;
   }
 
-  // ---- Abstract ----
-
-  /**
-   * Creates the inverse mapping (target → source).
-   * <p>
-   * Each target value in this mapping becomes a source in the inverse, and vice versa.
-   * If the inverse is partial (not all target-space indices are covered), unmapped indices
-   * map to {@code -1}.
-   *
-   * @return the inverse mapping
-   * @throws IllegalArgumentException if the mapping is not injective (cannot be inverted)
-   */
-  public abstract IndexMapping inverse();
-
-  // ---- Shared implementation utilities (package-private) ----
-
   /**
    * Computes the inverse of the given mapping array.
    *
+   * @param mapping the mapping array to invert
    * @return the inverse array, or empty array if input is empty or all-negative
    * @throws IllegalArgumentException if multiple sources map to the same target
    */

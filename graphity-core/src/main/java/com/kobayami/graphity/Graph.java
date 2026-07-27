@@ -14,7 +14,7 @@ import java.util.Objects;
  * Use {@code Graph} for algorithms that only need out-edges.
  * For in-edge access, obtain a {@link BiAdjacentGraph} via {@link #biAdjacentGraph()}.
  * <p>
- * <strong>Memory:</strong> 4 × (nodeCount + edgeCount) bytes.
+ * <strong>Memory:</strong> 4 x (nodeCount + edgeCount) bytes.
  *
  * @see BiAdjacentGraph
  */
@@ -103,6 +103,7 @@ public sealed class Graph permits BiAdjacentGraph {
 
   /**
    * Returns a zero-copy view of {@code node}'s out-nodes, sorted ascending.
+   * Out-nodes are the successors of {@code node} (targets of its outgoing edges).
    * <p>
    * <strong>Time:</strong> O(1).
    *
@@ -118,8 +119,6 @@ public sealed class Graph permits BiAdjacentGraph {
   int outAdjacencyEnd(int node) {
     return outAdjacencyStart[node + 1];
   }
-
-  // ---- Edge index API ----
 
   /**
    * Returns the edge index of the first out-edge of the given node.
@@ -229,12 +228,12 @@ public sealed class Graph permits BiAdjacentGraph {
   /**
    * Returns a {@link BiAdjacentGraph} with both in- and out-adjacency.
    * The result shares the out-adjacency data; only in-adjacency is newly computed.
-   * Not cached — store the result if needed across multiple calls.
+   * Not cached - store the result if needed across multiple calls.
    * <p>
    * If this graph is already a {@link BiAdjacentGraph}, returns {@code this} in O(1).
    * <p>
    * <strong>Time:</strong> O(nodeCount + edgeCount), or O(1) if already bi-adjacent.<br>
-   * <strong>Memory:</strong> +4 × (nodeCount + edgeCount) bytes, or none if already bi-adjacent.
+   * <strong>Memory:</strong> +4 x (nodeCount + edgeCount) bytes, or none if already bi-adjacent.
    *
    * @return a bi-adjacent graph with constant-time in- and out-node access
    */
@@ -291,9 +290,9 @@ public sealed class Graph permits BiAdjacentGraph {
    * Returns the transposed graph (all edge directions reversed).
    * <p>
    * <strong>Time:</strong> O(nodeCount + edgeCount)<br>
-   * <strong>Memory:</strong> 4 × (nodeCount + edgeCount) bytes.
+   * <strong>Memory:</strong> 4 x (nodeCount + edgeCount) bytes.
    *
-   * @return a graph with all edge directions reversed
+   * @return the transposed graph
    */
   public Graph transposed() {
     return biAdjacentGraph().transposed();
@@ -314,6 +313,11 @@ public sealed class Graph permits BiAdjacentGraph {
         && Arrays.equals(outAdjacency, other.outAdjacency);
   }
 
+  /**
+   * Hash code consistent with {@link #equals(Object)}, computed over nodes and edges.
+   * <p>
+   * <strong>Time:</strong> O(nodeCount + edgeCount).
+   */
   @Override
   public final int hashCode() {
     return 31 * Arrays.hashCode(outAdjacencyStart) + Arrays.hashCode(outAdjacency);

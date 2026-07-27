@@ -19,8 +19,8 @@ Thumbs.db
 .cursor/
 
 
-# Benchmark results
-graphity-benchmarks/results/
+# Benchmark raw measurements (gitignored scratch: JMH JSON, JOL CSV, intermediate MDs)
+graphity-benchmarks/measurements/
 
 # Local benchmark datasets (downloaded, not versioned)
 graphity-benchmarks/datasets/*

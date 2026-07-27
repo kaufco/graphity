@@ -67,11 +67,17 @@ import java.util.Objects;
  * processing. When {@code visitNode} returns, the enqueued children have not yet been visited.
  * <p>
  * {@code run} methods may be called <strong>multiple times</strong>, and freely combined
- * (e.g., {@code runFromRoots(); run(); runFromNodes(list)}). Already-visited nodes are
- * never revisited — the visited set is cumulative across calls.
+ * (e.g., {@code run(int); run(); runFromNodes(list)}). Already-visited nodes are
+ * never revisited - the visited set is cumulative across calls.
  * <p>
  * Subclasses may pre-mark nodes in {@link #visited} before calling a {@code run} method
- * to exclude them from traversal.
+ * to exclude them from traversal. This is useful for multi-phase algorithms, subgraph
+ * traversal, or interleaved multi-source exploration.
+ * <p>
+ * <strong>Memory:</strong> O(nodeCount) - the {@link #visited} bitset plus an internal
+ * frontier array. The frontier array is never trimmed: it retains every node visited
+ * across the traverser's lifetime, not just the currently active wave, though its size
+ * is still bounded by nodeCount since each node is enqueued at most once.
  *
  * @see DfsTraverser
  * @see Graph
@@ -84,15 +90,14 @@ public abstract class FrontierTraverser {
   protected final Graph graph;
 
   /**
-   * Tracks which nodes have been visited. Subclasses may pre-mark nodes before calling
-   * a {@code run} method to exclude them from traversal.
+   * Tracks which nodes have been visited. See the class doc for pre-marking nodes to
+   * exclude them from traversal.
    */
   protected final BitSet visited;
 
   private final IntArrayList frontier = new IntArrayList();
   private int cursor;
   private int level;
-  private int levelEnd;
 
   /**
    * Creates a traverser for the given graph.
@@ -197,7 +202,7 @@ public abstract class FrontierTraverser {
    * or pre-marked nodes). The level resets to 0 for each new tree.
    * <p>
    * May be called multiple times, and freely combined with other {@code run} methods.
-   * Each call continues from the current visited state — already-visited nodes are never revisited.
+   * Each call continues from the current visited state - already-visited nodes are never revisited.
    * <p>
    * <strong>Time:</strong> O(nodeCount + edgeCount).
    */
@@ -267,7 +272,7 @@ public abstract class FrontierTraverser {
   private void processFrontier() {
     level = 0;
     int levelStart = cursor;
-    levelEnd = frontier.size();
+    int levelEnd = frontier.size();
     while (cursor < frontier.size()) {
       if (cursor == levelEnd) {
         onLevelComplete(level);

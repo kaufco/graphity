@@ -35,4 +35,4 @@ echo "  ${SNAP_DIR}"
 echo
 echo "You can now run:"
 echo "  cd \"$(cd "${SCRIPT_DIR}/.." && pwd)\""
-echo "  ./run-benchmarks.sh perf dataset-quick"
+echo "  ./run-benchmarks.sh realworld all        # or: realworld all --profile realworld-quick (web-Google only)"

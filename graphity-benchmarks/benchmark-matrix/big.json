@@ -1,0 +1,201 @@
+{
+  "name": "big",
+  "description": "Large-graph scaling matrix: Graphity only (peers are dropped from 1M nodes up — JGraphT/Guava object graphs and WebGraph's in-RAM ArrayListMutableGraph build path OOM, and the peers' recursive DFS reference wrappers overflow the stack, whereas Graphity's cores are iterative). 1M/10M cover the standard shape set; 100M is sparse-only because Graphity's int-indexed CSR caps out-adjacency at ~2.1B edges, so GNP_DENSE (deg 30) and CHAIN_OF_CLIQUES (deg ~31) would overflow at 100M. Each traversal algorithm is also run on a DFS-preorder reordered graph (graphity-reordered pseudo-lib → 'Graphity (reordered)' column), and the one-time reorder cost is captured by the graphity-only 'reorder' algorithm. To keep the added runtime in check at these scales, the reordered/reorder-cost cases are restricted to two representative shapes — GNP_SPARSE (sparse, benefits strongly) and GNP_DENSE_SHUFFLED (dense worst-case layout) — dropping the ID-local no-op CHAIN_OF_CLIQUES and the redundant GNP_DENSE; the huge (100M) tier keeps its sole GNP_SPARSE shape. Reduced iterations and perf-only (no alloc); memory footprint still comes from the cheap JOL 'mem' phase.",
+  "jmh": {
+    "forks": 1,
+    "warmup_iterations": 1,
+    "warmup_time": "1s",
+    "measurement_iterations": 2,
+    "measurement_time": "1s",
+    "jvm_stack": "-Xss128m",
+    "jvm_heap": "-Xmx32g"
+  },
+  "cases": [
+    {
+      "name": "build-mid",
+      "libraries": ["graphity"],
+      "algorithms": ["build"],
+      "phases": ["perf"],
+      "params": {
+        "nodeCount": [1000000, 10000000],
+        "shape": ["GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "GNP_DENSE_SHUFFLED"]
+      }
+    },
+    {
+      "name": "scc-mid",
+      "libraries": ["graphity"],
+      "algorithms": ["scc"],
+      "phases": ["perf"],
+      "params": {
+        "nodeCount": [1000000, 10000000],
+        "shape": ["GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "GNP_DENSE_SHUFFLED"]
+      }
+    },
+    {
+      "name": "components-mid",
+      "libraries": ["graphity"],
+      "algorithms": ["wcc", "ccs"],
+      "phases": ["perf"],
+      "params": {
+        "nodeCount": [1000000, 10000000],
+        "shape": ["GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "GNP_DENSE_SHUFFLED"]
+      }
+    },
+    {
+      "name": "toporder-mid",
+      "libraries": ["graphity"],
+      "algorithms": ["toporder"],
+      "phases": ["perf"],
+      "params": {
+        "nodeCount": [1000000, 10000000],
+        "shape": ["DAG_GNP_SPARSE", "DAG_GNP_DENSE", "DAG_GNP_DENSE_SHUFFLED"]
+      }
+    },
+    {
+      "name": "toporder-levels-mid",
+      "libraries": ["graphity"],
+      "algorithms": ["toporderandlevels"],
+      "phases": ["perf"],
+      "params": {
+        "nodeCount": [1000000, 10000000],
+        "shape": ["DAG_GNP_SPARSE", "DAG_GNP_DENSE", "DAG_GNP_DENSE_SHUFFLED"]
+      }
+    },
+    {
+      "name": "dfs-analysis-mid",
+      "libraries": ["graphity"],
+      "algorithms": ["backedges", "edgetypes"],
+      "phases": ["perf"],
+      "params": {
+        "nodeCount": [1000000, 10000000],
+        "shape": ["GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "GNP_DENSE_SHUFFLED"]
+      }
+    },
+    {
+      "name": "build-huge",
+      "libraries": ["graphity"],
+      "algorithms": ["build"],
+      "phases": ["perf"],
+      "params": {
+        "nodeCount": [100000000],
+        "shape": ["GNP_SPARSE"]
+      }
+    },
+    {
+      "name": "scc-huge",
+      "libraries": ["graphity"],
+      "algorithms": ["scc"],
+      "phases": ["perf"],
+      "params": {
+        "nodeCount": [100000000],
+        "shape": ["GNP_SPARSE"]
+      }
+    },
+    {
+      "name": "components-huge",
+      "libraries": ["graphity"],
+      "algorithms": ["wcc", "ccs"],
+      "phases": ["perf"],
+      "params": {
+        "nodeCount": [100000000],
+        "shape": ["GNP_SPARSE"]
+      }
+    },
+    {
+      "name": "toporder-huge",
+      "libraries": ["graphity"],
+      "algorithms": ["toporder"],
+      "phases": ["perf"],
+      "params": {
+        "nodeCount": [100000000],
+        "shape": ["DAG_GNP_SPARSE"]
+      }
+    },
+    {
+      "name": "toporder-levels-huge",
+      "libraries": ["graphity"],
+      "algorithms": ["toporderandlevels"],
+      "phases": ["perf"],
+      "params": {
+        "nodeCount": [100000000],
+        "shape": ["DAG_GNP_SPARSE"]
+      }
+    },
+    {
+      "name": "dfs-analysis-huge",
+      "libraries": ["graphity"],
+      "algorithms": ["backedges", "edgetypes"],
+      "phases": ["perf"],
+      "params": {
+        "nodeCount": [100000000],
+        "shape": ["GNP_SPARSE"]
+      }
+    },
+    {
+      "name": "reordered-graph-mid",
+      "libraries": ["graphity-reordered"],
+      "algorithms": ["scc", "wcc", "ccs", "backedges", "edgetypes"],
+      "phases": ["perf"],
+      "params": {
+        "nodeCount": [1000000, 10000000],
+        "shape": ["GNP_SPARSE", "GNP_DENSE_SHUFFLED"]
+      }
+    },
+    {
+      "name": "reordered-dag-mid",
+      "libraries": ["graphity-reordered"],
+      "algorithms": ["toporder", "toporderandlevels"],
+      "phases": ["perf"],
+      "params": {
+        "nodeCount": [1000000, 10000000],
+        "shape": ["DAG_GNP_SPARSE", "DAG_GNP_DENSE_SHUFFLED"]
+      }
+    },
+    {
+      "name": "reorder-cost-mid",
+      "libraries": ["graphity"],
+      "algorithms": ["reorder"],
+      "phases": ["perf"],
+      "params": {
+        "nodeCount": [1000000, 10000000],
+        "shape": ["GNP_SPARSE", "GNP_DENSE_SHUFFLED"]
+      }
+    },
+    {
+      "name": "reordered-graph-huge",
+      "libraries": ["graphity-reordered"],
+      "algorithms": ["scc", "wcc", "ccs", "backedges", "edgetypes"],
+      "phases": ["perf"],
+      "params": {
+        "nodeCount": [100000000],
+        "shape": ["GNP_SPARSE"]
+      }
+    },
+    {
+      "name": "reordered-dag-huge",
+      "libraries": ["graphity-reordered"],
+      "algorithms": ["toporder", "toporderandlevels"],
+      "phases": ["perf"],
+      "params": {
+        "nodeCount": [100000000],
+        "shape": ["DAG_GNP_SPARSE"]
+      }
+    },
+    {
+      "name": "reorder-cost-huge",
+      "libraries": ["graphity"],
+      "algorithms": ["reorder"],
+      "phases": ["perf"],
+      "params": {
+        "nodeCount": [100000000],
+        "shape": ["GNP_SPARSE"]
+      }
+    }
+  ],
+  "mem": {
+    "enabled": true,
+    "nodes": [1000000, 10000000, 100000000],
+    "shapes": ["GNP_SPARSE"],
+    "libraries": ["graphity"]
+  }
+}

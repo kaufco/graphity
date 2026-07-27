@@ -7,7 +7,7 @@
     "warmup_time": "1s",
     "measurement_iterations": 3,
     "measurement_time": "1s",
-    "jvm_stack": "-Xss16m"
+    "jvm_stack": "-Xss128m"
   },
   "cases": [
     {
@@ -62,6 +62,36 @@
       "params": {
         "nodeCount": [10000, 100000],
         "shape": ["PATH", "TREE", "DAG_GNP_SPARSE", "DAG_GNP_DENSE", "PATH_SHUFFLED", "TREE_SHUFFLED", "DAG_GNP_DENSE_SHUFFLED"]
+      }
+    },
+    {
+      "name": "reordered-graph-algos",
+      "libraries": ["graphity-reordered"],
+      "algorithms": ["scc", "wcc", "ccs", "backedges", "edgetypes"],
+      "phases": ["perf"],
+      "params": {
+        "nodeCount": [10000, 100000],
+        "shape": ["PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "PATH_SHUFFLED", "GNP_DENSE_SHUFFLED", "CHAIN_OF_CLIQUES_SHUFFLED"]
+      }
+    },
+    {
+      "name": "reordered-dag-algos",
+      "libraries": ["graphity-reordered"],
+      "algorithms": ["toporder", "toporderandlevels"],
+      "phases": ["perf"],
+      "params": {
+        "nodeCount": [10000, 100000],
+        "shape": ["PATH", "TREE", "DAG_GNP_SPARSE", "DAG_GNP_DENSE", "PATH_SHUFFLED", "TREE_SHUFFLED", "DAG_GNP_DENSE_SHUFFLED"]
+      }
+    },
+    {
+      "name": "reorder-cost",
+      "libraries": ["graphity"],
+      "algorithms": ["reorder"],
+      "phases": ["perf"],
+      "params": {
+        "nodeCount": [10000, 100000],
+        "shape": ["PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "PATH_SHUFFLED", "GNP_DENSE_SHUFFLED", "CHAIN_OF_CLIQUES_SHUFFLED"]
       }
     }
   ],

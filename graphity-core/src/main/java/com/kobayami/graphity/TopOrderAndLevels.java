@@ -4,8 +4,6 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.ints.IntLists;
 
-import java.util.Objects;
-
 /**
  * Topological order and level assignment of a directed acyclic graph (DAG).
  * <p>
@@ -20,7 +18,7 @@ import java.util.Objects;
  * var tol = TopOrderAndLevels.of(graph);
  * IntList order = tol.order();         // topological order
  * int lvl = tol.levelOf(node);         // level of a node
- * int depth = tol.levelCount();        // number of levels (DAG depth + 1)
+ * int depth = tol.levelCount();        // number of levels (longest path length + 1)
  * }</pre>
  *
  * <strong>Time:</strong> O(nodeCount + edgeCount) for computation.<br>

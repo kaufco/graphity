@@ -11,7 +11,7 @@ import java.util.Objects;
  * each node's in-nodes sorted ascending.
  * Obtain via {@link Graph#biAdjacentGraph()}; convert back via {@link #uniAdjacentGraph()}.
  * <p>
- * <strong>Memory:</strong> 8 × (nodeCount + edgeCount) bytes (2× {@link Graph}).
+ * <strong>Memory:</strong> 8 x (nodeCount + edgeCount) bytes (2x {@link Graph}).
  *
  * @see Graph
  */
@@ -52,6 +52,8 @@ public final class BiAdjacentGraph extends Graph {
   /**
    * Returns the total degree (inDegree + outDegree) of {@code node}.
    * <p>
+   * A self-loop counts twice: once as an out-edge, once as an in-edge.
+   * <p>
    * <strong>Time:</strong> O(1).
    *
    * @param node node ID in {@code 0..nodeCount()-1}
@@ -65,6 +67,7 @@ public final class BiAdjacentGraph extends Graph {
 
   /**
    * Returns a zero-copy view of {@code node}'s in-nodes, sorted ascending.
+   * In-nodes are the predecessors of {@code node} (sources of its incoming edges).
    * <p>
    * <strong>Time:</strong> O(1).
    *
@@ -134,7 +137,7 @@ public final class BiAdjacentGraph extends Graph {
    * Returns a merged, duplicate-free view of {@code node}'s in- and out-nodes (neighbors),
    * sorted ascending.
    * <p>
-   * <strong>Time:</strong> O(inDegree + outDegree).
+   * <strong>Time:</strong> O(inDegree + outDegree).<br>
    * <strong>Memory:</strong> allocates a merged array.
    *
    * @param node node ID in {@code 0..nodeCount()-1}
@@ -170,7 +173,9 @@ public final class BiAdjacentGraph extends Graph {
   }
 
   /**
-   * Tests whether {@code node} is a root node (has no incoming edges).
+   * Tests whether {@code node} is a root node (in-degree 0, no incoming edges).
+   * A root node is a natural entry point for traversal; this is distinct from an edge's
+   * source node (see {@link #edgeSource(int)}).
    * <p>
    * <strong>Time:</strong> O(1).
    *

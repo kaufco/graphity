@@ -2,10 +2,10 @@
 # Graphity benchmark orchestrator (JSON-matrix driven, fail-fast validation).
 #
 # Usage:
-#   ./run-benchmarks.sh <subcommand> <profile-or-matrix.json>
-#   subcommands: perf | alloc | mem | report | all  (typically 'all')
-#   profiles:    quick, full, full-big-graph, dataset-quick, dataset-full
-#                or a path to any JSON matrix file
+#   ./run-benchmarks.sh <command> [args]
+#   commands: clean | synthetic <lib|all> | realworld <lib|all> | report [version]
+#   run 'clean → synthetic/realworld → report [version]' in order.
+#   See './run-benchmarks.sh --help' for the full workflow.
 #
 # Run from anywhere — script resolves paths relative to its own location.
 #
@@ -46,7 +46,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BENCH_DIR="${SCRIPT_DIR}"
 JAR="${BENCH_DIR}/target/graphity-benchmarks.jar"
-RESULTS="${BENCH_DIR}/results"
+MEASUREMENTS="${BENCH_DIR}/measurements"
 MATRIX_DIR="${BENCH_DIR}/benchmark-matrix"
 
 if [[ ! -f "$JAR" ]]; then
@@ -59,7 +59,7 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 1
 fi
 
-mkdir -p "$RESULTS"
+mkdir -p "$MEASUREMENTS"
 
 banner() {
   local txt="$1"
@@ -118,20 +118,25 @@ DAG_FIXTURE_SHAPES = {
     "PATH", "TREE", "DAG_GNP_SPARSE", "DAG_GNP_DENSE",
     "PATH_SHUFFLED", "TREE_SHUFFLED", "DAG_GNP_SPARSE_SHUFFLED", "DAG_GNP_DENSE_SHUFFLED"
 }
-SUPPORTED_LIBS = {"graphity", "jgrapht", "guava", "webgraph"}
+# "graphity-reordered" is a pseudo-library: the same Graphity algorithm run on a
+# DFS-preorder reordered graph (Graphs.dfsReordered). It shows up as a separate
+# "Graphity (reordered)" column in the report. "reorder" is the graphity-only
+# algorithm that measures the one-time cost of that reordering.
+SUPPORTED_LIBS = {"graphity", "graphity-reordered", "jgrapht", "guava", "webgraph"}
 SUPPORTED_ALGOS = {
     "build", "scc", "wcc", "ccs", "toporder", "toporderandlevels",
-    "backedges", "edgetypes"
+    "backedges", "edgetypes", "reorder"
 }
 ALGO_SUPPORTED_LIBS = {
     "build": {"graphity", "jgrapht", "guava", "webgraph"},
-    "scc": {"graphity", "jgrapht", "guava", "webgraph"},
-    "toporder": {"graphity", "jgrapht", "guava", "webgraph"},
-    "backedges": {"graphity", "jgrapht", "guava", "webgraph"},
-    "edgetypes": {"graphity", "jgrapht", "guava", "webgraph"},
-    "wcc": {"graphity"},
-    "ccs": {"graphity"},
-    "toporderandlevels": {"graphity"},
+    "scc": {"graphity", "graphity-reordered", "jgrapht", "guava", "webgraph"},
+    "toporder": {"graphity", "graphity-reordered", "jgrapht", "guava", "webgraph"},
+    "backedges": {"graphity", "graphity-reordered", "jgrapht", "guava", "webgraph"},
+    "edgetypes": {"graphity", "graphity-reordered", "jgrapht", "guava", "webgraph"},
+    "wcc": {"graphity", "graphity-reordered"},
+    "ccs": {"graphity", "graphity-reordered"},
+    "toporderandlevels": {"graphity", "graphity-reordered"},
+    "reorder": {"graphity"},
 }
 ALGO_ALLOWED_SHAPES = {
     "build": GRAPH_FIXTURE_SHAPES,
@@ -142,6 +147,7 @@ ALGO_ALLOWED_SHAPES = {
     "wcc": GRAPH_FIXTURE_SHAPES,
     "ccs": GRAPH_FIXTURE_SHAPES,
     "toporderandlevels": DAG_FIXTURE_SHAPES,
+    "reorder": GRAPH_FIXTURE_SHAPES,
 }
 SUPPORTED_PHASES = {"perf", "alloc"}
 DAG_ALGOS = {"toporder", "toporderandlevels"}
@@ -178,6 +184,9 @@ for key in ("warmup_time", "measurement_time", "jvm_stack"):
     v = jmh.get(key, "")
     if not isinstance(v, str) or not v.strip():
         fail(f"jmh.{key} must be a non-empty string")
+heap = jmh.get("jvm_heap", "")
+if heap != "" and (not isinstance(heap, str) or not heap.strip()):
+    fail("jmh.jvm_heap must be a non-empty string when present")
 
 cases = data.get("cases")
 if not isinstance(cases, list) or not cases:
@@ -301,18 +310,21 @@ w = jmh.get("warmup_time", "500ms")
 it = jmh.get("measurement_iterations", 5)
 r = jmh.get("measurement_time", "500ms")
 stack = jmh.get("jvm_stack", "-Xss16m")
-print(f"{forks}\t{wi}\t{w}\t{it}\t{r}\t{stack}")
+heap = jmh.get("jvm_heap", "")
+print(f"{forks}\t{wi}\t{w}\t{it}\t{r}\t{stack}\t{heap}")
 PY
 }
 
 matrix_cases_tsv() {
   local matrix_file="$1"
   local phase="$2"
-  python3 - "$matrix_file" "$phase" <<'PY'
+  local lib_filter="${3:-}"
+  python3 - "$matrix_file" "$phase" "$lib_filter" <<'PY'
 import json, os, re, sys
 matrix_path = sys.argv[1]
 data = json.loads(open(matrix_path, encoding="utf-8").read())
 phase = sys.argv[2]
+lib_filter = [x.strip() for x in sys.argv[3].split(",") if x.strip()] if len(sys.argv) > 3 else []
 base_dir = os.path.dirname(os.path.abspath(matrix_path))
 
 def resolve_dataset_path(raw):
@@ -320,6 +332,9 @@ def resolve_dataset_path(raw):
     if not os.path.isabs(expanded):
         expanded = os.path.normpath(os.path.join(base_dir, expanded))
     return expanded
+
+def slug(text):
+    return re.sub(r"[^A-Za-z0-9.-]+", "-", str(text)).strip("-")
 
 BENCHMARK_FQNS = {
     "build": {
@@ -330,36 +345,46 @@ BENCHMARK_FQNS = {
     },
     "scc": {
         "graphity": "com.kobayami.graphity.benchmarks.graphity.SccBenchmark.scc",
+        "graphity-reordered": "com.kobayami.graphity.benchmarks.graphity.SccReorderedBenchmark.scc",
         "jgrapht": "com.kobayami.graphity.benchmarks.jgrapht.JGraphTSccBenchmark.scc",
         "guava": "com.kobayami.graphity.benchmarks.guava.GuavaSccBenchmark.scc",
         "webgraph": "com.kobayami.graphity.benchmarks.webgraph.WebGraphSccBenchmark.scc",
     },
     "wcc": {
         "graphity": "com.kobayami.graphity.benchmarks.graphity.WccBenchmark.wcc",
+        "graphity-reordered": "com.kobayami.graphity.benchmarks.graphity.WccReorderedBenchmark.wcc",
     },
     "ccs": {
         "graphity": "com.kobayami.graphity.benchmarks.graphity.CcsBenchmark.ccs",
+        "graphity-reordered": "com.kobayami.graphity.benchmarks.graphity.CcsReorderedBenchmark.ccs",
     },
     "toporder": {
         "graphity": "com.kobayami.graphity.benchmarks.graphity.TopOrderBenchmark.topOrder",
+        "graphity-reordered": "com.kobayami.graphity.benchmarks.graphity.TopOrderReorderedBenchmark.topOrder",
         "jgrapht": "com.kobayami.graphity.benchmarks.jgrapht.JGraphTTopOrderBenchmark.topOrder",
         "guava": "com.kobayami.graphity.benchmarks.guava.GuavaTopOrderBenchmark.topOrder",
         "webgraph": "com.kobayami.graphity.benchmarks.webgraph.WebGraphTopOrderBenchmark.topOrder",
     },
     "toporderandlevels": {
         "graphity": "com.kobayami.graphity.benchmarks.graphity.TopOrderAndLevelsBenchmark.topOrderAndLevels",
+        "graphity-reordered": "com.kobayami.graphity.benchmarks.graphity.TopOrderAndLevelsReorderedBenchmark.topOrderAndLevels",
     },
     "backedges": {
         "graphity": "com.kobayami.graphity.benchmarks.graphity.BackEdgesBenchmark.backEdges",
+        "graphity-reordered": "com.kobayami.graphity.benchmarks.graphity.BackEdgesReorderedBenchmark.backEdges",
         "jgrapht": "com.kobayami.graphity.benchmarks.jgrapht.JGraphTBackEdgesBenchmark.backEdges",
         "guava": "com.kobayami.graphity.benchmarks.guava.GuavaBackEdgesBenchmark.backEdges",
         "webgraph": "com.kobayami.graphity.benchmarks.webgraph.WebGraphBackEdgesBenchmark.backEdges",
     },
     "edgetypes": {
         "graphity": "com.kobayami.graphity.benchmarks.graphity.EdgeTypesBenchmark.edgeTypes",
+        "graphity-reordered": "com.kobayami.graphity.benchmarks.graphity.EdgeTypesReorderedBenchmark.edgeTypes",
         "jgrapht": "com.kobayami.graphity.benchmarks.jgrapht.JGraphTEdgeTypesBenchmark.edgeTypes",
         "guava": "com.kobayami.graphity.benchmarks.guava.GuavaEdgeTypesBenchmark.edgeTypes",
         "webgraph": "com.kobayami.graphity.benchmarks.webgraph.WebGraphEdgeTypesBenchmark.edgeTypes",
+    },
+    "reorder": {
+        "graphity": "com.kobayami.graphity.benchmarks.graphity.ReorderBenchmark.reorder",
     },
 }
 
@@ -370,6 +395,10 @@ for c in cases:
         continue
     name = c["name"]
     libs = c["libraries"]
+    if lib_filter:
+        libs = [l for l in libs if l in lib_filter]
+        if not libs:
+            continue
     algos = c["algorithms"]
     if "params" in c:
         params = dict(c.get("params", {}))
@@ -383,11 +412,28 @@ for c in cases:
             "nodeCount": [1000],
             "shape": ["PATH"],
         }
+    # One TSV row per (case, algorithm) — libraries and param values stay
+    # bundled into one JMH invocation via -p key=v1,v2,... exactly as before.
+    # `case_key` is a stable, matrix-derived identifier (not a running
+    # counter) so the same case always maps to the same output filename for a
+    # given profile+library-filter. Actual resume no longer hinges on that
+    # filename though: run_jmh_phase matches already-measured results by
+    # (benchmark FQN, params) across ALL profiles (see compute_case_resume),
+    # so a differently-named subset profile's data is reused too.
+    # The libraries actually selected for this invocation (after --lib
+    # filtering) are still part of the key so `realworld jgrapht` and
+    # `realworld graphity` write to distinct files rather than clobbering
+    # each other.
+    libs_key = slug(",".join(sorted(libs)))
     for algo in algos:
         fqns = [BENCHMARK_FQNS[algo][lib] for lib in libs]
         escaped = [re.escape(x) for x in fqns]
         bench_regex = "^(?:" + "|".join(escaped) + ")$"
-        fields = [f"{name}:{algo}", bench_regex]
+        case_key = f"{slug(name)}__{slug(algo)}__{libs_key}"
+        # Field 4 (fqns) carries the exact benchmark FQNs this case expects, so
+        # run_jmh_phase can compute cross-profile coverage per param-combo
+        # (a combo is "done" only once every listed FQN has a result for it).
+        fields = [f"{name}:{algo}", bench_regex, case_key, ",".join(fqns)]
         for k in sorted(params.keys()):
             v = params[k]
             if isinstance(v, list):
@@ -399,35 +445,23 @@ for c in cases:
 PY
 }
 
-merge_jmh_json_arrays() {
-  local out="$1"
-  shift
-  python3 - "$out" "$@" <<'PY'
-import json, sys
-out = sys.argv[1]
-inputs = sys.argv[2:]
-arr = []
-for p in inputs:
-    with open(p, encoding="utf-8") as f:
-        data = json.load(f)
-    if not isinstance(data, list):
-        raise SystemExit(f"expected JSON array in {p}")
-    arr.extend(data)
-with open(out, "w", encoding="utf-8") as f:
-    json.dump(arr, f, indent=2)
-PY
-}
-
 matrix_mem_tsv() {
   local matrix_file="$1"
-  python3 - "$matrix_file" <<'PY'
+  local lib_filter="${2:-}"
+  python3 - "$matrix_file" "$lib_filter" <<'PY'
 import json, sys
 data = json.loads(open(sys.argv[1], encoding="utf-8").read())
+lib_filter = [x.strip() for x in sys.argv[2].split(",") if x.strip()] if len(sys.argv) > 2 else []
 mem = data.get("mem", {})
 enabled = mem.get("enabled", True)
+libs = list(mem.get("libraries", []))
+if lib_filter:
+    libs = [l for l in libs if l in lib_filter]
+    if not libs:
+        enabled = False
 nodes = ",".join(str(x) for x in mem.get("nodes", []))
 shapes = ",".join(str(x) for x in mem.get("shapes", []))
-libraries = ",".join(str(x) for x in mem.get("libraries", []))
+libraries = ",".join(str(x) for x in libs)
 print(f"{str(bool(enabled)).lower()}\t{nodes}\t{shapes}\t{libraries}")
 PY
 }
@@ -435,11 +469,12 @@ PY
 matrix_validate_cases_tsv() {
   local matrix_file="$1"
   local phase="$2"
-  python3 - "$matrix_file" "$phase" <<'PY'
+  python3 - "$matrix_file" "$phase" "${3:-}" <<'PY'
 import json, os, sys
 matrix_path = sys.argv[1]
 data = json.loads(open(matrix_path, encoding="utf-8").read())
 phase = sys.argv[2]
+lib_filter = [x.strip() for x in sys.argv[3].split(",") if x.strip()] if len(sys.argv) > 3 else []
 base_dir = os.path.dirname(os.path.abspath(matrix_path))
 sep = "\x1f"
 
@@ -453,7 +488,19 @@ for c in data.get("cases", []):
     if phase not in phases:
         continue
     name = c["name"]
-    libs = ",".join(c["libraries"])
+    orig_libs = c["libraries"]
+    if lib_filter:
+        orig_libs = [l for l in orig_libs if l in lib_filter]
+        if not orig_libs:
+            continue
+    # The reordered pseudo-library runs the identical Graphity algorithm on a reordered
+    # graph, so it validates as plain "graphity" (dedup to avoid running it twice).
+    mapped_libs = []
+    for lib in orig_libs:
+        canon = "graphity" if lib == "graphity-reordered" else lib
+        if canon not in mapped_libs:
+            mapped_libs.append(canon)
+    libs = ",".join(mapped_libs)
     for algo in c["algorithms"]:
         if "params" in c:
             params = c["params"]
@@ -472,94 +519,316 @@ PY
 run_validate_phase() {
   local matrix_file="$1"
   local phase="$2"
-  IFS=$'\t' read -r _ _ _ _ _ jvm_stack <<< "$(matrix_jmh_defaults "$matrix_file")"
+  IFS=$'\t' read -r _ _ _ _ _ jvm_stack jvm_heap <<< "$(matrix_jmh_defaults "$matrix_file")"
   banner "validate — semantic quick-fail (${phase})"
+  local -a jbase=(java "$jvm_stack")
+  [[ -n "$jvm_heap" ]] && jbase+=("$jvm_heap")
+  jbase+=(-jar "$JAR" validate)
   local case_idx=0
   while IFS=$'\x1f' read -r case_name algo libs nodes shapes datasets; do
     [[ -z "$algo" ]] && continue
     case_idx=$((case_idx + 1))
     echo "[validate/$case_idx] case=${case_name} algo=${algo} libs=${libs}"
     if [[ -n "$datasets" ]]; then
-      java "$jvm_stack" -jar "$JAR" validate \
+      "${jbase[@]}" \
         --algorithm "$algo" \
         --libraries "$libs" \
         --datasets "$datasets"
     else
-      java "$jvm_stack" -jar "$JAR" validate \
+      "${jbase[@]}" \
         --algorithm "$algo" \
         --libraries "$libs" \
         --nodes "$nodes" \
         --shapes "$shapes"
     fi
-  done < <(matrix_validate_cases_tsv "$matrix_file" "$phase")
+  done < <(matrix_validate_cases_tsv "$matrix_file" "$phase" "$LIB_FILTER")
+}
+
+# Adds a "measuredAt" (ISO 8601, UTC) field to every entry of a JMH JSON
+# result array, in place. The report tooling (ReportMain.java's hand-rolled
+# JSON parser) reads results into a generic map and only looks up the keys it
+# knows about, so an extra field is silently ignored there — this is purely
+# provenance data for anyone inspecting the raw JSON later, since the
+# filename itself no longer carries a timestamp.
+stamp_measured_at() {
+  local json_file="$1"
+  python3 - "$json_file" <<'PY'
+import datetime, json, sys
+path = sys.argv[1]
+with open(path, encoding="utf-8") as f:
+    data = json.load(f)
+now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+for entry in data:
+    entry["measuredAt"] = now
+with open(path, "w", encoding="utf-8") as f:
+    json.dump(data, f, indent=2)
+PY
+}
+
+# compute_case_resume <reuse_dest.json> <phase> <fqns_csv> <param_spec...>
+#
+# Cross-profile resume for a single case. Scans EVERY `<phase>-*@*.json` in
+# measurements/ (not just this profile's file) and decides, per param-combo
+# (the JMH cross-product of the case's `-p key=v1,v2,...` values — one combo is
+# one dataset in dataset mode, or one (shape,nodeCount) pair in fixture mode),
+# whether it is already fully measured. A combo counts as done only once EVERY
+# expected benchmark FQN of the case has a result for it, so a partially-run
+# combo is re-measured rather than silently accepted.
+#
+# Writes the reusable entries (all FQNs of every fully-covered combo) as a JSON
+# array to <reuse_dest>. Prints to stdout:
+#   STATS\t<total_combos>\t<run_combos>\t<reused_combos>
+#   PARAM\t<key=csv>            (one per param key; ONLY the values still to run)
+# When <run_combos> is 0 there are no PARAM lines and the caller skips JMH and
+# just materializes the reuse array as the case output.
+compute_case_resume() {
+  local reuse_dest="$1" phase="$2" fqns_csv="$3"; shift 3
+  python3 - "$reuse_dest" "$MEASUREMENTS" "$phase" "$fqns_csv" "$@" <<'PY'
+import glob, itertools, json, os, sys
+
+reuse_dest = sys.argv[1]
+results_dir = sys.argv[2]
+phase = sys.argv[3]
+fqns = [x for x in sys.argv[4].split(",") if x]
+specs = sys.argv[5:]
+
+# Ordered param space: [(key, [values...]), ...] exactly as passed to `-p`.
+param_space = []
+for spec in specs:
+    if "=" not in spec:
+        continue
+    key, raw = spec.split("=", 1)
+    param_space.append((key, raw.split(",") if raw != "" else [""]))
+keys = [k for k, _ in param_space]
+
+# All combos in this case's param cross-product.
+combos = [dict(zip(keys, vals)) for vals in itertools.product(*[v for _, v in param_space])] if param_space else [{}]
+
+# Index existing results across ALL profiles for this phase.
+# present[combo_key] -> set of benchmark FQNs; stored[(fqn, combo_key)] -> entry.
+present, stored = {}, {}
+for path in sorted(glob.glob(os.path.join(results_dir, f"{phase}-*@*.json")), key=os.path.getmtime):
+    try:
+        data = json.load(open(path, encoding="utf-8"))
+    except Exception:
+        continue
+    if not isinstance(data, list):
+        continue
+    for entry in data:
+        bm = entry.get("benchmark", "")
+        p = entry.get("params") or {}
+        if not all(k in p for k in keys):
+            continue
+        combo_key = tuple((k, str(p[k])) for k in keys)
+        present.setdefault(combo_key, set()).add(bm)
+        stored[(bm, combo_key)] = entry  # mtime-sorted glob → newest wins
+
+def combo_key_of(combo):
+    return tuple((k, combo[k]) for k in keys)
+
+covered, uncovered = [], []
+for combo in combos:
+    ck = combo_key_of(combo)
+    have = present.get(ck, set())
+    (covered if all(fqn in have for fqn in fqns) else uncovered).append(combo)
+
+# Values still needed per key = those appearing in any uncovered combo.
+run_values = {k: set() for k in keys}
+for combo in uncovered:
+    for k in keys:
+        run_values[k].add(combo[k])
+
+reuse_entries = []
+for combo in covered:
+    ck = combo_key_of(combo)
+    for fqn in fqns:
+        e = stored.get((fqn, ck))
+        if e is not None:
+            reuse_entries.append(e)
+json.dump(reuse_entries, open(reuse_dest, "w", encoding="utf-8"), indent=2)
+
+if uncovered:
+    # Keep original per-key value order, drop values no uncovered combo needs.
+    filtered = [[v for v in vals if v in run_values[k]] for k, vals in param_space]
+    run_combos = 1
+    for f in filtered:
+        run_combos *= len(f)
+else:
+    filtered = []
+    run_combos = 0
+
+total = len(combos)
+reused = total - run_combos
+print(f"STATS\t{total}\t{run_combos}\t{reused}")
+if run_combos > 0:
+    for (k, _), fvals in zip(param_space, filtered):
+        print(f"PARAM\t{k}={','.join(fvals)}")
+PY
+}
+
+# merge_case_result <dest.json> <base.json> [<overlay.json>]
+# Combines two JMH result arrays, deduplicating by (benchmark, params); entries
+# from <overlay> win over <base>. Used to fold freshly measured combos on top of
+# reused ones so the case output is complete and self-contained.
+merge_case_result() {
+  local dest="$1" base="$2" overlay="${3:-}"
+  python3 - "$dest" "$base" "$overlay" <<'PY'
+import json, sys
+dest, base, overlay = sys.argv[1], sys.argv[2], sys.argv[3]
+merged, order = {}, []
+for path in (base, overlay):
+    if not path or not __import__("os").path.isfile(path):
+        continue
+    try:
+        data = json.load(open(path, encoding="utf-8"))
+    except Exception:
+        continue
+    if not isinstance(data, list):
+        continue
+    for entry in data:
+        params = entry.get("params") or {}
+        key = (entry.get("benchmark", ""), tuple(sorted((str(k), str(v)) for k, v in params.items())))
+        if key not in merged:
+            order.append(key)
+        merged[key] = entry
+json.dump([merged[k] for k in order], open(dest, "w", encoding="utf-8"), indent=2)
+PY
 }
 
 run_jmh_phase() {
-  local phase="$1" matrix_file="$2" profile="$3" ts="$4"
-  local out="${RESULTS}/${phase}-${profile}-${ts}.json"
-  local log="${out%.json}.log"
-  local tmp_dir
-  tmp_dir="$(mktemp -d)"
-  local -a case_json_files=()
-  local case_idx=0
+  local phase="$1" matrix_file="$2" profile="$3"
+  # One JSON file per matrix case, written directly into measurements/ — the
+  # same granularity as before this feature existed (one JMH invocation
+  # covering all of a case's libraries/shapes/nodeCounts via
+  # `-p key=v1,v2,...`). Filename: `<phase>-<profile>@<case_key>.json` — no
+  # timestamp, no hash: it must be the SAME name on every invocation of the
+  # same command, so a rerun of the same profile lands on the same file.
+  #
+  # Resume is CROSS-PROFILE and per param-combo, not per file. Before running a
+  # case, compute_case_resume scans EVERY `<phase>-*@*.json` (all profiles) and
+  # matches results by (benchmark FQN, params) — the same key `report` merges
+  # on. A combo (one dataset in dataset mode, or one (shape,nodeCount) pair in
+  # fixture mode) is "done" only once every FQN the case expects has a result
+  # for it; JMH is then invoked with `-p` filtered to the combos still missing,
+  # and the fresh results are merged on top of the reused ones (fresh wins) into
+  # this profile's case file — so it is always complete and self-contained even
+  # when part of the data came from another profile (e.g. a narrower subset
+  # profile measured earlier). If nothing is missing the case is materialized
+  # from the reused entries with no JMH run at all.
+  #
+  # Run `clean` for a full rerun from scratch; if you change the matrix's `jmh`
+  # block (forks/warmup/measurement/stack/heap) between two runs, `clean` first
+  # — nothing here detects that the settings changed, and stale combos would be
+  # reused as-is.
+  local case_idx=0 n_run=0 n_cached=0
 
-  IFS=$'\t' read -r forks wi w it r jvm_stack <<< "$(matrix_jmh_defaults "$matrix_file")"
+  IFS=$'\t' read -r forks wi w it r jvm_stack jvm_heap <<< "$(matrix_jmh_defaults "$matrix_file")"
 
-  : > "$log"
   while IFS=$'\t' read -r -a fields; do
-    [[ ${#fields[@]} -lt 2 ]] && continue
+    [[ ${#fields[@]} -lt 4 ]] && continue
     case_idx=$((case_idx + 1))
     local case_name="${fields[0]}"
     local bench_regex="${fields[1]}"
-    local case_out="${tmp_dir}/${phase}-${case_idx}.json"
-    local case_log="${tmp_dir}/${phase}-${case_idx}.log"
+    local case_key="${fields[2]}"
+    local fqns_csv="${fields[3]}"
+    local case_out="${MEASUREMENTS}/${phase}-${profile}@${case_key}.json"
+    local case_log="${case_out%.json}.log"
 
-    echo "[$phase/$case_idx] case=${case_name}" | tee -a "$log"
+    # Cross-profile resume: ask which param-combos of this case are already
+    # measured (in ANY profile's JSON) and which still need to run. Reused
+    # entries are captured so the case output stays complete and self-contained.
+    local reuse_json="${case_out}.reuse.$$"
+    local -a run_params=()
+    local total_combos=0 run_combos=0 reused_combos=0
+    while IFS=$'\t' read -r tag rest; do
+      case "$tag" in
+        STATS) IFS=$'\t' read -r total_combos run_combos reused_combos <<< "$rest" ;;
+        PARAM) run_params+=("$rest") ;;
+      esac
+    done < <(compute_case_resume "$reuse_json" "$phase" "$fqns_csv" "${fields[@]:4}")
+
+    if [[ "$total_combos" -eq 0 ]]; then
+      rm -f "$reuse_json"
+      echo "[$phase/$case_idx] FAILED: case=${case_name} — resume planning produced no combos (see stderr)" | tee "$case_log"
+      FAILED_MEASUREMENTS+=("${phase}/${profile}/${case_name}")
+      continue
+    fi
+
+    if [[ "$run_combos" -eq 0 ]]; then
+      # Everything this case needs is already measured elsewhere — materialize
+      # the reused entries under this profile's name; no JMH run.
+      merge_case_result "$case_out" "$reuse_json"
+      rm -f "$reuse_json"
+      echo "[$phase/$case_idx] case=${case_name} — all ${total_combos} combo(s) reused from measurements/, skipping"
+      n_cached=$((n_cached + 1))
+      continue
+    fi
+
+    echo "[$phase/$case_idx] case=${case_name} — ${run_combos} combo(s) to run, ${reused_combos} reused" | tee "$case_log"
     rm -f /tmp/jmh.lock
 
-    local -a cmd=(java "$jvm_stack" -jar "$JAR" -f "$forks" -wi "$wi" -w "$w" -i "$it" -r "$r")
+    local -a cmd=(java "$jvm_stack")
+    [[ -n "$jvm_heap" ]] && cmd+=("$jvm_heap")
+    cmd+=(-jar "$JAR" -f "$forks" -wi "$wi" -w "$w" -i "$it" -r "$r")
     if [[ "$phase" == "alloc" ]]; then
       cmd+=(-prof gc)
     fi
-    for ((i = 2; i < ${#fields[@]}; i++)); do
-      cmd+=(-p "${fields[i]}")
+    local p
+    for p in "${run_params[@]}"; do
+      cmd+=(-p "$p")
     done
-    cmd+=("$bench_regex" -jvmArgsAppend "$jvm_stack" -rf json -rff "$case_out")
+    local fork_args="$jvm_stack"
+    [[ -n "$jvm_heap" ]] && fork_args="$jvm_stack $jvm_heap"
+    local case_tmp="${case_out}.tmp.$$"
+    cmd+=("$bench_regex" -jvmArgsAppend "$fork_args" -rf json -rff "$case_tmp")
 
-    "${cmd[@]}" 2>&1 | tee "$case_log"
-    cat "$case_log" >> "$log"
-    case_json_files+=("$case_out")
-  done < <(matrix_cases_tsv "$matrix_file" "$phase")
+    # Guarded call (not a bare pipeline statement): a crashing/OOM-killed
+    # library must not abort the whole script via `set -e` — it should only
+    # mark this one case as failed and let the rest keep running.
+    if "${cmd[@]}" 2>&1 | tee -a "$case_log"; then
+      if [[ -f "$case_tmp" ]]; then
+        stamp_measured_at "$case_tmp"
+        # Fold freshly measured combos on top of the reused ones (fresh wins).
+        merge_case_result "$case_out" "$reuse_json" "$case_tmp"
+        rm -f "$case_tmp"
+        n_run=$((n_run + 1))
+      else
+        echo "[$phase/$case_idx] WARNING: case=${case_name} exited 0 but wrote no result — treating as failed" | tee -a "$case_log"
+        FAILED_MEASUREMENTS+=("${phase}/${profile}/${case_name}")
+      fi
+    else
+      rm -f "$case_tmp"
+      echo "[$phase/$case_idx] FAILED: case=${case_name} (see ${case_log})" | tee -a "$case_log"
+      FAILED_MEASUREMENTS+=("${phase}/${profile}/${case_name}")
+    fi
+    rm -f "$reuse_json"
+  done < <(matrix_cases_tsv "$matrix_file" "$phase" "$LIB_FILTER")
 
-  if [[ ${#case_json_files[@]} -eq 0 ]]; then
-    echo "error: no JMH cases for phase '$phase' in matrix $matrix_file" >&2
-    rm -rf "$tmp_dir"
-    exit 2
+  if [[ $((n_run + n_cached)) -eq 0 ]]; then
+    echo "skip: no cases declare phase '$phase' in matrix $matrix_file (nothing to run)"
+    return 0
   fi
-
-  merge_jmh_json_arrays "$out" "${case_json_files[@]}"
-  rm -rf "$tmp_dir"
-  echo "$phase JSON → $out"
+  echo "$phase (${profile}): ${n_run} run, ${n_cached} already done → ${MEASUREMENTS}/${phase}-${profile}@*.json"
 }
 
 run_perf() {
-  local matrix_file="$1" profile="$2" ts="$3"
+  local matrix_file="$1" profile="$2"
   run_validate_phase "$matrix_file" "perf"
   banner "perf — ${profile}"
-  run_jmh_phase "perf" "$matrix_file" "$profile" "$ts"
+  run_jmh_phase "perf" "$matrix_file" "$profile"
 }
 
 run_alloc() {
-  local matrix_file="$1" profile="$2" ts="$3"
+  local matrix_file="$1" profile="$2"
   run_validate_phase "$matrix_file" "alloc"
   banner "alloc — ${profile} (with -prof gc)"
-  run_jmh_phase "alloc" "$matrix_file" "$profile" "$ts"
+  run_jmh_phase "alloc" "$matrix_file" "$profile"
 }
 
 run_mem() {
-  local matrix_file="$1" profile="$2" ts="$3"
-  local out="${RESULTS}/mem-${profile}-${ts}.csv"
-  IFS=$'\t' read -r mem_enabled mem_nodes mem_shapes mem_libraries <<< "$(matrix_mem_tsv "$matrix_file")"
+  local matrix_file="$1" profile="$2"
+  IFS=$'\t' read -r mem_enabled mem_nodes mem_shapes mem_libraries <<< "$(matrix_mem_tsv "$matrix_file" "$LIB_FILTER")"
+  IFS=$'\t' read -r _ _ _ _ _ _ jvm_heap <<< "$(matrix_jmh_defaults "$matrix_file")"
 
   banner "mem — ${profile}"
   if [[ "$mem_enabled" != "true" ]]; then
@@ -567,119 +836,449 @@ run_mem() {
     return
   fi
 
-  local -a mem_args=(mem -o "$out")
-  if [[ -n "$mem_nodes" ]]; then
-    mem_args+=(-n "$mem_nodes")
-  fi
-  if [[ -n "$mem_shapes" ]]; then
-    mem_args+=(-s "$mem_shapes")
-  fi
-  if [[ -n "$mem_libraries" ]]; then
-    mem_args+=(-l "$mem_libraries")
+  # Same idea as run_jmh_phase: a stable filename directly in measurements/,
+  # written atomically. The mem CLI's own -o file is flushed row-by-row but
+  # TRUNCATED on every invocation, so pointing two separate attempts at the
+  # same path would destroy a crashed run's partial progress — write once,
+  # atomically, and skip if the final file already exists. Keyed by the
+  # actually-selected libraries so `synthetic graphity` and a later
+  # `synthetic jgrapht` don't collide on the same file.
+  local libs_key="${mem_libraries//,/-}"
+  [[ -z "$libs_key" ]] && libs_key="none"
+  local out="${MEASUREMENTS}/mem-${profile}@${libs_key}.csv"
+
+  if [[ -f "$out" ]]; then
+    echo "mem — already in measurements/, skipping (${out})"
+    return
   fi
 
-  java -jar "$JAR" "${mem_args[@]}"
-  echo "mem CSV → $out"
+  local -a mem_args=(mem -o "${out}.tmp.$$")
+  [[ -n "$mem_nodes" ]] && mem_args+=(-n "$mem_nodes")
+  [[ -n "$mem_shapes" ]] && mem_args+=(-s "$mem_shapes")
+  [[ -n "$mem_libraries" ]] && mem_args+=(-l "$mem_libraries")
+
+  local -a mem_cmd=(java)
+  [[ -n "$jvm_heap" ]] && mem_cmd+=("$jvm_heap")
+  mem_cmd+=(-jar "$JAR" "${mem_args[@]}")
+
+  if "${mem_cmd[@]}"; then
+    mv -f "${out}.tmp.$$" "$out"
+    echo "mem CSV → $out"
+  else
+    rm -f "${out}.tmp.$$"
+    echo "mem FAILED (${profile})" >&2
+    FAILED_MEASUREMENTS+=("mem/${profile}/${libs_key}")
+  fi
 }
 
-run_report() {
-  local profile="$1" ts="$2"
-  local out="${RESULTS}/report-${profile}-${ts}.md"
+# merge_json_across_profiles <phase> <dest.json> <profile1> [<profile2> ...]
+# Merges JMH JSON arrays from multiple profiles into one, deduplicating by benchmark+params.
+merge_json_across_profiles() {
+  local phase="$1" dest="$2"
+  shift 2
+  python3 - "$dest" "$MEASUREMENTS" "$phase" "$@" <<'PY'
+import glob, json, os, sys
+dest = sys.argv[1]; results = sys.argv[2]; phase = sys.argv[3]; profiles = sys.argv[4:]
+merged, order = {}, []
+for profile in profiles:
+    for path in sorted(glob.glob(os.path.join(results, f"{phase}-{profile}@*.json")), key=os.path.getmtime):
+        try:
+            data = json.load(open(path, encoding="utf-8"))
+        except Exception:
+            continue
+        if not isinstance(data, list):
+            continue
+        for entry in data:
+            params = entry.get("params") or {}
+            key = (entry.get("benchmark",""), tuple(sorted((str(k), str(v)) for k,v in params.items())))
+            if key not in merged:
+                order.append(key)
+            merged[key] = entry
+if not order:
+    sys.exit(1)
+json.dump([merged[k] for k in order], open(dest, "w", encoding="utf-8"), indent=2)
+print(f"{len(order)} benchmarks from profiles: {profiles}", file=sys.stderr)
+PY
+}
 
-  banner "report — aggregating latest artifacts for profile '$profile'"
+# merge_mem_csv_across_profiles <dest.csv> <profile1> [<profile2> ...]
+# Concatenates JOL CSV files from multiple profiles (header from first file only).
+merge_mem_csv_across_profiles() {
+  local dest="$1"; shift
+  local header_done=0
+  for p in "$@"; do
+    local f
+    f=$(ls -t "${MEASUREMENTS}"/mem-"${p}"@*.csv 2>/dev/null | head -1 || true)
+    [[ -z "$f" ]] && continue
+    if [[ $header_done -eq 0 ]]; then
+      cat "$f" > "$dest"
+      header_done=1
+    else
+      tail -n +2 "$f" >> "$dest"
+    fi
+  done
+  [[ $header_done -eq 1 ]]  # return true if at least one file found
+}
 
-  local perf_file alloc_file mem_file
-  perf_file=$(ls -t "${RESULTS}"/perf-"${profile}"-*.json 2>/dev/null | head -1 || true)
-  alloc_file=$(ls -t "${RESULTS}"/alloc-"${profile}"-*.json 2>/dev/null | head -1 || true)
-  mem_file=$(ls -t "${RESULTS}"/mem-"${profile}"-*.csv 2>/dev/null | head -1 || true)
+# run_report_merged <kind> <out.md> <profile1> [<profile2> ...]
+# Generates one unified report MD merging JSON from all given profiles.
+run_report_merged() {
+  local kind="$1" out="$2"
+  shift 2
+  local profiles=("$@")
+  local merge_dir
+  merge_dir=$(mktemp -d)
+  local report_args=(report --profile "$kind" --out "$out")
 
-  local report_args=(report --profile "$profile" --out "$out")
-  if [[ -n "$perf_file" ]]; then
-    report_args+=(--perf "$perf_file")
-    echo "  using perf:  $(basename "$perf_file")"
-  else
-    echo "  perf:  (missing)"
+  if merge_json_across_profiles perf "${merge_dir}/perf.json" "${profiles[@]}" 2>/dev/null; then
+    report_args+=(--perf "${merge_dir}/perf.json")
+    echo "  perf: merged profiles (${profiles[*]})"
   fi
-  if [[ -n "$alloc_file" ]]; then
-    report_args+=(--alloc "$alloc_file")
-    echo "  using alloc: $(basename "$alloc_file")"
-  else
-    echo "  alloc: (missing)"
+  if merge_json_across_profiles alloc "${merge_dir}/alloc.json" "${profiles[@]}" 2>/dev/null; then
+    report_args+=(--alloc "${merge_dir}/alloc.json")
+    echo "  alloc: merged profiles (${profiles[*]})"
   fi
-  if [[ -n "$mem_file" ]]; then
-    report_args+=(--mem "$mem_file")
-    echo "  using mem:   $(basename "$mem_file")"
-  else
-    echo "  mem:   (missing)"
+  if merge_mem_csv_across_profiles "${merge_dir}/mem.csv" "${profiles[@]}"; then
+    report_args+=(--mem "${merge_dir}/mem.csv")
+    echo "  mem: merged profiles (${profiles[*]})"
   fi
 
   java -jar "$JAR" "${report_args[@]}"
+  rm -rf "$merge_dir"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# High-level, task-oriented commands (clean → synthetic/realworld → report)
+# ─────────────────────────────────────────────────────────────────────────────
+
+OPS_SCRIPT="${BENCH_DIR}/times-to-ops.py"
+REPORTS_DIR="${BENCH_DIR}/reports"
+DEFAULT_SYNTHETIC_PROFILE="full"
+DEFAULT_REALWORLD_PROFILE="realworld"
+SUPPORTED_LIBS=" graphity graphity-reordered jgrapht guava webgraph "
+# LIB_FILTER is consumed by the engine functions (matrix_*_tsv); set per run below.
+LIB_FILTER=""
+# Accumulates "phase/profile/case" labels for any measurement that failed
+# during this invocation (see run_jmh_phase / run_mem). Checked once at the
+# very end of the script so a crashed/failed measurement never aborts the
+# rest of the run via `set -e` — it's just reported, and re-running the same
+# command retries only what's still missing.
+FAILED_MEASUREMENTS=()
+
+# Extract the project version from the parent pom.xml (strips -SNAPSHOT suffix).
+read_project_version() {
+  python3 - "${SCRIPT_DIR}/../pom.xml" <<'PY'
+import re, sys
+try:
+    text = open(sys.argv[1], encoding="utf-8").read()
+except FileNotFoundError:
+    raise SystemExit(f"error: pom.xml not found at {sys.argv[1]}")
+m = re.search(r'<version>([^<]+)</version>', text)
+if not m:
+    raise SystemExit("error: could not find <version> in pom.xml")
+v = m.group(1).strip().removesuffix("-SNAPSHOT")
+print(v)
+PY
+}
+
+cmd_clean() {
+  banner "clean — removing run artifacts from measurements/"
+  local n=0 f
+  shopt -s nullglob
+  for f in "${MEASUREMENTS}"/perf-*.json "${MEASUREMENTS}"/alloc-*.json "${MEASUREMENTS}"/mem-*.csv \
+           "${MEASUREMENTS}"/report-*.md "${MEASUREMENTS}"/*.log; do
+    rm -f "$f"
+    n=$((n + 1))
+  done
+  shopt -u nullglob
+  echo "removed ${n} file(s) from ${MEASUREMENTS}/ (this is also the resumable-run cache — next run starts fully fresh)"
+}
+
+# run_kind <synthetic|realworld> <lib|all> <profile>
+run_kind() {
+  local kind="$1" lib="$2" profile="$3"
+  if [[ -z "$lib" ]]; then
+    echo "error: '$kind' requires a library name or 'all'" >&2
+    echo "supported: graphity, graphity-reordered, jgrapht, guava, webgraph, all" >&2
+    exit 2
+  fi
+  if [[ "$lib" == "all" ]]; then
+    LIB_FILTER=""
+  elif [[ "$SUPPORTED_LIBS" == *" $lib "* ]]; then
+    LIB_FILTER="$lib"
+    echo "library filter active: only [${lib}]"
+  else
+    echo "error: unknown library '$lib'" >&2
+    echo "supported: graphity, graphity-reordered, jgrapht, guava, webgraph, all" >&2
+    exit 2
+  fi
+
+  local matrix_file profile_name
+  matrix_file="$(resolve_matrix_file "$profile")"
+  validate_matrix "$matrix_file"
+  profile_name="$(matrix_profile_name "$matrix_file")"
+
+  banner "${kind} — profile '${profile_name}', libraries [${lib}]"
+  run_perf  "$matrix_file" "$profile_name"
+  run_alloc "$matrix_file" "$profile_name"
+  run_mem   "$matrix_file" "$profile_name"
+  echo
+  echo "→ JSON written to ${MEASUREMENTS}/ (profile '${profile_name}')."
+  echo "  Repeat per library as needed, then:  $(basename "$0") report"
+}
+
+list_result_profiles() {
+  python3 - "$MEASUREMENTS" <<'PY'
+import os, re, sys
+d = sys.argv[1]
+if not os.path.isdir(d):
+    raise SystemExit(0)
+pat = re.compile(r"^perf-(.+)@.+\.json$")
+seen = []
+for f in sorted(os.listdir(d)):
+    m = pat.match(f)
+    if m and m.group(1) not in seen:
+        seen.append(m.group(1))
+print("\n".join(seen))
+PY
+}
+
+# report_meta <report.md> [machine-override] -> prints "<kind>\t<machine>"
+report_meta() {
+  python3 - "$1" "${2:-}" <<'PY'
+import re, sys
+text = open(sys.argv[1], encoding="utf-8").read()
+override = sys.argv[2] if len(sys.argv) > 2 else ""
+
+def field(name):
+    m = re.search(rf"^{name}:\s*(.+)$", text, re.MULTILINE)
+    return m.group(1).strip() if m else ""
+
+profile = field("Profile")
+kind = "realworld" if profile.lower().startswith(("dataset", "realworld")) else "synthetic"
+if override:
+    machine = override
+else:
+    os_raw = field("OS")
+    os_first = (re.split(r"[\s,]+", os_raw)[0] or "unknown").lower()
+    # "Mac OS X ..." → first token is "mac"; normalise to "macos"
+    os_tok = "macos" if os_first == "mac" else os_first
+    cpu = field("CPU").lower()
+    if "ryzen" in cpu:
+        m = re.search(r"([0-9]{4}[a-z]?)", cpu)
+        cpu_tok = "ryzen-" + (m.group(1) if m else "cpu")
+    elif re.search(r"\bm[0-9]", cpu) or "apple" in cpu:
+        m = re.search(r"\b(m[0-9][a-z]*)", cpu)
+        cpu_tok = m.group(1) if m else "apple"
+    elif "aarch64" in os_raw.lower() or "arm" in cpu:
+        # Apple Silicon: JVM may report only core count, not chip name
+        cpu_tok = "apple"
+    else:
+        m = re.search(r"([a-z][a-z0-9]*)", cpu)  # letter-first to skip bare numbers
+        cpu_tok = m.group(1) if m else "cpu"
+    machine = f"{os_tok}-{cpu_tok}"
+print(f"{kind}\t{machine}")
+PY
+}
+
+cmd_report() {
+  local version="${1:-}"
+  local machine_override="${2:-}"
+
+  local synth_promoted=0 real_promoted=0
+
+  # Classify which profiles are in measurements/ and group by kind.
+  local -a profiles=()
+  while IFS= read -r line; do [[ -n "$line" ]] && profiles+=("$line"); done < <(list_result_profiles)
+
+  if [[ ${#profiles[@]} -gt 0 ]]; then
+    # Split profiles into synthetic vs realworld.
+    local -a synth_profiles=() rw_profiles=()
+    for p in "${profiles[@]}"; do
+      if [[ "$p" == realworld* || "$p" == dataset* ]]; then
+        rw_profiles+=("$p")
+      else
+        synth_profiles+=("$p")
+      fi
+    done
+
+    # Step 1 – generate one merged report per kind (synthetic = full+big+…; realworld = realworld+…)
+    banner "report — merging JSON artifacts into Markdown"
+    local synth_md="" rw_md=""
+    if [[ ${#synth_profiles[@]} -gt 0 ]]; then
+      synth_md="${MEASUREMENTS}/report-synthetic-${ts}.md"
+      echo "  synthetic profiles: ${synth_profiles[*]}"
+      run_report_merged synthetic "$synth_md" "${synth_profiles[@]}"
+    fi
+    if [[ ${#rw_profiles[@]} -gt 0 ]]; then
+      rw_md="${MEASUREMENTS}/report-realworld-${ts}.md"
+      echo "  realworld profiles: ${rw_profiles[*]}"
+      run_report_merged realworld "$rw_md" "${rw_profiles[@]}"
+    fi
+
+    # Step 2 – determine version
+    if [[ -z "$version" ]]; then
+      version="$(read_project_version)"
+      echo "  version: ${version} (from pom.xml)"
+    else
+      echo "  version: ${version} (explicit)"
+    fi
+
+    # Step 3 – promote merged reports into reports/versions/
+    banner "report — promoting results as version '${version}'"
+    local machine
+    if [[ -n "$synth_md" && -f "$synth_md" ]]; then
+      IFS=$'\t' read -r _ machine < <(report_meta "$synth_md" "$machine_override")
+      mkdir -p "${REPORTS_DIR}/versions"
+      cp "$synth_md" "${REPORTS_DIR}/versions/${version}-synthetic-${machine}.md"
+      echo "  synthetic → reports/versions/${version}-synthetic-${machine}.md"
+      synth_promoted=1
+    fi
+    if [[ -n "$rw_md" && -f "$rw_md" ]]; then
+      IFS=$'\t' read -r _ machine < <(report_meta "$rw_md" "$machine_override")
+      mkdir -p "${REPORTS_DIR}/versions"
+      cp "$rw_md" "${REPORTS_DIR}/versions/${version}-realworld-${machine}.md"
+      echo "  realworld → reports/versions/${version}-realworld-${machine}.md"
+      real_promoted=1
+    fi
+  else
+    echo "(no perf-*.json in ${MEASUREMENTS}/ — skipping promote, regenerating summary from existing versions)"
+    synth_promoted=1
+    real_promoted=1
+  fi
+
+  # Step 4 – regenerate summary reports (one call covers all kinds)
+  if [[ $synth_promoted -eq 1 || $real_promoted -eq 1 ]] && \
+     compgen -G "${REPORTS_DIR}/versions/"*.md >/dev/null 2>&1; then
+    banner "report — regenerating reports/summary/"
+    python3 "$OPS_SCRIPT" \
+      --source-dir "${REPORTS_DIR}/versions" \
+      --output-dir "${REPORTS_DIR}/summary"
+  fi
+  echo
+  echo "→ Done. Summary reports updated in ${REPORTS_DIR}/summary/"
+}
+
+cmd_bench() {
+  local version="${1:-}"
+  banner "bench — complete benchmark run: synthetic full + big + realworld (~3 h)"
+
+  banner "bench [1/3] — synthetic full (all libraries, n = 10K / 100K)"
+  run_kind synthetic all "$DEFAULT_SYNTHETIC_PROFILE"
+
+  banner "bench [2/3] — synthetic big (Graphity + reordered, n = 1M / 10M / 100M)"
+  run_kind synthetic all "big"
+
+  local datasets_present=0
+  if compgen -G "${BENCH_DIR}/datasets/*.txt" >/dev/null 2>&1 || \
+     compgen -G "${BENCH_DIR}/datasets/snap/*.txt" >/dev/null 2>&1; then
+    datasets_present=1
+  fi
+
+  if [[ $datasets_present -eq 1 ]]; then
+    banner "bench [3/3] — realworld (all libraries)"
+    run_kind realworld all "$DEFAULT_REALWORLD_PROFILE"
+  else
+    banner "bench [3/3] — realworld skipped (no datasets found under datasets/)"
+    echo "  Run './datasets/download-datasets.sh' first to enable real-world benchmarks."
+  fi
+
+  echo
+  echo "→ Benchmark run complete. Now run:  $(basename "$0") report [version]"
 }
 
 usage() {
   cat <<EOF
-Usage: $(basename "$0") <subcommand> <profile-or-matrix.json>
+Usage: $(basename "$0") <command> [args]
 
-Subcommands:
-  perf    <profile>   JMH performance run (matrix-driven)      -> perf-*.json
-  alloc   <profile>   JMH allocation run (-prof gc, matrix)    -> alloc-*.json
-  mem     <profile>   JOL memory measurement (matrix-driven)   -> mem-*.csv
-  report  <profile>   Aggregate latest artifacts to Markdown   → report-*.md
-  all     <profile>   perf → alloc → mem → report, sequentially
+Workflow — from a clean slate to committed reports with charts:
 
-Profiles (resolved as benchmark-matrix/<name>.json):
-  quick
-  full
-  full-big-graph
-  dataset-quick
-  dataset-full
+  1. $(basename "$0") clean                   # wipe measurements/ (old JSON etc.)
+  2. $(basename "$0") bench                   # complete ~3h run: synthetic full + big + realworld
+     — OR run individual steps:
+     $(basename "$0") synthetic <lib|all>     # synthetic full (n = 10K / 100K, all libraries)
+     $(basename "$0") synthetic <lib|all> --profile big   # large graphs (n = 1M+, Graphity only)
+     $(basename "$0") realworld <lib|all>     # real-world datasets
+     (repeat per library so one slow/crashing peer can't block the run)
+  3. $(basename "$0") report [version]        # merge JSON → promote → regenerate summary reports
+
+Commands:
+  clean                          Delete run artifacts (JSON/CSV/MD/log) from measurements/.
+  bench                          Run all benchmark phases in sequence: synthetic full → big → realworld.
+                                 Skips realworld if datasets/ contains no .txt files.
+  synthetic <lib|all>            perf+alloc+mem on synthetic graphs (default profile: ${DEFAULT_SYNTHETIC_PROFILE}).
+  realworld <lib|all>            perf on real-world SNAP datasets   (default profile: ${DEFAULT_REALWORLD_PROFILE}).
+  report [version] [machine]     Merge JSON → promote to reports/versions/<version>-<kind>-<machine>.md →
+                                 regenerate reports/summary/<kind>-<machine>.md + chart SVGs.
+                                 Version defaults to the value in pom.xml (SNAPSHOT stripped).
+                                 Machine is auto-derived from OS/CPU; override if needed.
+
+Libraries (for synthetic / realworld):
+  all   graphity   graphity-reordered   jgrapht   guava   webgraph
+
+Profiles (--profile <name>):
+  Synthetic:    quick   — fast dev loop, n = 10K/100K, all libs, perf+alloc (~minutes)
+                full    — full baseline, n = 10K/100K, all libs, perf+alloc (~hours) [default]
+                big     — large graphs, n = 1M/10M/100M, Graphity+reordered only, perf (~hours)
+  Real-world:   realworld       — all libs, all datasets, perf [default]
+                realworld-quick — web-Google only, smoke run (~minutes)
 
 Examples:
-  $(basename "$0") all quick
-  $(basename "$0") perf full
-  $(basename "$0") all dataset-quick
-  $(basename "$0") all ./benchmark-matrix/full.json
+  $(basename "$0") bench                             # complete run (~3h): full + big + realworld
+  $(basename "$0") clean && $(basename "$0") bench   # clean slate then full run
+  $(basename "$0") synthetic all                     # full synthetic only
+  $(basename "$0") synthetic all --profile big       # large-graph synthetic only
+  $(basename "$0") realworld all                     # real-world only
+  $(basename "$0") report                            # regenerate summary from existing versions
+  $(basename "$0") report 2.0.0
+  $(basename "$0") report 2.0.0 macos-m5
 EOF
 }
 
-subcmd="${1:-}"
-profile_arg="${2:-}"
+cmd="${1:-}"
 ts=$(date +%Y%m%d-%H%M%S)
 
-case "$subcmd" in
-  -h|--help|help|"")
-    usage
-    exit 0
-    ;;
+case "$cmd" in
+  -h|--help|help|"") usage; exit 0 ;;
 esac
 
-if [[ -z "$profile_arg" ]]; then
-  usage
-  exit 2
-fi
+shift || true
 
-matrix_file="$(resolve_matrix_file "$profile_arg")"
-validate_matrix "$matrix_file"
-profile_name="$(matrix_profile_name "$matrix_file")"
+# Parse options (only --profile/--matrix are meaningful; run commands use positionals).
+PROFILE_OVERRIDE=""
+POSARGS=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --profile|--matrix)
+      PROFILE_OVERRIDE="${2:-}"
+      [[ -z "$PROFILE_OVERRIDE" ]] && { echo "error: $1 requires a value" >&2; exit 2; }
+      shift 2 ;;
+    --profile=*|--matrix=*)
+      PROFILE_OVERRIDE="${1#*=}"; shift ;;
+    -*)
+      echo "error: unknown option '$1'" >&2; usage; exit 2 ;;
+    *)
+      POSARGS+=("$1"); shift ;;
+  esac
+done
 
-case "$subcmd" in
-  perf)   run_perf   "$matrix_file" "$profile_name" "$ts" ;;
-  alloc)  run_alloc  "$matrix_file" "$profile_name" "$ts" ;;
-  mem)    run_mem    "$matrix_file" "$profile_name" "$ts" ;;
-  report) run_report "$profile_name" "$ts" ;;
-  all)
-    banner "Phase 1/4 — perf"
-    run_perf "$matrix_file" "$profile_name" "$ts"
-    banner "Phase 2/4 — alloc"
-    run_alloc "$matrix_file" "$profile_name" "$ts"
-    banner "Phase 3/4 — mem"
-    run_mem "$matrix_file" "$profile_name" "$ts"
-    banner "Phase 4/4 — report"
-    run_report "$profile_name" "$ts"
-    ;;
+case "$cmd" in
+  clean)     cmd_clean ;;
+  bench)     cmd_bench "${POSARGS[0]:-}" ;;
+  synthetic) run_kind synthetic "${POSARGS[0]:-}" "${PROFILE_OVERRIDE:-$DEFAULT_SYNTHETIC_PROFILE}" ;;
+  realworld) run_kind realworld "${POSARGS[0]:-}" "${PROFILE_OVERRIDE:-$DEFAULT_REALWORLD_PROFILE}" ;;
+  report)    cmd_report "${POSARGS[0]:-}" "${POSARGS[1]:-}" ;;
   *)
-    echo "error: unknown subcommand '$subcmd'" >&2
+    echo "error: unknown command '$cmd'" >&2
     usage
     exit 2
     ;;
 esac
+
+if [[ ${#FAILED_MEASUREMENTS[@]} -gt 0 ]]; then
+  banner "done, but with failures"
+  echo "${#FAILED_MEASUREMENTS[@]} measurement(s) failed and were skipped (everything else succeeded and was kept):" >&2
+  printf '  - %s\n' "${FAILED_MEASUREMENTS[@]}" >&2
+  echo "Re-run the same command to retry only these — already-completed measurements are cached and skipped." >&2
+  exit 1
+fi

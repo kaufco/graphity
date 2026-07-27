@@ -26,7 +26,13 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
  * Domain-specific convenience methods ({@link #nodeCount()}, {@link #nodesOf(int)})
  * delegate to the generic interface.
  * <p>
- * Extend this class for domain-specific partitions (e.g. {@link Sccs}).
+ * Sealed to package-internal domain-specific partitions (e.g. {@link Sccs}); the
+ * package-private constructor already restricts extension to this package, and
+ * {@code permits} makes that explicit.
+ * <p>
+ * <strong>Memory:</strong> 4 x (2 x nodeCount + groupCount) bytes for the backing arrays
+ * ({@code mapping}, {@link #members}, {@link #memberStart}), plus a shared reference to
+ * the original {@link #graph}.
  *
  * <pre>{@code
  * int groupId = partition.get(node);
@@ -40,12 +46,12 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
  * @see Sccs
  * @see Components
  */
-public non-sealed class NodePartition extends NodeMapping implements IndexPartition {
+public sealed class NodePartition extends IndexMapping implements IndexPartition permits Sccs {
 
   /** The graph from which this partition was computed. */
   final Graph graph;
 
-  /** CSR values: node IDs of all group members, grouped by partition. */
+  /** CSR values: node IDs of all group members, grouped by partition, sorted ascending within each group. */
   final int[] members;
 
   /** CSR offsets: group {@code g}'s members span {@code members[memberStart[g]..memberStart[g+1]-1]}. */
@@ -56,7 +62,7 @@ public non-sealed class NodePartition extends NodeMapping implements IndexPartit
    *
    * @param graph       the graph from which this partition was computed
    * @param nodeToGroup mapping from node ID to group ID (no {@code -1} entries)
-   * @param members     CSR values: group member node IDs
+   * @param members     CSR values: group member node IDs, sorted ascending within each group
    * @param memberStart CSR offsets: per-group start indices into {@code members}
    */
   NodePartition(Graph graph, int[] nodeToGroup, int[] members, int[] memberStart) {
@@ -65,8 +71,6 @@ public non-sealed class NodePartition extends NodeMapping implements IndexPartit
     this.members = members;
     this.memberStart = memberStart;
   }
-
-  // ---- IndexPartition implementation ----
 
   /**
    * Returns the number of groups (partitions).
@@ -118,8 +122,6 @@ public non-sealed class NodePartition extends NodeMapping implements IndexPartit
     return memberStart[groupId + 1] - memberStart[groupId];
   }
 
-  // ---- Domain-specific convenience (delegate to IndexPartition) ----
-
   /**
    * Returns the total number of nodes in the partition.
    * Equivalent to {@link #indexCount()}.
@@ -146,8 +148,6 @@ public non-sealed class NodePartition extends NodeMapping implements IndexPartit
     return indicesOf(groupId);
   }
 
-  // ---- Condensation ----
-
   /**
    * Builds the condensation graph from this partition.
    * <p>
@@ -161,7 +161,8 @@ public non-sealed class NodePartition extends NodeMapping implements IndexPartit
    * and {@code nodesOf(condensationNode)} to retrieve all original nodes within a
    * condensation node.
    * <p>
-   * <strong>Time:</strong> O(nodeCount + edgeCount).<br>
+   * <strong>Time:</strong> O(nodeCount + edgeCount + condensationEdgeCount x log d̄) where d̄
+   * is the average out-degree in the condensation (per-group adjacency sort).<br>
    * <strong>Memory:</strong> O(groupCount + condensationEdgeCount) for the result;
    * O(groupCount) additional during computation.
    *
@@ -203,17 +204,5 @@ public non-sealed class NodePartition extends NodeMapping implements IndexPartit
     dagStart[groups] = dagAdj.size();
 
     return new Graph(dagStart, dagAdj.toIntArray());
-  }
-
-  /**
-   * Always throws — a partition mapping is many-to-one and cannot be inverted
-   * to a {@link NodeMapping}. Use {@link #nodesOf(int)} for the reverse direction.
-   *
-   * @throws IllegalArgumentException always
-   */
-  @Override
-  public NodeMapping inverse() {
-    throw new IllegalArgumentException(
-        "Cannot invert a partition mapping (many-to-one). Use nodesOf() for the reverse direction.");
   }
 }

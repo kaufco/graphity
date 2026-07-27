@@ -18,6 +18,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.TreeSet;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Report generator: aggregates JMH perf JSON, JMH alloc JSON, and JOL memory CSV into
@@ -64,12 +65,27 @@ public final class ReportMain {
       Map.entry("TopOrder", "TopOrder"),
       Map.entry("TopOrderAndLevels", "TopOrderAndLevels"),
       Map.entry("BackEdges", "BackEdges"),
-      Map.entry("EdgeTypes", "EdgeTypes"));
+      Map.entry("EdgeTypes", "EdgeTypes"),
+      Map.entry("Reorder", "Reorder (DFS-preorder) cost"));
 
-  /** Libraries in the preferred display order (Graphity first as the baseline). */
-  private static final List<String> LIB_ORDER = List.of("graphity", "jgrapht", "guava", "webgraph");
+  /**
+   * Fixed algorithm order for the performance / allocation sub-chapters. {@code Reorder} — the
+   * one-time cost of {@code Graphs.dfsReordered} — is deliberately last, as the closing
+   * subsection of chapter 1.
+   */
+  private static final List<String> ALGO_ORDER = List.of(
+      "Build", "Scc", "Wcc", "Ccs", "TopOrder", "TopOrderAndLevels",
+      "BackEdges", "EdgeTypes", "Reorder");
+
+  /**
+   * Libraries in the preferred display order. Graphity is the baseline; its DFS-preorder
+   * reordered variant sits immediately after it so the reordered speedup reads left-to-right.
+   */
+  private static final List<String> LIB_ORDER =
+      List.of("graphity", "graphity-reordered", "jgrapht", "guava", "webgraph");
   private static final Map<String, String> LIB_DISPLAY = Map.of(
       "graphity", "Graphity",
+      "graphity-reordered", "Graphity (reordered)",
       "jgrapht", "JGraphT",
       "guava", "Guava",
       "webgraph", "WebGraph");
@@ -188,21 +204,69 @@ public final class ReportMain {
     out.println("## 1 · Performance");
     out.println();
 
-    // Group by algorithm, then by nodeCount.
-    Map<String, List<PerfResult>> byAlgo = new LinkedHashMap<>();
-    for (String canonical : List.of(
-        "Build", "Scc", "Wcc", "Ccs", "TopOrder", "TopOrderAndLevels",
-        "BackEdges", "EdgeTypes")) {
-      byAlgo.put(canonical, new ArrayList<>());
-    }
-    for (PerfResult r : perf) byAlgo.computeIfAbsent(r.algoKey, k -> new ArrayList<>()).add(r);
+    // Split synthetic (shape × n) from real-world dataset rows: they render differently
+    // (dataset rows are keyed by dataset name, not by shape/nodeCount).
+    List<PerfResult> synthetic = new ArrayList<>();
+    List<PerfResult> datasets = new ArrayList<>();
+    for (PerfResult r : perf) (r.dataset == null ? synthetic : datasets).add(r);
 
     int subIdx = 0;
+
+    // --- synthetic: group by algorithm, then by nodeCount.
+    Map<String, List<PerfResult>> byAlgo = new LinkedHashMap<>();
+    for (String canonical : ALGO_ORDER) byAlgo.put(canonical, new ArrayList<>());
+    for (PerfResult r : synthetic) byAlgo.computeIfAbsent(r.algoKey, k -> new ArrayList<>()).add(r);
     for (Map.Entry<String, List<PerfResult>> e : byAlgo.entrySet()) {
       if (e.getValue().isEmpty()) continue;
       subIdx++;
       emitPerfAlgoSubsection(out, subIdx, e.getKey(), e.getValue());
     }
+
+    // --- real-world datasets: group by algorithm, rows keyed by dataset name.
+    if (!datasets.isEmpty()) {
+      Map<String, List<PerfResult>> dsByAlgo = new LinkedHashMap<>();
+      for (String canonical : ALGO_ORDER) dsByAlgo.put(canonical, new ArrayList<>());
+      for (PerfResult r : datasets) dsByAlgo.computeIfAbsent(r.algoKey, k -> new ArrayList<>()).add(r);
+      for (Map.Entry<String, List<PerfResult>> e : dsByAlgo.entrySet()) {
+        if (e.getValue().isEmpty()) continue;
+        subIdx++;
+        emitPerfDatasetSubsection(out, subIdx, e.getKey(), e.getValue());
+      }
+    }
+  }
+
+  private static void emitPerfDatasetSubsection(PrintStream out, int idx, String algoKey, List<PerfResult> rows) {
+    String pretty = ALGO_NAME.getOrDefault(algoKey, algoKey);
+    out.printf("### 1.%d · %s — real-world graphs%n%n", idx, pretty);
+
+    List<String> libs = librariesIn(rows);
+
+    StringBuilder hdr = new StringBuilder("| Dataset |");
+    StringBuilder sep = new StringBuilder("|---|");
+    for (String lib : libs) {
+      hdr.append(" ").append(LIB_DISPLAY.get(lib)).append(" |");
+      sep.append("---:|");
+    }
+    out.println(hdr);
+    out.println(sep);
+
+    // dataset name → library → score, preserving first-seen dataset order.
+    Map<String, Map<String, Double>> cells = new LinkedHashMap<>();
+    for (PerfResult r : rows) {
+      cells.computeIfAbsent(r.dataset, k -> new LinkedHashMap<>()).put(r.library, r.score);
+    }
+
+    for (Map.Entry<String, Map<String, Double>> e : cells.entrySet()) {
+      Map<String, Double> byLib = e.getValue();
+      Double baseline = byLib.get("graphity");
+      StringBuilder line = new StringBuilder("| ").append(e.getKey()).append(" |");
+      for (String lib : libs) {
+        Double v = byLib.get(lib);
+        line.append(" ").append(v == null ? "—" : withRatio(fmtMs(v) + " ms", v, baseline, lib)).append(" |");
+      }
+      out.println(line);
+    }
+    out.println();
   }
 
   private static void emitPerfAlgoSubsection(PrintStream out, int idx, String algoKey, List<PerfResult> rows) {
@@ -399,21 +463,66 @@ public final class ReportMain {
         + "shown as `~0`.*");
     out.println();
 
-    // Group by algorithm, then nodeCount.
-    Map<String, List<AllocResult>> byAlgo = new LinkedHashMap<>();
-    for (String canonical : List.of(
-        "Build", "Scc", "Wcc", "Ccs", "TopOrder", "TopOrderAndLevels",
-        "BackEdges", "EdgeTypes")) {
-      byAlgo.put(canonical, new ArrayList<>());
-    }
-    for (AllocResult r : alloc) byAlgo.computeIfAbsent(r.algoKey, k -> new ArrayList<>()).add(r);
+    List<AllocResult> synthetic = new ArrayList<>();
+    List<AllocResult> datasets = new ArrayList<>();
+    for (AllocResult r : alloc) (r.dataset == null ? synthetic : datasets).add(r);
 
     int subIdx = 0;
+
+    // --- synthetic: group by algorithm, then nodeCount.
+    Map<String, List<AllocResult>> byAlgo = new LinkedHashMap<>();
+    for (String canonical : ALGO_ORDER) byAlgo.put(canonical, new ArrayList<>());
+    for (AllocResult r : synthetic) byAlgo.computeIfAbsent(r.algoKey, k -> new ArrayList<>()).add(r);
     for (Map.Entry<String, List<AllocResult>> e : byAlgo.entrySet()) {
       if (e.getValue().isEmpty()) continue;
       subIdx++;
       emitAllocAlgoSubsection(out, subIdx, e.getKey(), e.getValue());
     }
+
+    // --- real-world datasets: group by algorithm, rows keyed by dataset name.
+    if (!datasets.isEmpty()) {
+      Map<String, List<AllocResult>> dsByAlgo = new LinkedHashMap<>();
+      for (String canonical : ALGO_ORDER) dsByAlgo.put(canonical, new ArrayList<>());
+      for (AllocResult r : datasets) dsByAlgo.computeIfAbsent(r.algoKey, k -> new ArrayList<>()).add(r);
+      for (Map.Entry<String, List<AllocResult>> e : dsByAlgo.entrySet()) {
+        if (e.getValue().isEmpty()) continue;
+        subIdx++;
+        emitAllocDatasetSubsection(out, subIdx, e.getKey(), e.getValue());
+      }
+    }
+  }
+
+  private static void emitAllocDatasetSubsection(PrintStream out, int idx, String algoKey, List<AllocResult> rows) {
+    String pretty = ALGO_NAME.getOrDefault(algoKey, algoKey);
+    out.printf("### 3.%d · %s — real-world graphs%n%n", idx, pretty);
+
+    List<String> libs = librariesInAlloc(rows);
+
+    StringBuilder hdr = new StringBuilder("| Dataset |");
+    StringBuilder sep = new StringBuilder("|---|");
+    for (String lib : libs) {
+      hdr.append(" ").append(LIB_DISPLAY.get(lib)).append(" |");
+      sep.append("---:|");
+    }
+    out.println(hdr);
+    out.println(sep);
+
+    Map<String, Map<String, Double>> cells = new LinkedHashMap<>();
+    for (AllocResult r : rows) {
+      cells.computeIfAbsent(r.dataset, k -> new LinkedHashMap<>()).put(r.library, r.bytesPerOp);
+    }
+
+    for (Map.Entry<String, Map<String, Double>> e : cells.entrySet()) {
+      Map<String, Double> byLib = e.getValue();
+      Double baseline = byLib.get("graphity");
+      StringBuilder line = new StringBuilder("| ").append(e.getKey()).append(" |");
+      for (String lib : libs) {
+        Double v = byLib.get(lib);
+        line.append(" ").append(v == null ? "—" : withRatio(fmtBytes(v) + " B", v, baseline, lib)).append(" |");
+      }
+      out.println(line);
+    }
+    out.println();
   }
 
   private static void emitAllocAlgoSubsection(PrintStream out, int idx, String algoKey, List<AllocResult> rows) {
@@ -479,9 +588,11 @@ public final class ReportMain {
 
     for (PerfResult r : sorted) {
       double rel = r.score == 0 ? 0 : Math.abs(r.scoreError / r.score) * 100.0;
+      String rowLabel = r.dataset != null ? r.dataset : r.shape;
+      String nodesLabel = r.dataset != null ? "—" : fmtInt(r.nodeCount);
       out.printf(Locale.ROOT, "| %s | %s | %s | %s | %s | %.0f%% |%n",
           shortBenchmarkName(r.benchmarkFull),
-          r.shape, fmtInt(r.nodeCount), fmtMs(r.score), fmtMs(r.scoreError), rel);
+          rowLabel, nodesLabel, fmtMs(r.score), fmtMs(r.scoreError), rel);
     }
     out.println();
   }
@@ -511,9 +622,11 @@ public final class ReportMain {
       Map<String, Object> params = castMap(e.get("params"));
       String shape = params == null ? "?" : asStr(params.get("shape"));
       int nodeCount = params == null ? 0 : asInt(params.get("nodeCount"));
+      String dataset = params == null ? null
+          : datasetName(asStr(params.get("inputMode")), asStr(params.get("datasetPath")));
 
       Meta meta = parseBenchmarkName(benchmark);
-      out.add(new PerfResult(benchmark, meta.library, meta.algoKey, shape, nodeCount, score, err));
+      out.add(new PerfResult(benchmark, meta.library, meta.algoKey, shape, nodeCount, score, err, dataset));
     }
     return out;
   }
@@ -525,6 +638,8 @@ public final class ReportMain {
       Map<String, Object> params = castMap(e.get("params"));
       String shape = params == null ? "?" : asStr(params.get("shape"));
       int nodeCount = params == null ? 0 : asInt(params.get("nodeCount"));
+      String dataset = params == null ? null
+          : datasetName(asStr(params.get("inputMode")), asStr(params.get("datasetPath")));
 
       Map<String, Object> sec = castMap(e.get("secondaryMetrics"));
       Double bytesPerOp = null;
@@ -538,7 +653,7 @@ public final class ReportMain {
       if (bytesPerOp == null) continue;  // no gc metric recorded — skip silently
 
       Meta meta = parseBenchmarkName(benchmark);
-      out.add(new AllocResult(benchmark, meta.library, meta.algoKey, shape, nodeCount, bytesPerOp));
+      out.add(new AllocResult(benchmark, meta.library, meta.algoKey, shape, nodeCount, bytesPerOp, dataset));
     }
     return out;
   }
@@ -594,6 +709,14 @@ public final class ReportMain {
     if (library.equals("guava") && stem.startsWith("Guava")) stem = stem.substring("Guava".length());
     if (library.equals("webgraph") && stem.startsWith("WebGraph")) stem = stem.substring("WebGraph".length());
     if (stem.endsWith("Benchmark")) stem = stem.substring(0, stem.length() - "Benchmark".length());
+
+    // Graphity's *Reordered benchmarks (e.g. SccReorderedBenchmark) run the same algorithm on
+    // a DFS-preorder reordered graph: fold them into the base algorithm key but tag them as the
+    // "graphity-reordered" pseudo-library so they render as a separate column.
+    if (library.equals("graphity") && stem.endsWith("Reordered")) {
+      library = "graphity-reordered";
+      stem = stem.substring(0, stem.length() - "Reordered".length());
+    }
     return new Meta(library, stem);
   }
 
@@ -692,17 +815,42 @@ public final class ReportMain {
   }
 
   private static String cpuModel() {
+    // Linux: /proc/cpuinfo
     Path p = Path.of("/proc/cpuinfo");
-    if (!Files.isReadable(p)) return null;
-    try {
-      for (String line : Files.readAllLines(p, StandardCharsets.UTF_8)) {
-        if (line.startsWith("model name")) {
-          int colon = line.indexOf(':');
-          return colon < 0 ? null : line.substring(colon + 1).trim();
+    if (Files.isReadable(p)) {
+      try {
+        for (String line : Files.readAllLines(p, StandardCharsets.UTF_8)) {
+          if (line.startsWith("model name")) {
+            int colon = line.indexOf(':');
+            if (colon >= 0) return line.substring(colon + 1).trim();
+          }
         }
-      }
-    } catch (IOException ignored) {}
+      } catch (IOException ignored) {}
+    }
+
+    // macOS: sysctl brand string (Intel; sometimes Apple Silicon)
+    String brand = runCommand("sysctl", "-n", "machdep.cpu.brand_string");
+    if (brand != null && !brand.isBlank()) return brand.trim();
+
+    // macOS Apple Silicon: chip name via system_profiler
+    String chip = runCommand("bash", "-c",
+        "system_profiler SPHardwareDataType 2>/dev/null | awk '/Chip:/{$1=$2=\"\"; print; exit}'");
+    if (chip != null && !chip.isBlank()) return chip.trim();
+
     return null;
+  }
+
+  private static String runCommand(String... cmd) {
+    try {
+      ProcessBuilder pb = new ProcessBuilder(cmd);
+      pb.redirectErrorStream(false);
+      Process proc = pb.start();
+      String out = new String(proc.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim();
+      proc.waitFor(5, java.util.concurrent.TimeUnit.SECONDS);
+      return out.isBlank() ? null : out;
+    } catch (Exception ignored) {
+      return null;
+    }
   }
 
   // ======================================================================
@@ -739,6 +887,23 @@ public final class ReportMain {
     return o == null ? null : o.toString();
   }
 
+  /**
+   * Derives a short dataset label (basename without extension, e.g. {@code web-Google}) from a
+   * fixture's {@code datasetPath} param. Returns {@code null} for synthetic runs — i.e. when the
+   * path is blank or {@code inputMode} is set to something other than {@code dataset}.
+   */
+  private static String datasetName(String inputMode, String datasetPath) {
+    if (datasetPath == null || datasetPath.isBlank()) return null;
+    if (inputMode != null && !inputMode.isBlank() && !inputMode.trim().equalsIgnoreCase("dataset")) {
+      return null;
+    }
+    String p = datasetPath.trim().replace('\\', '/');
+    int slash = p.lastIndexOf('/');
+    String base = slash < 0 ? p : p.substring(slash + 1);
+    int dot = base.indexOf('.');
+    return dot < 0 ? base : base.substring(0, dot);
+  }
+
   // ======================================================================
   // Usage
   // ======================================================================
@@ -767,15 +932,19 @@ public final class ReportMain {
   // Data records
   // ======================================================================
 
-  /** One row from the perf JSON. */
+  /**
+   * One row from the perf JSON. For real-world dataset runs {@code dataset} carries the
+   * dataset name (e.g. {@code web-Google}) and {@code shape}/{@code nodeCount} are the
+   * placeholder fixture params; for synthetic runs {@code dataset} is {@code null}.
+   */
   record PerfResult(
       String benchmarkFull, String library, String algoKey,
-      String shape, int nodeCount, double score, double scoreError) {}
+      String shape, int nodeCount, double score, double scoreError, String dataset) {}
 
   /** One row from the alloc JSON (only gc.alloc.rate.norm extracted). */
   record AllocResult(
       String benchmarkFull, String library, String algoKey,
-      String shape, int nodeCount, double bytesPerOp) {}
+      String shape, int nodeCount, double bytesPerOp, String dataset) {}
 
   /** One row from the mem CSV. */
   record MemResult(String library, String shape, int nodes, int edges, long totalBytes) {}

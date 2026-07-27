@@ -4,7 +4,8 @@ package com.kobayami.graphity;
  * Unidirectional mapping between two edge index spaces.
  * <p>
  * Maps source edge indices to target edge indices. A target value of {@code -1} indicates
- * that the source edge has no mapping (e.g. an intra-group edge dropped during condensation).
+ * that the source edge has no mapping (e.g. an edge that exists in the new graph but not
+ * in the old graph).
  * <p>
  * Edge indices correspond to positions in the CSR adjacency array of a {@link Graph}:
  * edge 0 is the first out-edge of node 0, edge 1 the second, etc.
@@ -17,10 +18,11 @@ package com.kobayami.graphity;
  * // Derive edge mapping from node mapping
  * EdgeMapping em = Graphs.edgeMapping(newGraph, oldGraph, nodeMapping);
  *
- * // Translate edge metadata
+ * // Translate edge metadata, skipping edges with no correspondence in the old graph
  * double[] newWeights = new double[newGraph.edgeCount()];
- * for (int i = 0; i < em.size(); i++) {
- *     newWeights[i] = oldWeights[em.get(i)];
+ * for (int i = 0; i < newGraph.edgeCount(); i++) {
+ *     int oldEdge = em.get(i);
+ *     if (oldEdge >= 0) newWeights[i] = oldWeights[oldEdge];
  * }
  * }</pre>
  *
@@ -28,12 +30,12 @@ package com.kobayami.graphity;
  * @see EdgePartition
  * @see Graphs#edgeMapping(Graph, Graph, NodeMapping)
  */
-public sealed class EdgeMapping extends IndexMapping permits EdgePartition {
+public final class EdgeMapping extends IndexMapping {
 
   /**
    * Package-private constructor.
    *
-   * @param mapping    the mapping array (not copied — caller must not retain a reference)
+   * @param mapping    the mapping array (not copied - caller must not retain a reference)
    * @param validCount number of non-negative entries in {@code mapping}
    * @param partial    whether the mapping contains unmapped entries ({@code -1})
    */
@@ -50,7 +52,6 @@ public sealed class EdgeMapping extends IndexMapping permits EdgePartition {
    * @return the inverse edge mapping
    * @throws IllegalArgumentException if multiple source indices map to the same target
    */
-  @Override
   public EdgeMapping inverse() {
     int[] inv = computeInverse(mapping);
     int valid = countValid(inv);

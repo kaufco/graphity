@@ -10,8 +10,8 @@ package com.kobayami.graphity;
  * <p>
  * Concrete implementations provide domain-specific convenience methods:
  * <ul>
- *   <li>{@link NodePartition} — partitions nodes, with {@code nodesOf()}, {@code nodeCount()}</li>
- *   <li>{@link EdgePartition} — partitions edges, with {@code edgesOf()}, {@code edgeCount()}</li>
+ *   <li>{@link NodePartition} - partitions nodes, with {@code nodesOf()}, {@code nodeCount()}</li>
+ *   <li>{@link EdgePartition} - partitions edges, with {@code edgesOf()}, {@code edgeCount()}</li>
  * </ul>
  *
  * @see NodePartition

@@ -96,11 +96,4 @@ class EdgePartitionTest {
     assertThatThrownBy(() -> sampleEdgePartition().sizeOf(groupId))
         .isInstanceOf(IndexOutOfBoundsException.class);
   }
-
-  @Test
-  void inverseThrowsAlways() {
-    assertThatThrownBy(() -> sampleEdgePartition().inverse())
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("edgesOf");
-  }
 }

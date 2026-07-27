@@ -35,7 +35,8 @@ public abstract class BiAdjacentFrontierTraverser extends FrontierTraverser {
    * <p>
    * May be called multiple times, and freely combined with other {@code run} methods.
    * <p>
-   * <strong>Time:</strong> O(nodeCount + reachable edges).
+   * <strong>Time:</strong> O(nodeCount + reachable edges).<br>
+   * <strong>Memory:</strong> allocates an array holding the root node IDs.
    */
   public final void runFromRoots() {
     runFromNodes(biAdjacentGraph.rootNodes());

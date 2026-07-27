@@ -94,14 +94,6 @@ class NodePartitionTest {
   }
 
   @Test
-  void inverseThrowsAlways() {
-    var p = threeGroupPartition(emptyGraph());
-    assertThatThrownBy(p::inverse)
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("nodesOf");
-  }
-
-  @Test
   void condenseEmptyPartitionReturnsEmptyGraph() {
     var p = new NodePartition(emptyGraph(), new int[0], new int[0], new int[] {0});
     var condensed = p.condense();

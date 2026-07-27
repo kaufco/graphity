@@ -3,8 +3,7 @@ package com.kobayami.graphity;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.ints.IntLists;
-
-import java.util.BitSet;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
 
 /**
  * Topological sort of a directed acyclic graph (DAG).
@@ -39,7 +38,7 @@ public final class TopOrder {
    * @throws IllegalArgumentException if the graph contains a cycle
    */
   public static IntList of(Graph graph) {
-    var traverser = new Traverser(graph);
+    var traverser = new TopOrderTraverser(graph);
     traverser.run();
     if (traverser.hasCycle) {
       throw new IllegalArgumentException("Graph contains a cycle");
@@ -48,44 +47,79 @@ public final class TopOrder {
   }
 
   /**
-   * DFS traverser that records reverse postorder (= topological order) and detects
-   * back-edges (cycles) via an {@code onStack} BitSet.
+   * Iterative DFS (explicit stack, no recursion) that records reverse postorder
+   * (= topological order) and detects back-edges (cycles).
+   * <p>
+   * visited and on-stack flags are packed 2 bits per node into a single {@code int[]}
+   * (bit 0 = visited, bit 1 = on-stack, 16 nodes per int): one memory touch per node check
+   * instead of two separate bit-set lookups.
    */
-  private static final class Traverser extends DfsTraverser {
+  private static final class TopOrderTraverser {
 
-    private final BitSet onStack;
+    private static final int VISITED = 0b01;
+    private static final int ON_STACK = 0b10;
+
+    private final Graph graph;
+    private final int[] state;
     final int[] order;
     int orderPos;
     boolean hasCycle;
 
-    Traverser(Graph graph) {
-      super(graph);
+    TopOrderTraverser(Graph graph) {
       int n = graph.nodeCount();
-      this.onStack = new BitSet(n);
+      this.graph = graph;
+      this.state = new int[(n >> 4) + 1];
       this.order = new int[n];
       this.orderPos = n;
     }
 
-    @Override
-    protected void visitNode(int node) {
-      if (hasCycle) return;
-      onStack.set(node);
+    void run() {
+      int n = graph.nodeCount();
+      int[] out = graph.outAdjacencyStart;
+      int[] adj = graph.outAdjacency;
+      int[] state = this.state;
+      int[] order = this.order;
+      // Each frame packs (node << 32 | resume cursor) into one long: node and cursor share a
+      // cache line, and the list grows on demand (one allocation per resize instead of two).
+      LongArrayList frames = new LongArrayList(Math.max(16, Math.min(n, 1024)));
 
-      var adjacency = graph.outAdjacency;
-      var adjacencyStart = graph.outAdjacencyStart;
-      int end = adjacencyStart[node + 1];
-      for (int i = adjacencyStart[node]; i < end; i++) {
-        int target = adjacency[i];
-        if (onStack.get(target)) {
-          hasCycle = true;
-          return;
+      for (int root = 0; root < n; root++) {
+        int rShift = (root & 0xF) << 1;
+        if (((state[root >> 4] >>> rShift) & VISITED) != 0) {
+          continue;
         }
-        visit(target);
-        if (hasCycle) return;
-      }
+        state[root >> 4] |= (VISITED | ON_STACK) << rShift;
+        frames.add(((long) root << 32) | (out[root] & 0xFFFFFFFFL));
 
-      onStack.clear(node);
-      order[--orderPos] = node;
+        outer:
+        while (!frames.isEmpty()) {
+          int top = frames.size() - 1;
+          long frame = frames.getLong(top);
+          int u = (int) (frame >>> 32);
+          int end = out[u + 1];
+          // Tight neighbor scan: i and end stay in registers; the frame list is
+          // touched only when we actually descend, not once per edge.
+          int i = (int) frame;
+          while (i < end) {
+            int v = adj[i++];
+            int shift = (v & 0xF) << 1;
+            int flags = state[v >> 4] >>> shift;
+            if ((flags & ON_STACK) != 0) {
+              hasCycle = true;
+              return;
+            }
+            if ((flags & VISITED) == 0) {
+              frames.set(top, (frame & 0xFFFFFFFF00000000L) | (i & 0xFFFFFFFFL));
+              state[v >> 4] |= (VISITED | ON_STACK) << shift;
+              frames.add(((long) v << 32) | (out[v] & 0xFFFFFFFFL));
+              continue outer;
+            }
+          }
+          state[u >> 4] &= ~(ON_STACK << ((u & 0xF) << 1));
+          order[--orderPos] = u;
+          frames.size(top);
+        }
+      }
     }
   }
 }

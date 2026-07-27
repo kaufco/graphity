@@ -10,7 +10,7 @@ import it.unimi.dsi.fastutil.ints.IntLists;
  * Each edge is identified by its index in {@code 0..count()-1}. Edge {@code i} goes from
  * {@code sourceNodes().getInt(i)} to {@code targetNodes().getInt(i)}.
  * <p>
- * Both lists are unmodifiable {@link IntList} instances — use their standard API for
+ * Both lists are unmodifiable {@link IntList} instances - use their standard API for
  * iteration, streaming, and element access. No Collection API is replicated on this class.
  *
  * <pre>{@code
@@ -87,8 +87,6 @@ public final class Edges {
 
   /**
    * Returns an empty edge collection.
-   *
-   * @return an empty {@code Edges} instance
    */
   static Edges empty() {
     return EMPTY;

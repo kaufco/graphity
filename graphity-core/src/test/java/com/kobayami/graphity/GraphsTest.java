@@ -235,6 +235,23 @@ class GraphsTest {
     assertThat(remapped.outNodes(3).toIntArray()).containsExactly(0, 1, 2);
   }
 
+  // ---- dfsReordered ----
+
+  @Test
+  void dfsReorderedMatchesRemappedWithReindexMapping() {
+    // Diamond + tail: 0 -> 1, 0 -> 2, 1 -> 3, 2 -> 3, 3 -> 4, 3 -> 5.
+    var g = TestGraphs.of(6, 0, 1, 0, 2, 1, 3, 2, 3, 3, 4, 3, 5);
+    var expected = Graphs.remapped(g, NodeMapping.reindex(g));
+    assertThat(Graphs.dfsReordered(g)).isEqualTo(expected);
+  }
+
+  @Test
+  void dfsReorderedOnEmptyGraphIsEmpty() {
+    var reordered = Graphs.dfsReordered(TestGraphs.empty());
+    assertThat(reordered.nodeCount()).isZero();
+    assertThat(reordered.edgeCount()).isZero();
+  }
+
   // ---- edgeMapping ----
 
   @Test

@@ -1,0 +1,92 @@
+# Signs graphity-core and uploads it to Maven Central via the Central Publisher
+# Portal.
+#
+# Manual trigger only, deliberately not tied to the release tag: a tag may be
+# pushed for reasons that should not start a deploy, and re-running a deploy for
+# an already published version just produces a failed run.
+#
+# What the job does — and where it stops: it builds, tests, signs, uploads a
+# bundle and waits for the portal to validate it. That is all. Making the release
+# visible on Maven Central is a separate "Publish" in the portal, by hand,
+# because a published version can never be withdrawn.
+#
+# The `version` input changes nothing. It forces whoever starts the run to state
+# which version they believe they are publishing, and the job stops if that
+# disagrees with the POM.
+#
+# Required repository secrets:
+#   GPG_PRIVATE_KEY         armored secret key (gpg --armor --export-secret-keys)
+#   GPG_PASSPHRASE          passphrase of that key
+#   CENTRAL_TOKEN_USERNAME  user token from central.sonatype.com
+#   CENTRAL_TOKEN_PASSWORD
+#
+# The job is guarded with `if: github.repository == 'kaufco/graphity'` so that
+# forks never attempt a deploy they have no credentials for.
+
+name: Release to Maven Central
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish; must match the POM (e.g. 2.0.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# Never run two releases at once, and never cancel one in flight: an interrupted
+# upload would leave a partial deployment in the portal.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Sign & upload to Central
+    if: github.repository == 'kaufco/graphity'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          # Writes a settings.xml containing <server id="central"> whose
+          # credentials are read from the environment variables named here, and
+          # imports the signing key into the runner's keyring.
+          server-id: central
+          server-username: CENTRAL_TOKEN_USERNAME
+          server-password: CENTRAL_TOKEN_PASSWORD
+          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+
+      - name: Check the POM version against the input
+        # The input is passed through the environment rather than interpolated
+        # into the script, so it cannot be read as shell syntax.
+        env:
+          EXPECTED: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          pom="$(mvn -B -ntp -q help:evaluate -Dexpression=project.version -DforceStdout)"
+          if [[ "$pom" != "$EXPECTED" ]]; then
+            echo "The POM is at $pom, but this run was started for $EXPECTED." >&2
+            exit 1
+          fi
+          echo "Publishing $pom."
+
+      - name: Build, sign and upload
+        # The reactor is narrowed to the parent POM (which consumers need in
+        # order to resolve graphity-core) and the library itself, so the
+        # benchmarks uber-jar stays out of the bundle.
+        run: mvn -B -ntp -pl graphity-core -am clean deploy -P release
+        env:
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          CENTRAL_TOKEN_USERNAME: ${{ secrets.CENTRAL_TOKEN_USERNAME }}
+          CENTRAL_TOKEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN_PASSWORD }}

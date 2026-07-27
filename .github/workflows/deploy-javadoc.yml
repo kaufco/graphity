@@ -1,13 +1,12 @@
 # Builds the graphity-core Javadoc and deploys it to GitHub Pages.
 #
-# This workflow is intentionally limited to the public release repository
-# (kobayami/graphity) via `if: github.repository == 'kobayami/graphity'`.
-# In the private kaufco/graphity mirror the workflow file is present but
-# the job is skipped — Pages is not configured there.
+# The job is guarded with `if: github.repository == 'kaufco/graphity'` so that
+# forks don't attempt a Pages deploy they have neither the settings nor the
+# permissions for.
 #
 # Two triggers:
 #   * workflow_dispatch — manual run, used before 1.0.0 to populate
-#     https://kobayami.github.io/graphity/ from main HEAD so the page is
+#     https://kaufco.github.io/graphity/ from main HEAD so the page is
 #     not blank.
 #   * push.tags 'v*.*.*' — automatic run on release tags. For 1.0/1.1
 #     the published Javadoc is the tag's snapshot at Pages root; a
@@ -17,8 +16,6 @@
 # GitHub Pages source must be set to "GitHub Actions" in the repository
 # settings — this workflow uses actions/deploy-pages, not a gh-pages
 # branch.
-#
-# See internal/RELEASES.md §C for the broader context.
 
 name: Deploy Javadoc
 
@@ -42,7 +39,7 @@ concurrency:
 jobs:
   deploy:
     name: Build & deploy Javadoc
-    if: github.repository == 'kobayami/graphity'
+    if: github.repository == 'kaufco/graphity'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment:

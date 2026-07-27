@@ -1,7 +1,8 @@
 package com.kobayami.graphity;
 
+import it.unimi.dsi.fastutil.longs.LongArrayList;
+
 import java.util.Arrays;
-import java.util.BitSet;
 
 /**
  * Utility methods for graph transformations and shape checks.
@@ -18,7 +19,7 @@ import java.util.BitSet;
  * Graphs.isPath(graph);      // out-tree with all outDegrees <= 1?
  *
  * // Reindexing for cache-friendly layout
- * Graph reindexed = Graphs.remapped(graph, NodeMapping.reindex(graph));
+ * Graph reindexed = Graphs.dfsReordered(graph);
  *
  * // Subgraph extraction
  * Graph sub = Graphs.remapped(graph, NodeMapping.forSubgraph(selectedNodes));
@@ -28,6 +29,9 @@ import java.util.BitSet;
  * }</pre>
  *
  * @see NodeMapping
+ * @see NodePartition
+ * @see EdgeMapping
+ * @see EdgePartition
  * @see Graph
  */
 public final class Graphs {
@@ -45,7 +49,11 @@ public final class Graphs {
    * For <strong>subgraph</strong> mappings, edges to nodes not in the subgraph are dropped.
    * Adjacency lists in the resulting graph are sorted ascending.
    * <p>
-   * <strong>Time:</strong> O(nodeCount + edgeCount + Σ newDegree × log(newDegree)).<br>
+   * The parameter type is {@link NodeMapping}, <strong>not</strong> a {@link NodePartition}:
+   * a partition is many-to-one, so it cannot be inverted and is not a {@code NodeMapping}.
+   * Passing one is therefore a compile error, not a runtime failure.
+   * <p>
+   * <strong>Time:</strong> O(nodeCount + edgeCount + Σ newDegree x log(newDegree)).<br>
    * <strong>Memory:</strong> O(nodeCount + edgeCount) for the result;
    * O(nodeCount) additional during computation (inverse mapping).
    *
@@ -53,7 +61,7 @@ public final class Graphs {
    * @param newToOld mapping from new node IDs to original node IDs
    * @return a new graph with remapped node IDs
    * @throws IllegalArgumentException if the mapping contains duplicate targets
-   *         (not injective — cannot compute inverse)
+   *         (not injective - cannot compute inverse)
    * @see NodeMapping#reindex(Graph)
    * @see NodeMapping#forSubgraph(java.util.BitSet)
    * @see NodeMapping#forPermutation(it.unimi.dsi.fastutil.ints.IntList)
@@ -110,7 +118,35 @@ public final class Graphs {
     return new Graph(outStart, outAdj);
   }
 
-  // ---- Shape checks ----
+  /**
+   * Returns a copy of {@code graph} with node IDs reassigned in DFS preorder, so that nodes
+   * visited close together during traversal receive adjacent IDs. This is the cache-friendly
+   * reindexing shortcut for {@code remapped(graph, NodeMapping.reindex(graph))}.
+   * <p>
+   * DFS-preorder relabeling clusters each node's out-neighbors near it in ID space. This turns
+   * the random {@code state[target]} accesses of the DFS-based algorithms (SCC, WCC, CCs,
+   * TopOrder, back-edge and edge-type classification) into near-sequential scans. On
+   * poorly-ordered inputs this speeds those traversals up by a multiple; on already
+   * well-ordered inputs it is effectively a no-op.
+   * <p>
+   * The returned graph uses fresh node IDs. When the caller also needs to translate results
+   * back to the original IDs, obtain the mapping explicitly instead:
+   * <pre>{@code
+   * NodeMapping newToOld = NodeMapping.reindex(graph);
+   * Graph reordered = Graphs.remapped(graph, newToOld);
+   * }</pre>
+   * <p>
+   * <strong>Time:</strong> O(nodeCount + edgeCount).<br>
+   * <strong>Memory:</strong> O(nodeCount + edgeCount) for the result.
+   *
+   * @param graph the graph to reorder
+   * @return a new graph with DFS-preorder node IDs
+   * @see NodeMapping#reindex(Graph)
+   * @see #remapped(Graph, NodeMapping)
+   */
+  public static Graph dfsReordered(Graph graph) {
+    return remapped(graph, NodeMapping.reindex(graph));
+  }
 
   /**
    * Returns whether the given graph is a DAG (contains no cycles).
@@ -181,8 +217,6 @@ public final class Graphs {
     return info != null && info.rootCount <= 1 && info.maxOutDegree <= 1;
   }
 
-  // ---- Shape check internals ----
-
   /**
    * Computes forest properties in a single edge scan pass. Returns null if the graph
    * is not a forest (some node has in-degree > 1, or the graph contains a cycle).
@@ -232,8 +266,6 @@ public final class Graphs {
 
   private record ForestInfo(int rootCount, int maxOutDegree) {}
 
-  // ---- Edge mapping derivation ----
-
   /**
    * Derives an edge mapping from a node mapping and two graphs.
    * <p>
@@ -243,7 +275,7 @@ public final class Graphs {
    * The node mapping must be in the direction new → old (as produced by all
    * {@link NodeMapping} factory methods).
    * <p>
-   * <strong>Time:</strong> O(newEdgeCount × log d̄) where d̄ is the average out-degree
+   * <strong>Time:</strong> O(newEdgeCount x log d̄) where d̄ is the average out-degree
    * in the old graph (binary search per edge).<br>
    * <strong>Memory:</strong> O(newEdgeCount) for the result.
    *
@@ -290,7 +322,7 @@ public final class Graphs {
    * The condensed graph must be the result of {@link NodePartition#condense()} applied to
    * the given partition.
    * <p>
-   * <strong>Time:</strong> O(originalEdgeCount × log d̄) where d̄ is the average out-degree
+   * <strong>Time:</strong> O(originalEdgeCount x log d̄) where d̄ is the average out-degree
    * in the condensed graph (binary search per edge).<br>
    * <strong>Memory:</strong> O(originalEdgeCount + condensedEdgeCount) for the result.
    *
@@ -355,38 +387,72 @@ public final class Graphs {
   }
 
   /**
-   * DFS traverser for cycle detection. Detects back-edges (including self-loops) via an
-   * {@code onStack} BitSet. Terminates early on the first cycle found.
+   * Iterative DFS (explicit stack, no recursion) for cycle detection. Detects back-edges
+   * (including self-loops) and terminates early on the first cycle found.
+   * <p>
+   * visited and on-stack flags are packed 2 bits per node into a single {@code int[]}
+   * (bit 0 = visited, bit 1 = on-stack, 16 nodes per int): one memory touch per node check
+   * instead of two separate bit-set lookups.
    */
-  private static final class CycleChecker extends DfsTraverser {
+  private static final class CycleChecker {
 
-    private final BitSet onStack;
+    private static final int VISITED = 0b01;
+    private static final int ON_STACK = 0b10;
+
+    private final Graph graph;
+    private final int[] state;
     boolean hasCycle;
 
     CycleChecker(Graph graph) {
-      super(graph);
-      this.onStack = new BitSet(graph.nodeCount());
+      this.graph = graph;
+      this.state = new int[(graph.nodeCount() >> 4) + 1];
     }
 
-    @Override
-    protected void visitNode(int node) {
-      if (hasCycle) return;
-      onStack.set(node);
+    void run() {
+      int n = graph.nodeCount();
+      int[] out = graph.outAdjacencyStart;
+      int[] adj = graph.outAdjacency;
+      int[] state = this.state;
+      // Each frame packs (node << 32 | resume cursor) into one long: node and cursor share a
+      // cache line, and the list grows on demand (one allocation per resize instead of two).
+      LongArrayList frames = new LongArrayList(Math.max(16, Math.min(n, 1024)));
 
-      var adjacency = graph.outAdjacency;
-      var adjacencyStart = graph.outAdjacencyStart;
-      int end = adjacencyStart[node + 1];
-      for (int i = adjacencyStart[node]; i < end; i++) {
-        int target = adjacency[i];
-        if (onStack.get(target)) {
-          hasCycle = true;
-          return;
+      for (int root = 0; root < n; root++) {
+        int rShift = (root & 0xF) << 1;
+        if (((state[root >> 4] >>> rShift) & VISITED) != 0) {
+          continue;
         }
-        visit(target);
-        if (hasCycle) return;
-      }
+        state[root >> 4] |= (VISITED | ON_STACK) << rShift;
+        frames.add(((long) root << 32) | (out[root] & 0xFFFFFFFFL));
 
-      onStack.clear(node);
+        outer:
+        while (!frames.isEmpty()) {
+          int top = frames.size() - 1;
+          long frame = frames.getLong(top);
+          int u = (int) (frame >>> 32);
+          int end = out[u + 1];
+          // Tight neighbor scan: i and end stay in registers; the frame list is
+          // touched only when we actually descend, not once per edge.
+          int i = (int) frame;
+          while (i < end) {
+            int v = adj[i++];
+            int shift = (v & 0xF) << 1;
+            int flags = state[v >> 4] >>> shift;
+            if ((flags & ON_STACK) != 0) {
+              hasCycle = true;
+              return;
+            }
+            if ((flags & VISITED) == 0) {
+              frames.set(top, (frame & 0xFFFFFFFF00000000L) | (i & 0xFFFFFFFFL));
+              state[v >> 4] |= (VISITED | ON_STACK) << shift;
+              frames.add(((long) v << 32) | (out[v] & 0xFFFFFFFFL));
+              continue outer;
+            }
+          }
+          state[u >> 4] &= ~(ON_STACK << ((u & 0xF) << 1));
+          frames.size(top);
+        }
+      }
     }
   }
 }

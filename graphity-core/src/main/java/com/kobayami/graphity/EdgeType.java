@@ -6,10 +6,10 @@ package com.kobayami.graphity;
  * Every edge in a directed graph falls into exactly one of these four categories,
  * determined by the relationship between source and target in the DFS forest:
  * <ul>
- *   <li>{@link #TREE} — target is discovered for the first time via this edge</li>
- *   <li>{@link #BACK} — target is an ancestor of source in the DFS tree (including self-loops)</li>
- *   <li>{@link #FORWARD} — target is a descendant of source, but not via a tree edge</li>
- *   <li>{@link #CROSS} — target is neither ancestor nor descendant (already fully processed)</li>
+ *   <li>{@link #TREE} - target is discovered for the first time via this edge</li>
+ *   <li>{@link #BACK} - target is an ancestor of source in the DFS tree (including self-loops)</li>
+ *   <li>{@link #FORWARD} - target is a descendant of source, but not via a tree edge</li>
+ *   <li>{@link #CROSS} - target is neither ancestor nor descendant (already fully processed)</li>
  * </ul>
  *
  * @see EdgeTypes

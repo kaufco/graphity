@@ -16,6 +16,13 @@ import java.util.Objects;
  * <strong>Pre/Post processing:</strong> code before {@code visitChildren()} executes in
  * preorder, code after in postorder.<br>
  * <strong>Cut (pruning):</strong> omit the {@code visitChildren()} call to skip a subtree.
+ * <p>
+ * <strong>Stack depth:</strong> descent recurses one JVM call-stack frame per DFS level, with
+ * no performance penalty versus an iterative approach. But a very deep or degenerate graph
+ * (e.g. a long path-like chain) can exhaust the call stack and throw {@link StackOverflowError}.
+ * If the graph's depth is large or unknown, use {@link IterativeDfsTraverser} instead - it
+ * handles arbitrary depth without requiring a larger JVM thread stack ({@code -Xss}). Prefer
+ * this class only when an algorithm needs per-edge control (see above).
  *
  * <h2>Example: parenthesized DFS trace</h2>
  * <pre>{@code
@@ -50,16 +57,20 @@ import java.util.Objects;
  * }</pre>
  *
  * <p>{@code run} methods may be called <strong>multiple times</strong>, and freely combined
- * (e.g., {@code runFromRoots(); run(); runFromNodes(list)}). Already-visited nodes are
- * never revisited — the visited set is cumulative across calls.
+ * (e.g., {@code run(int); run(); runFromNodes(list)}). Already-visited nodes are
+ * never revisited - the visited set is cumulative across calls.
  * <p>
  * Subclasses may pre-mark nodes in {@link #visited} before calling a {@code run} method
  * to exclude them from traversal. This is useful for multi-phase algorithms, subgraph
  * traversal, or interleaved multi-source exploration.
+ * <p>
+ * <strong>Memory:</strong> O(nodeCount) for the {@link #visited} bitset (excluding call-stack
+ * usage - see the stack depth note above).
  *
  * @see Graph
  * @see BiAdjacentGraph
  * @see BiAdjacentDfsTraverser
+ * @see IterativeDfsTraverser
  */
 public abstract class DfsTraverser {
 
@@ -67,8 +78,8 @@ public abstract class DfsTraverser {
   protected final Graph graph;
 
   /**
-   * Tracks which nodes have been visited. Subclasses may pre-mark nodes before calling
-   * a {@code run} method to exclude them from traversal.
+   * Tracks which nodes have been visited. See the class doc for pre-marking nodes to
+   * exclude them from traversal.
    */
   protected final BitSet visited;
 
@@ -155,7 +166,7 @@ public abstract class DfsTraverser {
    * (including nodes visited by previous {@code run} calls or pre-marked nodes).
    * <p>
    * May be called multiple times, and freely combined with other {@code run} methods.
-   * Each call continues from the current visited state — already-visited nodes are never revisited.
+   * Each call continues from the current visited state - already-visited nodes are never revisited.
    * <p>
    * <strong>Time:</strong> O(nodeCount + edgeCount).
    */

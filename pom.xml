@@ -1,17 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
+         child.project.url.inherit.append.path="false">
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>com.kobayami</groupId>
   <artifactId>graphity-parent</artifactId>
-  <version>1.0.0</version>
+  <version>2.0.0</version>
   <packaging>pom</packaging>
 
   <name>graphity (parent)</name>
   <description>Aggregator POM for Graphity: core library and benchmarks.</description>
-  <url>https://github.com/kobayami/graphity</url>
+  <url>https://github.com/kaufco/graphity</url>
   <inceptionYear>2025</inceptionYear>
 
   <licenses>
@@ -23,15 +24,15 @@
   </licenses>
 
   <organization>
-    <name>kobayami</name>
-    <url>https://github.com/kobayami</url>
+    <name>kaufco</name>
+    <url>https://github.com/kaufco</url>
   </organization>
 
   <developers>
     <developer>
-      <id>kobayami</id>
+      <id>kaufco</id>
       <name>Marco Kaufmann</name>
-      <url>https://github.com/kobayami</url>
+      <url>https://github.com/kaufco</url>
       <roles>
         <role>author</role>
         <role>maintainer</role>
@@ -40,22 +41,26 @@
     </developer>
   </developers>
 
-  <scm>
-    <connection>scm:git:https://github.com/kobayami/graphity.git</connection>
-    <developerConnection>scm:git:git@github.com:kobayami/graphity.git</developerConnection>
-    <url>https://github.com/kobayami/graphity</url>
+  <!-- The child.*.inherit.append.path attributes (here and on <project>) stop Maven
+       from appending the module directory to inherited URLs. Without them the
+       published graphity-core POM would advertise .../graphity/graphity-core, which
+       does not exist. -->
+  <scm child.scm.connection.inherit.append.path="false"
+       child.scm.developerConnection.inherit.append.path="false"
+       child.scm.url.inherit.append.path="false">
+    <connection>scm:git:https://github.com/kaufco/graphity.git</connection>
+    <developerConnection>scm:git:git@github.com:kaufco/graphity.git</developerConnection>
+    <url>https://github.com/kaufco/graphity</url>
     <tag>HEAD</tag>
   </scm>
 
   <!-- No <distributionManagement> on purpose. Sonatype OSSRH was sunset in
-       mid-2025; Maven Central now publishes via the Central Publisher Portal,
-       which uses a dedicated deploy plugin (e.g. central-publishing-maven-plugin)
-       instead of a <distributionManagement>/<repository> entry. The plugin
-       configuration plus credentials/GPG land here ahead of the first
-       release-tag deploy — see internal/RELEASES.md §B for the open items. -->
+       mid-2025; Maven Central now publishes through the Central Publisher Portal,
+       whose deploy plugin takes the place of a <repository> entry. See the
+       "release" profile at the bottom of this file. -->
   <issueManagement>
     <system>GitHub Issues</system>
-    <url>https://github.com/kobayami/graphity/issues</url>
+    <url>https://github.com/kaufco/graphity/issues</url>
   </issueManagement>
 
   <modules>
@@ -85,6 +90,8 @@
     <shade-plugin.version>3.5.3</shade-plugin.version>
     <javadoc-plugin.version>3.11.2</javadoc-plugin.version>
     <source-plugin.version>3.3.1</source-plugin.version>
+    <gpg-plugin.version>3.2.8</gpg-plugin.version>
+    <central-publishing-plugin.version>0.11.0</central-publishing-plugin.version>
   </properties>
 
   <dependencyManagement>
@@ -201,11 +208,7 @@
           <artifactId>maven-surefire-plugin</artifactId>
           <version>${surefire.version}</version>
           <configuration>
-            <!-- @{argLine} late-binds the JaCoCo javaagent set by jacoco:prepare-agent.
-                 -Xss16m: documented safety margin for the recursive DFS traverser; users with
-                 very deep graphs must configure this themselves (see Traverser.md
-                 "Recursion and Stack Depth"). -->
-            <argLine>@{argLine} -ea -Xss16m</argLine>
+            <argLine>@{argLine} -ea</argLine>
           </configuration>
         </plugin>
 
@@ -247,9 +250,6 @@
             <encoding>${project.build.sourceEncoding}</encoding>
             <docencoding>UTF-8</docencoding>
             <charset>UTF-8</charset>
-            <!-- doclint=all enforces HTML correctness, valid @link/@see references,
-                 well-formed tags AND missing tags (@param, @return, @throws). The
-                 coverage sweep is done; keep this strict so CI catches new lapses. -->
             <doclint>all</doclint>
             <failOnWarnings>true</failOnWarnings>
             <notimestamp>true</notimestamp>
@@ -257,10 +257,78 @@
             <doctitle>${project.name} ${project.version} API</doctitle>
             <windowtitle>${project.name} ${project.version} API</windowtitle>
             <bottom><![CDATA[Copyright &#169; {inceptionYear}&#x2013;{currentYear} Marco Kaufmann. Apache License 2.0.]]></bottom>
+
+            <links>
+              <link>https://docs.oracle.com/en/java/javase/21/docs/api/</link>
+            </links>
+            <linksource>true</linksource>
+            <tags>
+              <tag><name>apiNote</name><placement>a</placement><head>API Note:</head></tag>
+              <tag><name>implSpec</name><placement>a</placement><head>Implementation Requirements:</head></tag>
+              <tag><name>implNote</name><placement>a</placement><head>Implementation Note:</head></tag>
+            </tags>
           </configuration>
         </plugin>
       </plugins>
     </pluginManagement>
   </build>
+
+  <!-- Publishing to Maven Central needs PGP signatures and the Central Portal
+       deploy plugin, but a plain `mvn verify` must not ask for a GPG passphrase.
+       Both therefore live in a profile that only the release build activates:
+
+         mvn -pl graphity-core -am clean deploy -P release
+
+       The reactor is deliberately narrowed to the parent POM (which consumers
+       need in order to resolve graphity-core) and the library itself. -->
+  <profiles>
+    <profile>
+      <id>release</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-gpg-plugin</artifactId>
+            <version>${gpg-plugin.version}</version>
+            <executions>
+              <execution>
+                <id>sign-artifacts</id>
+                <phase>verify</phase>
+                <goals><goal>sign</goal></goals>
+              </execution>
+            </executions>
+            <configuration>
+              <!-- Loopback pinentry lets gpg take the passphrase from
+                   MAVEN_GPG_PASSPHRASE instead of opening a dialog, which is what
+                   a headless release build needs. -->
+              <gpgArguments>
+                <arg>--pinentry-mode</arg>
+                <arg>loopback</arg>
+              </gpgArguments>
+            </configuration>
+          </plugin>
+
+          <plugin>
+            <groupId>org.sonatype.central</groupId>
+            <artifactId>central-publishing-maven-plugin</artifactId>
+            <version>${central-publishing-plugin.version}</version>
+            <!-- The extension replaces maven-deploy-plugin in the deploy phase and
+                 uploads one bundle for the whole reactor. -->
+            <extensions>true</extensions>
+            <configuration>
+              <publishingServerId>central</publishingServerId>
+              <!-- The upload waits for the portal's validation, then stops: the
+                   release is published by hand from the Deployments page. -->
+              <autoPublish>false</autoPublish>
+              <!-- Not ${project.artifactId}: the upload is triggered by the last
+                   module of the reactor, so the name would follow whichever module
+                   that happens to be. -->
+              <deploymentName>graphity ${project.version}</deploymentName>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 
 </project>

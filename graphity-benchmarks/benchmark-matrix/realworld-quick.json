@@ -1,0 +1,53 @@
+{
+  "name": "realworld-quick",
+  "description": "Quick dataset smoke profile (real-world edge lists from ../datasets). Includes the DFS-preorder reordered variant ('Graphity (reordered)' column) plus its one-time reorder cost. Perf-only.",
+  "jmh": {
+    "forks": 0,
+    "warmup_iterations": 1,
+    "warmup_time": "300ms",
+    "measurement_iterations": 3,
+    "measurement_time": "500ms",
+    "jvm_stack": "-Xss16m"
+  },
+  "cases": [
+    {
+      "name": "snap-general",
+      "libraries": ["graphity", "jgrapht", "guava", "webgraph"],
+      "algorithms": ["scc", "backedges", "edgetypes"],
+      "phases": ["perf"],
+      "dataset": {
+        "dag": false,
+        "files": [
+          "../datasets/snap/web-Google.txt"
+        ]
+      }
+    },
+    {
+      "name": "snap-general-reordered",
+      "libraries": ["graphity-reordered"],
+      "algorithms": ["scc", "backedges", "edgetypes"],
+      "phases": ["perf"],
+      "dataset": {
+        "dag": false,
+        "files": [
+          "../datasets/snap/web-Google.txt"
+        ]
+      }
+    },
+    {
+      "name": "reorder-cost",
+      "libraries": ["graphity"],
+      "algorithms": ["reorder"],
+      "phases": ["perf"],
+      "dataset": {
+        "dag": false,
+        "files": [
+          "../datasets/snap/web-Google.txt"
+        ]
+      }
+    }
+  ],
+  "mem": {
+    "enabled": false
+  }
+}
