@@ -224,14 +224,21 @@ public final class NodeMapping extends IndexMapping {
   private static final class ReindexTraverser {
 
     private final Graph graph;
-    private final BitSet visited;
+
+    /**
+     * Visited bits, one per node. A raw {@code long[]} rather than a {@link BitSet}, so that the
+     * inner scan can test and set a node's bit with a single word load and store instead of two
+     * independent {@code get}/{@code set} calls.
+     */
+    private final long[] visited;
+
     final int[] order;
     int pos;
 
     ReindexTraverser(Graph graph) {
       int n = graph.nodeCount();
       this.graph = graph;
-      this.visited = new BitSet(n);
+      this.visited = new long[(n >> 6) + 1];
       this.order = new int[n];
     }
 
@@ -239,12 +246,13 @@ public final class NodeMapping extends IndexMapping {
       int n = graph.nodeCount();
       int[] out = graph.outAdjacencyStart;
       int[] adj = graph.outAdjacency;
+      long[] visited = this.visited;
       // Each frame packs (node << 32 | resume cursor) into one long: node and cursor share a
       // cache line, and the array grows on demand (one allocation per resize instead of two).
       long[] frames = new long[Math.max(16, Math.min(n, 1024))];
 
-      for (int root = visited.nextClearBit(0); root < n; root = visited.nextClearBit(root + 1)) {
-        visited.set(root);
+      for (int root = nextClearBit(visited, 0); root < n; root = nextClearBit(visited, root + 1)) {
+        visited[root >>> 6] |= 1L << root;
         order[pos++] = root;
         frames[0] = ((long) root << 32) | (out[root] & 0xFFFFFFFFL);
         int top = 0;
@@ -259,8 +267,11 @@ public final class NodeMapping extends IndexMapping {
           int i = (int) frame;
           while (i < end) {
             int v = adj[i++];
-            if (!visited.get(v)) {
-              visited.set(v);
+            int w = v >>> 6;
+            long bits = visited[w];          // one load serves both the test and the set
+            long mask = 1L << v;
+            if ((bits & mask) == 0) {
+              visited[w] = bits | mask;
               order[pos++] = v;
               frames[top] = (frame & 0xFFFFFFFF00000000L) | (i & 0xFFFFFFFFL);
               if (++top == frames.length) {
@@ -273,6 +284,23 @@ public final class NodeMapping extends IndexMapping {
           top--;
         }
       }
+    }
+
+    /**
+     * Index of the first clear bit at or after {@code from}, mirroring
+     * {@link BitSet#nextClearBit(int)}: words of set bits are skipped 64 at a time, and a result
+     * beyond the node count is left for the caller's bound check to reject.
+     */
+    private static int nextClearBit(long[] bits, int from) {
+      int word = from >>> 6;
+      long candidates = ~bits[word] & (-1L << from);
+      while (candidates == 0) {
+        if (++word == bits.length) {
+          return bits.length << 6;
+        }
+        candidates = ~bits[word];
+      }
+      return (word << 6) + Long.numberOfTrailingZeros(candidates);
     }
   }
 
