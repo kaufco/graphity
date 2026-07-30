@@ -15,9 +15,6 @@ target/
 .DS_Store
 Thumbs.db
 
-# Cursor
-.cursor/
-
 
 # Benchmark raw measurements (gitignored scratch: JMH JSON, JOL CSV, intermediate MDs)
 graphity-benchmarks/measurements/

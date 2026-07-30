@@ -1,7 +1,6 @@
 package com.kobayami.graphity;
 
 import java.util.Arrays;
-import java.util.BitSet;
 import java.util.Objects;
 
 import it.unimi.dsi.fastutil.ints.IntArrayList;
@@ -180,11 +179,14 @@ public sealed class NodePartition extends IndexMapping implements IndexPartition
 
     var dagStart = new int[groups + 1];
     var dagAdj = new IntArrayList();
-    var seen = new BitSet(groups);
+    // Own bit array rather than java.util.BitSet: clearing single bits there triggers
+    // recalculateWordsInUse(), which scans back for the highest set word and would
+    // reintroduce the very cost this avoids.
+    var seen = new long[(groups >> 6) + 1];
 
     for (int g = 0; g < groups; g++) {
-      dagStart[g] = dagAdj.size();
-      seen.clear();
+      int groupStart = dagAdj.size();
+      dagStart[g] = groupStart;
 
       int nodesEnd = memberStart[g + 1];
       for (int ni = memberStart[g]; ni < nodesEnd; ni++) {
@@ -192,14 +194,24 @@ public sealed class NodePartition extends IndexMapping implements IndexPartition
         int edgeEnd = adjacencyStart[u + 1];
         for (int ei = adjacencyStart[u]; ei < edgeEnd; ei++) {
           int tgtGroup = nodeToGroup[adjacency[ei]];
-          if (tgtGroup != g && !seen.get(tgtGroup)) {
-            seen.set(tgtGroup);
+          if (tgtGroup != g && (seen[tgtGroup >>> 6] & (1L << tgtGroup)) == 0) {
+            seen[tgtGroup >>> 6] |= 1L << tgtGroup;
             dagAdj.add(tgtGroup);
           }
         }
       }
 
-      Arrays.sort(dagAdj.elements(), dagStart[g], dagAdj.size());
+      // The bits set above are exactly the group's emitted targets, so resetting them
+      // costs one write per emitted edge instead of one per word up to the highest ID
+      // ever marked. Zeroing the whole word is safe: every set bit in it belongs to
+      // this group and is being cleared anyway.
+      int groupEnd = dagAdj.size();
+      int[] elements = dagAdj.elements();
+      for (int i = groupStart; i < groupEnd; i++) {
+        seen[elements[i] >>> 6] = 0;
+      }
+
+      Arrays.sort(elements, groupStart, groupEnd);
     }
     dagStart[groups] = dagAdj.size();
 
