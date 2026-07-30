@@ -79,19 +79,31 @@ public final class Graphs {
     var origAdj = graph.outAdjacency;
     var origStart = graph.outAdjacencyStart;
 
+    // A mapping that covers every node one-to-one drops no edge, so the target filter below is
+    // always true. Knowing that up front turns the degree count into offset arithmetic and saves
+    // a full pass over the adjacency: reindexing (the common case) never needs the filter.
+    boolean total = !newToOld.isPartial() && newNodeCount == graph.nodeCount();
+
     // Pass 1: count out-degrees in new graph.
     var outStart = new int[newNodeCount + 1];
-    for (int n = 0; n < newNodeCount; n++) {
-      int oldNode = fwd[n];
-      int end = origStart[oldNode + 1];
-      int count = 0;
-      for (int i = origStart[oldNode]; i < end; i++) {
-        int oldTarget = origAdj[i];
-        if (oldTarget < bwd.length && bwd[oldTarget] >= 0) {
-          count++;
-        }
+    if (total) {
+      for (int n = 0; n < newNodeCount; n++) {
+        int oldNode = fwd[n];
+        outStart[n + 1] = origStart[oldNode + 1] - origStart[oldNode];
       }
-      outStart[n + 1] = count;
+    } else {
+      for (int n = 0; n < newNodeCount; n++) {
+        int oldNode = fwd[n];
+        int end = origStart[oldNode + 1];
+        int count = 0;
+        for (int i = origStart[oldNode]; i < end; i++) {
+          int oldTarget = origAdj[i];
+          if (oldTarget < bwd.length && bwd[oldTarget] >= 0) {
+            count++;
+          }
+        }
+        outStart[n + 1] = count;
+      }
     }
 
     // Prefix sum: convert degrees to CSR offsets.
@@ -102,17 +114,29 @@ public final class Graphs {
 
     // Pass 2: fill adjacency and sort each adjacency list.
     var outAdj = new int[totalEdges];
-    for (int n = 0; n < newNodeCount; n++) {
-      int writePos = outStart[n];
-      int oldNode = fwd[n];
-      int end = origStart[oldNode + 1];
-      for (int i = origStart[oldNode]; i < end; i++) {
-        int oldTarget = origAdj[i];
-        if (oldTarget < bwd.length && bwd[oldTarget] >= 0) {
-          outAdj[writePos++] = bwd[oldTarget];
+    if (total) {
+      for (int n = 0; n < newNodeCount; n++) {
+        int writePos = outStart[n];
+        int oldNode = fwd[n];
+        int end = origStart[oldNode + 1];
+        for (int i = origStart[oldNode]; i < end; i++) {
+          outAdj[writePos++] = bwd[origAdj[i]];
         }
+        Arrays.sort(outAdj, outStart[n], writePos);
       }
-      Arrays.sort(outAdj, outStart[n], outStart[n + 1]);
+    } else {
+      for (int n = 0; n < newNodeCount; n++) {
+        int writePos = outStart[n];
+        int oldNode = fwd[n];
+        int end = origStart[oldNode + 1];
+        for (int i = origStart[oldNode]; i < end; i++) {
+          int oldTarget = origAdj[i];
+          if (oldTarget < bwd.length && bwd[oldTarget] >= 0) {
+            outAdj[writePos++] = bwd[oldTarget];
+          }
+        }
+        Arrays.sort(outAdj, outStart[n], outStart[n + 1]);
+      }
     }
 
     return new Graph(outStart, outAdj);
