@@ -7,6 +7,42 @@ Graphity adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **`GraphBuilder` construction API.** Eighteen methods covering the patterns that previously
+  had to be written out by hand. All additive; existing code is unaffected.
+
+  *Node allocation.* `addChild(parent)`, `addChildren(parent, count)`, `addParent(child)` and
+  `addParents(child, count)` add nodes and link them in one call, returning the first new ID.
+
+  *Edge batches.* `addEdges(source, int...)` complements the existing `IntList` overload,
+  `addInEdges(target, …)` is its fan-in counterpart, `addPath(…)` chains a sequence of
+  nodes, and `addEdgePairs(int...)` takes a flat list of alternating sources and targets.
+
+  *Parameter forms.* The fan-out, fan-in and path methods accept their node IDs as loose
+  arguments, as an `int[]`, or as an `IntList` — including the `SortedIntView` that
+  `outNodes(node)` and its relatives return, so a result of the library can be fed back into a
+  builder without being copied into an array first. `addEdges`, `addEdgesAndNodes`,
+  `addInEdges` and `addInEdgesAndNodes` became variable-arity in the process, which changes
+  neither their descriptor nor the meaning of any existing call.
+
+  *Creating nodes on reference.* Every edge-adding method has a twin with an `AndNodes`
+  suffix — `addEdgeAndNodes`, `addEdgesAndNodes`, `addInEdgesAndNodes`, `addPathAndNodes`,
+  `addEdgePairsAndNodes` — that raises the node count to cover the highest ID it references
+  instead of requiring the nodes to exist. This is what makes externally numbered input, such
+  as block IDs arriving in arbitrary order, work without tracking the maximum by hand.
+
+- **`GraphBuilder.strict()`** — opt-in validation of node references, throwing
+  `IndexOutOfBoundsException` instead of relying on assertions. Must be called before the first
+  edge, so a builder can never hold a mix of validated and unvalidated edges. Without it,
+  behaviour is unchanged.
+
+- **`GraphBuilder.ensureEdgeCapacity(totalEdges)`** — pre-sizes the internal edge storage when
+  the edge count is known or can be estimated, avoiding the reallocation and copying that
+  filling a growing list to millions of edges otherwise costs.
+
 ## [2.0.0] — 2026-07-23
 
 ### Added

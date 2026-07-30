@@ -106,6 +106,35 @@ These types compose. `sccs.condense()` returns a `Graph` plus a `NodeMapping` fr
 
 **Zero-copy views.** Adjacency lists, partition members, edge lists — wherever the underlying CSR already holds the data in the right form, the API hands back a view, not a copy. No allocation on hot loops.
 
+**A builder that matches how graphs are actually written.** `GraphBuilder` covers the recurring construction patterns directly instead of leaving them as boilerplate — top-down and bottom-up node allocation, fan-out and fan-in batches, paths, and flat edge lists:
+
+```java
+var b = new GraphBuilder();
+b.ensureEdgeCapacity(1_000_000);        // no reallocation when the size is known
+b.strict();                             // reject unknown node IDs eagerly
+
+int entry = b.addNode();
+int cond = b.addChild(entry);                       // adds a node, links entry -> it, returns its ID
+int firstBranch = b.addChildren(cond, 2);           // two successors at once, ID of the first
+b.addPath(firstBranch, firstBranch + 1);            // chains existing nodes
+b.addInEdges(entry, firstBranch + 1);               // fan-in, the counterpart of addEdges
+```
+
+The fan-out, fan-in and path methods take their node IDs in whichever form you already have them — loose arguments, an `int[]`, or an `IntList`. The last one matters because it is what Graphity itself returns, so a result can go straight back into a builder without a copy:
+
+```java
+for (int n = 0; n < source.nodeCount(); n++) {
+    b.addEdges(n, source.outNodes(n));  // SortedIntView, no intermediate array
+}
+b.addPath(TopOrder.of(source));         // any IntList works
+```
+
+Node IDs often come from somewhere else — block numbers in a control-flow graph, symbol IDs from a table — and then arrive in arbitrary order. Every edge-adding method has an `AndNodes` twin that creates what it references, so no caller has to track the highest ID:
+
+```java
+b.addEdgeAndNodes(7, 3);                // 8 nodes now exist
+```
+
 **Immutable graphs, safe to share across threads.** Once built, a `Graph` never changes. The same instance can be passed to multiple algorithms or threads without locking or defensive copying. Mutation happens exclusively through transformations (`subgraph`, `remap`, `condense`) that produce new graphs. The immutability is what makes the zero-copy result types and shared-graph parallelism safe by construction, not by convention.
 
 **Iterative algorithms — no recursion, no stack ceiling.** Every DFS-based algorithm (`Sccs`, `TopOrder`, `BackEdges`, `EdgeTypes`, the shape predicates, node reindexing) runs on an explicit heap-allocated stack, not the JVM call stack. They complete on arbitrarily deep graphs — verified at a DFS depth of 1M — under the default `-Xss`, with zero JVM tuning. This is a real differentiator: JGraphT, Guava, and WebGraph (built for billion-node web crawls) all use recursive DFS. On a 4.8M-node graph like `soc-LiveJournal1`, JGraphT's and WebGraph's SCC overflow the default stack and only complete once `-Xss` is raised to 256–512 MB (WebGraph's own SCC Javadoc advises setting "a large stack size"); on deeper topologies they fail regardless of `-Xss`. Graphity just runs.
