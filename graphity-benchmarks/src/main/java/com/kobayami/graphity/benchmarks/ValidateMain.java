@@ -140,6 +140,7 @@ public final class ValidateMain {
       case "scc" -> validateScc(libraries, template, wgTmpRoot);
       case "wcc" -> validateWcc(template);
       case "ccs" -> validateCcs(template);
+      case "condense" -> validateCondense(template);
       case "toporder" -> validateTopOrder(libraries, template, wgTmpRoot);
       case "toporderandlevels" -> validateTopOrderAndLevels(template);
       case "backedges" -> validateBackEdges(libraries, template, wgTmpRoot);
@@ -186,6 +187,20 @@ public final class ValidateMain {
     String canonical = canonicalPartition(mappingFromNodePartition(c, template.nodeCount()));
     if (canonical.isBlank()) {
       fail("ccs validation produced empty canonical partition");
+    }
+  }
+
+  private static void validateCondense(com.kobayami.graphity.Graph template) {
+    NodePartition sccs = Components.sccsOf(template);
+    com.kobayami.graphity.Graph condensed = sccs.condense();
+    if (condensed.nodeCount() != sccs.groupCount()) {
+      fail("condense produced " + condensed.nodeCount()
+          + " nodes for " + sccs.groupCount() + " groups");
+    }
+    // The condensation of the SCCs is a DAG by construction; a broken dedup or a stale
+    // "seen" reset would show up here before the benchmark reports a number.
+    if (!Graphs.isDag(condensed)) {
+      fail("condensation of SCCs is not a DAG");
     }
   }
 

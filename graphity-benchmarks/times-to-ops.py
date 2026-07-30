@@ -51,9 +51,26 @@ HEADER_BLOCK_RE = re.compile(r"```\n(?P<body>.*?)\n```", re.DOTALL)
 BYTES_VALUE_RE = re.compile(
     r"^(?:~0|(?P<num>\d{1,3}(?: \d{3})*(?:\.\d+)?|\d+(?:\.\d+)?)\s+B)"
 )
-# n-value extraction from section title like "1.2.1 · SCC @ n = 10 000"
-N_VALUE_RE = re.compile(r"\bn\s*=\s*([\d\s]+)")
-SECTION_NUM_RE = re.compile(r"^(\d+(?:\.\d+)*)")
+# Section headings in a version report look like
+#   "1.6.1 · TopOrder @ n = 10 000"     — synthetic, one block per node count
+#   "1.8 · SCC — real-world graphs"     — dataset mode, no node count
+#   "2.1 · Total Graph Size"            — memory
+# The leading number is a running index over the algorithms that had data in
+# that particular run, so it SHIFTS whenever an algorithm is added or absent
+# (Condense entered the matrix after 2.0.0 and pushed TopOrder from 1.5 to 1.6).
+# Matching sections across versions must therefore ignore the number and key on
+# algorithm + variant + node count instead; the combined report then assigns its
+# own numbers from the union of all versions.
+SECTION_TITLE_RE = re.compile(r"^(?P<num>\d+(?:\.\d+)*)\s*·\s*(?P<rest>.+)$")
+N_SUFFIX_RE = re.compile(r"\s*@\s*n\s*=\s*(?P<n>[\d\s]+)$")
+VARIANT_SUFFIX_RE = re.compile(r"\s*—\s*(?P<variant>.+)$")
+# Mirrors ReportMain.ALGO_ORDER, which fixes the algorithm order within a single
+# version report. Algorithms not listed here (e.g. the memory sub-chapters) keep
+# the relative order they have in the source files.
+ALGO_ORDER = (
+    "Build", "SCC", "WCC", "CCs", "Condense", "TopOrder", "TopOrderAndLevels",
+    "BackEdges", "EdgeTypes", "Reorder (DFS-preorder) cost",
+)
 
 MISSING = {"—", "-", ""}
 META_HEADERS = ("Nodes", "Edges", "Edges/Node")
@@ -316,6 +333,15 @@ class DataRow:
 ROW_KEY_HEADERS = ("Shape", "Dataset")
 
 
+@dataclass(frozen=True)
+class SectionId:
+    """Number-independent identity of a report section, stable across versions."""
+
+    algo: str
+    variant: str = ""
+    n_value: int | None = None
+
+
 @dataclass
 class SectionTable:
     title: str
@@ -323,6 +349,35 @@ class SectionTable:
     lib_columns: list[str]
     rows: list[DataRow]
     key_column: str = "Shape"
+    sid: SectionId = SectionId("")
+    source_number: tuple[int, ...] = (999,)
+
+
+def parse_section_id(title: str) -> SectionId:
+    """Strip the (run-dependent) section number and split off variant / node count."""
+    match = SECTION_TITLE_RE.match(title.strip())
+    rest = (match.group("rest") if match else title).strip()
+
+    n_value: int | None = None
+    n_match = N_SUFFIX_RE.search(rest)
+    if n_match:
+        n_value = int(n_match.group("n").replace(" ", ""))
+        rest = rest[: n_match.start()].rstrip()
+
+    variant = ""
+    variant_match = VARIANT_SUFFIX_RE.search(rest)
+    if variant_match:
+        variant = variant_match.group("variant").strip()
+        rest = rest[: variant_match.start()].rstrip()
+
+    return SectionId(algo=rest, variant=variant, n_value=n_value)
+
+
+def parse_section_number(title: str) -> tuple[int, ...]:
+    match = SECTION_TITLE_RE.match(title.strip())
+    if match is None:
+        return (999,)
+    return tuple(int(p) for p in match.group("num").split("."))
 
 
 def parse_report_filename(path: Path) -> ReportRef:
@@ -357,6 +412,8 @@ def parse_sections(
         table = _parse_metric_table(body, value_parser)
         if table is not None:
             table.title = title
+            table.sid = parse_section_id(title)
+            table.source_number = parse_section_number(title)
             sections.append(table)
     return sections
 
@@ -410,32 +467,92 @@ def parse_bytes_chapter(text: str, chapter: int) -> list[SectionTable]:
 
 
 # ---------------------------------------------------------------------------
-# Section ordering helpers
+# Section grouping and renumbering
 # ---------------------------------------------------------------------------
 
 
-def _section_sort_key(title: str) -> tuple:
-    """Sort sections by numeric prefix tuple, then by n-value within same prefix."""
-    num_m = SECTION_NUM_RE.match(title)
-    nums = tuple(int(x) for x in num_m.group(1).split(".")) if num_m else (999,)
-    n_m = N_VALUE_RE.search(title)
-    n_val = int(n_m.group(1).replace(" ", "")) if n_m else 0
-    return nums + (n_val,)
+@dataclass
+class SectionGroup:
+    """One ``###`` block of the combined report: an algorithm across all node counts."""
+
+    heading: str                          # e.g. "1.6 TopOrder"
+    entries: list[tuple[SectionId, str]]  # (identity, display title) ordered by n
 
 
-def _collect_all_section_titles(
-    times_perf: dict[str, list[SectionTable]],
-) -> list[str]:
-    """Return a deduplicated, sorted list of ALL section titles from all versions."""
-    seen: set[str] = set()
-    titles: list[str] = []
-    for sections in times_perf.values():
-        for s in sections:
-            if s.title not in seen:
-                seen.add(s.title)
-                titles.append(s.title)
-    titles.sort(key=_section_sort_key)
-    return titles
+def _fmt_spaced_int(value: int) -> str:
+    return f"{value:,}".replace(",", " ")
+
+
+def _group_sort_key(
+    group: tuple[str, str], source_number: tuple[int, ...]
+) -> tuple:
+    """Order groups: synthetic before variants, then by canonical algorithm order.
+
+    Algorithms outside ``ALGO_ORDER`` (the memory sub-chapters) fall back to the
+    lowest section number they had in any source file, which preserves their
+    original relative order.
+    """
+    algo, variant = group
+    try:
+        algo_rank = ALGO_ORDER.index(algo)
+    except ValueError:
+        algo_rank = len(ALGO_ORDER)
+    return (bool(variant), variant, algo_rank, source_number, algo)
+
+
+def build_section_groups(
+    sections_by_version: dict[str, list[SectionTable]],
+    chapter: int,
+) -> list[SectionGroup]:
+    """Union the sections of all versions and renumber them for the combined report.
+
+    Sections are collected by their number-independent :class:`SectionId`, so the
+    same algorithm merges across versions even when the source files number it
+    differently. The emitted numbers are derived from the union, which makes them
+    independent of which algorithms a single run happened to cover.
+    """
+    ids_by_group: dict[tuple[str, str], list[SectionId]] = {}
+    hint_by_group: dict[tuple[str, str], tuple[int, ...]] = {}
+    for sections in sections_by_version.values():
+        for section in sections:
+            group = (section.sid.algo, section.sid.variant)
+            ids = ids_by_group.setdefault(group, [])
+            if section.sid not in ids:
+                ids.append(section.sid)
+            previous = hint_by_group.get(group)
+            if previous is None or section.source_number < previous:
+                hint_by_group[group] = section.source_number
+
+    ordered_groups = sorted(
+        ids_by_group, key=lambda g: _group_sort_key(g, hint_by_group[g])
+    )
+
+    groups: list[SectionGroup] = []
+    for idx, group in enumerate(ordered_groups, start=1):
+        algo, variant = group
+        number = f"{chapter}.{idx}"
+        variant_suffix = f" — {variant}" if variant else ""
+        entries: list[tuple[SectionId, str]] = []
+        sids = sorted(ids_by_group[group], key=lambda s: s.n_value or 0)
+        for sub_idx, sid in enumerate(sids, start=1):
+            if sid.n_value is None:
+                entries.append((sid, f"{number} · {algo}{variant_suffix}"))
+            else:
+                entries.append((
+                    sid,
+                    f"{number}.{sub_idx} · {algo}{variant_suffix}"
+                    f" @ n = {_fmt_spaced_int(sid.n_value)}",
+                ))
+        groups.append(
+            SectionGroup(heading=f"{number} {algo}{variant_suffix}", entries=entries)
+        )
+    return groups
+
+
+def find_section(
+    sections: list[SectionTable], sid: SectionId
+) -> SectionTable | None:
+    return next((s for s in sections if s.sid == sid), None)
 
 
 # ---------------------------------------------------------------------------
@@ -454,46 +571,6 @@ def _gh_anchor(text: str) -> str:
 def _clean_heading(title: str) -> str:
     """Remove middle-dot separator '·' from section titles."""
     return re.sub(r'\s*·\s*', ' ', title).strip()
-
-
-def _parse_algo_group(title: str) -> tuple[str, str, int | None]:
-    """Parse section title → (group_key like '1.1', algo_name, n_value_or_None)."""
-    num_m = re.match(r'^(\d+)\.(\d+)', title)
-    if not num_m:
-        return ("0.0", title, None)
-    group = f"{num_m.group(1)}.{num_m.group(2)}"
-    algo_m = re.search(r'·\s*([^·@—\n]+?)(?:\s*@|\s*—|\s*$)', title)
-    algo = algo_m.group(1).strip() if algo_m else title
-    n_m = re.search(r'@\s*n\s*=\s*([\d\s]+)', title)
-    n_val = int(n_m.group(1).replace(' ', '')) if n_m else None
-    return (group, algo, n_val)
-
-
-def _group_by_algo(
-    titles: list[str],
-) -> dict[str, tuple[str, list[tuple[str, int | None]]]]:
-    """Group section titles by group_key, preserving order.
-
-    Returns {group_key: (algo_name, [(title, n_value), ...])} sorted by group_key.
-    """
-    groups: dict[str, tuple[str, list[tuple[str, int | None]]]] = {}
-    for title in titles:
-        gk, algo, n_val = _parse_algo_group(title)
-        if gk not in groups:
-            groups[gk] = (algo, [])
-        groups[gk][1].append((title, n_val))
-    for gk in groups:
-        groups[gk][1].sort(key=lambda t: t[1] or 0)
-    return dict(sorted(groups.items()))
-
-
-def _algo_section_heading(
-    gk: str, algo: str, title_n_list: list[tuple[str, int | None]]
-) -> str:
-    """Compute the ### heading for an algorithm group."""
-    if len(title_n_list) == 1 and title_n_list[0][1] is None:
-        return _clean_heading(title_n_list[0][0])
-    return f"{gk} {algo}"
 
 
 # Known SNAP dataset sizes for real-world subscripts
@@ -816,6 +893,7 @@ def _build_perf_section(
     row_metas: list[dict[str, str]],
     meta_columns: list[str],
     baseline_label: str,
+    version_labels: list[str],
     machine: str,
     machine_fig_dir: Path,
     fig_slug_base: str,
@@ -875,12 +953,22 @@ def _build_perf_section(
     lines.append("")
 
     # ── Chart ────────────────────────────────────────────────────────────────
+    # A benchmark that only exists in older releases has no data in the newest
+    # version, which would leave the whole chart empty. Normalise against the
+    # newest version that does have data so every Throughput table keeps a chart.
+    chart_baseline = baseline_label
+    if not any(v is not None for v in ms_matrix.get(baseline_label, [])):
+        for col in reversed(all_column_labels):
+            if col in version_labels and any(v is not None for v in ms_matrix[col]):
+                chart_baseline = col
+                break
+
     chart_series: list[tuple[str, list[float | None]]] = []
     for col in all_column_labels:
         pcts: list[float | None] = []
         for i in range(n):
             ms = ms_matrix[col][i]
-            baseline_ms = ms_matrix[baseline_label][i] if baseline_label in ms_matrix else None
+            baseline_ms = ms_matrix[chart_baseline][i] if chart_baseline in ms_matrix else None
             if ms is None or ms <= 0 or baseline_ms is None or baseline_ms <= 0:
                 pcts.append(None)
             else:
@@ -889,7 +977,7 @@ def _build_perf_section(
             chart_series.append((col, pcts))
 
     if chart_series:
-        svg = render_grouped_bar_svg(chart_labels, chart_series, baseline_label, log_scale=False)
+        svg = render_grouped_bar_svg(chart_labels, chart_series, chart_baseline, log_scale=False)
         if svg:
             fig_name = f"{section_fig_slug(fig_slug_base)}.svg"
             (machine_fig_dir / fig_name).write_text(svg, encoding="utf-8")
@@ -1125,9 +1213,10 @@ def build_combined_for_machine(
     version_labels = [r.label for r in reports]
     baseline_label = newest.label
 
-    # Group perf titles by algorithm
-    all_titles = _collect_all_section_titles(times_perf)
-    algo_groups = _group_by_algo(all_titles)
+    # Group perf sections by algorithm, renumbered from the union of all versions
+    perf_groups = build_section_groups(times_perf, 1)
+    mem_groups = build_section_groups({v: s for v, s in times_mem.items() if s}, 2)
+    alloc_groups = build_section_groups({v: s for v, s in times_alloc.items() if s}, 3)
 
     # Build shape → edges lookup from memory data (for subscripts in perf tables)
     shape_edges_lookup: dict[tuple[str, int], int] = {}
@@ -1160,20 +1249,16 @@ def build_combined_for_machine(
     # ── Table of contents ────────────────────────────────────────────────────
     toc: list[str] = ["## Contents", ""]
     toc.append(f"- [1 Performance]({_gh_anchor('1 Performance')})")
-    for gk, (algo_name, title_n_list) in algo_groups.items():
-        heading = _algo_section_heading(gk, algo_name, title_n_list)
-        toc.append(f"  - [{heading}]({_gh_anchor(heading)})")
+    for group in perf_groups:
+        toc.append(f"  - [{group.heading}]({_gh_anchor(group.heading)})")
     if has_mem:
         toc.append(f"- [2 Memory Footprint]({_gh_anchor('2 Memory Footprint')})")
-        for mt in _collect_all_section_titles({v: s for v, s in times_mem.items() if s}):
-            cleaned = _clean_heading(mt)
-            toc.append(f"  - [{cleaned}]({_gh_anchor(cleaned)})")
+        for group in mem_groups:
+            toc.append(f"  - [{group.heading}]({_gh_anchor(group.heading)})")
     if has_alloc:
         toc.append(f"- [3 Allocations]({_gh_anchor('3 Allocations')})")
-        alloc_titles_toc = _collect_all_section_titles({v: s for v, s in times_alloc.items() if s})
-        for gk2, (an2, tns2) in _group_by_algo(alloc_titles_toc).items():
-            h2 = _algo_section_heading(gk2, an2, tns2)
-            toc.append(f"  - [{h2}]({_gh_anchor(h2)})")
+        for group in alloc_groups:
+            toc.append(f"  - [{group.heading}]({_gh_anchor(group.heading)})")
     toc.append("")
     lines.extend(toc)
 
@@ -1187,12 +1272,11 @@ def build_combined_for_machine(
     )
     lines.append("")
 
-    for gk, (algo_name, title_n_list) in algo_groups.items():
-        heading = _algo_section_heading(gk, algo_name, title_n_list)
-        lines.append(f"### {heading}")
+    for group in perf_groups:
+        lines.append(f"### {group.heading}")
         lines.append("")
 
-        for title, n_val in title_n_list:
+        for sid, title in group.entries:
             row_keys_ordered: list[str] = []
             row_key_to_shape: dict[str, str] = {}
             row_key_to_meta: dict[str, dict[str, str]] = {}
@@ -1200,7 +1284,7 @@ def build_combined_for_machine(
             key_column = "Shape"
 
             for ref in reports:
-                sec = next((s for s in times_perf[ref.version] if s.title == title), None)
+                sec = find_section(times_perf[ref.version], sid)
                 if sec is not None:
                     key_column = sec.key_column
                     if not meta_columns_set:
@@ -1220,7 +1304,7 @@ def build_combined_for_machine(
 
             ms_matrix: dict[str, list[float | None]] = {}
             for ref in reports:
-                sec = next((s for s in times_perf[ref.version] if s.title == title), None)
+                sec = find_section(times_perf[ref.version], sid)
                 ms_matrix[ref.label] = (
                     [None] * n if sec is None
                     else [{row.key: row.values.get("Graphity") for row in sec.rows}.get(k) for k in row_keys_ordered]
@@ -1228,7 +1312,7 @@ def build_combined_for_machine(
 
             section_reordered_label: str | None = None
             for ref in reversed(reports):
-                sec = next((s for s in times_perf[ref.version] if s.title == title), None)
+                sec = find_section(times_perf[ref.version], sid)
                 if sec is not None and "Graphity (reordered)" in sec.lib_columns:
                     section_reordered_label = f"Graphity {ref.version} (reordered)"
                     by_key_r = {row.key: row.values.get("Graphity (reordered)") for row in sec.rows}
@@ -1237,7 +1321,7 @@ def build_combined_for_machine(
 
             for peer in ("JGraphT", "Guava", "WebGraph"):
                 for ref in reversed(reports):
-                    sec = next((s for s in times_perf[ref.version] if s.title == title), None)
+                    sec = find_section(times_perf[ref.version], sid)
                     if sec is not None and peer in sec.lib_columns:
                         by_key_p = {row.key: row.values.get(peer) for row in sec.rows}
                         ms_matrix[peer] = [by_key_p.get(k) for k in row_keys_ordered]
@@ -1265,10 +1349,11 @@ def build_combined_for_machine(
                 row_metas=row_metas,
                 meta_columns=meta_columns_set,
                 baseline_label=baseline_label,
+                version_labels=version_labels,
                 machine=fig_slug,
                 machine_fig_dir=machine_fig_dir,
                 fig_slug_base=title,
-                n_value=n_val,
+                n_value=sid.n_value,
                 shape_edges_lookup=shape_edges_lookup,
                 shape_edges_per_node=shape_edges_per_node,
             )
@@ -1284,24 +1369,23 @@ def build_combined_for_machine(
         )
         lines.append("")
 
-        for title in _collect_all_section_titles({v: s for v, s in times_mem.items() if s}):
-            _append_bytes_comparison_section(
-                lines,
-                title=title,
-                reports=reports,
-                newest=newest,
-                sections_by_version=times_mem,
-                machine=fig_slug,
-                machine_fig_dir=machine_fig_dir,
-                table_title="Memory footprint in bytes (lower is better)",
-                dual_charts=True,
-            )
+        for group in mem_groups:
+            for sid, title in group.entries:
+                _append_bytes_comparison_section(
+                    lines,
+                    sid=sid,
+                    title=title,
+                    reports=reports,
+                    newest=newest,
+                    sections_by_version=times_mem,
+                    machine=fig_slug,
+                    machine_fig_dir=machine_fig_dir,
+                    table_title="Memory footprint in bytes (lower is better)",
+                    dual_charts=True,
+                )
 
     # ── Chapter 3: Allocations ───────────────────────────────────────────────
     if has_alloc:
-        alloc_all_titles = _collect_all_section_titles({v: s for v, s in times_alloc.items() if s})
-        alloc_groups = _group_by_algo(alloc_all_titles)
-
         lines.append("## 3 Allocations")
         lines.append("")
         lines.append(
@@ -1310,14 +1394,14 @@ def build_combined_for_machine(
         )
         lines.append("")
 
-        for gk, (algo_name, title_n_list) in alloc_groups.items():
-            heading = _algo_section_heading(gk, algo_name, title_n_list)
-            lines.append(f"### {heading}")
+        for group in alloc_groups:
+            lines.append(f"### {group.heading}")
             lines.append("")
-            for title, n_val in title_n_list:
-                n_label = f" @ {fmt_count(n_val)} nodes" if n_val else ""
+            for sid, title in group.entries:
+                n_label = f" @ {fmt_count(sid.n_value)} nodes" if sid.n_value else ""
                 _append_bytes_comparison_section(
                     lines,
+                    sid=sid,
                     title=title,
                     reports=reports,
                     newest=newest,
@@ -1327,7 +1411,7 @@ def build_combined_for_machine(
                     table_title=f"Allocations{n_label} in bytes (lower is better)",
                     dual_charts=False,
                     show_heading=False,
-                    n_value=n_val,
+                    n_value=sid.n_value,
                     shape_edges_lookup=shape_edges_lookup,
                     shape_edges_per_node=shape_edges_per_node,
                 )
@@ -1338,6 +1422,7 @@ def build_combined_for_machine(
 def _append_bytes_comparison_section(
     lines: list[str],
     *,
+    sid: SectionId,
     title: str,
     reports: list[ReportRef],
     newest: ReportRef,
@@ -1359,8 +1444,7 @@ def _append_bytes_comparison_section(
     key_column = "Shape"
 
     for ref in reports:
-        secs = sections_by_version.get(ref.version, [])
-        sec = next((s for s in secs if s.title == title), None)
+        sec = find_section(sections_by_version.get(ref.version, []), sid)
         if sec is not None:
             key_column = sec.key_column
             if not meta_columns_set:
@@ -1378,16 +1462,6 @@ def _append_bytes_comparison_section(
     row_shapes = [row_key_to_shape[k] for k in row_keys_ordered]
     row_metas = [row_key_to_meta[k] for k in row_keys_ordered]
 
-    # Collect all libraries present across all versions for this section
-    all_libs_seen: list[str] = []
-    for ref in reports:
-        secs = sections_by_version.get(ref.version, [])
-        sec = next((s for s in secs if s.title == title), None)
-        if sec is not None:
-            for lib in sec.lib_columns:
-                if lib not in all_libs_seen:
-                    all_libs_seen.append(lib)
-
     # Build bytes_matrix: {col_label: [value_per_row]}
     # Column layout: Graphity versions, then peers
     bytes_matrix: dict[str, list[float | None]] = {}
@@ -1396,8 +1470,7 @@ def _append_bytes_comparison_section(
     # Per-version Graphity columns
     for ref in reports:
         col_label = ref.label
-        secs = sections_by_version.get(ref.version, [])
-        sec = next((s for s in secs if s.title == title), None)
+        sec = find_section(sections_by_version.get(ref.version, []), sid)
         if sec is None or "Graphity" not in sec.lib_columns:
             bytes_matrix[col_label] = [None] * n
         else:
@@ -1408,13 +1481,11 @@ def _append_bytes_comparison_section(
     # Peer columns from newest version with data
     newest_with_data = newest
     for ref in reversed(reports):
-        secs = sections_by_version.get(ref.version, [])
-        if any(s.title == title for s in secs):
+        if find_section(sections_by_version.get(ref.version, []), sid) is not None:
             newest_with_data = ref
             break
 
-    peer_secs = sections_by_version.get(newest_with_data.version, [])
-    peer_sec = next((s for s in peer_secs if s.title == title), None)
+    peer_sec = find_section(sections_by_version.get(newest_with_data.version, []), sid)
     for peer in ("Graphity (reordered)", "JGraphT", "Guava", "WebGraph"):
         if peer_sec is not None and peer in peer_sec.lib_columns:
             display = (
@@ -1466,6 +1537,12 @@ def generate_combined(
     by_kind_machine: dict[tuple[str, str], list[ReportRef]] = defaultdict(list)
     for path in sorted(source_dir.glob("*.md")):
         if not FILENAME_RE.match(path.name):
+            # A typo in the version (e.g. "2.1.a-…") would otherwise drop a whole
+            # run from the summary without a trace.
+            print(
+                f"warning: ignoring {path.name} — not <version>-<kind>-<machine>.md",
+                file=sys.stderr,
+            )
             continue
         ref = parse_report_filename(path)
         by_kind_machine[(ref.kind, ref.machine)].append(ref)

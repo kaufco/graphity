@@ -65,6 +65,15 @@
       }
     },
     {
+      "name": "condense-graphity",
+      "libraries": ["graphity"],
+      "algorithms": ["condense"],
+      "params": {
+        "nodeCount": [1000, 10000, 100000],
+        "shape": ["PATH", "CHAIN_OF_CLIQUES", "GNP_DENSE", "DAG_GNP_SPARSE"]
+      }
+    },
+    {
       "name": "reordered-graph-algos",
       "libraries": ["graphity-reordered"],
       "algorithms": ["scc", "wcc", "ccs", "backedges", "edgetypes"],

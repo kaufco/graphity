@@ -3,8 +3,10 @@
 #
 # Usage:
 #   ./run-benchmarks.sh <command> [args]
-#   commands: clean | synthetic <lib|all> | realworld <lib|all> | report [version]
-#   run 'clean → synthetic/realworld → report [version]' in order.
+#   commands: clean | bench [version] | synthetic <lib|all> | realworld <lib|all>
+#             | report [version]
+#   'bench [version]' runs synthetic → realworld → report in one go; the
+#   individual commands do the same thing step by step.
 #   See './run-benchmarks.sh --help' for the full workflow.
 #
 # Run from anywhere — script resolves paths relative to its own location.
@@ -124,7 +126,7 @@ DAG_FIXTURE_SHAPES = {
 # algorithm that measures the one-time cost of that reordering.
 SUPPORTED_LIBS = {"graphity", "graphity-reordered", "jgrapht", "guava", "webgraph"}
 SUPPORTED_ALGOS = {
-    "build", "scc", "wcc", "ccs", "toporder", "toporderandlevels",
+    "build", "scc", "wcc", "ccs", "condense", "toporder", "toporderandlevels",
     "backedges", "edgetypes", "reorder"
 }
 ALGO_SUPPORTED_LIBS = {
@@ -135,6 +137,7 @@ ALGO_SUPPORTED_LIBS = {
     "edgetypes": {"graphity", "graphity-reordered", "jgrapht", "guava", "webgraph"},
     "wcc": {"graphity", "graphity-reordered"},
     "ccs": {"graphity", "graphity-reordered"},
+    "condense": {"graphity"},
     "toporderandlevels": {"graphity", "graphity-reordered"},
     "reorder": {"graphity"},
 }
@@ -146,6 +149,9 @@ ALGO_ALLOWED_SHAPES = {
     "toporder": DAG_FIXTURE_SHAPES,
     "wcc": GRAPH_FIXTURE_SHAPES,
     "ccs": GRAPH_FIXTURE_SHAPES,
+    # CondenseFixture accepts cyclic and acyclic input alike: the group count, not
+    # acyclicity, is the dimension that matters for condense().
+    "condense": ALL_SHAPES,
     "toporderandlevels": DAG_FIXTURE_SHAPES,
     "reorder": GRAPH_FIXTURE_SHAPES,
 }
@@ -357,6 +363,9 @@ BENCHMARK_FQNS = {
     "ccs": {
         "graphity": "com.kobayami.graphity.benchmarks.graphity.CcsBenchmark.ccs",
         "graphity-reordered": "com.kobayami.graphity.benchmarks.graphity.CcsReorderedBenchmark.ccs",
+    },
+    "condense": {
+        "graphity": "com.kobayami.graphity.benchmarks.graphity.CondenseBenchmark.condense",
     },
     "toporder": {
         "graphity": "com.kobayami.graphity.benchmarks.graphity.TopOrderBenchmark.topOrder",
@@ -964,6 +973,11 @@ LIB_FILTER=""
 # rest of the run via `set -e` — it's just reported, and re-running the same
 # command retries only what's still missing.
 FAILED_MEASUREMENTS=()
+# Accumulates whole phases that were skipped because a precondition was missing
+# (currently only: real-world datasets not downloaded). Reported in its own
+# banner at the very end so a multi-hour `bench` run cannot silently produce a
+# report that covers less than expected.
+SKIPPED_PHASES=()
 
 # Extract the project version from the parent pom.xml (strips -SNAPSHOT suffix).
 read_project_version() {
@@ -1161,12 +1175,12 @@ cmd_report() {
 
 cmd_bench() {
   local version="${1:-}"
-  banner "bench — complete benchmark run: synthetic full + big + realworld (~3 h)"
+  banner "bench — complete run: synthetic full + big + realworld + report (~3 h)"
 
-  banner "bench [1/3] — synthetic full (all libraries, n = 10K / 100K)"
+  banner "bench [1/4] — synthetic full (all libraries, n = 10K / 100K)"
   run_kind synthetic all "$DEFAULT_SYNTHETIC_PROFILE"
 
-  banner "bench [2/3] — synthetic big (Graphity + reordered, n = 1M / 10M / 100M)"
+  banner "bench [2/4] — synthetic big (Graphity + reordered, n = 1M / 10M / 100M)"
   run_kind synthetic all "big"
 
   local datasets_present=0
@@ -1176,15 +1190,21 @@ cmd_bench() {
   fi
 
   if [[ $datasets_present -eq 1 ]]; then
-    banner "bench [3/3] — realworld (all libraries)"
+    banner "bench [3/4] — realworld (all libraries)"
     run_kind realworld all "$DEFAULT_REALWORLD_PROFILE"
   else
-    banner "bench [3/3] — realworld skipped (no datasets found under datasets/)"
-    echo "  Run './datasets/download-datasets.sh' first to enable real-world benchmarks."
+    banner "bench [3/4] — realworld SKIPPED — no datasets found"
+    echo "  No .txt edge lists under ${BENCH_DIR}/datasets/ (or datasets/snap/)."
+    echo "  The SNAP datasets are gitignored and must be fetched once per machine:"
+    echo "      ./datasets/download-datasets.sh"
+    echo "  Without them this run produces synthetic results only."
+    SKIPPED_PHASES+=("realworld — no datasets under ${BENCH_DIR}/datasets (run ./datasets/download-datasets.sh, then re-run)")
   fi
 
-  echo
-  echo "→ Benchmark run complete. Now run:  $(basename "$0") report [version]"
+  # The report step belongs to the run: it merges measurements/ into
+  # reports/versions/<version>-… and regenerates reports/summary/.
+  banner "bench [4/4] — report"
+  cmd_report "$version"
 }
 
 usage() {
@@ -1193,8 +1213,12 @@ Usage: $(basename "$0") <command> [args]
 
 Workflow — from a clean slate to committed reports with charts:
 
+  0. ./datasets/download-datasets.sh          # once per machine: fetch the SNAP datasets
+       (they are gitignored; without them the realworld phase is skipped)
   1. $(basename "$0") clean                   # wipe measurements/ (old JSON etc.)
-  2. $(basename "$0") bench                   # complete ~3h run: synthetic full + big + realworld
+       Mandatory before comparing two code states: measurements/ doubles as the
+       resume cache and is reused as-is, so stale results would be kept.
+  2. $(basename "$0") bench [version]         # complete ~3h run: synthetic full + big + realworld + report
      — OR run individual steps:
      $(basename "$0") synthetic <lib|all>     # synthetic full (n = 10K / 100K, all libraries)
      $(basename "$0") synthetic <lib|all> --profile big   # large graphs (n = 1M+, Graphity only)
@@ -1204,8 +1228,9 @@ Workflow — from a clean slate to committed reports with charts:
 
 Commands:
   clean                          Delete run artifacts (JSON/CSV/MD/log) from measurements/.
-  bench                          Run all benchmark phases in sequence: synthetic full → big → realworld.
-                                 Skips realworld if datasets/ contains no .txt files.
+  bench [version]                Run all phases in sequence: synthetic full → big → realworld → report.
+                                 Skips realworld (loudly, and again in the closing summary) if
+                                 datasets/ contains no .txt files. 'version' is passed to report.
   synthetic <lib|all>            perf+alloc+mem on synthetic graphs (default profile: ${DEFAULT_SYNTHETIC_PROFILE}).
   realworld <lib|all>            perf on real-world SNAP datasets   (default profile: ${DEFAULT_REALWORLD_PROFILE}).
   report [version] [machine]     Merge JSON → promote to reports/versions/<version>-<kind>-<machine>.md →
@@ -1224,7 +1249,8 @@ Profiles (--profile <name>):
                 realworld-quick — web-Google only, smoke run (~minutes)
 
 Examples:
-  $(basename "$0") bench                             # complete run (~3h): full + big + realworld
+  $(basename "$0") bench                             # complete run (~3h) + report, version from pom.xml
+  $(basename "$0") bench 2.2.0                       # same, promoted as version 2.2.0
   $(basename "$0") clean && $(basename "$0") bench   # clean slate then full run
   $(basename "$0") synthetic all                     # full synthetic only
   $(basename "$0") synthetic all --profile big       # large-graph synthetic only
@@ -1274,6 +1300,12 @@ case "$cmd" in
     exit 2
     ;;
 esac
+
+if [[ ${#SKIPPED_PHASES[@]} -gt 0 ]]; then
+  banner "skipped phases"
+  echo "${#SKIPPED_PHASES[@]} phase(s) did not run — the report covers less than a full run:" >&2
+  printf '  - %s\n' "${SKIPPED_PHASES[@]}" >&2
+fi
 
 if [[ ${#FAILED_MEASUREMENTS[@]} -gt 0 ]]; then
   banner "done, but with failures"

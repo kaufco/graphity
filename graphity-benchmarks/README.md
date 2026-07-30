@@ -47,8 +47,9 @@ The runner is a single script with a three-step workflow — **clean → run →
 | Command                        | Effect                                                                                              |
 |--------------------------------|-----------------------------------------------------------------------------------------------------|
 | `clean`                        | Delete run artifacts (JSON/CSV/MD/log) from `measurements/`                                              |
-| `bench`                        | Run all phases in sequence: `synthetic full` → `synthetic big` → `realworld` (~3 h total).         |
-|                                | Skips realworld if no dataset files are found under `datasets/`.                                    |
+| `bench [version]`              | Run all phases in sequence: `synthetic full` → `synthetic big` → `realworld` → `report` (~3 h total). |
+|                                | `version` is handed to the `report` step. Skips realworld if no dataset files are found under        |
+|                                | `datasets/` — loudly, and again in a closing "skipped phases" banner.                                |
 | `synthetic <lib\|all>`         | `perf`+`alloc`+`mem` on synthetic graphs (default profile: `full`)                                  |
 | `realworld <lib\|all>`         | `perf` on real-world SNAP datasets (default profile: `realworld`)                                   |
 | `report [version] [machine]`   | Merge JSON → times Markdown → promote to `reports/versions/` → regenerate summary report + chart SVGs.    |
@@ -89,7 +90,7 @@ full  →  n = 10⁴/10⁵, all libraries, perf + alloc + mem
 big   →  n = 10⁶/10⁷/10⁸, Graphity + reordered only, perf
 ```
 
-Use `bench` to run all three in one go (see [Commands](#commands)).
+Use `bench` to run all three plus the report step in one go (see [Commands](#commands)). The real-world part needs the datasets on disk; if they are missing, `bench` skips that phase and says so both at the point of the skip and in a closing banner — see [Real-world graphs](#real-world-graphs-a-separate-run).
 
 - **`big`** is Graphity-only: at n ≥ 10⁶ the generalist peers (JGraphT/Guava object graphs) and WebGraph's in-RAM `ArrayListMutableGraph` build path run out of memory, and the peers' recursive DFS reference wrappers overflow the stack, whereas Graphity's algorithm cores are iterative. The 10⁸ tier is sparse-only because Graphity's int-indexed CSR caps out-adjacency at ~2.1 B edges. Each traversal algorithm is also run on a DFS-preorder reordered copy (see [Reordering](#reordering-graphity-reordered-and-reorder)).
 - **`realworld` / `realworld-quick`** run on real-world edge lists — see [Real-world graphs](#real-world-graphs-a-separate-run).
@@ -158,10 +159,10 @@ Dataset paths support `~` expansion and `${ENV}` variables; relative paths resol
 | Field        | Values                                                                                            |
 |--------------|---------------------------------------------------------------------------------------------------|
 | `libraries`  | `graphity`, `graphity-reordered`, `jgrapht`, `guava`, `webgraph`                                   |
-| `algorithms` | `build`, `scc`, `wcc`, `ccs`, `toporder`, `toporderandlevels`, `backedges`, `edgetypes`, `reorder` |
+| `algorithms` | `build`, `scc`, `wcc`, `ccs`, `condense`, `toporder`, `toporderandlevels`, `backedges`, `edgetypes`, `reorder` |
 | `shape`      | see [Shapes](#shapes) below                                                                        |
 
-Algorithm coverage is asymmetric: only `graphity` (and its `graphity-reordered` variant) implements `wcc`, `ccs` and `toporderandlevels` natively; `reorder` is `graphity`-only. `graphity-reordered` supports the traversal algorithms but not `build`. The matrix validator rejects unsupported library / algorithm pairings before any run starts.
+Algorithm coverage is asymmetric: only `graphity` (and its `graphity-reordered` variant) implements `wcc`, `ccs` and `toporderandlevels` natively; `reorder` and `condense` are `graphity`-only. `graphity-reordered` supports the traversal algorithms but not `build`. The matrix validator rejects unsupported library / algorithm pairings before any run starts.
 
 See [Reordering](#reordering-graphity-reordered-and-reorder) for what `graphity-reordered` and `reorder` mean.
 
@@ -179,6 +180,8 @@ General directed shapes (`build`, `scc`, `wcc`, `ccs`, `backedges`, `edgetypes`)
 DAG-only shapes (`toporder`, `toporderandlevels`):
 
 - `DAG_GNP_SPARSE`, `DAG_GNP_DENSE` — random DAGs
+
+`condense` accepts every shape from both groups. It measures `NodePartition.condense()` on the SCC partition, and its cost scales with the *group* count rather than the node count — so the useful axis is how many SCCs a shape produces at a given `nodeCount`: `DAG_GNP_SPARSE` and `PATH` yield one group per node, `CHAIN_OF_CLIQUES` roughly one per 32 nodes, and `GNP_DENSE` collapses into a single giant SCC.
 
 Shuffled variants (`*_SHUFFLED`) take the corresponding base shape and randomise node IDs. Topology is unchanged; ID-locality is broken. They are the basis for measuring how much each library's locality assumptions are worth — relevant in particular for compression-based representations like WebGraph's BVGraph.
 
@@ -203,7 +206,7 @@ Graphity can permute node IDs into DFS-preorder (`Graphs.dfsReordered(graph)`), 
 - **`graphity-reordered`** is a *pseudo-library*: it runs the identical Graphity algorithm on a reordered copy of the graph and appears as a separate **`Graphity (reordered)`** column next to `Graphity`. Its ratio is relative to the `Graphity` baseline, so `0.50×` means the reordered run is twice as fast. It is kept as a dedicated JMH state so reordered and as-built runs never warm each other up; the one-time reordering itself is excluded from the measured algorithm.
 - **`reorder`** is a `graphity`-only algorithm that measures exactly that one-time cost (`Graphs.dfsReordered`), reported in its own subsection. Compare it against the per-algorithm savings to judge amortization: reordering only pays off when the layout is poor *and* the graph is traversed several times.
 
-Reordering is a no-op on already ID-local shapes (`PATH`, `TREE`, `CHAIN_OF_CLIQUES`) and helps most on `GNP_*` and `*_SHUFFLED`. To keep runtime in check, the `big` profile restricts the reordered/`reorder` cases to two representative shapes (`GNP_SPARSE`, `GNP_DENSE_SHUFFLED`).
+Reordering is a no-op on already ID-local shapes (`PATH`, `TREE`, `CHAIN_OF_CLIQUES`) and helps most on `GNP_*` and `*_SHUFFLED`. All shipped profiles run the reordered/`reorder` cases on the same shapes as their plain counterparts, so the `Graphity (reordered)` column is never partially empty. (The `big` profile used to restrict them to `GNP_SPARSE` and `GNP_DENSE_SHUFFLED` to save runtime, which left visible gaps in the report charts from 10⁶ nodes up.)
 
 ## Datasets
 
@@ -296,6 +299,8 @@ It then immediately regenerates the per-machine combined report:
 - `reports/summary/fig/<kind>-<machine>/` — chart SVGs linked from the combined Markdown
 
 Previous versions' data is never lost: the combined report is generated from all `<version>-<machine>.md` source files present in the directory, so adding a new version just adds columns.
+
+Sections are matched across versions by **algorithm name and node count**, never by the section number. The numbers in a per-version report are a running index over the algorithms that had data in that run, so they shift as soon as an algorithm is added or missing — `Condense` entered the matrix after 2.0.0 and pushed `TopOrder` from 1.5 to 1.6, for example. The combined report assigns its own numbering from the union of all versions, in the canonical algorithm order, which is why an algorithm measured in only some versions shows up exactly once, with empty columns for the versions that lack it.
 
 Only `reports/` is committed; `measurements/` is scratch and gitignored.
 

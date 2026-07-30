@@ -62,6 +62,7 @@ public final class ReportMain {
       Map.entry("Scc", "SCC"),
       Map.entry("Wcc", "WCC"),
       Map.entry("Ccs", "CCs"),
+      Map.entry("Condense", "Condense"),
       Map.entry("TopOrder", "TopOrder"),
       Map.entry("TopOrderAndLevels", "TopOrderAndLevels"),
       Map.entry("BackEdges", "BackEdges"),
@@ -74,7 +75,7 @@ public final class ReportMain {
    * subsection of chapter 1.
    */
   private static final List<String> ALGO_ORDER = List.of(
-      "Build", "Scc", "Wcc", "Ccs", "TopOrder", "TopOrderAndLevels",
+      "Build", "Scc", "Wcc", "Ccs", "Condense", "TopOrder", "TopOrderAndLevels",
       "BackEdges", "EdgeTypes", "Reorder");
 
   /**

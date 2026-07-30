@@ -52,14 +52,23 @@ new version's measurements does not overwrite older data.
 
 File naming: `<version>-<kind>-<machine>.md`
 
+Their section numbers are a running index over the algorithms that had data in that
+run, so the same algorithm can carry different numbers in different files (`Condense`
+entered the matrix after 2.0.0 and pushed `TopOrder` from 1.5 to 1.6). `summary/`
+matches sections by algorithm and node count and assigns its own numbering, so the
+numbers in `versions/` are never authoritative.
+
 ## Adding new measurements
 
 ```bash
 cd graphity-benchmarks
-./run-benchmarks.sh clean
-./run-benchmarks.sh bench          # or individual: synthetic/realworld
-./run-benchmarks.sh report         # version from pom.xml; promotes + regenerates summary
+./run-benchmarks.sh clean          # mandatory: measurements/ is also the resume cache
+./run-benchmarks.sh bench          # measures everything and runs report at the end
 ```
+
+`bench` takes an optional version (`bench 2.2.0`); without it the version comes from
+`pom.xml`. Running `synthetic`/`realworld` individually requires a separate `report`
+call afterwards.
 
 To regenerate `summary/` from existing `versions/` without new measurements:
 
