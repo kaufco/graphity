@@ -2,8 +2,8 @@ package com.kobayami.graphity;
 
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntLists;
-import it.unimi.dsi.fastutil.longs.LongArrayList;
 
+import java.util.Arrays;
 import java.util.Objects;
 
 /**
@@ -160,8 +160,8 @@ public final class EdgeTypes {
       byte forward = (byte) EdgeType.FORWARD.ordinal();
       byte cross = (byte) EdgeType.CROSS.ordinal();
       // Each frame packs (node << 32 | resume cursor) into one long: node and cursor share a
-      // cache line, and the list grows on demand (one allocation per resize instead of two).
-      LongArrayList frames = new LongArrayList(Math.max(16, Math.min(n, 1024)));
+      // cache line, and the array grows on demand (one allocation per resize instead of two).
+      long[] frames = new long[Math.max(16, Math.min(n, 1024))];
       int time = 0;
 
       for (int root = 0; root < n; root++) {
@@ -171,12 +171,12 @@ public final class EdgeTypes {
         }
         state[root >> 4] |= (VISITED | ON_STACK) << rShift;
         disc[root] = ++time;
-        frames.add(((long) root << 32) | (out[root] & 0xFFFFFFFFL));
+        frames[0] = ((long) root << 32) | (out[root] & 0xFFFFFFFFL);
+        int top = 0;
 
         outer:
-        while (!frames.isEmpty()) {
-          int top = frames.size() - 1;
-          long frame = frames.getLong(top);
+        while (top >= 0) {
+          long frame = frames[top];
           int u = (int) (frame >>> 32);
           int end = out[u + 1];
           // Tight neighbor scan: i and end stay in registers; the frame list is
@@ -189,10 +189,13 @@ public final class EdgeTypes {
             int flags = state[v >> 4] >>> shift;
             if ((flags & VISITED) == 0) {
               types[c] = tree;
-              frames.set(top, (frame & 0xFFFFFFFF00000000L) | (i & 0xFFFFFFFFL));
+              frames[top] = (frame & 0xFFFFFFFF00000000L) | (i & 0xFFFFFFFFL);
               state[v >> 4] |= (VISITED | ON_STACK) << shift;
               disc[v] = ++time;
-              frames.add(((long) v << 32) | (out[v] & 0xFFFFFFFFL));
+              if (++top == frames.length) {
+                frames = Arrays.copyOf(frames, top << 1);
+              }
+              frames[top] = ((long) v << 32) | (out[v] & 0xFFFFFFFFL);
               continue outer;
             } else if ((flags & ON_STACK) != 0) {
               types[c] = back;
@@ -203,7 +206,7 @@ public final class EdgeTypes {
             }
           }
           state[u >> 4] &= ~(ON_STACK << ((u & 0xF) << 1));
-          frames.size(top);
+          top--;
         }
       }
     }

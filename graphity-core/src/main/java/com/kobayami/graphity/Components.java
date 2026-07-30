@@ -1,7 +1,5 @@
 package com.kobayami.graphity;
 
-import it.unimi.dsi.fastutil.longs.LongArrayList;
-
 import java.util.Arrays;
 
 /**
@@ -218,20 +216,20 @@ public final class Components {
       // DFS frames grow on demand: depth is data-dependent and usually far below n, so
       // pre-sizing to n would needlessly zero a huge array for shallow graphs. Each frame
       // packs (node << 32 | resume cursor) into one long: node and cursor share a cache
-      // line, and the list grows with one allocation per resize instead of two.
-      LongArrayList frames = new LongArrayList(Math.max(16, Math.min(n, 1024)));
+      // line, and the array grows with one allocation per resize instead of two.
+      long[] frames = new long[Math.max(16, Math.min(n, 1024))];
 
       for (int root = 0; root < n; root++) {
         if ((node[root] & VISITED) != 0) {
           continue;
         }
         preorder(root);
-        frames.add(((long) root << 32) | (out[root] & 0xFFFFFFFFL));
+        frames[0] = ((long) root << 32) | (out[root] & 0xFFFFFFFFL);
+        int top = 0;
 
         outer:
-        while (!frames.isEmpty()) {
-          int top = frames.size() - 1;
-          long frame = frames.getLong(top);
+        while (top >= 0) {
+          long frame = frames[top];
           int u = (int) (frame >>> 32);
           int end = out[u + 1];
           // Tight neighbor scan: i and end stay in registers; the frame list is
@@ -241,9 +239,12 @@ public final class Components {
             int v = adj[i++];
             long nv = node[v];               // one load yields all of v's packed state
             if ((nv & VISITED) == 0) {
-              frames.set(top, (frame & 0xFFFFFFFF00000000L) | (i & 0xFFFFFFFFL));  // resume here after v's subtree finishes
+              frames[top] = (frame & 0xFFFFFFFF00000000L) | (i & 0xFFFFFFFFL);  // resume here after v's subtree finishes
               preorder(v);
-              frames.add(((long) v << 32) | (out[v] & 0xFFFFFFFFL));
+              if (++top == frames.length) {
+                frames = Arrays.copyOf(frames, top << 1);
+              }
+              frames[top] = ((long) v << 32) | (out[v] & 0xFFFFFFFFL);
               continue outer;
             } else if ((nv & ON_STACK) != 0) {
               // lowlink[u] = min(lowlink[u], index[v])
@@ -272,9 +273,8 @@ public final class Components {
             Arrays.sort(sccNodes, start, sccNodesPos);
             sccCount++;
           }
-          frames.size(top);
-          if (top > 0) {
-            int parent = (int) (frames.getLong(top - 1) >>> 32);
+          if (--top >= 0) {
+            int parent = (int) (frames[top] >>> 32);
             long np = node[parent];
             if (lowU < (int) ((np >>> LOWLINK_SHIFT) & INDEX_MASK)) {
               node[parent] = (np & ~LOWLINK_FIELD) | ((long) lowU << LOWLINK_SHIFT);

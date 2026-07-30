@@ -1,7 +1,5 @@
 package com.kobayami.graphity;
 
-import it.unimi.dsi.fastutil.longs.LongArrayList;
-
 import java.util.Arrays;
 
 /**
@@ -438,8 +436,8 @@ public final class Graphs {
       int[] adj = graph.outAdjacency;
       int[] state = this.state;
       // Each frame packs (node << 32 | resume cursor) into one long: node and cursor share a
-      // cache line, and the list grows on demand (one allocation per resize instead of two).
-      LongArrayList frames = new LongArrayList(Math.max(16, Math.min(n, 1024)));
+      // cache line, and the array grows on demand (one allocation per resize instead of two).
+      long[] frames = new long[Math.max(16, Math.min(n, 1024))];
 
       for (int root = 0; root < n; root++) {
         int rShift = (root & 0xF) << 1;
@@ -447,12 +445,12 @@ public final class Graphs {
           continue;
         }
         state[root >> 4] |= (VISITED | ON_STACK) << rShift;
-        frames.add(((long) root << 32) | (out[root] & 0xFFFFFFFFL));
+        frames[0] = ((long) root << 32) | (out[root] & 0xFFFFFFFFL);
+        int top = 0;
 
         outer:
-        while (!frames.isEmpty()) {
-          int top = frames.size() - 1;
-          long frame = frames.getLong(top);
+        while (top >= 0) {
+          long frame = frames[top];
           int u = (int) (frame >>> 32);
           int end = out[u + 1];
           // Tight neighbor scan: i and end stay in registers; the frame list is
@@ -467,14 +465,17 @@ public final class Graphs {
               return;
             }
             if ((flags & VISITED) == 0) {
-              frames.set(top, (frame & 0xFFFFFFFF00000000L) | (i & 0xFFFFFFFFL));
+              frames[top] = (frame & 0xFFFFFFFF00000000L) | (i & 0xFFFFFFFFL);
               state[v >> 4] |= (VISITED | ON_STACK) << shift;
-              frames.add(((long) v << 32) | (out[v] & 0xFFFFFFFFL));
+              if (++top == frames.length) {
+                frames = Arrays.copyOf(frames, top << 1);
+              }
+              frames[top] = ((long) v << 32) | (out[v] & 0xFFFFFFFFL);
               continue outer;
             }
           }
           state[u >> 4] &= ~(ON_STACK << ((u & 0xF) << 1));
-          frames.size(top);
+          top--;
         }
       }
     }

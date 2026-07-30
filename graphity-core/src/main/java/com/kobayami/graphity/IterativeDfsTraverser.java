@@ -1,8 +1,8 @@
 package com.kobayami.graphity;
 
 import it.unimi.dsi.fastutil.ints.IntList;
-import it.unimi.dsi.fastutil.longs.LongArrayList;
 
+import java.util.Arrays;
 import java.util.Objects;
 
 /**
@@ -90,9 +90,11 @@ public abstract class IterativeDfsTraverser {
    * Explicit DFS stack, replacing the call stack; grows on demand. Each frame packs
    * {@code (node << 32 | resume cursor)} into one {@code long}: the node ID at depth
    * {@code d} and the next adjacency index to scan for it share a cache line, and the
-   * backing array grows with one allocation per resize instead of two.
+   * backing array grows with one allocation per resize instead of two. A raw array rather
+   * than a list, so that the traversal loop keeps array reference and stack pointer in
+   * registers; the field only carries the capacity across {@code run} calls.
    */
-  private final LongArrayList frames;
+  private long[] frames;
 
   /**
    * Creates a traverser for the given graph.
@@ -103,7 +105,7 @@ public abstract class IterativeDfsTraverser {
     this.graph = graph;
     int n = graph.nodeCount();
     this.state = new int[(n >> 4) + 1];
-    this.frames = new LongArrayList(Math.max(16, Math.min(n, 1024)));
+    this.frames = new long[Math.max(16, Math.min(n, 1024))];
   }
 
   /**
@@ -213,7 +215,7 @@ public abstract class IterativeDfsTraverser {
     int[] out = graph.outAdjacencyStart;
     int[] adj = graph.outAdjacency;
     int[] state = this.state;
-    LongArrayList frames = this.frames;
+    long[] frames = this.frames;
 
     int rShift = (root & 0xF) << 1;
     state[root >> 4] |= (VISITED | ON_STACK) << rShift;
@@ -223,12 +225,12 @@ public abstract class IterativeDfsTraverser {
       leaveNode(root);
       return;
     }
-    frames.add(((long) root << 32) | (out[root] & 0xFFFFFFFFL));
+    frames[0] = ((long) root << 32) | (out[root] & 0xFFFFFFFFL);
+    int top = 0;
 
     outer:
-    while (!frames.isEmpty()) {
-      int top = frames.size() - 1;
-      long frame = frames.getLong(top);
+    while (top >= 0) {
+      long frame = frames[top];
       int u = (int) (frame >>> 32);
       int end = out[u + 1];
       int i = (int) frame;
@@ -238,8 +240,12 @@ public abstract class IterativeDfsTraverser {
         if (((state[v >> 4] >>> shift) & VISITED) == 0) {  // tree edge
           state[v >> 4] |= (VISITED | ON_STACK) << shift;
           if (enterNode(v)) {
-            frames.set(top, (frame & 0xFFFFFFFF00000000L) | (i & 0xFFFFFFFFL));  // save u's resume point before descending
-            frames.add(((long) v << 32) | (out[v] & 0xFFFFFFFFL));
+            frames[top] = (frame & 0xFFFFFFFF00000000L) | (i & 0xFFFFFFFFL);  // save u's resume point before descending
+            if (++top == frames.length) {
+              frames = Arrays.copyOf(frames, top << 1);
+              this.frames = frames;  // keep the grown capacity for later run calls
+            }
+            frames[top] = ((long) v << 32) | (out[v] & 0xFFFFFFFFL);
             continue outer;
           }
           // Pruned: no descent, immediate postorder. u's scan continues with the
@@ -251,7 +257,7 @@ public abstract class IterativeDfsTraverser {
       // Postorder u.
       state[u >> 4] &= ~(ON_STACK << ((u & 0xF) << 1));
       leaveNode(u);
-      frames.size(top);
+      top--;
     }
   }
 }
