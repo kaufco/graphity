@@ -98,6 +98,7 @@ double[] weights = new double[graph.edgeCount()];
 | `Components.wccsOf(graph)` | `NodePartition` | `nodesOf()`, `condense()`                    |
 | `EdgeTypes.of(graph)`      | `EdgeTypes`     | `typeOf(edgeIndex)`, `edgesOfType(TREE)`     |
 | `BackEdges.of(graph)`      | `Edges`         | `sourceNodes()`, `targetNodes()`             |
+| `Ancestry.of(forest)`      | `Ancestry`      | `lowestCommonAncestorOf(a, b)`, `depthOf()`  |
 | `NodeMapping.of(...)`      | `NodeMapping`   | `inverse()`, `compose(other)`                |
 
 These types compose. `sccs.condense()` returns a `Graph` plus a `NodeMapping` from original nodes to SCC IDs that you can run further algorithms on; `nodeMapping.compose(other)` chains transformations and applies the result to your own metadata arrays in one step.
@@ -209,6 +210,7 @@ Graphity ships the following algorithms out of the box. All of them return typed
 | Topological order with levels (Kahn's)                          | `TopOrderAndLevels.of(graph)` |
 | DFS edge classification (TREE / BACK / FORWARD / CROSS)         | `EdgeTypes.of(graph)`         |
 | Back edges                                                      | `BackEdges.of(graph)`         |
+| Lowest common ancestor (trees and forests)                      | `Ancestry.of(forest)`         |
 | Shape predicates (`isDag`, `isForest`, `isOutTree`, `isPath`)   | `Graphs.isDag(graph)`         |
 | Condensation DAG                                                | `sccs.condense()`             |
 | Subgraph extraction and node remapping                          | `Graphs.remapped(...)`        |

@@ -37,6 +37,17 @@ class DeepGraphStackSafetyTest {
   }
 
   @Test
+  void deepAncestryDoesNotOverflowStack() {
+    // A chain of DEEP nodes is one heavy path; construction and queries must stay iterative.
+    Graph path = TestGraphs.path(DEEP);
+
+    Ancestry ancestry = Ancestry.of(path);
+    assertThat(ancestry.depthOf(DEEP - 1)).isEqualTo(DEEP - 1);
+    assertThat(ancestry.lowestCommonAncestorOf(DEEP - 1, DEEP / 2)).isEqualTo(DEEP / 2);
+    assertThat(ancestry.isAncestorOf(0, DEEP - 1)).isTrue();
+  }
+
+  @Test
   void deepCycleDoesNotOverflowStack() {
     // One giant SCC: DFS descends DEEP levels, then a single back-edge closes the cycle.
     // Stresses the deep sccStack pop (Tarjan) and the deep onStack unwind.

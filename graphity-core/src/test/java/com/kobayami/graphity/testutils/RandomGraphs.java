@@ -76,6 +76,38 @@ public final class RandomGraphs {
   }
 
   /**
+   * Random forest of out-trees: node 0 is always a root, every other node either starts a new
+   * tree (with probability {@code rootProb}) or gets a random parent from {@code [0, i)}.
+   * No cycles, no self-loops, every node has in-degree ≤ 1.
+   */
+  public static Graph randomForest(int n, double rootProb, long seed) {
+    if (n == 0) return new GraphBuilder().build();
+    var rnd = new Random(seed);
+    var b = new GraphBuilder();
+    b.addNodes(n);
+    for (int i = 1; i < n; i++) {
+      if (rnd.nextDouble() >= rootProb) b.addEdge(rnd.nextInt(i), i);
+    }
+    return b.build();
+  }
+
+  /**
+   * Forest of long chains: every node's parent is its predecessor, except where a new tree
+   * starts (with probability {@code rootProb}). Produces deep, thin trees - the shape that
+   * makes path decomposition and per-query walks differ most.
+   */
+  public static Graph chainForest(int n, double rootProb, long seed) {
+    if (n == 0) return new GraphBuilder().build();
+    var rnd = new Random(seed);
+    var b = new GraphBuilder();
+    b.addNodes(n);
+    for (int i = 1; i < n; i++) {
+      if (rnd.nextDouble() >= rootProb) b.addEdge(i - 1, i);
+    }
+    return b.build();
+  }
+
+  /**
    * Random DAG: edges only go from lower node indices to higher ones.
    * Each of the {@code n*(n-1)/2} candidate forward edges is added with probability
    * {@code edgeProb}. No cycles, no self-loops.
@@ -127,6 +159,28 @@ public final class RandomGraphs {
       }
       case 2 -> new LabeledGraph("randomTree", n, seed, randomTree(n, innerSeed));
       case 3 -> new LabeledGraph("randomDag(p=%.3f)".formatted(p), n, seed, randomDag(n, p, innerSeed));
+      default -> throw new IllegalStateException();
+    };
+  }
+
+  /**
+   * Picks a random forest of out-trees, mixing bushy and chain-like shapes and single-tree
+   * with multi-tree cases. Use for algorithms that require forest input.
+   */
+  public static LabeledGraph anyForest(long seed) {
+    var rnd = new Random(seed);
+    int n = pickNodeCount(rnd);
+    long innerSeed = rnd.nextLong();
+    double rootProb = new double[] {0.0, 0.01, 0.1}[rnd.nextInt(3)];
+    int choice = rnd.nextInt(3);
+    return switch (choice) {
+      case 0 -> new LabeledGraph("randomTree", n, seed, randomTree(n, innerSeed));
+      case 1 -> new LabeledGraph(
+          "randomForest(rootProb=%.2f)".formatted(rootProb), n, seed,
+          randomForest(n, rootProb, innerSeed));
+      case 2 -> new LabeledGraph(
+          "chainForest(rootProb=%.2f)".formatted(rootProb), n, seed,
+          chainForest(n, rootProb, innerSeed));
       default -> throw new IllegalStateException();
     };
   }

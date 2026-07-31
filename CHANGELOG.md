@@ -43,6 +43,18 @@ Graphity adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the edge count is known or can be estimated, avoiding the reallocation and copying that
   filling a growing list to millions of edges otherwise costs.
 
+- **`Ancestry`** — ancestor queries on a forest of out-trees, built once via
+  `Ancestry.of(forest)` and then queried arbitrarily often: `lowestCommonAncestorOf(a, b)`,
+  `isAncestorOf(node, descendant)`, `depthOf(node)` and `parentOf(node)`. Preprocessing is a
+  heavy-path decomposition — O(nodeCount + edgeCount) to build, O(log nodeCount) per
+  lowest-common-ancestor query, and 12 bytes per node, an order of magnitude less than the
+  level tables that binary lifting or a sparse-table RMQ would need for the same queries.
+
+  Two nodes in different trees of the forest yield `-1`. A graph that is not a forest of
+  out-trees is rejected with `IllegalArgumentException` naming the offending node; for a forest
+  of in-trees, pass the transpose. Construction and queries are iterative and verified on a
+  chain of 10^6 nodes.
+
 - **Edge indices across a transpose.** `transposed()` keeps node IDs but not edge indices, so
   edge metadata held in a parallel array could not be addressed while iterating a transpose.
   Two additions close that gap: `Graphs.transposedEdgeMapping(graph)` translates every edge
