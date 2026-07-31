@@ -124,13 +124,52 @@ public final class BiAdjacentGraph extends Graph {
   /**
    * Returns a zero-copy view with in- and out-adjacency swapped (graph transpose).
    * <p>
+   * Node IDs are preserved, <strong>edge indices are not</strong>: the edge at index {@code i}
+   * of the transpose is a different edge from the one at index {@code i} here. To address
+   * external edge metadata across the transpose, translate the index with
+   * {@link #transposedEdgeIndex(int)} or {@link Graphs#transposedEdgeMapping(Graph)}.
+   * <p>
    * <strong>Time:</strong> O(1).
    *
    * @return a bi-adjacent view with all edge directions reversed
+   * @see #transposedEdgeIndex(int)
+   * @see Graphs#transposedEdgeMapping(Graph)
    */
   @Override
   public final BiAdjacentGraph transposed() {
     return new BiAdjacentGraph(inAdjacencyStart, inAdjacency, outAdjacencyStart, outAdjacency);
+  }
+
+  /**
+   * Returns the index of the same edge in {@link #transposed()}.
+   * <p>
+   * The edge at {@code edgeIndex} runs {@code source → target}; in the transpose the same
+   * edge runs {@code target → source} and sits at the returned index. This is the inverse
+   * direction of {@link Graphs#transposedEdgeMapping(Graph)} and its own inverse across the
+   * two graphs:
+   * <pre>{@code
+   * BiAdjacentGraph transpose = graph.transposed();
+   * int back = transpose.transposedEdgeIndex(graph.transposedEdgeIndex(edgeIndex));
+   * assert back == edgeIndex;
+   * }</pre>
+   * The result is never {@code -1} - the edge being translated exists by definition. Use
+   * {@link Graphs#transposedEdgeMapping(Graph)} instead when translating every edge, which
+   * costs one linear pass rather than a binary search per edge.
+   * <p>
+   * <strong>Time:</strong> O(log nodeCount + log inDegree) via binary search.
+   *
+   * @param edgeIndex edge index in {@code 0..edgeCount()-1}
+   * @return the index of the same edge in {@link #transposed()}
+   * @throws IndexOutOfBoundsException if {@code edgeIndex} is out of range
+   * @see #transposed()
+   * @see Graphs#transposedEdgeMapping(Graph)
+   */
+  public final int transposedEdgeIndex(int edgeIndex) {
+    Objects.checkIndex(edgeIndex, edgeCount());
+    int source = edgeSource(edgeIndex);
+    int target = outAdjacency[edgeIndex];
+    return SortedIntView.indexOfInRange(
+        inAdjacency, inAdjacencyStart[target], inAdjacencyEnd(target), source);
   }
 
   /**

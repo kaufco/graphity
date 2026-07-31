@@ -290,6 +290,69 @@ class GraphsTest {
     assertThat(em.size()).isZero();
   }
 
+  // ---- transposedEdgeMapping ----
+
+  @Test
+  void transposedEdgeMappingRelabelsEdges() {
+    // 0->2 is edge 0, 1->0 is edge 1. In the transpose 0->1 comes first, so the two swap.
+    var g = TestGraphs.of(3, 1, 0, 0, 2);
+    var em = Graphs.transposedEdgeMapping(g);
+    assertThat(em.get(0)).isEqualTo(1);
+    assertThat(em.get(1)).isZero();
+  }
+
+  @Test
+  void transposedEdgeMappingIsTotal() {
+    var g = TestGraphs.of(4, 0, 1, 0, 2, 1, 3, 2, 3, 3, 3);
+    var em = Graphs.transposedEdgeMapping(g);
+    assertThat(em.size()).isEqualTo(g.edgeCount());
+    assertThat(em.isPartial()).isFalse();
+  }
+
+  @Test
+  void transposedEdgeMappingIdentifiesTheSwappedEdge() {
+    var g = TestGraphs.of(4, 0, 1, 0, 2, 1, 3, 2, 3);
+    var transposed = g.transposed();
+    var em = Graphs.transposedEdgeMapping(g);
+    for (int q = 0; q < transposed.edgeCount(); q++) {
+      int p = em.get(q);
+      assertThat(g.edgeSource(p)).isEqualTo(transposed.edgeTarget(q));
+      assertThat(g.edgeTarget(p)).isEqualTo(transposed.edgeSource(q));
+    }
+  }
+
+  @Test
+  void transposedEdgeMappingInverseEqualsTransposedEdgeIndex() {
+    var g = TestGraphs.of(4, 0, 1, 0, 2, 1, 3, 2, 3, 0, 0);
+    var inverse = Graphs.transposedEdgeMapping(g).inverse();
+    var biAdjacent = g.biAdjacentGraph();
+    for (int p = 0; p < g.edgeCount(); p++) {
+      assertThat(inverse.get(p)).isEqualTo(biAdjacent.transposedEdgeIndex(p));
+    }
+  }
+
+  @Test
+  void transposedEdgeMappingAgreesOnUniAndBiAdjacentInput() {
+    var g = TestGraphs.of(4, 0, 1, 0, 2, 1, 3, 2, 3);
+    var fromUniAdjacent = Graphs.transposedEdgeMapping(g);
+    var fromBiAdjacent = Graphs.transposedEdgeMapping(g.biAdjacentGraph());
+    for (int q = 0; q < g.edgeCount(); q++) {
+      assertThat(fromBiAdjacent.get(q)).isEqualTo(fromUniAdjacent.get(q));
+    }
+  }
+
+  @Test
+  void transposedEdgeMappingOfEmptyGraphHasZeroSize() {
+    var em = Graphs.transposedEdgeMapping(TestGraphs.empty());
+    assertThat(em.size()).isZero();
+    assertThat(em.isPartial()).isFalse();
+  }
+
+  @Test
+  void transposedEdgeMappingOfIsolatedNodesHasZeroSize() {
+    assertThat(Graphs.transposedEdgeMapping(TestGraphs.isolated(5)).size()).isZero();
+  }
+
   // ---- edgePartition ----
 
   @Test

@@ -102,7 +102,18 @@ double[] weights = new double[graph.edgeCount()];
 
 These types compose. `sccs.condense()` returns a `Graph` plus a `NodeMapping` from original nodes to SCC IDs that you can run further algorithms on; `nodeMapping.compose(other)` chains transformations and applies the result to your own metadata arrays in one step.
 
-**Edge indices as the bridge to user metadata.** Edges have stable CSR positions. You hold edge-attached data in a parallel array of length `graph.edgeCount()`. When a transformation reorders or filters edges (subgraph, condensation, remap), Graphity returns the corresponding `EdgeMapping` so you can reindex your metadata array in one pass.
+**Edge indices as the bridge to user metadata.** Edges have stable CSR positions. You hold edge-attached data in a parallel array of length `graph.edgeCount()`. When a transformation reorders or filters edges (subgraph, condensation, remap, transpose), Graphity returns the corresponding `EdgeMapping` so you can reindex your metadata array in one pass:
+
+```java
+Graph transpose = graph.transposed();                            // node IDs kept, edge indices not
+EdgeMapping newToOld = Graphs.transposedEdgeMapping(graph);      // one linear pass, total
+double[] transposedWeights = new double[transpose.edgeCount()];
+for (int e = 0; e < transpose.edgeCount(); e++) {
+    transposedWeights[e] = weights[newToOld.get(e)];
+}
+```
+
+For a single edge instead of a full pass, `BiAdjacentGraph.transposedEdgeIndex(edgeIndex)` answers the same question in the other direction.
 
 **Zero-copy views.** Adjacency lists, partition members, edge lists — wherever the underlying CSR already holds the data in the right form, the API hands back a view, not a copy. No allocation on hot loops.
 

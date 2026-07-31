@@ -289,10 +289,18 @@ public sealed class Graph permits BiAdjacentGraph {
   /**
    * Returns the transposed graph (all edge directions reversed).
    * <p>
+   * Node IDs are preserved, <strong>edge indices are not</strong>: the edge at index {@code i}
+   * of the transpose is a different edge from the one at index {@code i} here. To address
+   * external edge metadata across the transpose, translate the index with
+   * {@link Graphs#transposedEdgeMapping(Graph)}, or with
+   * {@link BiAdjacentGraph#transposedEdgeIndex(int)} for a single edge.
+   * <p>
    * <strong>Time:</strong> O(nodeCount + edgeCount)<br>
    * <strong>Memory:</strong> 4 x (nodeCount + edgeCount) bytes.
    *
    * @return the transposed graph
+   * @see Graphs#transposedEdgeMapping(Graph)
+   * @see BiAdjacentGraph#transposedEdgeIndex(int)
    */
   public Graph transposed() {
     return biAdjacentGraph().transposed();

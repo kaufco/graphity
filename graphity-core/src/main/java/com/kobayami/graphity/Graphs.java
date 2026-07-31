@@ -24,6 +24,9 @@ import java.util.Arrays;
  *
  * // Custom permutation
  * Graph permuted = Graphs.remapped(graph, NodeMapping.forPermutation(order));
+ *
+ * // Edge metadata on a transpose
+ * EdgeMapping newToOld = Graphs.transposedEdgeMapping(graph);
  * }</pre>
  *
  * @see NodeMapping
@@ -297,6 +300,12 @@ public final class Graphs {
    * The node mapping must be in the direction new → old (as produced by all
    * {@link NodeMapping} factory methods).
    * <p>
+   * <strong>Not applicable to a transpose.</strong> The lookup searches the target of each
+   * new edge in the out-adjacency of its source, and {@link Graph#transposed()} swaps those
+   * two roles - so {@code edgeMapping(graph.transposed(), graph, identity)} returns almost
+   * exclusively {@code -1} instead of failing. Use
+   * {@link #transposedEdgeMapping(Graph)} for that case.
+   * <p>
    * <strong>Time:</strong> O(newEdgeCount x log d̄) where d̄ is the average out-degree
    * in the old graph (binary search per edge).<br>
    * <strong>Memory:</strong> O(newEdgeCount) for the result.
@@ -305,6 +314,7 @@ public final class Graphs {
    * @param oldGraph the original graph
    * @param newToOld node mapping from new node IDs to old node IDs
    * @return edge mapping from new edge indices to old edge indices
+   * @see #transposedEdgeMapping(Graph)
    */
   public static EdgeMapping edgeMapping(Graph newGraph, Graph oldGraph, NodeMapping newToOld) {
     int newEdgeCount = newGraph.edgeCount();
@@ -331,6 +341,75 @@ public final class Graphs {
 
     int valid = IndexMapping.countValid(mapping);
     return new EdgeMapping(mapping, valid, valid < mapping.length);
+  }
+
+  /**
+   * Derives the edge mapping between a graph and its transpose.
+   * <p>
+   * Maps each edge index of {@code graph.transposed()} to the edge index of the same edge
+   * in {@code graph}, in the direction new → old like every other mapping factory here.
+   * {@link Graph#transposed()} preserves nodes but not edge indices, so this is what
+   * translates edge metadata onto the transpose:
+   * <pre>{@code
+   * Graph transpose = graph.transposed();
+   * EdgeMapping newToOld = Graphs.transposedEdgeMapping(graph);
+   * double[] transposedWeights = new double[transpose.edgeCount()];
+   * for (int e = 0; e < transpose.edgeCount(); e++) {
+   *     transposedWeights[e] = weights[newToOld.get(e)];
+   * }
+   * }</pre>
+   * The mapping is <strong>total</strong>: every edge of the transpose is an edge of the
+   * original with source and target swapped, so it holds no {@code -1} entries and
+   * {@link IndexMapping#isPartial()} is {@code false}.
+   * <p>
+   * For a single edge rather than a full pass, use
+   * {@link BiAdjacentGraph#transposedEdgeIndex(int)}, which is the inverse direction.
+   * <p>
+   * <strong>Time:</strong> O(nodeCount + edgeCount).<br>
+   * <strong>Memory:</strong> 4 x edgeCount bytes for the result, plus 4 x nodeCount bytes
+   * during computation.
+   *
+   * @param graph the graph whose transpose is to be addressed
+   * @return edge mapping from the transpose's edge indices to this graph's edge indices
+   * @see Graph#transposed()
+   * @see BiAdjacentGraph#transposedEdgeIndex(int)
+   */
+  public static EdgeMapping transposedEdgeMapping(Graph graph) {
+    int n = graph.nodeCount();
+    int m = graph.edgeCount();
+    var outAdjacency = graph.outAdjacency;
+    var outAdjacencyStart = graph.outAdjacencyStart;
+
+    // Write pointer per target node: where that node's next in-edge slot goes.
+    // A bi-adjacent graph already has those offsets; otherwise count and prefix-sum them.
+    int[] writePos;
+    if (graph instanceof BiAdjacentGraph biAdjacent) {
+      writePos = Arrays.copyOf(biAdjacent.inAdjacencyStart, n);
+    } else {
+      writePos = new int[n];
+      for (int target : outAdjacency) {
+        writePos[target]++;
+      }
+      int nextStart = 0;
+      for (int node = 0; node < n; node++) {
+        int inDegree = writePos[node];
+        writePos[node] = nextStart;
+        nextStart += inDegree;
+      }
+    }
+
+    // Same counting sort as Graph.biAdjacentGraph(), with the edge index as payload instead
+    // of the source node. Ascending node scan makes slot q of the transpose and entry q of
+    // the mapping describe the same edge.
+    int[] mapping = new int[m];
+    for (int node = 0; node < n; node++) {
+      int end = outAdjacencyStart[node + 1];
+      for (int edgeIndex = outAdjacencyStart[node]; edgeIndex < end; edgeIndex++) {
+        mapping[writePos[outAdjacency[edgeIndex]]++] = edgeIndex;
+      }
+    }
+
+    return new EdgeMapping(mapping, m, false);
   }
 
   /**

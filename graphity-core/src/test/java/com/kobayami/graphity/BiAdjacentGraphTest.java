@@ -121,6 +121,52 @@ class BiAdjacentGraphTest {
   }
 
   @Test
+  void transposedEdgeIndexSwapsEndpoints() {
+    var g = diamond();
+    var t = g.transposed();
+    for (int edgeIndex = 0; edgeIndex < g.edgeCount(); edgeIndex++) {
+      int transposedIndex = g.transposedEdgeIndex(edgeIndex);
+      assertThat(t.edgeSource(transposedIndex)).isEqualTo(g.edgeTarget(edgeIndex));
+      assertThat(t.edgeTarget(transposedIndex)).isEqualTo(g.edgeSource(edgeIndex));
+    }
+  }
+
+  @Test
+  void transposedEdgeIndexIsItsOwnInverseAcrossTheTranspose() {
+    var g = diamond();
+    var t = g.transposed();
+    for (int edgeIndex = 0; edgeIndex < g.edgeCount(); edgeIndex++) {
+      assertThat(t.transposedEdgeIndex(g.transposedEdgeIndex(edgeIndex))).isEqualTo(edgeIndex);
+    }
+  }
+
+  @Test
+  void transposedEdgeIndexRelabelsEdges() {
+    // 0->2 is edge 0, 1->0 is edge 1. In the transpose 0->1 comes first, so the two swap.
+    var g = TestGraphs.of(3, 1, 0, 0, 2).biAdjacentGraph();
+    assertThat(g.transposedEdgeIndex(0)).isEqualTo(1);
+    assertThat(g.transposedEdgeIndex(1)).isZero();
+  }
+
+  @Test
+  void transposedEdgeIndexHandlesSelfLoop() {
+    // Node 1 has a self-loop (edge 1) next to 1->2 (edge 2); 0->1 is edge 0.
+    var g = TestGraphs.of(3, 0, 1, 1, 1, 1, 2).biAdjacentGraph();
+    int loop = g.transposedEdgeIndex(1);
+    var t = g.transposed();
+    assertThat(t.edgeSource(loop)).isEqualTo(1);
+    assertThat(t.edgeTarget(loop)).isEqualTo(1);
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {-1, 4, 1000})
+  void transposedEdgeIndexOutOfRangeThrows(int edgeIndex) {
+    var g = diamond();
+    assertThatThrownBy(() -> g.transposedEdgeIndex(edgeIndex))
+        .isInstanceOf(IndexOutOfBoundsException.class);
+  }
+
+  @Test
   void neighborsMergesInAndOutSorted() {
     // Node 2 has out-neighbor {3} and in-neighbor {0}; expect [0, 3].
     var g = diamond();

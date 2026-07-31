@@ -43,6 +43,16 @@ Graphity adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the edge count is known or can be estimated, avoiding the reallocation and copying that
   filling a growing list to millions of edges otherwise costs.
 
+- **Edge indices across a transpose.** `transposed()` keeps node IDs but not edge indices, so
+  edge metadata held in a parallel array could not be addressed while iterating a transpose.
+  Two additions close that gap: `Graphs.transposedEdgeMapping(graph)` translates every edge
+  index of `graph.transposed()` back to `graph` in one linear pass and is always total, and
+  `BiAdjacentGraph.transposedEdgeIndex(edgeIndex)` answers the same question for a single edge
+  in the opposite direction, in O(log nodeCount + log inDegree). Both `transposed()` methods now
+  document that edge indices are not preserved, and `Graphs.edgeMapping` documents that it
+  cannot be used for a transpose — with the identity node mapping it silently returns `-1`
+  entries, because a transpose swaps the two roles its lookup relies on.
+
 ## [2.0.0] — 2026-07-23
 
 ### Added
