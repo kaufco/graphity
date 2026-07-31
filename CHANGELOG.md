@@ -43,6 +43,20 @@ Graphity adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the edge count is known or can be estimated, avoiding the reallocation and copying that
   filling a growing list to millions of edges otherwise costs.
 
+- **`Components.biconnectivityOf(graph)`** — bridges, articulation points and biconnected
+  components in one depth-first pass, returned as a `Biconnectivity`. `bridges()` yields an
+  `Edges` collection with the lower node ID as source, `articulationPoints()` a sorted
+  `SortedIntView`, and `blocks()` an `EdgePartition` over edge indices, because blocks partition
+  the edges rather than the nodes — an articulation point belongs to every block that meets it.
+
+  The graph is read as undirected, like `ccsOf`, with the reading now stated explicitly: `a → b`
+  and `b → a` are one undirected edge rather than two, so a graph storing its undirected edges
+  symmetrically still has bridges, and both edge indices of such a pair land in the same block.
+  Self-loops are ignored and left unmapped. The traversal is iterative and verified on a path of
+  10^6 nodes. It is the most memory-hungry entry point in the library — during the pass it holds
+  up to 37 bytes per node and up to 8 bytes per edge, which the Javadoc states as a number rather
+  than as a complexity class.
+
 - **`Ancestry`** — ancestor queries on a forest of out-trees, built once via
   `Ancestry.of(forest)` and then queried arbitrarily often: `lowestCommonAncestorOf(a, b)`,
   `isAncestorOf(node, descendant)`, `depthOf(node)` and `parentOf(node)`. Preprocessing is a

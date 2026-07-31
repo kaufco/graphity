@@ -5,20 +5,22 @@ import java.util.Objects;
 /**
  * Bidirectional partition of edges into disjoint groups, with efficient reverse lookup.
  * <p>
- * Used for many-to-one edge mappings, such as condensation: multiple original edges
- * may map to a single condensed edge. Intra-group edges (edges within a single group,
- * omitted from the condensation graph) are unmapped ({@code get(edgeIndex) == -1}).
+ * Used wherever several edges belong to one group. In a condensation the group is a condensed
+ * edge, and multiple original edges map to it; in {@link Biconnectivity#blocks()} the group is
+ * a biconnected component. Edges that belong to no group are unmapped
+ * ({@code get(edgeIndex) == -1}) - intra-group edges in a condensation, self-loops in a
+ * biconnectivity result.
  * <p>
- * The forward direction (original edge → condensed edge) is inherited from
- * {@link IndexMapping#get(int)}. The reverse direction (condensed edge → original edges)
- * is provided by {@link #edgesOf(int)}.
+ * The forward direction (edge → group) is inherited from {@link IndexMapping#get(int)}. The
+ * reverse direction (group → edges) is provided by {@link #edgesOf(int)}.
  * <p>
  * Implements {@link IndexPartition} for generic partition access via {@link #groupCount()},
  * {@link #indexCount()}, {@link #indicesOf(int)}, and {@link #sizeOf(int)}.
  * Domain-specific convenience methods ({@link #edgeCount()}, {@link #edgesOf(int)})
  * delegate to the generic interface.
  * <p>
- * Instances are created via {@link Graphs#edgePartition(Graph, Graph, NodePartition)}.
+ * Instances are created via {@link Graphs#edgePartition(Graph, Graph, NodePartition)} and
+ * {@link Biconnectivity#blocks()}.
  *
  * <pre>{@code
  * EdgePartition ep = Graphs.edgePartition(condensed, original, partition);
@@ -31,10 +33,11 @@ import java.util.Objects;
  * @see EdgeMapping
  * @see IndexPartition
  * @see Graphs#edgePartition(Graph, Graph, NodePartition)
+ * @see Biconnectivity#blocks()
  */
 public final class EdgePartition extends IndexMapping implements IndexPartition {
 
-  /** CSR values: original edge indices of all group members, grouped by condensed edge. */
+  /** CSR values: original edge indices of all group members, grouped by group ID. */
   private final int[] members;
 
   /** CSR offsets: group {@code g}'s members span {@code members[memberStart[g]..memberStart[g+1]-1]}. */
@@ -43,10 +46,10 @@ public final class EdgePartition extends IndexMapping implements IndexPartition 
   /**
    * Package-private constructor.
    *
-   * @param mapping     forward mapping: original edge index → condensed edge index, or -1
+   * @param mapping     forward mapping: original edge index → group ID, or -1
    * @param validCount  number of non-negative entries in mapping
    * @param partial     whether mapping contains -1 entries
-   * @param members     CSR values: original edge indices per condensed edge group
+   * @param members     CSR values: original edge indices per group
    * @param memberStart CSR offsets: per-group start indices into members
    */
   EdgePartition(int[] mapping, int validCount, boolean partial, int[] members, int[] memberStart) {
@@ -56,7 +59,7 @@ public final class EdgePartition extends IndexMapping implements IndexPartition 
   }
 
   /**
-   * Returns the number of groups (condensed edges).
+   * Returns the number of groups (condensed edges, or blocks).
    * <p>
    * <strong>Time:</strong> O(1).
    */
@@ -80,7 +83,7 @@ public final class EdgePartition extends IndexMapping implements IndexPartition 
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param groupId group ID (condensed edge index) in {@code 0..groupCount()-1}
+   * @param groupId group ID (condensed edge index, or block ID) in {@code 0..groupCount()-1}
    * @return original edge indices in this group, sorted ascending
    * @throws IndexOutOfBoundsException if {@code groupId} is out of range
    */
@@ -95,7 +98,7 @@ public final class EdgePartition extends IndexMapping implements IndexPartition 
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param groupId group ID (condensed edge index) in {@code 0..groupCount()-1}
+   * @param groupId group ID (condensed edge index, or block ID) in {@code 0..groupCount()-1}
    * @return number of original edges in this group
    * @throws IndexOutOfBoundsException if {@code groupId} is out of range
    */
@@ -118,13 +121,13 @@ public final class EdgePartition extends IndexMapping implements IndexPartition 
   }
 
   /**
-   * Returns the original edge indices for the given condensed edge as a sorted, zero-copy view.
+   * Returns the edge indices in the given group as a sorted, zero-copy view.
    * Equivalent to {@link #indicesOf(int)}.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param groupId condensed edge index in {@code 0..groupCount()-1}
-   * @return original edge indices, sorted ascending
+   * @param groupId group ID (condensed edge index, or block ID) in {@code 0..groupCount()-1}
+   * @return edge indices in this group, sorted ascending
    * @throws IndexOutOfBoundsException if {@code groupId} is out of range
    */
   public SortedIntView edgesOf(int groupId) {

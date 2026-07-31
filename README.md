@@ -86,7 +86,7 @@ The result types are themselves graphs or partitions backed by CSR — they comp
 double[] weights = new double[graph.edgeCount()];
 ```
 
-**Direction is an interpretation, not a type.** Edges are stored as directed pairs, but nothing commits a graph to one reading. Where the distinction matters, both variants are available — `Components.sccsOf` reads the graph as directed, `Components.ccsOf` as undirected. An AST that is a tree for one analysis and a dependency graph for the next needs no conversion and no second copy.
+**Direction is an interpretation, not a type.** Edges are stored as directed pairs, but nothing commits a graph to one reading. Where the distinction matters, both variants are available — `Components.sccsOf` reads the graph as directed, `Components.ccsOf` as undirected. An AST that is a tree for one analysis and a dependency graph for the next needs no conversion and no second copy. Reading a graph as undirected collapses `a → b` and `b → a` into one edge and ignores self-loops, so a graph that stores its undirected edges symmetrically behaves exactly like one that stores a single direction per edge.
 
 **`BiAdjacentGraph` for O(1) bidirectional access.** Opt-in via `graph.biAdjacentGraph()`. Doubles the storage to 8 B per (node + edge) and gives constant-time access in both directions — useful for Kahn's topological order, bidirectional BFS, and weakly-connected-component detection.
 
@@ -96,6 +96,7 @@ double[] weights = new double[graph.edgeCount()];
 |----------------------------|-----------------|----------------------------------------------|
 | `Components.sccsOf(graph)` | `Sccs`          | `containsCycle()`, `condense()`, `nodesOf()` |
 | `Components.wccsOf(graph)` | `NodePartition` | `nodesOf()`, `condense()`                    |
+| `Components.biconnectivityOf(graph)` | `Biconnectivity` | `bridges()`, `articulationPoints()`, `blocks()` |
 | `EdgeTypes.of(graph)`      | `EdgeTypes`     | `typeOf(edgeIndex)`, `edgesOfType(TREE)`     |
 | `BackEdges.of(graph)`      | `Edges`         | `sourceNodes()`, `targetNodes()`             |
 | `Ancestry.of(forest)`      | `Ancestry`      | `lowestCommonAncestorOf(a, b)`, `depthOf()`  |
@@ -206,6 +207,7 @@ Graphity ships the following algorithms out of the box. All of them return typed
 | Strongly connected components (Tarjan)                          | `Components.sccsOf(graph)`    |
 | Weakly connected components                                     | `Components.wccsOf(graph)`    |
 | Connected components (undirected interpretation)                | `Components.ccsOf(graph)`     |
+| Bridges, articulation points, biconnected components            | `Components.biconnectivityOf(graph)` |
 | Topological order (DFS reverse postorder)                       | `TopOrder.of(graph)`          |
 | Topological order with levels (Kahn's)                          | `TopOrderAndLevels.of(graph)` |
 | DFS edge classification (TREE / BACK / FORWARD / CROSS)         | `EdgeTypes.of(graph)`         |

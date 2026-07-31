@@ -124,6 +124,24 @@ public final class RandomGraphs {
     return b.build();
   }
 
+  /**
+   * Returns a copy of the given graph with every edge stored in both directions - the way an
+   * undirected graph is usually represented. Self-loops are kept as they are.
+   */
+  public static Graph symmetrized(Graph graph) {
+    var b = new GraphBuilder();
+    b.addNodes(graph.nodeCount());
+    for (int u = 0; u < graph.nodeCount(); u++) {
+      var outs = graph.outNodes(u);
+      for (int i = 0; i < outs.size(); i++) {
+        int v = outs.getInt(i);
+        b.addEdge(u, v);
+        b.addEdge(v, u);
+      }
+    }
+    return b.build();
+  }
+
   // ---- Randomized selection (size, density, generator) ----
 
   /** Node count uniformly in [10, 500]. */

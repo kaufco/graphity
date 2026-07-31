@@ -5,18 +5,21 @@ import java.util.Arrays;
 /**
  * Factory for computing connected components of a {@link Graph}.
  * <p>
- * Provides three entry points for different component types:
+ * Provides four entry points for different component types:
  * <ul>
  *   <li>{@link #sccsOf(Graph)} - Strongly Connected Components (Tarjan's algorithm)</li>
  *   <li>{@link #wccsOf(Graph)} - Weakly Connected Components (Union-Find)</li>
  *   <li>{@link #ccsOf(Graph)} - Connected Components for undirected interpretation
  *       (identical to {@code wccsOf})</li>
+ *   <li>{@link #biconnectivityOf(Graph)} - bridges, articulation points and biconnected
+ *       components, also for undirected interpretation</li>
  * </ul>
  *
  * <pre>{@code
  * var sccs = Components.sccsOf(graph);   // directed: SCCs via Tarjan
  * var wccs = Components.wccsOf(graph);   // directed: WCCs via Union-Find
  * var ccs  = Components.ccsOf(graph);    // undirected interpretation: same as wccsOf
+ * var bcc  = Components.biconnectivityOf(graph);  // undirected: bridges, cut vertices, blocks
  * }</pre>
  *
  * <h2>Directed vs. undirected interpretation</h2>
@@ -27,12 +30,15 @@ import java.util.Arrays;
  *       each is reachable from the other <em>following edge directions</em>.</li>
  *   <li>{@code wccsOf} / {@code ccsOf} ignores edge direction - two nodes are in the same
  *       component if connected by any path, regardless of edge direction.</li>
+ *   <li>{@code biconnectivityOf} ignores edge direction as well, and additionally reads
+ *       {@code a → b} and {@code b → a} as one undirected edge rather than two.</li>
  * </ul>
  * For graphs that represent undirected structures (with both a→b and b→a for each edge),
  * {@code ccsOf} is the natural choice. The result is identical to {@code wccsOf}.
  *
  * @see Sccs
  * @see NodePartition
+ * @see Biconnectivity
  * @see Graph
  */
 public final class Components {
@@ -137,6 +143,38 @@ public final class Components {
    */
   public static NodePartition ccsOf(Graph graph) {
     return wccsOf(graph);
+  }
+
+  /**
+   * Computes bridges, articulation points and biconnected components of the given graph,
+   * treating it as undirected like {@link #ccsOf(Graph)}.
+   * <p>
+   * Where {@code ccsOf} answers whether a graph falls apart, this answers how close it is to
+   * falling apart: which single node or single edge holds it together, and which parts are
+   * robust because all their edges lie on shared cycles. All three results come out of one
+   * depth-first pass and are always computed together.
+   * <p>
+   * The edges {@code a → b} and {@code b → a} count as one undirected edge, so a graph that
+   * stores undirected edges in both directions still has bridges. Self-loops are ignored.
+   * <p>
+   * In-adjacency is required and is obtained via {@link Graph#biAdjacentGraph()} unless the
+   * argument already provides it.
+   * <p>
+   * <strong>Time:</strong> O(nodeCount + edgeCount + bridgeCount x log bridgeCount), the last
+   * term for ordering the bridges; bridgeCount is at most nodeCount - 1.<br>
+   * <strong>Memory:</strong> O(nodeCount + edgeCount) for the result; during computation
+   * 29 x nodeCount bytes for the traversal state, up to 8 x nodeCount bytes for the collected
+   * bridges before they are ordered, 4 x edgeCount bytes for the edge index translation and up
+   * to 4 x edgeCount bytes for the edge stack, which grows on demand and never exceeds
+   * edgeCount entries - several times the size of the graph itself, and worth checking against
+   * the available heap on very large graphs.
+   *
+   * @param graph the graph to analyze
+   * @return bridges, articulation points and blocks as a {@link Biconnectivity} instance
+   * @see Biconnectivity
+   */
+  public static Biconnectivity biconnectivityOf(Graph graph) {
+    return Biconnectivity.of(graph);
   }
 
   private static int find(int[] parent, int x) {

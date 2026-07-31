@@ -3,6 +3,7 @@ package com.kobayami.graphity.testutils;
 import com.kobayami.graphity.Graph;
 import org.jgrapht.graph.DefaultDirectedGraph;
 import org.jgrapht.graph.DefaultEdge;
+import org.jgrapht.graph.SimpleGraph;
 
 /**
  * Converts a Graphity {@link Graph} into an equivalent JGraphT
@@ -29,6 +30,25 @@ public final class JGraphtAdapter {
       for (int i = 0; i < outs.size(); i++) {
         int v = outs.getInt(i);
         g.addEdge(u, v);
+      }
+    }
+    return g;
+  }
+
+  /**
+   * Builds a JGraphT undirected graph under the same undirected interpretation Graphity uses:
+   * {@code a → b} and {@code b → a} collapse into one edge, and self-loops are dropped.
+   * {@link SimpleGraph} enforces both by construction.
+   */
+  public static SimpleGraph<Integer, DefaultEdge> toUndirectedJgrapht(Graph graph) {
+    var g = new SimpleGraph<Integer, DefaultEdge>(DefaultEdge.class);
+    int n = graph.nodeCount();
+    for (int i = 0; i < n; i++) g.addVertex(i);
+    for (int u = 0; u < n; u++) {
+      var outs = graph.outNodes(u);
+      for (int i = 0; i < outs.size(); i++) {
+        int v = outs.getInt(i);
+        if (u != v) g.addEdge(u, v);
       }
     }
     return g;

@@ -48,6 +48,18 @@ class DeepGraphStackSafetyTest {
   }
 
   @Test
+  void deepBiconnectivityDoesNotOverflowStack() {
+    // Every edge of a path is a bridge and its own block, so the traversal descends DEEP levels
+    // before the first block closes.
+    Graph path = TestGraphs.path(DEEP);
+
+    Biconnectivity biconnectivity = Components.biconnectivityOf(path);
+    assertThat(biconnectivity.bridges().count()).isEqualTo(DEEP - 1);
+    assertThat(biconnectivity.articulationPoints().size()).isEqualTo(DEEP - 2);
+    assertThat(biconnectivity.blocks().groupCount()).isEqualTo(DEEP - 1);
+  }
+
+  @Test
   void deepCycleDoesNotOverflowStack() {
     // One giant SCC: DFS descends DEEP levels, then a single back-edge closes the cycle.
     // Stresses the deep sccStack pop (Tarjan) and the deep onStack unwind.
