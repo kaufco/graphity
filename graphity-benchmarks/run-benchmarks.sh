@@ -121,7 +121,7 @@ DAG_FIXTURE_SHAPES = {
     "PATH_SHUFFLED", "TREE_SHUFFLED", "DAG_GNP_SPARSE_SHUFFLED", "DAG_GNP_DENSE_SHUFFLED"
 }
 # "graphity-reordered" is a pseudo-library: the same Graphity algorithm run on a
-# DFS-preorder reordered graph (Graphs.dfsReordered). It shows up as a separate
+# DFS-preorder reordered graph (NodeMapping.reindex + Graphs.remapped). It shows up as a separate
 # "Graphity (reordered)" column in the report. "reorder" is the graphity-only
 # algorithm that measures the one-time cost of that reordering.
 SUPPORTED_LIBS = {"graphity", "graphity-reordered", "jgrapht", "guava", "webgraph"}

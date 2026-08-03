@@ -17,7 +17,8 @@ import java.util.Arrays;
  * Graphs.isPath(graph);      // out-tree with all outDegrees <= 1?
  *
  * // Reindexing for cache-friendly layout
- * Graph reindexed = Graphs.dfsReordered(graph);
+ * NodeMapping newToOld = NodeMapping.reindex(graph);
+ * Graph reindexed = Graphs.remapped(graph, newToOld);
  *
  * // Subgraph extraction
  * Graph sub = Graphs.remapped(graph, NodeMapping.forSubgraph(selectedNodes));
@@ -145,21 +146,22 @@ public final class Graphs {
 
   /**
    * Returns a copy of {@code graph} with node IDs reassigned in DFS preorder, so that nodes
-   * visited close together during traversal receive adjacent IDs. This is the cache-friendly
-   * reindexing shortcut for {@code remapped(graph, NodeMapping.reindex(graph))}.
+   * visited close together during traversal receive adjacent IDs.
+   * <p>
+   * This is a convenience method for cache-friendly reindexing. It is equivalent to:
+   * <pre>{@code
+   * NodeMapping newToOld = NodeMapping.reindex(graph);
+   * Graph reordered = Graphs.remapped(graph, newToOld);
+   * }</pre>
+   * It adds nothing beyond those two calls and discards {@code newToOld}. Write them out instead:
+   * the mapping is what translates results, and any data the caller keys by node ID, back to the
+   * original numbering.
    * <p>
    * DFS-preorder relabeling clusters each node's out-neighbors near it in ID space. This turns
    * the random {@code state[target]} accesses of the DFS-based algorithms (SCC, WCC, CCs,
    * TopOrder, back-edge and edge-type classification) into near-sequential scans. On
    * poorly-ordered inputs this speeds those traversals up by a multiple; on already
    * well-ordered inputs it is effectively a no-op.
-   * <p>
-   * The returned graph uses fresh node IDs. When the caller also needs to translate results
-   * back to the original IDs, obtain the mapping explicitly instead:
-   * <pre>{@code
-   * NodeMapping newToOld = NodeMapping.reindex(graph);
-   * Graph reordered = Graphs.remapped(graph, newToOld);
-   * }</pre>
    * <p>
    * <strong>Time:</strong> O(nodeCount + edgeCount).<br>
    * <strong>Memory:</strong> O(nodeCount + edgeCount) for the result.
@@ -168,7 +170,14 @@ public final class Graphs {
    * @return a new graph with DFS-preorder node IDs
    * @see NodeMapping#reindex(Graph)
    * @see #remapped(Graph, NodeMapping)
+   * @deprecated Reordering renumbers every node, so anything the caller keys by node ID - labels,
+   *     weights, source locations - has to be permuted along with it, and this method throws away
+   *     the only thing that can do that. Code that reorders and keeps such data compiles, runs,
+   *     and reads the wrong entries. Use {@link NodeMapping#reindex(Graph)} followed by
+   *     {@link #remapped(Graph, NodeMapping)} and keep the mapping. Whether shortcuts of this kind
+   *     belong in the API in any form is under review; nothing replaces this method for now.
    */
+  @Deprecated(since = "2.1.0")
   public static Graph dfsReordered(Graph graph) {
     return remapped(graph, NodeMapping.reindex(graph));
   }

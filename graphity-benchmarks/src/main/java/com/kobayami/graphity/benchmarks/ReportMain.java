@@ -71,8 +71,8 @@ public final class ReportMain {
 
   /**
    * Fixed algorithm order for the performance / allocation sub-chapters. {@code Reorder} — the
-   * one-time cost of {@code Graphs.dfsReordered} — is deliberately last, as the closing
-   * subsection of chapter 1.
+   * one-time cost of {@code NodeMapping.reindex} plus {@code Graphs.remapped} — is deliberately
+   * last, as the closing subsection of chapter 1.
    */
   private static final List<String> ALGO_ORDER = List.of(
       "Build", "Scc", "Wcc", "Ccs", "Condense", "TopOrder", "TopOrderAndLevels",

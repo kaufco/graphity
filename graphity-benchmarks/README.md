@@ -201,10 +201,10 @@ Practical defaults: `forks = 0` and short windows for fast feedback during devel
 
 ## Reordering (`graphity-reordered` and `reorder`)
 
-Graphity can permute node IDs into DFS-preorder (`Graphs.dfsReordered(graph)`), which gives cache-friendly adjacency for the random `state[v]` accesses that dominate DFS-based algorithms. The benchmark suite measures this in two ways:
+Graphity can permute node IDs into DFS-preorder (`Graphs.remapped(graph, NodeMapping.reindex(graph))`), which gives cache-friendly adjacency for the random `state[v]` accesses that dominate DFS-based algorithms. The benchmark suite measures this in two ways:
 
 - **`graphity-reordered`** is a *pseudo-library*: it runs the identical Graphity algorithm on a reordered copy of the graph and appears as a separate **`Graphity (reordered)`** column next to `Graphity`. Its ratio is relative to the `Graphity` baseline, so `0.50×` means the reordered run is twice as fast. It is kept as a dedicated JMH state so reordered and as-built runs never warm each other up; the one-time reordering itself is excluded from the measured algorithm.
-- **`reorder`** is a `graphity`-only algorithm that measures exactly that one-time cost (`Graphs.dfsReordered`), reported in its own subsection. Compare it against the per-algorithm savings to judge amortization: reordering only pays off when the layout is poor *and* the graph is traversed several times.
+- **`reorder`** is a `graphity`-only algorithm that measures exactly that one-time cost (`NodeMapping.reindex` plus `Graphs.remapped`), reported in its own subsection. Compare it against the per-algorithm savings to judge amortization: reordering only pays off when the layout is poor *and* the graph is traversed several times.
 
 Reordering is a no-op on already ID-local shapes (`PATH`, `TREE`, `CHAIN_OF_CLIQUES`) and helps most on `GNP_*` and `*_SHUFFLED`. All shipped profiles run the reordered/`reorder` cases on the same shapes as their plain counterparts, so the `Graphity (reordered)` column is never partially empty. (The `big` profile used to restrict them to `GNP_SPARSE` and `GNP_DENSE_SHUFFLED` to save runtime, which left visible gaps in the report charts from 10⁶ nodes up.)
 

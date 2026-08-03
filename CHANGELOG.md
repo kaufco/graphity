@@ -85,6 +85,15 @@ Graphity adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   cannot be used for a transpose — with the identity node mapping it silently returns `-1`
   entries, because a transpose swaps the two roles its lookup relies on.
 
+### Deprecated
+
+- **`Graphs.dfsReordered(graph)`** — reordering renumbers every node, so anything held outside the
+  graph and keyed by node ID has to be permuted along with it, and this method discards the only
+  thing that can do that. Code that reorders and keeps such data compiles, runs, and reads the
+  wrong entries. Use `NodeMapping.reindex(graph)` followed by `Graphs.remapped(graph, newToOld)`
+  and keep the mapping; the two calls are exactly what the method did. Nothing replaces it for now,
+  and it still works.
+
 ## [2.0.0] — 2026-07-23
 
 ### Added

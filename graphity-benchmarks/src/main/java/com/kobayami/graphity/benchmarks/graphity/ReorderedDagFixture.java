@@ -2,6 +2,7 @@ package com.kobayami.graphity.benchmarks.graphity;
 
 import com.kobayami.graphity.Graph;
 import com.kobayami.graphity.Graphs;
+import com.kobayami.graphity.NodeMapping;
 import com.kobayami.graphity.benchmarks.generators.BenchmarkGraphs;
 import com.kobayami.graphity.benchmarks.generators.GraphShape;
 import org.openjdk.jmh.annotations.Level;
@@ -36,6 +37,6 @@ public class ReorderedDagFixture {
   @Setup(Level.Trial)
   public void setupGraph() {
     Graph base = BenchmarkGraphs.fromInput(shape, nodeCount, inputMode, datasetPath, /*requireDag=*/ true);
-    graph = Graphs.dfsReordered(base);
+    graph = Graphs.remapped(base, NodeMapping.reindex(base));
   }
 }

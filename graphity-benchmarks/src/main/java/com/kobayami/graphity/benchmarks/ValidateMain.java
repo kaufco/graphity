@@ -134,7 +134,7 @@ public final class ValidateMain {
         // No semantic output to cross-validate here.
       }
       case "reorder" -> {
-        // Pure structural transform; correctness of dfsReordered is covered by the
+        // Pure structural transform; correctness of reindex + remapped is covered by the
         // NodeMapping/Graphs unit tests. Nothing to cross-validate here.
       }
       case "scc" -> validateScc(libraries, template, wgTmpRoot);

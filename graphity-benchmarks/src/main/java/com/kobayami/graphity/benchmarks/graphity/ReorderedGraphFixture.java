@@ -2,6 +2,7 @@ package com.kobayami.graphity.benchmarks.graphity;
 
 import com.kobayami.graphity.Graph;
 import com.kobayami.graphity.Graphs;
+import com.kobayami.graphity.NodeMapping;
 import com.kobayami.graphity.benchmarks.generators.BenchmarkGraphs;
 import com.kobayami.graphity.benchmarks.generators.GraphShape;
 import org.openjdk.jmh.annotations.Level;
@@ -12,7 +13,8 @@ import org.openjdk.jmh.annotations.State;
 
 /**
  * Variant of {@link GraphFixture} whose graph is DFS-preorder reordered once per trial via
- * {@link Graphs#dfsReordered(Graph)}. The one-time reordering cost is excluded from the
+ * {@link NodeMapping#reindex(Graph)} plus {@link Graphs#remapped(Graph, NodeMapping)}. The
+ * one-time reordering cost is excluded from the
  * measured algorithm (it is captured separately in {@link ReorderBenchmark}); the benchmarks
  * that use this fixture therefore measure algorithm throughput on a cache-friendly layout.
  *
@@ -41,6 +43,6 @@ public class ReorderedGraphFixture {
   @Setup(Level.Trial)
   public void setupGraph() {
     Graph base = BenchmarkGraphs.fromInput(shape, nodeCount, inputMode, datasetPath, /*requireDag=*/ false);
-    graph = Graphs.dfsReordered(base);
+    graph = Graphs.remapped(base, NodeMapping.reindex(base));
   }
 }
