@@ -43,6 +43,12 @@ Graphity adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the edge count is known or can be estimated, avoiding the reallocation and copying that
   filling a growing list to millions of edges otherwise costs.
 
+- **`NodeMapping.forSubgraph(int...)`** — the parameter form that was missing next to the
+  existing `BitSet` and `IntList` overloads, so a selection that already is a plain `int[]`, or
+  just a handful of loose IDs, no longer has to be wrapped in an `IntArrayList` first. The IDs are
+  copied and sorted, leaving the caller's array unchanged; unlike the `IntList` form there is no
+  sortedness shortcut, since a plain array carries no such guarantee.
+
 - **`Components.biconnectivityOf(graph)`** — bridges, articulation points and biconnected
   components in one depth-first pass, returned as a `Biconnectivity`. `bridges()` yields an
   `Edges` collection with the lower node ID as source, `articulationPoints()` a sorted

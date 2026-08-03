@@ -105,6 +105,52 @@ class NodeMappingTest {
   }
 
   @Test
+  void forSubgraphFromLooseArgumentsSortsIds() {
+    var nm = NodeMapping.forSubgraph(5, 2, 7);
+    assertThat(nm.size()).isEqualTo(3);
+    assertThat(nm.isPartial()).isFalse();
+    assertThat(nm.get(0)).isEqualTo(2);
+    assertThat(nm.get(1)).isEqualTo(5);
+    assertThat(nm.get(2)).isEqualTo(7);
+  }
+
+  @Test
+  void forSubgraphFromNoArgumentsCreatesEmptyMapping() {
+    var nm = NodeMapping.forSubgraph();
+    assertThat(nm.size()).isZero();
+    assertThat(nm.isPartial()).isFalse();
+  }
+
+  @Test
+  void forSubgraphCopiesInputArray() {
+    int[] input = {5, 2, 7};
+    var nm = NodeMapping.forSubgraph(input);
+    assertThat(input).containsExactly(5, 2, 7);
+    input[0] = 999;
+    assertThat(nm.get(1)).isEqualTo(5);
+  }
+
+  @Test
+  void forSubgraphArrayAndBitSetAgree() {
+    var selected = new BitSet();
+    selected.set(2);
+    selected.set(5);
+    selected.set(7);
+    var fromBitSet = NodeMapping.forSubgraph(selected);
+    var fromArray = NodeMapping.forSubgraph(7, 2, 5);
+    assertThat(fromArray.size()).isEqualTo(fromBitSet.size());
+    for (int id = 0; id < fromBitSet.size(); id++) {
+      assertThat(fromArray.get(id)).isEqualTo(fromBitSet.get(id));
+    }
+  }
+
+  @Test
+  void forSubgraphDuplicatesInArrayTriggerAssertion() {
+    assertThatThrownBy(() -> NodeMapping.forSubgraph(3, 1, 3))
+        .isInstanceOf(AssertionError.class);
+  }
+
+  @Test
   void forPermutationWrapsOrder() {
     IntList order = new IntArrayList(new int[] {2, 0, 1});
     var nm = NodeMapping.forPermutation(order);

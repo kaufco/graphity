@@ -13,7 +13,10 @@ import java.util.BitSet;
  * <p>
  * Factory methods create mappings in a <strong>natural direction</strong> (new → old):
  * <ul>
- *   <li>{@link #forSubgraph} - maps dense new IDs (0..k-1) to original IDs</li>
+ *   <li>{@link #forSubgraph} - maps dense new IDs (0..k-1) to original IDs; takes the selection
+ *       as a {@link BitSet}, as loose arguments or an {@code int[]}, or as an {@link IntList} -
+ *       including the {@link SortedIntView} that {@link Graph#outNodes(int)} and
+ *       {@link NodePartition#nodesOf(int)} return</li>
  *   <li>{@link #forPermutation} - maps new IDs to old IDs ({@code order[newId] = oldId})</li>
  *   <li>{@link #reindex(Graph)} - DFS-preorder reindexing for cache-friendly layouts</li>
  *   <li>{@link #of(int[])} - general-purpose, caller defines direction</li>
@@ -31,6 +34,7 @@ import java.util.BitSet;
  *
  * // Subgraph extraction
  * Graph sub = Graphs.remapped(graph, NodeMapping.forSubgraph(selectedNodes));
+ * Graph fanout = Graphs.remapped(graph, NodeMapping.forSubgraph(3, 7, 11));
  *
  * // Custom permutation
  * Graph permuted = Graphs.remapped(graph, NodeMapping.forPermutation(order));
@@ -126,6 +130,27 @@ public final class NodeMapping extends IndexMapping {
     }
     assert noDuplicates(map) : "selected contains duplicate node IDs";
     return new NodeMapping(map, k, false);
+  }
+
+  /**
+   * Creates a subgraph mapping from the given selected node IDs.
+   * <p>
+   * Selected nodes receive dense new IDs in ascending order of their original IDs. The IDs are
+   * copied and sorted internally; the caller's array is left unchanged. The resulting mapping
+   * maps dense IDs (0..k-1) to original IDs.
+   * <p>
+   * <strong>Time:</strong> O(k log k) where k = number of selected IDs. Sortedness is not
+   * detected - pass a {@link SortedIntView} to the {@link #forSubgraph(IntList)} overload to
+   * skip the sort.
+   *
+   * @param selected selected node IDs in any order (duplicates lead to undefined behavior)
+   * @return mapping from dense IDs to original IDs
+   */
+  public static NodeMapping forSubgraph(int... selected) {
+    int[] map = Arrays.copyOf(selected, selected.length);
+    Arrays.sort(map);
+    assert noDuplicates(map) : "selected contains duplicate node IDs";
+    return new NodeMapping(map, map.length, false);
   }
 
   /**
