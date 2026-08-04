@@ -69,8 +69,8 @@ class GraphsTest {
   }
 
   @Test
-  void isForestTrueForDisjointOutTrees() {
-    // Two disjoint out-trees: {0->1, 0->2} and {3->4}.
+  void isForestTrueForDisjointTrees() {
+    // Two disjoint trees: {0->1, 0->2} and {3->4}.
     assertThat(Graphs.isForest(TestGraphs.of(5, 0, 1, 0, 2, 3, 4))).isTrue();
   }
 
@@ -87,29 +87,46 @@ class GraphsTest {
   }
 
   @Test
-  void isOutTreeTrueForSingleNode() {
-    assertThat(Graphs.isOutTree(TestGraphs.isolated(1))).isTrue();
+  void isTreeTrueForSingleNode() {
+    assertThat(Graphs.isTree(TestGraphs.isolated(1))).isTrue();
   }
 
   @Test
-  void isOutTreeTrueForPath() {
-    assertThat(Graphs.isOutTree(TestGraphs.path(5))).isTrue();
+  void isTreeTrueForPath() {
+    assertThat(Graphs.isTree(TestGraphs.path(5))).isTrue();
   }
 
   @Test
-  void isOutTreeTrueForOutStar() {
-    assertThat(Graphs.isOutTree(TestGraphs.outStar(5))).isTrue();
+  void isTreeTrueForOutStar() {
+    assertThat(Graphs.isTree(TestGraphs.outStar(5))).isTrue();
   }
 
   @Test
-  void isOutTreeFalseForDisjointOutTrees() {
+  void isTreeFalseForDisjointTrees() {
     // Two roots: {0->1} and {2->3}.
-    assertThat(Graphs.isOutTree(TestGraphs.of(4, 0, 1, 2, 3))).isFalse();
+    assertThat(Graphs.isTree(TestGraphs.of(4, 0, 1, 2, 3))).isFalse();
   }
 
   @Test
-  void isOutTreeFalseForIsolatedMultipleNodes() {
-    assertThat(Graphs.isOutTree(TestGraphs.isolated(3))).isFalse();
+  void isTreeFalseForIsolatedMultipleNodes() {
+    assertThat(Graphs.isTree(TestGraphs.isolated(3))).isFalse();
+  }
+
+  @Test
+  void isTreeFalseForInStar() {
+    // Edges point toward the center, so there is no root with in-degree 0 except the leaves.
+    assertThat(Graphs.isTree(TestGraphs.inStar(4))).isFalse();
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  void isOutTreeAnswersLikeIsTree() {
+    for (var g : new Graph[] {
+        TestGraphs.empty(), TestGraphs.isolated(1), TestGraphs.isolated(3),
+        TestGraphs.path(5), TestGraphs.outStar(5), TestGraphs.inStar(4),
+        TestGraphs.cycle(3), TestGraphs.of(4, 0, 1, 2, 3)}) {
+      assertThat(Graphs.isOutTree(g)).isEqualTo(Graphs.isTree(g));
+    }
   }
 
   @Test
@@ -135,22 +152,249 @@ class GraphsTest {
 
   @Test
   void shapeHierarchyConsistencyForCycle() {
-    // Cycle is none of DAG/forest/out-tree/path.
+    // Cycle is none of DAG/forest/tree/path.
     var g = TestGraphs.cycle(3);
     assertThat(Graphs.isDag(g)).isFalse();
     assertThat(Graphs.isForest(g)).isFalse();
-    assertThat(Graphs.isOutTree(g)).isFalse();
+    assertThat(Graphs.isTree(g)).isFalse();
     assertThat(Graphs.isPath(g)).isFalse();
   }
 
   @Test
   void shapeHierarchyConsistencyForPath() {
-    // Path is DAG, forest, out-tree, and path.
+    // Path is DAG, forest, tree, and path.
     var g = TestGraphs.path(4);
     assertThat(Graphs.isDag(g)).isTrue();
     assertThat(Graphs.isForest(g)).isTrue();
-    assertThat(Graphs.isOutTree(g)).isTrue();
+    assertThat(Graphs.isTree(g)).isTrue();
     assertThat(Graphs.isPath(g)).isTrue();
+  }
+
+  // ---- Undirected shape checks ----
+
+  @Test
+  void isBipartiteTrueForEmptyGraph() {
+    assertThat(Graphs.isBipartite(TestGraphs.empty())).isTrue();
+  }
+
+  @Test
+  void isBipartiteTrueForIsolatedNodes() {
+    assertThat(Graphs.isBipartite(TestGraphs.isolated(3))).isTrue();
+  }
+
+  @Test
+  void isBipartiteTrueForPath() {
+    assertThat(Graphs.isBipartite(TestGraphs.path(5))).isTrue();
+  }
+
+  @Test
+  void isBipartiteTrueForStars() {
+    // A star is bipartite either way round: center in one class, leaves in the other.
+    assertThat(Graphs.isBipartite(TestGraphs.outStar(5))).isTrue();
+    assertThat(Graphs.isBipartite(TestGraphs.inStar(5))).isTrue();
+  }
+
+  @Test
+  void isBipartiteTrueForEvenCycle() {
+    assertThat(Graphs.isBipartite(TestGraphs.cycle(4))).isTrue();
+  }
+
+  @Test
+  void isBipartiteFalseForOddCycle() {
+    assertThat(Graphs.isBipartite(TestGraphs.cycle(3))).isFalse();
+  }
+
+  @Test
+  void isBipartiteTrueForReciprocalPair() {
+    // 0->1 and 1->0 are one undirected edge, not a 2-cycle - and a 2-cycle would be even anyway.
+    assertThat(Graphs.isBipartite(TestGraphs.of(2, 0, 1, 1, 0))).isTrue();
+  }
+
+  @Test
+  void isBipartiteFalseForSymmetricallyStoredOddCycle() {
+    // The triangle stored in both directions: collapsing the pairs still leaves an odd cycle.
+    var g = TestGraphs.of(3, 0, 1, 1, 0, 1, 2, 2, 1, 0, 2, 2, 0);
+    assertThat(Graphs.isBipartite(g)).isFalse();
+  }
+
+  @Test
+  void isBipartiteFalseForSelfLoop() {
+    // The one place where a self-loop is not ignored: a node adjacent to itself has no class.
+    assertThat(Graphs.isBipartite(TestGraphs.of(1, 0, 0))).isFalse();
+    assertThat(Graphs.isBipartite(TestGraphs.of(3, 0, 1, 1, 2, 2, 2))).isFalse();
+  }
+
+  @Test
+  void isUndirectedTreeTrueForEmptyGraph() {
+    assertThat(Graphs.isUndirectedTree(TestGraphs.empty())).isTrue();
+  }
+
+  @Test
+  void isUndirectedTreeTrueForSingleNode() {
+    assertThat(Graphs.isUndirectedTree(TestGraphs.isolated(1))).isTrue();
+  }
+
+  @Test
+  void isUndirectedTreeTrueForPath() {
+    assertThat(Graphs.isUndirectedTree(TestGraphs.path(5))).isTrue();
+  }
+
+  @Test
+  void isUndirectedTreeTrueForInStar() {
+    // Edges point toward the center, so this is no directed tree - undirected it is a star.
+    var g = TestGraphs.inStar(4);
+    assertThat(Graphs.isTree(g)).isFalse();
+    assertThat(Graphs.isUndirectedTree(g)).isTrue();
+  }
+
+  @Test
+  void isUndirectedTreeTrueForMixedDirections() {
+    // 0->1 and 2->1: a DAG, but node 1 has two parents, so neither forest nor tree. Undirected
+    // it is three nodes joined by two edges.
+    var g = TestGraphs.of(3, 0, 1, 2, 1);
+    assertThat(Graphs.isDag(g)).isTrue();
+    assertThat(Graphs.isForest(g)).isFalse();
+    assertThat(Graphs.isUndirectedTree(g)).isTrue();
+  }
+
+  @Test
+  void isUndirectedTreeTrueForSymmetricallyStoredPath() {
+    // Every edge in both directions: no DAG at all, yet the same tree when read as undirected.
+    var g = TestGraphs.of(3, 0, 1, 1, 0, 1, 2, 2, 1);
+    assertThat(Graphs.isDag(g)).isFalse();
+    assertThat(Graphs.isUndirectedTree(g)).isTrue();
+  }
+
+  @Test
+  void isUndirectedTreeTrueForReciprocalPair() {
+    assertThat(Graphs.isUndirectedTree(TestGraphs.of(2, 0, 1, 1, 0))).isTrue();
+  }
+
+  @Test
+  void isUndirectedTreeIgnoresSelfLoops() {
+    // A self-loop on every node of a path leaves the path a tree.
+    var g = TestGraphs.of(3, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2);
+    assertThat(Graphs.isUndirectedTree(g)).isTrue();
+  }
+
+  @Test
+  void isUndirectedTreeFalseForDisconnectedGraph() {
+    assertThat(Graphs.isUndirectedTree(TestGraphs.isolated(3))).isFalse();
+    assertThat(Graphs.isUndirectedTree(TestGraphs.of(4, 0, 1, 2, 3))).isFalse();
+  }
+
+  @Test
+  void isUndirectedTreeFalseForCycle() {
+    assertThat(Graphs.isUndirectedTree(TestGraphs.cycle(3))).isFalse();
+  }
+
+  @Test
+  void isUndirectedTreeFalseForSymmetricallyStoredCycle() {
+    // The triangle in both directions. Every edge here is a reciprocal pair, so a check that
+    // discounted pairs without asking whether it has seen this one before would count three
+    // edges as two and report a tree.
+    var g = TestGraphs.of(3, 0, 1, 1, 0, 1, 2, 2, 1, 0, 2, 2, 0);
+    assertThat(Graphs.isUndirectedTree(g)).isFalse();
+    assertThat(Graphs.isUndirectedForest(g)).isFalse();
+  }
+
+  @Test
+  void isUndirectedTreeTrueAtTheEdgeBound() {
+    // A symmetrically stored path with a self-loop on every node holds exactly
+    // 2 x (nodeCount - 1) + nodeCount = 3 x nodeCount - 2 edges: the most a tree can store, and
+    // therefore the largest edge count the O(1) rejection must still let through.
+    var g = TestGraphs.of(4,
+        0, 0, 0, 1, 1, 0, 1, 1, 1, 2, 2, 1, 2, 2, 2, 3, 3, 2, 3, 3);
+    assertThat(g.edgeCount()).isEqualTo(3 * g.nodeCount() - 2);
+    assertThat(Graphs.isUndirectedTree(g)).isTrue();
+  }
+
+  @Test
+  void isUndirectedTreeFalseForDiamond() {
+    // Connected with n - 1 = 3 edges? No: four edges, and undirected they close a cycle.
+    assertThat(Graphs.isUndirectedTree(TestGraphs.of(4, 0, 1, 0, 2, 1, 3, 2, 3))).isFalse();
+  }
+
+  @Test
+  void isUndirectedForestTrueForEmptyGraph() {
+    assertThat(Graphs.isUndirectedForest(TestGraphs.empty())).isTrue();
+  }
+
+  @Test
+  void isUndirectedForestTrueForIsolatedNodes() {
+    assertThat(Graphs.isUndirectedForest(TestGraphs.isolated(3))).isTrue();
+  }
+
+  @Test
+  void isUndirectedForestTrueForDisjointTrees() {
+    assertThat(Graphs.isUndirectedForest(TestGraphs.of(5, 0, 1, 0, 2, 3, 4))).isTrue();
+  }
+
+  @Test
+  void isUndirectedForestTrueForInStar() {
+    var g = TestGraphs.inStar(4);
+    assertThat(Graphs.isForest(g)).isFalse();
+    assertThat(Graphs.isUndirectedForest(g)).isTrue();
+  }
+
+  @Test
+  void isUndirectedForestTrueForSelfLoopsOnly() {
+    assertThat(Graphs.isUndirectedForest(TestGraphs.of(2, 0, 0, 1, 1))).isTrue();
+  }
+
+  @Test
+  void isUndirectedForestFalseForCycle() {
+    assertThat(Graphs.isUndirectedForest(TestGraphs.cycle(3))).isFalse();
+  }
+
+  @Test
+  void isUndirectedForestFalseForDiamond() {
+    assertThat(Graphs.isUndirectedForest(TestGraphs.of(4, 0, 1, 0, 2, 1, 3, 2, 3))).isFalse();
+  }
+
+  @Test
+  void isUndirectedForestFalseForCliqueRejectedByEdgeBound() {
+    // 5 nodes, 20 edges - above 3 x nodeCount - 2, so this is decided without reading an edge.
+    assertThat(Graphs.isUndirectedForest(TestGraphs.clique(5))).isFalse();
+    assertThat(Graphs.isUndirectedTree(TestGraphs.clique(5))).isFalse();
+  }
+
+  @Test
+  void isWeaklyConnectedTrueForEmptyGraph() {
+    assertThat(Graphs.isWeaklyConnected(TestGraphs.empty())).isTrue();
+  }
+
+  @Test
+  void isWeaklyConnectedTrueForSingleNode() {
+    assertThat(Graphs.isWeaklyConnected(TestGraphs.isolated(1))).isTrue();
+  }
+
+  @Test
+  void isWeaklyConnectedTrueForPathAndStars() {
+    assertThat(Graphs.isWeaklyConnected(TestGraphs.path(5))).isTrue();
+    assertThat(Graphs.isWeaklyConnected(TestGraphs.outStar(5))).isTrue();
+    assertThat(Graphs.isWeaklyConnected(TestGraphs.inStar(5))).isTrue();
+  }
+
+  @Test
+  void isWeaklyConnectedTrueForCycle() {
+    assertThat(Graphs.isWeaklyConnected(TestGraphs.cycle(3))).isTrue();
+  }
+
+  @Test
+  void isWeaklyConnectedFalseForIsolatedNodes() {
+    assertThat(Graphs.isWeaklyConnected(TestGraphs.isolated(3))).isFalse();
+  }
+
+  @Test
+  void isWeaklyConnectedFalseForTwoComponents() {
+    assertThat(Graphs.isWeaklyConnected(TestGraphs.of(4, 0, 1, 2, 3))).isFalse();
+  }
+
+  @Test
+  void isWeaklyConnectedIgnoresSelfLoops() {
+    // Self-loops connect nothing, so two nodes carrying one each stay two components.
+    assertThat(Graphs.isWeaklyConnected(TestGraphs.of(2, 0, 0, 1, 1))).isFalse();
   }
 
   // ---- remapped ----

@@ -8,13 +8,24 @@ import java.util.Arrays;
  * Provides operations that create new {@link Graph} instances from existing graphs
  * and {@link NodeMapping}s (the original graph is never modified), as well as
  * predicate methods to test structural properties of a graph.
+ * <p>
+ * A predicate whose name does not say otherwise reads the graph as directed; the ones prefixed
+ * {@code undirected} read it as {@link Components#ccsOf(Graph)} does. {@code isBipartite} and
+ * {@code isWeaklyConnected} carry no prefix because neither property has a directed reading that
+ * could be meant instead.
  *
  * <pre>{@code
- * // Shape checks
- * Graphs.isDag(graph);       // acyclic?
- * Graphs.isForest(graph);    // DAG with all inDegrees <= 1?
- * Graphs.isOutTree(graph);   // forest with exactly one root?
- * Graphs.isPath(graph);      // out-tree with all outDegrees <= 1?
+ * // Shape checks, directed reading
+ * Graphs.isDag(graph);              // acyclic?
+ * Graphs.isForest(graph);           // DAG with all inDegrees <= 1?
+ * Graphs.isTree(graph);             // forest with exactly one root?
+ * Graphs.isPath(graph);             // tree with all outDegrees <= 1?
+ *
+ * // Shape checks, undirected reading
+ * Graphs.isBipartite(graph);        // nodes split into two classes?
+ * Graphs.isUndirectedTree(graph);   // connected and acyclic?
+ * Graphs.isUndirectedForest(graph); // acyclic?
+ * Graphs.isWeaklyConnected(graph);  // one component?
  *
  * // Reindexing for cache-friendly layout
  * NodeMapping newToOld = NodeMapping.reindex(graph);
@@ -37,6 +48,12 @@ import java.util.Arrays;
  * @see Graph
  */
 public final class Graphs {
+
+  /**
+   * Node count from which the double cover of {@link #isBipartite(Graph)} would need more elements
+   * than an {@code int[]} can hold.
+   */
+  private static final int MAX_BIPARTITE_NODE_COUNT = 1 << 30;
 
   private Graphs() {}
 
@@ -203,8 +220,11 @@ public final class Graphs {
   /**
    * Returns whether the given graph is a forest (DAG where every node has in-degree ≤ 1).
    * <p>
-   * Equivalently: a forest is a DAG consisting of zero or more disjoint out-trees.
+   * Equivalently: a forest is a DAG consisting of zero or more disjoint trees.
    * An empty graph is a forest.
+   * <p>
+   * Reads the graph as directed. For the undirected reading see
+   * {@link #isUndirectedForest(Graph)}.
    * <p>
    * <strong>Time:</strong> O(nodeCount + edgeCount).<br>
    * <strong>Memory:</strong> O(nodeCount).
@@ -218,25 +238,48 @@ public final class Graphs {
   }
 
   /**
-   * Returns whether the given graph is an out-tree (forest that is weakly connected).
+   * Returns whether the given graph is a tree (forest that is weakly connected).
    * <p>
-   * An out-tree has exactly one root node (in-degree 0), and every other node has
-   * in-degree exactly 1. An empty graph is an out-tree (vacuously). A single node
-   * with no edges is an out-tree.
+   * A tree has exactly one root node (in-degree 0), and every other node has
+   * in-degree exactly 1, so its edges point away from the root. An empty graph is a
+   * tree (vacuously). A single node with no edges is a tree.
+   * <p>
+   * Reads the graph as directed. For the undirected reading see
+   * {@link #isUndirectedTree(Graph)}; for the reading in which edges point toward the root,
+   * apply this to {@link Graph#transposed()} - which builds a second graph and therefore costs
+   * 4 x (nodeCount + edgeCount) bytes, unlike this method itself.
    * <p>
    * <strong>Time:</strong> O(nodeCount + edgeCount).<br>
    * <strong>Memory:</strong> O(nodeCount).
    *
    * @param graph the graph to check
-   * @return {@code true} if the graph is an out-tree
+   * @return {@code true} if the graph is a tree
    */
-  public static boolean isOutTree(Graph graph) {
+  public static boolean isTree(Graph graph) {
     var info = computeForestInfo(graph);
     return info != null && info.rootCount <= 1;
   }
 
   /**
-   * Returns whether the given graph is a path (out-tree where every node has out-degree ≤ 1).
+   * Returns whether the given graph is a tree. Equivalent to {@link #isTree(Graph)}.
+   * <p>
+   * <strong>Time:</strong> O(nodeCount + edgeCount).<br>
+   * <strong>Memory:</strong> O(nodeCount).
+   *
+   * @param graph the graph to check
+   * @return {@code true} if the graph is a tree
+   * @deprecated Use {@link #isTree(Graph)}. The result is the same in every case; only the name
+   *     changed, because an unqualified predicate name here reads the graph as directed and the
+   *     spelled-out direction made this the only exception. Whether this name is removed in a
+   *     later major version is not decided.
+   */
+  @Deprecated(since = "2.1.0")
+  public static boolean isOutTree(Graph graph) {
+    return isTree(graph);
+  }
+
+  /**
+   * Returns whether the given graph is a path (tree where every node has out-degree ≤ 1).
    * <p>
    * A path is a linear chain of nodes. An empty graph is a path. A single node is a path.
    * <p>
@@ -249,6 +292,280 @@ public final class Graphs {
   public static boolean isPath(Graph graph) {
     var info = computeForestInfo(graph);
     return info != null && info.rootCount <= 1 && info.maxOutDegree <= 1;
+  }
+
+  /**
+   * Returns whether the given graph is bipartite, reading it as undirected.
+   * <p>
+   * The nodes of a bipartite graph split into two classes such that every edge runs between the
+   * classes rather than inside one. The graph is read as undirected like
+   * {@link Components#ccsOf(Graph)}: the edges {@code a → b} and {@code b → a} are one undirected
+   * edge rather than two. That collapsing cannot change the answer, since a reciprocal pair is an
+   * even cycle either way - but a <strong>self-loop</strong> can, and it makes the graph not
+   * bipartite, because a node adjacent to itself belongs in neither class. This is the one place
+   * where the undirected predicates here do not ignore self-loops: two-colorability is not a
+   * connectivity question. An empty graph is bipartite.
+   * <p>
+   * Terminates as soon as an edge closes an odd cycle. This is the only predicate here that holds
+   * two elements per node, and therefore the only one limited in graph size: it requires
+   * {@code nodeCount < 2^30}. That limit is reachable rather than theoretical - a graph of 10^9
+   * nodes fits in a large heap - so exceeding it is rejected outright instead of surfacing as a
+   * failure to allocate an array of negative length.
+   * <p>
+   * <strong>Time:</strong> O(nodeCount x α(nodeCount) + edgeCount), effectively
+   * O(nodeCount + edgeCount), with early termination.<br>
+   * <strong>Memory:</strong> 10 x nodeCount bytes.
+   *
+   * @param graph the graph to check
+   * @return {@code true} if the graph is bipartite
+   * @throws IllegalArgumentException if {@code graph.nodeCount() >= 2^30}
+   * @see #isUndirectedForest(Graph)
+   */
+  public static boolean isBipartite(Graph graph) {
+    int n = graph.nodeCount();
+    if (n == 0) {
+      return true;
+    }
+    if (n >= MAX_BIPARTITE_NODE_COUNT) {
+      throw new IllegalArgumentException(
+          "isBipartite holds two elements per node and so requires nodeCount < 2^30, but was " + n);
+    }
+
+    var adjacency = graph.outAdjacency;
+    var adjacencyStart = graph.outAdjacencyStart;
+
+    // Double cover: element u means "u in class A", element u + n means "u in class B". An edge
+    // ties each endpoint to the other's opposite, so once a node shares a set with its own
+    // opposite, both classes would have to hold it - an odd cycle. Both unions are symmetric in
+    // u and v, which is why the stored direction is irrelevant and a reciprocal pair simply
+    // repeats them.
+    var sets = new UnionFind(2 * n);
+
+    for (int u = 0; u < n; u++) {
+      int end = adjacencyStart[u + 1];
+      for (int ei = adjacencyStart[u]; ei < end; ei++) {
+        int v = adjacency[ei];
+        if (u == v) {
+          return false;
+        }
+        sets.union(u, v + n);
+        sets.union(u + n, v);
+        if (sets.find(u) == sets.find(u + n)) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Returns whether the given graph is a tree when read as undirected: connected, with exactly
+   * {@code nodeCount - 1} undirected edges.
+   * <p>
+   * Where {@link #isTree(Graph)} requires every edge to point away from one root, this ignores
+   * direction entirely, so a graph whose edges point toward a root, or in mixed directions, is a
+   * tree here as long as the underlying undirected structure is one. The graph is read as
+   * undirected like {@link Components#ccsOf(Graph)}: the edges {@code a → b} and {@code b → a} are
+   * one undirected edge rather than two, so a graph storing its undirected edges symmetrically is
+   * a tree exactly when the same structure stored with a single direction per edge is. Self-loops
+   * are ignored. An empty graph is a tree (vacuously), and so is a single node with no edges.
+   * <p>
+   * A non-empty graph holding more than {@code 3 x nodeCount - 2} edges is rejected without
+   * reading any of them, since no tree can store that many even with a self-loop on every node.
+   * <p>
+   * <strong>Time:</strong> O(nodeCount x α(nodeCount) + edgeCount), effectively
+   * O(nodeCount + edgeCount), plus O(log outDegree) per edge that is stored in both directions;
+   * O(1) when the edge count alone rules out a tree.<br>
+   * <strong>Memory:</strong> 5 x nodeCount bytes.
+   *
+   * @param graph the graph to check
+   * @return {@code true} if the graph is a tree when read as undirected
+   * @see #isTree(Graph)
+   * @see #isUndirectedForest(Graph)
+   */
+  public static boolean isUndirectedTree(Graph graph) {
+    int n = graph.nodeCount();
+    if (n == 0) {
+      return true;
+    }
+    if (exceedsAcyclicEdgeBound(graph)) {
+      return false;
+    }
+    // A cycle yields -1, which can never equal n - 1 here, so one comparison covers both
+    // acyclicity and connectedness.
+    return undirectedMergeCount(graph) == n - 1;
+  }
+
+  /**
+   * Returns whether the given graph is a forest when read as undirected, that is, whether it holds
+   * no undirected cycle.
+   * <p>
+   * A forest is a disjoint union of trees, so this is {@link #isUndirectedTree(Graph)} without the
+   * requirement that there be exactly one component. It is also the undirected counterpart of
+   * {@link #isDag(Graph)}: an undirected graph is acyclic exactly when it is a forest. The graph is
+   * read as undirected like {@link Components#ccsOf(Graph)}, so a reciprocal pair
+   * {@code a → b} / {@code b → a} is one edge and not a cycle, and self-loops are ignored. An empty
+   * graph is a forest.
+   * <p>
+   * A non-empty graph holding more than {@code 3 x nodeCount - 2} edges is rejected without
+   * reading any of them, since no forest can store that many even with a self-loop on every node.
+   * <p>
+   * <strong>Time:</strong> O(nodeCount x α(nodeCount) + edgeCount), effectively
+   * O(nodeCount + edgeCount), plus O(log outDegree) per edge that is stored in both directions;
+   * O(1) when the edge count alone rules out a forest.<br>
+   * <strong>Memory:</strong> 5 x nodeCount bytes.
+   *
+   * @param graph the graph to check
+   * @return {@code true} if the graph holds no undirected cycle
+   * @see #isForest(Graph)
+   * @see #isUndirectedTree(Graph)
+   */
+  public static boolean isUndirectedForest(Graph graph) {
+    if (exceedsAcyclicEdgeBound(graph)) {
+      return false;
+    }
+    return undirectedMergeCount(graph) >= 0;
+  }
+
+  /**
+   * Returns whether the given graph is weakly connected: at most one component when edge
+   * direction is ignored.
+   * <p>
+   * This is the whole-graph question behind {@link Components#wccsOf(Graph)}, which it would
+   * otherwise be answered from, and it needs neither that partition nor a full pass - the check
+   * stops once the nodes are known to form one component. For the directed reading see
+   * {@link Sccs#isStronglyConnected()}. An empty graph and a single node are weakly connected
+   * (vacuously). Self-loops are irrelevant here, as they connect nothing.
+   * <p>
+   * <strong>Time:</strong> O(nodeCount x α(nodeCount) + edgeCount), effectively
+   * O(nodeCount + edgeCount), with early termination.<br>
+   * <strong>Memory:</strong> 5 x nodeCount bytes.
+   *
+   * @param graph the graph to check
+   * @return {@code true} if the graph consists of at most one weakly connected component
+   * @see Components#wccsOf(Graph)
+   * @see Sccs#isStronglyConnected()
+   */
+  public static boolean isWeaklyConnected(Graph graph) {
+    int n = graph.nodeCount();
+    if (n <= 1) {
+      return true;
+    }
+
+    var adjacency = graph.outAdjacency;
+    var adjacencyStart = graph.outAdjacencyStart;
+    // Reciprocal pairs need no attention: a second union of the same two nodes merges nothing,
+    // and neither does a self-loop.
+    var sets = new UnionFind(n);
+    int merges = 0;
+
+    for (int u = 0; u < n; u++) {
+      int end = adjacencyStart[u + 1];
+      for (int ei = adjacencyStart[u]; ei < end; ei++) {
+        if (sets.union(u, adjacency[ei]) && ++merges == n - 1) {
+          return true; // n - 1 merges join every node; no later edge can undo that
+        }
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Returns whether {@code graph} holds more edges than any acyclic undirected reading could: at
+   * most {@code nodeCount - 1} undirected edges, each stored in up to two directions, plus at most
+   * one self-loop per node. Rejecting on that count alone is what bounds the reciprocal-pair
+   * searches in {@link #undirectedMergeCount(Graph)} by nodeCount instead of edgeCount - without
+   * it, a dense symmetric graph would reach the search for every edge it holds.
+   */
+  private static boolean exceedsAcyclicEdgeBound(Graph graph) {
+    int n = graph.nodeCount();
+    return graph.edgeCount() > (n == 0 ? 0 : 3L * n - 2);
+  }
+
+  /**
+   * Merges the endpoints of every undirected edge and returns the number of merges performed, so
+   * that the nodes form {@code nodeCount - result} components; or {@code -1} as soon as an edge
+   * closes an undirected cycle. Self-loops are skipped.
+   * <p>
+   * Nodes are walked in ascending order, and that is what makes a failed union classifiable. A
+   * failure means both endpoints are already connected, so the edge is either the second stored
+   * direction of an edge already counted or a genuine extra edge closing a cycle. For
+   * {@code v > u} the opposite direction sits in a list not yet visited, so this is the first
+   * encounter with {@code {u,v}} and the failure is a cycle. For {@code v < u} one binary search
+   * in v's out-adjacency decides it. A successful union never needs the test: had the opposite
+   * direction been counted, the endpoints would already be connected and the union would have
+   * failed. Searching always would cost a search per edge; searching never would report every
+   * symmetrically stored edge as a cycle.
+   */
+  private static int undirectedMergeCount(Graph graph) {
+    int n = graph.nodeCount();
+    var adjacency = graph.outAdjacency;
+    var adjacencyStart = graph.outAdjacencyStart;
+    var sets = new UnionFind(n);
+    int merges = 0;
+
+    for (int u = 0; u < n; u++) {
+      int end = adjacencyStart[u + 1];
+      for (int ei = adjacencyStart[u]; ei < end; ei++) {
+        int v = adjacency[ei];
+        if (u == v) {
+          continue;
+        }
+        if (sets.union(u, v)) {
+          merges++;
+        } else if (v > u || SortedIntView.indexOfInRange(
+            adjacency, adjacencyStart[v], adjacencyStart[v + 1], u) < 0) {
+          return -1;
+        }
+      }
+    }
+    return merges;
+  }
+
+  /**
+   * Union-find over a fixed element count, with path halving and union by rank. {@code union}
+   * reports whether it merged two distinct sets, which is what lets a caller count components
+   * without a second pass. Union by rank keeps the rank below {@code log2(elementCount)}, so a
+   * byte per element suffices for any array Java can allocate.
+   */
+  private static final class UnionFind {
+
+    private final int[] parent;
+    private final byte[] rank;
+
+    UnionFind(int elementCount) {
+      this.parent = new int[elementCount];
+      this.rank = new byte[elementCount];
+      for (int i = 0; i < elementCount; i++) {
+        parent[i] = i;
+      }
+    }
+
+    int find(int element) {
+      int x = element;
+      while (parent[x] != x) {
+        parent[x] = parent[parent[x]]; // path halving
+        x = parent[x];
+      }
+      return x;
+    }
+
+    boolean union(int a, int b) {
+      int ra = find(a);
+      int rb = find(b);
+      if (ra == rb) {
+        return false;
+      }
+      if (rank[ra] < rank[rb]) {
+        parent[ra] = rb;
+      } else if (rank[ra] > rank[rb]) {
+        parent[rb] = ra;
+      } else {
+        parent[rb] = ra;
+        rank[ra]++;
+      }
+      return true;
+    }
   }
 
   /**

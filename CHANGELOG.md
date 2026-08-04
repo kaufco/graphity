@@ -85,7 +85,37 @@ Graphity adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   cannot be used for a transpose — with the identity node mapping it silently returns `-1`
   entries, because a transpose swaps the two roles its lookup relies on.
 
+- **Undirected shape predicates on `Graphs`.** `isBipartite(graph)`, `isUndirectedTree(graph)`,
+  `isUndirectedForest(graph)` and `isWeaklyConnected(graph)` read the graph as undirected, like
+  `ccsOf` and `biconnectivityOf`: `a → b` and `b → a` are one undirected edge rather than two. A
+  graph storing an undirected structure symmetrically is therefore answered on its actual shape,
+  instead of on the two-cycle that every such edge forms under the directed reading — until now
+  every shape predicate read the graph as directed, and there was no connectivity predicate at all.
+
+  Self-loops are ignored, with one exception: `isBipartite` reports them as disqualifying, because
+  a node adjacent to itself belongs in neither class, and two-colorability is not a connectivity
+  question. An empty graph satisfies all four.
+
+  None of the four needs in-adjacency, so passing a plain `Graph` costs nothing over a
+  `BiAdjacentGraph`. `isBipartite` and `isWeaklyConnected` are O(nodeCount + edgeCount) and hold 10
+  and 5 bytes per node, each stopping as soon as the answer is settled. Holding two elements per
+  node is also why `isBipartite` is the one predicate limited in graph size: it requires
+  `nodeCount < 2^30` and throws `IllegalArgumentException` above that, rather than failing on an
+  array length that has overflowed. `isUndirectedTree` and
+  `isUndirectedForest` reject in O(1) when the edge count alone exceeds what a forest could store,
+  and otherwise cost O(nodeCount + edgeCount) plus one binary search per edge stored in both
+  directions, at 5 bytes per node.
+
+- **`Graphs.isTree(graph)`** — the canonical name for the check that `isOutTree` performs, with
+  identical behaviour. Throughout `Graphs` an unqualified predicate name reads the graph as
+  directed, which left the spelled-out direction in `isOutTree` as the only exception; putting an
+  undirected tree check beside it made that visible at the call site.
+
 ### Deprecated
+
+- **`Graphs.isOutTree(graph)`** — use `Graphs.isTree(graph)`, which answers identically in every
+  case. Only the name changed, and the old one still works. Whether it is removed in a later major
+  version is not decided, so it is not marked `forRemoval`.
 
 - **`Graphs.dfsReordered(graph)`** — reordering renumbers every node, so anything held outside the
   graph and keyed by node ID has to be permuted along with it, and this method discards the only

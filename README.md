@@ -213,7 +213,8 @@ Graphity ships the following algorithms out of the box. All of them return typed
 | DFS edge classification (TREE / BACK / FORWARD / CROSS)         | `EdgeTypes.of(graph)`         |
 | Back edges                                                      | `BackEdges.of(graph)`         |
 | Lowest common ancestor (trees and forests)                      | `Ancestry.of(forest)`         |
-| Shape predicates (`isDag`, `isForest`, `isOutTree`, `isPath`)   | `Graphs.isDag(graph)`         |
+| Shape predicates (`isDag`, `isForest`, `isTree`, `isPath`)      | `Graphs.isDag(graph)`         |
+| Shape predicates, undirected interpretation (`isBipartite`, `isUndirectedTree`, `isUndirectedForest`, `isWeaklyConnected`) | `Graphs.isBipartite(graph)` |
 | Condensation DAG                                                | `sccs.condense()`             |
 | Subgraph extraction and node remapping                          | `Graphs.remapped(...)`        |
 

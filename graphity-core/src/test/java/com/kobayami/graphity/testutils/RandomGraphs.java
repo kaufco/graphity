@@ -125,6 +125,50 @@ public final class RandomGraphs {
   }
 
   /**
+   * Random bipartite graph: every node is assigned to one of two classes at random, and each
+   * cross-class pair is joined with probability {@code edgeProb} in a random direction. No
+   * self-loops, and no odd cycle can arise, so the result is always bipartite.
+   */
+  public static Graph randomBipartite(int n, double edgeProb, long seed) {
+    var rnd = new Random(seed);
+    var b = new GraphBuilder();
+    b.addNodes(n);
+    var secondClass = new boolean[n];
+    for (int i = 0; i < n; i++) secondClass[i] = rnd.nextBoolean();
+    for (int u = 0; u < n; u++) {
+      for (int v = u + 1; v < n; v++) {
+        if (secondClass[u] != secondClass[v] && rnd.nextDouble() < edgeProb) {
+          if (rnd.nextBoolean()) b.addEdge(u, v);
+          else b.addEdge(v, u);
+        }
+      }
+    }
+    return b.build();
+  }
+
+  /**
+   * Returns a copy of the given graph with {@code extraEdges} random edges added, which is how a
+   * graph is pushed just out of a shape class: one edge added to a tree closes an undirected
+   * cycle, one added to a bipartite graph is likely to close an odd one. The added edges may
+   * duplicate existing ones, reverse them, or be self-loops, so the cases where nothing changes
+   * are covered too.
+   */
+  public static Graph withExtraEdges(Graph graph, int extraEdges, long seed) {
+    int n = graph.nodeCount();
+    var rnd = new Random(seed);
+    var b = new GraphBuilder();
+    b.addNodes(n);
+    for (int u = 0; u < n; u++) {
+      var outs = graph.outNodes(u);
+      for (int i = 0; i < outs.size(); i++) b.addEdge(u, outs.getInt(i));
+    }
+    for (int i = 0; i < extraEdges && n > 0; i++) {
+      b.addEdge(rnd.nextInt(n), rnd.nextInt(n));
+    }
+    return b.build();
+  }
+
+  /**
    * Returns a copy of the given graph with every edge stored in both directions - the way an
    * undirected graph is usually represented. Self-loops are kept as they are.
    */
@@ -199,6 +243,46 @@ public final class RandomGraphs {
       case 2 -> new LabeledGraph(
           "chainForest(rootProb=%.2f)".formatted(rootProb), n, seed,
           chainForest(n, rootProb, innerSeed));
+      default -> throw new IllegalStateException();
+    };
+  }
+
+  /**
+   * Picks a graph from the shapes on which the undirected predicates actually discriminate:
+   * bipartite graphs and graphs one edge away from bipartite, trees and forests stored in one or
+   * in both directions, and each of those with a few random edges added. {@link #anyGraph} is
+   * almost never a tree and almost never bipartite, so comparing against it alone would be
+   * "false against false" throughout and would not test much.
+   */
+  public static LabeledGraph anyUndirectedShape(long seed) {
+    var rnd = new Random(seed);
+    int n = pickNodeCount(rnd);
+    double p = pickEdgeProb(rnd);
+    long innerSeed = rnd.nextLong();
+    int choice = rnd.nextInt(9);
+    return switch (choice) {
+      case 0 -> new LabeledGraph(
+          "randomBipartite(p=%.3f)".formatted(p), n, seed, randomBipartite(n, p, innerSeed));
+      case 1 -> new LabeledGraph(
+          "randomBipartite(p=%.3f)+3".formatted(p), n, seed,
+          withExtraEdges(randomBipartite(n, p, innerSeed), 3, innerSeed));
+      case 2 -> new LabeledGraph("randomTree", n, seed, randomTree(n, innerSeed));
+      case 3 -> new LabeledGraph(
+          "randomTree+1", n, seed, withExtraEdges(randomTree(n, innerSeed), 1, innerSeed));
+      case 4 -> new LabeledGraph(
+          "symmetrized(randomTree)", n, seed, symmetrized(randomTree(n, innerSeed)));
+      case 5 -> new LabeledGraph(
+          "randomForest(rootProb=0.05)", n, seed, randomForest(n, 0.05, innerSeed));
+      case 6 -> new LabeledGraph(
+          "symmetrized(randomForest(rootProb=0.05))", n, seed,
+          symmetrized(randomForest(n, 0.05, innerSeed)));
+      case 7 -> new LabeledGraph("gnm(m=n)", n, seed, gnm(n, n, innerSeed));
+      // A symmetrically stored graph that does hold an undirected cycle. The symmetrized trees
+      // above are all acyclic, so without this case nothing would distinguish "this pair is the
+      // second direction of an edge I already counted" from "this pair closes a cycle".
+      case 8 -> new LabeledGraph(
+          "symmetrized(randomTree+1)", n, seed,
+          symmetrized(withExtraEdges(randomTree(n, innerSeed), 1, innerSeed)));
       default -> throw new IllegalStateException();
     };
   }

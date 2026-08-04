@@ -57,8 +57,9 @@
  *   <li>{@link com.kobayami.graphity.BackEdges} - back-edge detection, the cycle-breaking subset
  *       of edge classification.</li>
  *   <li>{@link com.kobayami.graphity.Graphs} - graph transformations (remapping, DFS reordering)
- *       and structural shape checks ({@code isDag}, {@code isForest}, {@code isOutTree},
- *       {@code isPath}).</li>
+ *       and structural shape checks, directed ({@code isDag}, {@code isForest}, {@code isTree},
+ *       {@code isPath}) as well as undirected ({@code isBipartite}, {@code isUndirectedTree},
+ *       {@code isUndirectedForest}, {@code isWeaklyConnected}).</li>
  * </ul>
  *
  * <h2>Mappings and partitions</h2>

@@ -4,14 +4,28 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.kobayami.graphity.testutils.JGraphtAdapter;
 import com.kobayami.graphity.testutils.RandomGraphs;
+import org.jgrapht.GraphTests;
+import org.jgrapht.alg.connectivity.ConnectivityInspector;
 import org.jgrapht.alg.cycle.CycleDetector;
 import org.junit.jupiter.api.Test;
 
 /**
- * Cross-validates shape predicates in {@link Graphs} against independent references:
- * {@code isDag} against JGraphT's {@link CycleDetector}; {@code isForest},
- * {@code isOutTree}, {@code isPath} against their structural definitions computed
+ * Cross-validates shape predicates in {@link Graphs} against independent references.
+ * <p>
+ * The directed predicates: {@code isDag} against JGraphT's {@link CycleDetector};
+ * {@code isForest}, {@code isTree}, {@code isPath} against their structural definitions computed
  * from scratch via plain arrays.
+ * <p>
+ * The undirected predicates against JGraphT's {@link GraphTests} and
+ * {@link ConnectivityInspector}, applied to {@link JGraphtAdapter#toUndirectedJgrapht(Graph)}.
+ * That adapter builds a {@code SimpleGraph} and thereby enforces the undirected reading
+ * structurally - reciprocal pairs collapse, self-loops are rejected - and JGraphT decides
+ * bipartiteness by coloring and connectivity over vertex sets, so neither oracle shares an
+ * approach with the implementation under test.
+ * <p>
+ * One limit follows from that adapter: since it drops self-loops, JGraphT cannot express the one
+ * rule where {@code isBipartite} does not ignore them. Graphs holding a self-loop are therefore
+ * excluded from that comparison and covered by {@code GraphsTest} instead.
  */
 class GraphsFuzzTest {
 
@@ -47,15 +61,15 @@ class GraphsFuzzTest {
   }
 
   @Test
-  void isOutTreeAgreesWithDefinition() {
+  void isTreeAgreesWithDefinition() {
     for (int i = 0; i < ITERATIONS; i++) {
       var labeled = RandomGraphs.anyGraph(BASE_SEED + i);
       var g = labeled.graph();
-      boolean ours = Graphs.isOutTree(g);
-      boolean expected = isOutTreeReference(g);
+      boolean ours = Graphs.isTree(g);
+      boolean expected = isTreeReference(g);
 
       assertThat(ours)
-          .as("isOutTree mismatch for %s", labeled.describe())
+          .as("isTree mismatch for %s", labeled.describe())
           .isEqualTo(expected);
     }
   }
@@ -80,16 +94,142 @@ class GraphsFuzzTest {
       var labeled = RandomGraphs.anyGraph(BASE_SEED + i);
       var g = labeled.graph();
       if (Graphs.isPath(g)) {
-        assertThat(Graphs.isOutTree(g))
-            .as("isPath ⇒ isOutTree violated for %s", labeled.describe()).isTrue();
+        assertThat(Graphs.isTree(g))
+            .as("isPath ⇒ isTree violated for %s", labeled.describe()).isTrue();
       }
-      if (Graphs.isOutTree(g)) {
+      if (Graphs.isTree(g)) {
         assertThat(Graphs.isForest(g))
-            .as("isOutTree ⇒ isForest violated for %s", labeled.describe()).isTrue();
+            .as("isTree ⇒ isForest violated for %s", labeled.describe()).isTrue();
       }
       if (Graphs.isForest(g)) {
         assertThat(Graphs.isDag(g))
             .as("isForest ⇒ isDag violated for %s", labeled.describe()).isTrue();
+      }
+    }
+  }
+
+  // ---- Undirected predicates ----
+
+  @Test
+  void isBipartiteAgreesWithJgrapht() {
+    int bipartite = 0;
+    int notBipartite = 0;
+    for (int i = 0; i < ITERATIONS; i++) {
+      var labeled = RandomGraphs.anyUndirectedShape(BASE_SEED + i);
+      var g = labeled.graph();
+      if (containsSelfLoop(g)) {
+        continue; // the oracle cannot represent self-loops, see class comment
+      }
+      boolean ours = Graphs.isBipartite(g);
+      boolean theirs = GraphTests.isBipartite(JGraphtAdapter.toUndirectedJgrapht(g));
+
+      assertThat(ours)
+          .as("isBipartite mismatch vs JGraphT for %s", labeled.describe())
+          .isEqualTo(theirs);
+
+      if (ours) bipartite++;
+      else notBipartite++;
+    }
+    // Without both outcomes the comparison above would pass on agreement about nothing.
+    assertThat(bipartite).as("no bipartite graph was generated").isPositive();
+    assertThat(notBipartite).as("no non-bipartite graph was generated").isPositive();
+  }
+
+  @Test
+  void isUndirectedTreeAgreesWithJgrapht() {
+    int trees = 0;
+    int nonTrees = 0;
+    for (int i = 0; i < ITERATIONS; i++) {
+      var labeled = RandomGraphs.anyUndirectedShape(BASE_SEED + i);
+      var g = labeled.graph();
+      boolean ours = Graphs.isUndirectedTree(g);
+      boolean theirs = GraphTests.isTree(JGraphtAdapter.toUndirectedJgrapht(g));
+
+      assertThat(ours)
+          .as("isUndirectedTree mismatch vs JGraphT for %s", labeled.describe())
+          .isEqualTo(theirs);
+
+      if (ours) trees++;
+      else nonTrees++;
+    }
+    assertThat(trees).as("no undirected tree was generated").isPositive();
+    assertThat(nonTrees).as("no non-tree was generated").isPositive();
+  }
+
+  @Test
+  void isUndirectedForestAgreesWithJgrapht() {
+    int forests = 0;
+    int nonForests = 0;
+    for (int i = 0; i < ITERATIONS; i++) {
+      var labeled = RandomGraphs.anyUndirectedShape(BASE_SEED + i);
+      var g = labeled.graph();
+      boolean ours = Graphs.isUndirectedForest(g);
+      boolean theirs = GraphTests.isForest(JGraphtAdapter.toUndirectedJgrapht(g));
+
+      assertThat(ours)
+          .as("isUndirectedForest mismatch vs JGraphT for %s", labeled.describe())
+          .isEqualTo(theirs);
+
+      if (ours) forests++;
+      else nonForests++;
+    }
+    assertThat(forests).as("no undirected forest was generated").isPositive();
+    assertThat(nonForests).as("no graph with an undirected cycle was generated").isPositive();
+  }
+
+  @Test
+  void isWeaklyConnectedAgreesWithJgrapht() {
+    for (int i = 0; i < ITERATIONS; i++) {
+      var labeled = RandomGraphs.anyUndirectedShape(BASE_SEED + i);
+      var g = labeled.graph();
+      boolean ours = Graphs.isWeaklyConnected(g);
+      boolean theirs =
+          new ConnectivityInspector<>(JGraphtAdapter.toUndirectedJgrapht(g)).isConnected();
+
+      assertThat(ours)
+          .as("isWeaklyConnected mismatch vs JGraphT for %s", labeled.describe())
+          .isEqualTo(theirs);
+    }
+  }
+
+  @Test
+  void isWeaklyConnectedAgreesWithWeaklyConnectedComponents() {
+    for (int i = 0; i < ITERATIONS; i++) {
+      var labeled = RandomGraphs.anyGraph(BASE_SEED + i);
+      var g = labeled.graph();
+
+      assertThat(Graphs.isWeaklyConnected(g))
+          .as("isWeaklyConnected disagrees with wccsOf for %s", labeled.describe())
+          .isEqualTo(Components.wccsOf(g).groupCount() <= 1);
+    }
+  }
+
+  @Test
+  void undirectedShapeHierarchyHolds() {
+    for (int i = 0; i < ITERATIONS; i++) {
+      var labeled = RandomGraphs.anyUndirectedShape(BASE_SEED + i);
+      var g = labeled.graph();
+      if (Graphs.isTree(g)) {
+        assertThat(Graphs.isUndirectedTree(g))
+            .as("isTree ⇒ isUndirectedTree violated for %s", labeled.describe()).isTrue();
+      }
+      if (Graphs.isForest(g)) {
+        assertThat(Graphs.isUndirectedForest(g))
+            .as("isForest ⇒ isUndirectedForest violated for %s", labeled.describe()).isTrue();
+      }
+      if (Graphs.isUndirectedTree(g)) {
+        assertThat(Graphs.isUndirectedForest(g))
+            .as("isUndirectedTree ⇒ isUndirectedForest violated for %s", labeled.describe())
+            .isTrue();
+        assertThat(Graphs.isWeaklyConnected(g))
+            .as("isUndirectedTree ⇒ isWeaklyConnected violated for %s", labeled.describe())
+            .isTrue();
+        if (!containsSelfLoop(g)) {
+          // Holds only without self-loops: the tree ignores them, isBipartite does not. That
+          // restriction is the single observable consequence of the split rule.
+          assertThat(Graphs.isBipartite(g))
+              .as("isUndirectedTree ⇒ isBipartite violated for %s", labeled.describe()).isTrue();
+        }
       }
     }
   }
@@ -104,8 +244,8 @@ class GraphsFuzzTest {
     return true;
   }
 
-  /** An out-tree: forest with exactly one root (in-degree == 0), or an empty graph. */
-  private static boolean isOutTreeReference(Graph graph) {
+  /** A tree: forest with exactly one root (in-degree == 0), or an empty graph. */
+  private static boolean isTreeReference(Graph graph) {
     if (!isForestReference(graph)) return false;
     if (graph.nodeCount() == 0) return true;
     int roots = 0;
@@ -116,14 +256,21 @@ class GraphsFuzzTest {
     return roots == 1;
   }
 
-  /** A path: out-tree where every node has out-degree ≤ 1. */
+  /** A path: tree where every node has out-degree ≤ 1. */
   private static boolean isPathReference(Graph graph) {
-    if (!isOutTreeReference(graph)) return false;
+    if (!isTreeReference(graph)) return false;
     for (int v = 0; v < graph.nodeCount(); v++) {
       int outDeg = graph.outEdgeEnd(v) - graph.outEdgeStart(v);
       if (outDeg > 1) return false;
     }
     return true;
+  }
+
+  private static boolean containsSelfLoop(Graph graph) {
+    for (int v = 0; v < graph.nodeCount(); v++) {
+      if (graph.containsSelfLoop(v)) return true;
+    }
+    return false;
   }
 
   private static int[] inDegrees(Graph graph) {
