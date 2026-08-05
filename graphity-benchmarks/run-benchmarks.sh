@@ -120,14 +120,16 @@ DAG_FIXTURE_SHAPES = {
     "PATH", "TREE", "DAG_GNP_SPARSE", "DAG_GNP_DENSE",
     "PATH_SHUFFLED", "TREE_SHUFFLED", "DAG_GNP_SPARSE_SHUFFLED", "DAG_GNP_DENSE_SHUFFLED"
 }
-# "graphity-reordered" is a pseudo-library: the same Graphity algorithm run on a
-# DFS-preorder reordered graph (NodeMapping.reindex + Graphs.remapped). It shows up as a separate
-# "Graphity (reordered)" column in the report. "reorder" is the graphity-only
-# algorithm that measures the one-time cost of that reordering.
-SUPPORTED_LIBS = {"graphity", "graphity-reordered", "jgrapht", "guava", "webgraph"}
+# "graphity-reordered" and "graphity-biadjacent" are pseudo-libraries: the same Graphity
+# algorithm run on a transformed graph — a DFS-preorder reordered one (NodeMapping.reindex +
+# Graphs.remapped) or a bi-adjacent one (Graph.biAdjacentGraph). Each shows up as a separate
+# "Graphity (…)" column in the report. Alongside them sit the algorithms that measure the
+# one-time cost of those structures: "reorder" and "biadjacency" for Graphity, "symmetrize" for
+# WebGraph, whose ConnectedComponents needs a symmetric graph a BVGraph cannot provide.
+SUPPORTED_LIBS = {"graphity", "graphity-reordered", "graphity-biadjacent", "jgrapht", "guava", "webgraph"}
 SUPPORTED_ALGOS = {
     "build", "scc", "wcc", "ccs", "condense", "toporder", "toporderandlevels",
-    "backedges", "edgetypes", "reorder"
+    "backedges", "edgetypes", "reorder", "biadjacency", "symmetrize"
 }
 ALGO_SUPPORTED_LIBS = {
     "build": {"graphity", "jgrapht", "guava", "webgraph"},
@@ -135,11 +137,15 @@ ALGO_SUPPORTED_LIBS = {
     "toporder": {"graphity", "graphity-reordered", "jgrapht", "guava", "webgraph"},
     "backedges": {"graphity", "graphity-reordered", "jgrapht", "guava", "webgraph"},
     "edgetypes": {"graphity", "graphity-reordered", "jgrapht", "guava", "webgraph"},
-    "wcc": {"graphity", "graphity-reordered"},
+    "wcc": {"graphity", "graphity-reordered", "jgrapht", "guava", "webgraph"},
     "ccs": {"graphity", "graphity-reordered"},
     "condense": {"graphity"},
-    "toporderandlevels": {"graphity", "graphity-reordered"},
+    "toporderandlevels": {
+        "graphity", "graphity-reordered", "graphity-biadjacent", "jgrapht", "guava", "webgraph"
+    },
     "reorder": {"graphity"},
+    "biadjacency": {"graphity"},
+    "symmetrize": {"webgraph"},
 }
 ALGO_ALLOWED_SHAPES = {
     "build": GRAPH_FIXTURE_SHAPES,
@@ -154,6 +160,10 @@ ALGO_ALLOWED_SHAPES = {
     "condense": ALL_SHAPES,
     "toporderandlevels": DAG_FIXTURE_SHAPES,
     "reorder": GRAPH_FIXTURE_SHAPES,
+    # In-adjacency and symmetric closure exist for cyclic graphs just as much as for acyclic
+    # ones, so their construction cost is measured over the full shape set.
+    "biadjacency": GRAPH_FIXTURE_SHAPES,
+    "symmetrize": GRAPH_FIXTURE_SHAPES,
 }
 SUPPORTED_PHASES = {"perf", "alloc"}
 DAG_ALGOS = {"toporder", "toporderandlevels"}
@@ -359,6 +369,9 @@ BENCHMARK_FQNS = {
     "wcc": {
         "graphity": "com.kobayami.graphity.benchmarks.graphity.WccBenchmark.wcc",
         "graphity-reordered": "com.kobayami.graphity.benchmarks.graphity.WccReorderedBenchmark.wcc",
+        "jgrapht": "com.kobayami.graphity.benchmarks.jgrapht.JGraphTWccBenchmark.wcc",
+        "guava": "com.kobayami.graphity.benchmarks.guava.GuavaWccBenchmark.wcc",
+        "webgraph": "com.kobayami.graphity.benchmarks.webgraph.WebGraphWccBenchmark.wcc",
     },
     "ccs": {
         "graphity": "com.kobayami.graphity.benchmarks.graphity.CcsBenchmark.ccs",
@@ -377,6 +390,10 @@ BENCHMARK_FQNS = {
     "toporderandlevels": {
         "graphity": "com.kobayami.graphity.benchmarks.graphity.TopOrderAndLevelsBenchmark.topOrderAndLevels",
         "graphity-reordered": "com.kobayami.graphity.benchmarks.graphity.TopOrderAndLevelsReorderedBenchmark.topOrderAndLevels",
+        "graphity-biadjacent": "com.kobayami.graphity.benchmarks.graphity.TopOrderAndLevelsBiAdjacentBenchmark.topOrderAndLevels",
+        "jgrapht": "com.kobayami.graphity.benchmarks.jgrapht.JGraphTTopOrderAndLevelsBenchmark.topOrderAndLevels",
+        "guava": "com.kobayami.graphity.benchmarks.guava.GuavaTopOrderAndLevelsBenchmark.topOrderAndLevels",
+        "webgraph": "com.kobayami.graphity.benchmarks.webgraph.WebGraphTopOrderAndLevelsBenchmark.topOrderAndLevels",
     },
     "backedges": {
         "graphity": "com.kobayami.graphity.benchmarks.graphity.BackEdgesBenchmark.backEdges",
@@ -394,6 +411,12 @@ BENCHMARK_FQNS = {
     },
     "reorder": {
         "graphity": "com.kobayami.graphity.benchmarks.graphity.ReorderBenchmark.reorder",
+    },
+    "biadjacency": {
+        "graphity": "com.kobayami.graphity.benchmarks.graphity.BiAdjacencyBenchmark.biAdjacency",
+    },
+    "symmetrize": {
+        "webgraph": "com.kobayami.graphity.benchmarks.webgraph.WebGraphSymmetrizeBenchmark.symmetrize",
     },
 }
 
@@ -502,11 +525,14 @@ for c in data.get("cases", []):
         orig_libs = [l for l in orig_libs if l in lib_filter]
         if not orig_libs:
             continue
-    # The reordered pseudo-library runs the identical Graphity algorithm on a reordered
-    # graph, so it validates as plain "graphity" (dedup to avoid running it twice).
+    # The pseudo-libraries run the identical Graphity algorithm on a transformed graph, so they
+    # validate as plain "graphity" (dedup to avoid running it twice). The transforms themselves
+    # are covered inside ValidateMain: the "toporderandlevels" case checks the bi-adjacent path
+    # against the uni-adjacent one, and "wcc" checks WebGraph's symmetric closure against
+    # Graphity's partition.
     mapped_libs = []
     for lib in orig_libs:
-        canon = "graphity" if lib == "graphity-reordered" else lib
+        canon = "graphity" if lib in ("graphity-reordered", "graphity-biadjacent") else lib
         if canon not in mapped_libs:
             mapped_libs.append(canon)
     libs = ",".join(mapped_libs)
@@ -964,7 +990,7 @@ OPS_SCRIPT="${BENCH_DIR}/times-to-ops.py"
 REPORTS_DIR="${BENCH_DIR}/reports"
 DEFAULT_SYNTHETIC_PROFILE="full"
 DEFAULT_REALWORLD_PROFILE="realworld"
-SUPPORTED_LIBS=" graphity graphity-reordered jgrapht guava webgraph "
+SUPPORTED_LIBS=" graphity graphity-reordered graphity-biadjacent jgrapht guava webgraph "
 # LIB_FILTER is consumed by the engine functions (matrix_*_tsv); set per run below.
 LIB_FILTER=""
 # Accumulates "phase/profile/case" labels for any measurement that failed
@@ -1013,7 +1039,7 @@ run_kind() {
   local kind="$1" lib="$2" profile="$3"
   if [[ -z "$lib" ]]; then
     echo "error: '$kind' requires a library name or 'all'" >&2
-    echo "supported: graphity, graphity-reordered, jgrapht, guava, webgraph, all" >&2
+    echo "supported: graphity, graphity-reordered, graphity-biadjacent, jgrapht, guava, webgraph, all" >&2
     exit 2
   fi
   if [[ "$lib" == "all" ]]; then
@@ -1023,7 +1049,7 @@ run_kind() {
     echo "library filter active: only [${lib}]"
   else
     echo "error: unknown library '$lib'" >&2
-    echo "supported: graphity, graphity-reordered, jgrapht, guava, webgraph, all" >&2
+    echo "supported: graphity, graphity-reordered, graphity-biadjacent, jgrapht, guava, webgraph, all" >&2
     exit 2
   fi
 
@@ -1239,14 +1265,14 @@ Commands:
                                  Machine is auto-derived from OS/CPU; override if needed.
 
 Libraries (for synthetic / realworld):
-  all   graphity   graphity-reordered   jgrapht   guava   webgraph
+  all   graphity   graphity-reordered   graphity-biadjacent   jgrapht   guava   webgraph
 
 Profiles (--profile <name>):
   Synthetic:    quick   — fast dev loop, n = 10K/100K, all libs, perf+alloc (~minutes)
                 full    — full baseline, n = 10K/100K, all libs, perf+alloc (~hours) [default]
                 big     — large graphs, n = 1M/10M/100M, Graphity+reordered only, perf (~hours)
   Real-world:   realworld       — all libs, all datasets, perf [default]
-                realworld-quick — web-Google only, smoke run (~minutes)
+                realworld-quick — smoke run, one dataset per case (~minutes)
 
 Examples:
   $(basename "$0") bench                             # complete run (~3h) + report, version from pom.xml

@@ -370,8 +370,108 @@ class BaselineFallbackTest(unittest.TestCase):
         self.assertEqual(table_columns(self.peers, "### 1.2 Legacy"), ["Graphity 1.5"])
 
 
+VARIANT_REPORTS = {
+    # Two versions of one section that carries both Graphity variants next to a peer: the
+    # reordered graph and the bi-adjacent one.
+    "1.0": """
+## 1 · Performance
+
+### 1.1.1 · TopOrderAndLevels @ n = 1 000
+
+| Shape | Graphity | Graphity (reordered) | Graphity (bi-adjacent) | JGraphT |
+|---|---:|---:|---:|---:|
+| PATH | 2.000 ms | 1.600 ms (0.80×) | 1.200 ms (0.60×) | 8.000 ms (4.00×) |
+""",
+    "2.0.0": """
+## 1 · Performance
+
+### 1.1.1 · TopOrderAndLevels @ n = 1 000
+
+| Shape | Graphity | Graphity (reordered) | Graphity (bi-adjacent) | JGraphT |
+|---|---:|---:|---:|---:|
+| PATH | 1.900 ms | 1.500 ms (0.79×) | 1.100 ms (0.58×) | 7.900 ms (4.16×) |
+
+### 1.2.1 · BiAdjacency (in-adjacency) cost @ n = 1 000
+
+| Shape | Graphity |
+|---|---:|
+| PATH | 0.900 ms |
+
+### 1.3.1 · Symmetrize (WebGraph) cost @ n = 1 000
+
+| Shape | WebGraph |
+|---|---:|
+| PATH | 40.00 ms |
+""",
+}
+
+
+class GraphityVariantTest(unittest.TestCase):
+    """Both Graphity variants become columns of their own, before the peers."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls._tmp = tempfile.TemporaryDirectory()
+        root = Path(cls._tmp.name)
+        cls.output_dir = root / "summary"
+        source_dir = root / "versions"
+        source_dir.mkdir()
+        for version, body in VARIANT_REPORTS.items():
+            (source_dir / f"{version}-synthetic-testbox.md").write_text(
+                HEADER + body, encoding="utf-8"
+            )
+        with contextlib.redirect_stdout(io.StringIO()):
+            gen.generate_combined(source_dir, cls.output_dir)
+        cls.peers = (cls.output_dir / "synthetic-testbox-peers.md").read_text(encoding="utf-8")
+        cls.history = (cls.output_dir / "synthetic-testbox-history.md").read_text(encoding="utf-8")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._tmp.cleanup()
+
+    def test_peer_view_puts_both_variants_between_graphity_and_the_peers(self):
+        self.assertEqual(
+            table_columns(self.peers, "### 1.1 TopOrderAndLevels"),
+            [
+                "Graphity 2.0.0",
+                "Graphity 2.0.0 (reordered)",
+                "Graphity 2.0.0 (bi-adjacent)",
+                "JGraphT",
+            ],
+        )
+
+    def test_history_view_shows_each_variant_per_version(self):
+        self.assertEqual(
+            table_columns(self.history, "### 1.1 TopOrderAndLevels"),
+            [
+                "Graphity 1.0",
+                "Graphity 2.0.0",
+                "Graphity 1.0 (reordered)",
+                "Graphity 2.0.0 (reordered)",
+                "Graphity 1.0 (bi-adjacent)",
+                "Graphity 2.0.0 (bi-adjacent)",
+            ],
+        )
+
+    def test_a_structure_cost_section_survives_as_its_own_subsection(self):
+        # The cost of building a variant's structure is an algorithm of its own in the report,
+        # and the only library that measures it is Graphity.
+        heading = "### 1.2 BiAdjacency (in-adjacency) cost"
+        self.assertEqual(table_columns(self.peers, heading), ["Graphity 2.0.0"])
+
+    def test_peer_view_keeps_a_peer_only_section(self):
+        heading = "### 1.3 Symmetrize (WebGraph) cost"
+        self.assertEqual(table_columns(self.peers, heading), ["WebGraph"])
+
+    def test_history_view_drops_a_peer_only_section_entirely(self):
+        # No Graphity column can carry it, so heading and Contents entry would stay empty. The
+        # sections that remain keep their gapless numbering.
+        self.assertNotIn("Symmetrize", self.history)
+        self.assertIn("### 1.2 BiAdjacency (in-adjacency) cost", self.history)
+
+
 class SeriesColorTest(unittest.TestCase):
-    """Chart colours: versions, reordered variants and peers must be distinguishable."""
+    """Chart colours: versions, their variants and peers must be distinguishable."""
 
     def test_each_version_and_each_reordered_variant_gets_its_own_colour(self):
         labels = [
@@ -387,6 +487,15 @@ class SeriesColorTest(unittest.TestCase):
     def test_the_single_reordered_column_keeps_the_established_colour(self):
         colors = gen.assign_series_colors(["Graphity 2.0.0", "Graphity 2.0.0 (reordered)"])
         self.assertEqual(colors["Graphity 2.0.0 (reordered)"], gen.REORDERED_COLORS[0])
+
+    def test_the_two_variants_of_one_version_differ_from_each_other(self):
+        labels = [
+            "Graphity 2.0.0",
+            "Graphity 2.0.0 (reordered)",
+            "Graphity 2.0.0 (bi-adjacent)",
+        ]
+        colors = gen.assign_series_colors(labels)
+        self.assertEqual(len(set(colors.values())), len(labels))
 
 
 if __name__ == "__main__":

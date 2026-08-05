@@ -47,17 +47,26 @@
       }
     },
     {
-      "name": "components-graphity",
-      "libraries": ["graphity"],
-      "algorithms": ["wcc", "ccs"],
+      "name": "wcc",
+      "libraries": ["graphity", "jgrapht", "guava", "webgraph"],
+      "algorithms": ["wcc"],
       "params": {
         "nodeCount": [10000, 100000],
         "shape": ["PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES"]
       }
     },
     {
-      "name": "toporder-levels-graphity",
+      "name": "ccs-graphity",
       "libraries": ["graphity"],
+      "algorithms": ["ccs"],
+      "params": {
+        "nodeCount": [10000, 100000],
+        "shape": ["PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES"]
+      }
+    },
+    {
+      "name": "toporder-levels",
+      "libraries": ["graphity", "graphity-biadjacent", "jgrapht", "guava", "webgraph"],
       "algorithms": ["toporderandlevels"],
       "params": {
         "nodeCount": [10000, 100000],
@@ -71,6 +80,26 @@
       "params": {
         "nodeCount": [1000, 10000, 100000],
         "shape": ["PATH", "CHAIN_OF_CLIQUES", "GNP_DENSE", "DAG_GNP_SPARSE"]
+      }
+    },
+    {
+      "name": "biadjacency-cost",
+      "libraries": ["graphity"],
+      "algorithms": ["biadjacency"],
+      "phases": ["perf"],
+      "params": {
+        "nodeCount": [10000, 100000],
+        "shape": ["PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES"]
+      }
+    },
+    {
+      "name": "symmetrize-cost",
+      "libraries": ["webgraph"],
+      "algorithms": ["symmetrize"],
+      "phases": ["perf"],
+      "params": {
+        "nodeCount": [10000, 100000],
+        "shape": ["PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES"]
       }
     }
   ],

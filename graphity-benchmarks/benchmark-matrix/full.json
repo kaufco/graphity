@@ -47,17 +47,26 @@
       }
     },
     {
-      "name": "components-graphity",
-      "libraries": ["graphity"],
-      "algorithms": ["wcc", "ccs"],
+      "name": "wcc",
+      "libraries": ["graphity", "jgrapht", "guava", "webgraph"],
+      "algorithms": ["wcc"],
       "params": {
         "nodeCount": [10000, 100000],
         "shape": ["PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "PATH_SHUFFLED", "GNP_DENSE_SHUFFLED", "CHAIN_OF_CLIQUES_SHUFFLED"]
       }
     },
     {
-      "name": "toporder-levels-graphity",
+      "name": "ccs-graphity",
       "libraries": ["graphity"],
+      "algorithms": ["ccs"],
+      "params": {
+        "nodeCount": [10000, 100000],
+        "shape": ["PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "PATH_SHUFFLED", "GNP_DENSE_SHUFFLED", "CHAIN_OF_CLIQUES_SHUFFLED"]
+      }
+    },
+    {
+      "name": "toporder-levels",
+      "libraries": ["graphity", "graphity-biadjacent", "jgrapht", "guava", "webgraph"],
       "algorithms": ["toporderandlevels"],
       "params": {
         "nodeCount": [10000, 100000],
@@ -97,6 +106,26 @@
       "name": "reorder-cost",
       "libraries": ["graphity"],
       "algorithms": ["reorder"],
+      "phases": ["perf"],
+      "params": {
+        "nodeCount": [10000, 100000],
+        "shape": ["PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "PATH_SHUFFLED", "GNP_DENSE_SHUFFLED", "CHAIN_OF_CLIQUES_SHUFFLED"]
+      }
+    },
+    {
+      "name": "biadjacency-cost",
+      "libraries": ["graphity"],
+      "algorithms": ["biadjacency"],
+      "phases": ["perf"],
+      "params": {
+        "nodeCount": [10000, 100000],
+        "shape": ["PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "PATH_SHUFFLED", "GNP_DENSE_SHUFFLED", "CHAIN_OF_CLIQUES_SHUFFLED"]
+      }
+    },
+    {
+      "name": "symmetrize-cost",
+      "libraries": ["webgraph"],
+      "algorithms": ["symmetrize"],
       "phases": ["perf"],
       "params": {
         "nodeCount": [10000, 100000],

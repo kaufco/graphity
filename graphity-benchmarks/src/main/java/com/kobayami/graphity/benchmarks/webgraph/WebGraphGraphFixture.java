@@ -35,7 +35,13 @@ public class WebGraphGraphFixture {
   public String datasetPath;
 
   public ImmutableGraph graph;
-  private Path tmpRoot;
+
+  /**
+   * Workspace for BV intermediate files, deleted on teardown. Public because
+   * {@link WebGraphSymmetrizeBenchmark} writes its own intermediate files below it — the
+   * fixture owns the directory's lifetime, the benchmark only borrows it.
+   */
+  public Path tmpRoot;
 
   @Setup(Level.Trial)
   public void setupGraph() throws IOException {

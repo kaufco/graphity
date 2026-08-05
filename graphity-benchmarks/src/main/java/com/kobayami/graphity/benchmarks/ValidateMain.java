@@ -20,13 +20,17 @@ import com.kobayami.graphity.benchmarks.guava.GuavaDfsTopOrder;
 import com.kobayami.graphity.benchmarks.guava.GuavaEdgeTypes;
 import com.kobayami.graphity.benchmarks.guava.GuavaGraphs;
 import com.kobayami.graphity.benchmarks.guava.GuavaTarjanScc;
+import com.kobayami.graphity.benchmarks.guava.GuavaTopOrderAndLevels;
+import com.kobayami.graphity.benchmarks.guava.GuavaUnionFindWcc;
 import com.kobayami.graphity.benchmarks.jgrapht.JGraphTBackEdges;
 import com.kobayami.graphity.benchmarks.jgrapht.JGraphTEdgeTypes;
 import com.kobayami.graphity.benchmarks.jgrapht.JGraphTGraphs;
+import com.kobayami.graphity.benchmarks.jgrapht.JGraphTTopOrderAndLevels;
 import com.kobayami.graphity.benchmarks.webgraph.WebGraphBackEdges;
 import com.kobayami.graphity.benchmarks.webgraph.WebGraphDfsTopOrder;
 import com.kobayami.graphity.benchmarks.webgraph.WebGraphEdgeTypes;
 import com.kobayami.graphity.benchmarks.webgraph.WebGraphGraphs;
+import com.kobayami.graphity.benchmarks.webgraph.WebGraphTopOrderAndLevels;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.longs.Long2ByteMap;
@@ -35,10 +39,12 @@ import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import it.unimi.dsi.webgraph.ImmutableGraph;
 import it.unimi.dsi.webgraph.LazyIntIterator;
+import it.unimi.dsi.webgraph.algo.ConnectedComponents;
 import org.jgrapht.graph.DefaultEdge;
 import org.jgrapht.traverse.TopologicalOrderIterator;
 
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -137,12 +143,21 @@ public final class ValidateMain {
         // Pure structural transform; correctness of reindex + remapped is covered by the
         // NodeMapping/Graphs unit tests. Nothing to cross-validate here.
       }
+      case "biadjacency" -> {
+        // Pure structural transform. Its correctness is covered where it matters: the
+        // "toporderandlevels" case below runs Kahn over the bi-adjacent graph as well and
+        // requires the same levels as the uni-adjacent path.
+      }
+      case "symmetrize" -> {
+        // Same: a wrong symmetric closure would make WebGraph's components disagree with
+        // Graphity's under the "wcc" case, which is where the symmetrization is exercised.
+      }
       case "scc" -> validateScc(libraries, template, wgTmpRoot);
-      case "wcc" -> validateWcc(template);
+      case "wcc" -> validateWcc(libraries, template, wgTmpRoot);
       case "ccs" -> validateCcs(template);
       case "condense" -> validateCondense(template);
       case "toporder" -> validateTopOrder(libraries, template, wgTmpRoot);
-      case "toporderandlevels" -> validateTopOrderAndLevels(template);
+      case "toporderandlevels" -> validateTopOrderAndLevels(libraries, template, wgTmpRoot);
       case "backedges" -> validateBackEdges(libraries, template, wgTmpRoot);
       case "edgetypes" -> validateEdgeTypes(libraries, template, wgTmpRoot);
       default -> fail("unsupported algorithm: " + algorithm);
@@ -174,12 +189,66 @@ public final class ValidateMain {
     ensureAllEqual("scc", canonicalByLib);
   }
 
-  private static void validateWcc(com.kobayami.graphity.Graph template) {
-    NodePartition w = Components.wccsOf(template);
-    String canonical = canonicalPartition(mappingFromNodePartition(w, template.nodeCount()));
-    if (canonical.isBlank()) {
-      fail("wcc validation produced empty canonical partition");
+  /**
+   * Cross-validates the weakly connected components of every requested library. The three
+   * implementations are Union-Find, JGraphT's {@code ConnectivityInspector} and a breadth-first
+   * visit over the symmetric closure — a shared wrong answer would take three independent errors
+   * pointing the same way.
+   *
+   * <p>Group IDs are not comparable across libraries (WebGraph numbers by visit round, Graphity
+   * by order of discovery), so each partition is canonicalised into sorted member lists first.
+   */
+  private static void validateWcc(List<String> libraries, com.kobayami.graphity.Graph template, Path wgTmpRoot) throws Exception {
+    Map<String, String> canonicalByLib = new HashMap<>();
+    for (String lib : libraries) {
+      switch (lib) {
+        case "graphity" -> recordWcc(canonicalByLib, lib, template,
+            mappingFromNodePartition(Components.wccsOf(template), template.nodeCount()));
+        case "jgrapht" -> {
+          var g = JGraphTGraphs.fromGraphity(template);
+          var sets = new org.jgrapht.alg.connectivity.ConnectivityInspector<>(g).connectedSets();
+          recordWcc(canonicalByLib, lib, template, mappingFromSetPartition(sets, template.nodeCount()));
+        }
+        case "guava" -> {
+          Graph<Integer> g = GuavaGraphs.fromGraphity(template);
+          Map<Integer, Integer> m = new GuavaUnionFindWcc(g).compute();
+          recordWcc(canonicalByLib, lib, template, mappingFromMap(m, template.nodeCount()));
+        }
+        case "webgraph" -> {
+          ImmutableGraph symmetric =
+              WebGraphGraphs.symmetrized(WebGraphGraphs.fromGraphity(template, wgTmpRoot), wgTmpRoot);
+          recordWcc(canonicalByLib, lib, template, ConnectedComponents.compute(symmetric, 1, null).component);
+        }
+        default -> fail("unsupported library for wcc validation: " + lib);
+      }
     }
+    ensureAllEqual("wcc", canonicalByLib);
+  }
+
+  /**
+   * Checks one library's WCC mapping against the graph's edges, then keeps it for the
+   * cross-comparison. A case that lists a single library still gets this check.
+   */
+  private static void recordWcc(
+      Map<String, String> canonicalByLib,
+      String label,
+      com.kobayami.graphity.Graph graph,
+      int[] mapping) {
+    int n = graph.nodeCount();
+    if (mapping.length != n) {
+      fail("wcc[" + label + "] returned " + mapping.length + " group IDs for " + n + " nodes");
+    }
+    for (int source = 0; source < n; source++) {
+      SortedIntView outs = graph.outNodes(source);
+      for (int i = 0; i < outs.size(); i++) {
+        int target = outs.getInt(i);
+        if (mapping[source] != mapping[target]) {
+          fail("wcc[" + label + "] puts the adjacent nodes " + source + " and " + target
+              + " into different groups");
+        }
+      }
+    }
+    canonicalByLib.put(label, canonicalPartition(mapping));
   }
 
   private static void validateCcs(com.kobayami.graphity.Graph template) {
@@ -234,14 +303,89 @@ public final class ValidateMain {
     }
   }
 
-  private static void validateTopOrderAndLevels(com.kobayami.graphity.Graph template) {
-    TopOrderAndLevels tol = TopOrderAndLevels.of(template);
-    int[] order = tol.order().toIntArray();
-    if (!isValidTopOrder(template, order)) {
-      fail("invalid toporderandlevels.order");
+  /**
+   * Cross-validates Kahn's algorithm over every requested library, plus Graphity's bi-adjacent
+   * path against its uni-adjacent one.
+   *
+   * <p>The topological order is not unique, so identical orders cannot be required — each one is
+   * only checked against the edges of the graph. The level assignment
+   * {@code level(v) = max(level(predecessors)) + 1} is a function of the graph alone, which makes
+   * the level vectors the sharp condition here.
+   */
+  private static void validateTopOrderAndLevels(List<String> libraries, com.kobayami.graphity.Graph template, Path wgTmpRoot) throws Exception {
+    Map<String, int[]> levelsByLib = new LinkedHashMap<>();
+    for (String lib : libraries) {
+      switch (lib) {
+        case "graphity" -> {
+          TopOrderAndLevels uni = TopOrderAndLevels.of(template);
+          recordLevels(levelsByLib, lib, template, uni.order().toIntArray(), uni.levels().toIntArray());
+          // The bi-adjacent branch reads in-degrees from the in-adjacency offsets instead of
+          // scanning all edges. It is a second code path and its own report column, so it is
+          // checked rather than assumed.
+          TopOrderAndLevels bi = TopOrderAndLevels.of(template.biAdjacentGraph());
+          recordLevels(levelsByLib, lib + "/bi-adjacent", template, bi.order().toIntArray(), bi.levels().toIntArray());
+        }
+        case "jgrapht" -> {
+          JGraphTTopOrderAndLevels r = JGraphTTopOrderAndLevels.of(JGraphTGraphs.fromGraphity(template));
+          recordLevels(levelsByLib, lib, template, r.order(), r.levels());
+        }
+        case "guava" -> {
+          GuavaTopOrderAndLevels r = GuavaTopOrderAndLevels.of(GuavaGraphs.fromGraphity(template));
+          recordLevels(levelsByLib, lib, template, r.order(), r.levels());
+        }
+        case "webgraph" -> {
+          WebGraphTopOrderAndLevels r =
+              WebGraphTopOrderAndLevels.of(WebGraphGraphs.fromGraphity(template, wgTmpRoot));
+          recordLevels(levelsByLib, lib, template, r.order(), r.levels());
+        }
+        default -> fail("unsupported library for toporderandlevels validation: " + lib);
+      }
     }
-    if (tol.levelCount() < 0) {
-      fail("invalid toporderandlevels.levelCount");
+    ensureAllLevelsEqual(levelsByLib);
+  }
+
+  /** Checks one library's Kahn result on its own, then keeps its levels for the cross-comparison. */
+  private static void recordLevels(
+      Map<String, int[]> levelsByLib,
+      String label,
+      com.kobayami.graphity.Graph graph,
+      int[] order,
+      int[] levels) {
+    if (!isValidTopOrder(graph, order)) {
+      fail("invalid toporderandlevels.order for lib=" + label);
+    }
+    if (levels.length != graph.nodeCount()) {
+      fail("toporderandlevels[" + label + "] returned " + levels.length
+          + " levels for " + graph.nodeCount() + " nodes");
+    }
+    int n = graph.nodeCount();
+    for (int source = 0; source < n; source++) {
+      SortedIntView outs = graph.outNodes(source);
+      for (int i = 0; i < outs.size(); i++) {
+        int target = outs.getInt(i);
+        if (levels[target] <= levels[source]) {
+          fail("toporderandlevels[" + label + "] has level " + levels[target] + " for " + target
+              + " but level " + levels[source] + " for its predecessor " + source);
+        }
+      }
+    }
+    levelsByLib.put(label, levels);
+  }
+
+  private static void ensureAllLevelsEqual(Map<String, int[]> levelsByLib) {
+    String referenceLabel = null;
+    int[] reference = null;
+    for (Map.Entry<String, int[]> e : levelsByLib.entrySet()) {
+      if (reference == null) {
+        referenceLabel = e.getKey();
+        reference = e.getValue();
+        continue;
+      }
+      int at = Arrays.mismatch(reference, e.getValue());
+      if (at >= 0) {
+        fail("toporderandlevels level mismatch between " + referenceLabel + " and " + e.getKey()
+            + " at node " + at);
+      }
     }
   }
 

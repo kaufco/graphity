@@ -53,8 +53,9 @@ Both carry the same chapters:
 - **§3 Allocations** — bytes allocated per algorithm invocation (synthetic only)
 
 Percentages and factors are relative to the newest Graphity version in both views. Peer
-columns and reordered columns state the version whose run they come from, because a peer is
-not re-measured for every Graphity release.
+columns and the Graphity variant columns — `(reordered)` and `(bi-adjacent)` — state the
+version whose run they come from, because a peer is not re-measured for every Graphity
+release.
 
 ## What is in `versions/`
 

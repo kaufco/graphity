@@ -3,10 +3,10 @@
 
 Each invocation writes two files per ``(kind, machine)`` found in the source directory:
 
-* ``<kind>-<machine>-peers.md`` — the newest measured Graphity version, plus its DFS-preorder
-  reordered variant, against JGraphT, Guava and WebGraph.
-* ``<kind>-<machine>-history.md`` — every measured Graphity version, each with its own
-  reordered column where one was measured, without peer libraries.
+* ``<kind>-<machine>-peers.md`` — the newest measured Graphity version, plus its variants on a
+  DFS-preorder reordered and on a bi-adjacent graph, against JGraphT, Guava and WebGraph.
+* ``<kind>-<machine>-history.md`` — every measured Graphity version, each with its own variant
+  columns where they were measured, without peer libraries.
 
 Both carry the chapters their source files have: performance (times in ms/op and throughput
 in op/s), memory footprint and allocations, each normalised to the newest Graphity version
@@ -70,14 +70,19 @@ VARIANT_SUFFIX_RE = re.compile(r"\s*—\s*(?P<variant>.+)$")
 ALGO_ORDER = (
     "Build", "SCC", "WCC", "CCs", "Condense", "TopOrder", "TopOrderAndLevels",
     "BackEdges", "EdgeTypes", "Reorder (DFS-preorder) cost",
+    "BiAdjacency (in-adjacency) cost", "Symmetrize (WebGraph) cost",
 )
 
 MISSING = {"—", "-", ""}
 META_HEADERS = ("Nodes", "Edges", "Edges/Node")
-LIB_HEADERS = ("Graphity", "Graphity (reordered)", "JGraphT", "Guava", "WebGraph")
-# Columns taken from the newest version that measured them, in output order. The reordered
-# variant belongs here because it is measured per run, not per release.
-PEER_LIBS = ("Graphity (reordered)", "JGraphT", "Guava", "WebGraph")
+# Graphity variants: the same algorithm on a different graph representation, each its own column
+# next to the plain one. The suffix is what the version reports append to "Graphity <version>".
+GRAPHITY_VARIANTS = ("Graphity (reordered)", "Graphity (bi-adjacent)")
+VARIANT_LABELS = tuple(v.removeprefix("Graphity") for v in GRAPHITY_VARIANTS)
+LIB_HEADERS = ("Graphity", *GRAPHITY_VARIANTS, "JGraphT", "Guava", "WebGraph")
+# Columns taken from the newest version that measured them, in output order. The variants belong
+# here because they are measured per run, not per release.
+PEER_LIBS = (*GRAPHITY_VARIANTS, "JGraphT", "Guava", "WebGraph")
 
 SERIES_COLORS = {
     "JGraphT": "#16a34a",
@@ -91,8 +96,9 @@ GRAPHITY_COLORS = [
     "#ea580c",
     "#4f46e5",
 ]
-# The history view shows one reordered column per version, so a single teal would make those
-# bars indistinguishable. The first entry is the colour the peer view has always used.
+# The history view shows one column per version and variant, so a single colour per variant would
+# make those bars indistinguishable. One ramp per variant, and within it one entry per version;
+# the first entry of the reordered ramp is the colour the peer view has always used.
 REORDERED_COLORS = [
     "#0d9488",
     "#db2777",
@@ -100,8 +106,19 @@ REORDERED_COLORS = [
     "#7c3aed",
     "#0369a1",
 ]
+BIADJACENT_COLORS = [
+    "#be123c",
+    "#047857",
+    "#92400e",
+    "#155e75",
+    "#374151",
+]
+VARIANT_COLORS = {
+    " (reordered)": REORDERED_COLORS,
+    " (bi-adjacent)": BIADJACENT_COLORS,
+}
 GRAPHITY_LABEL_RE = re.compile(
-    r"^Graphity \d+(?:\.\d+)*(?P<reordered> \(reordered\))?$"
+    r"^Graphity \d+(?:\.\d+)*(?P<variant> \((?:reordered|bi-adjacent)\))?$"
 )
 
 
@@ -603,6 +620,36 @@ class RowFrame:
     key_column: str = "Shape"
 
 
+def _table_has_source(section: SectionTable, source: str) -> bool:
+    if source not in section.lib_columns:
+        return False
+    return any(row.values.get(source) is not None for row in section.rows)
+
+
+def visible_sections(
+    view: View, sections_by_version: dict[str, list[SectionTable]]
+) -> dict[str, list[SectionTable]]:
+    """Drops the sections a view cannot show, before section numbers are assigned.
+
+    The history view has Graphity columns only, so a section that no Graphity column covers —
+    the WebGraph symmetrization cost is the first such section in the suite — would come out as
+    a heading and a Contents entry with no table under them. Filtering has to happen before
+    numbering, or the remaining sections would be numbered with gaps.
+    """
+    if view is View.PEERS:
+        return sections_by_version
+    sources = ("Graphity", *GRAPHITY_VARIANTS)
+    return {
+        version: [s for s in sections if any(_table_has_source(s, src) for src in sources)]
+        for version, sections in sections_by_version.items()
+    }
+
+
+def _variant_suffix(source: str) -> str:
+    """``' (reordered)'`` for a Graphity variant source, empty for plain Graphity or a peer."""
+    return source.removeprefix("Graphity") if source in GRAPHITY_VARIANTS else ""
+
+
 def _section_has_data(
     sections: list[SectionTable], sid: SectionId, source: str
 ) -> bool:
@@ -621,13 +668,12 @@ def plan_columns(
     """Decide which version supplies which column of one section, in output order."""
     if view is View.HISTORY:
         columns = [Column(ref.label, ref.version, "Graphity") for ref in reports]
-        columns += [
-            Column(f"{ref.label} (reordered)", ref.version, "Graphity (reordered)")
-            for ref in reports
-            if _section_has_data(
-                sections_by_version.get(ref.version, []), sid, "Graphity (reordered)"
-            )
-        ]
+        for source in GRAPHITY_VARIANTS:
+            columns += [
+                Column(f"{ref.label}{_variant_suffix(source)}", ref.version, source)
+                for ref in reports
+                if _section_has_data(sections_by_version.get(ref.version, []), sid, source)
+            ]
         return columns
 
     # Peer view: one Graphity column plus one column per peer, each from the newest version
@@ -638,8 +684,8 @@ def plan_columns(
             if not _section_has_data(sections_by_version.get(ref.version, []), sid, source):
                 continue
             label = (
-                ref.label if source == "Graphity"
-                else f"{ref.label} (reordered)" if source == "Graphity (reordered)"
+                f"{ref.label}{_variant_suffix(source)}"
+                if source == "Graphity" or source in GRAPHITY_VARIANTS
                 else source
             )
             columns.append(Column(label, ref.version, source))
@@ -767,17 +813,19 @@ def _fmt_dataset_cell(dataset: str) -> str:
 
 
 def assign_series_colors(labels: list[str]) -> dict[str, str]:
-    """Map series labels to colours: Graphity versions, reordered variants, then peers."""
+    """Map series labels to colours: Graphity versions, their variants, then peers."""
     colors: dict[str, str] = {}
     plain = 0
-    reordered = 0
+    variants: dict[str, int] = {}
     for label in labels:
         match = GRAPHITY_LABEL_RE.match(label)
         if match is None:
             colors[label] = SERIES_COLORS.get(label, "#64748b")
-        elif match.group("reordered"):
-            colors[label] = REORDERED_COLORS[reordered % len(REORDERED_COLORS)]
-            reordered += 1
+        elif suffix := match.group("variant"):
+            ramp = VARIANT_COLORS[suffix]
+            seen = variants.get(suffix, 0)
+            colors[label] = ramp[seen % len(ramp)]
+            variants[suffix] = seen + 1
         else:
             colors[label] = GRAPHITY_COLORS[plain % len(GRAPHITY_COLORS)]
             plain += 1
@@ -1019,9 +1067,10 @@ def section_fig_slug(title: str) -> str:
 
 
 def _col_header(label: str) -> str:
-    """Format a column header: insert <br> before '(reordered)' to reduce column width."""
-    if " (reordered)" in label:
-        return label.replace(" (reordered)", "<br>(reordered)")
+    """Format a column header: break before a variant suffix to reduce column width."""
+    for suffix in VARIANT_LABELS:
+        if suffix in label:
+            return label.replace(suffix, f"<br>{suffix.lstrip()}")
     return label
 
 
@@ -1215,7 +1264,10 @@ def _build_bytes_section(
         lines.append("| " + shape_cell + " | " + " | ".join(cells) + " |")
     lines.append("")
 
-    graphity_cols = [c for c in all_column_labels if c.startswith("Graphity ") and "(reordered)" not in c]
+    graphity_cols = [
+        c for c in all_column_labels
+        if c.startswith("Graphity ") and not any(s in c for s in VARIANT_LABELS)
+    ]
 
     if dual_charts:
         # Chart A: Graphity versions + WebGraph
@@ -1352,8 +1404,12 @@ def build_combined_for_machine(
         times_mem[ref.version] = parse_bytes_chapter(text, 2)
         times_alloc[ref.version] = parse_bytes_chapter(text, 3)
 
-    has_mem = any(times_mem.values())
-    has_alloc = any(times_alloc.values())
+    visible_perf = visible_sections(view, times_perf)
+    visible_mem = visible_sections(view, times_mem)
+    visible_alloc = visible_sections(view, times_alloc)
+
+    has_mem = any(visible_mem.values())
+    has_alloc = any(visible_alloc.values())
 
     baseline_label = newest.label
     # A benchmark the newest version did not measure falls back to the newest one that did,
@@ -1363,9 +1419,9 @@ def build_combined_for_machine(
     )
 
     # Group perf sections by algorithm, renumbered from the union of all versions
-    perf_groups = build_section_groups(times_perf, 1)
-    mem_groups = build_section_groups({v: s for v, s in times_mem.items() if s}, 2)
-    alloc_groups = build_section_groups({v: s for v, s in times_alloc.items() if s}, 3)
+    perf_groups = build_section_groups(visible_perf, 1)
+    mem_groups = build_section_groups({v: s for v, s in visible_mem.items() if s}, 2)
+    alloc_groups = build_section_groups({v: s for v, s in visible_alloc.items() if s}, 3)
 
     # Build shape → edges lookup from memory data (for subscripts in perf tables)
     shape_edges_lookup: dict[tuple[str, int], int] = {}

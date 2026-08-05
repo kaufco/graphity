@@ -69,7 +69,7 @@ The runner is a single script with a three-step workflow — **clean → run →
 ./run-benchmarks.sh report                        # merges all of the above into one report
 ```
 
-Supported libraries: `graphity`, `graphity-reordered`, `jgrapht`, `guava`, `webgraph`, or `all`. The value matches library tokens exactly, so `graphity` runs the plain-Graphity cases (and, in the dataset profiles, the `reorder`-cost case) but **not** the reordered variant — pass `graphity-reordered` for the `Graphity (reordered)` column. `all` runs everything in one go.
+Supported libraries: `graphity`, `graphity-reordered`, `graphity-biadjacent`, `jgrapht`, `guava`, `webgraph`, or `all`. The value matches library tokens exactly, so `graphity` runs the plain-Graphity cases (and, in the dataset profiles, the structure-cost cases) but **not** the variants — pass `graphity-reordered` or `graphity-biadjacent` for the `Graphity (reordered)` and `Graphity (bi-adjacent)` columns. `all` runs everything in one go.
 
 ## Built-in profiles
 
@@ -158,13 +158,13 @@ Dataset paths support `~` expansion and `${ENV}` variables; relative paths resol
 
 | Field        | Values                                                                                            |
 |--------------|---------------------------------------------------------------------------------------------------|
-| `libraries`  | `graphity`, `graphity-reordered`, `jgrapht`, `guava`, `webgraph`                                   |
-| `algorithms` | `build`, `scc`, `wcc`, `ccs`, `condense`, `toporder`, `toporderandlevels`, `backedges`, `edgetypes`, `reorder` |
+| `libraries`  | `graphity`, `graphity-reordered`, `graphity-biadjacent`, `jgrapht`, `guava`, `webgraph`             |
+| `algorithms` | `build`, `scc`, `wcc`, `ccs`, `condense`, `toporder`, `toporderandlevels`, `backedges`, `edgetypes`, `reorder`, `biadjacency`, `symmetrize` |
 | `shape`      | see [Shapes](#shapes) below                                                                        |
 
-Algorithm coverage is asymmetric: only `graphity` (and its `graphity-reordered` variant) implements `wcc`, `ccs` and `toporderandlevels` natively; `reorder` and `condense` are `graphity`-only. `graphity-reordered` supports the traversal algorithms but not `build`. The matrix validator rejects unsupported library / algorithm pairings before any run starts.
+Algorithm coverage is asymmetric: `ccs` has no peer implementation, `condense`, `reorder` and `biadjacency` are `graphity`-only, `symmetrize` is `webgraph`-only, and `graphity-biadjacent` exists for `toporderandlevels` alone — it is the only algorithm whose result changes with in-adjacency. `graphity-reordered` supports the traversal algorithms but not `build`. The matrix validator rejects unsupported library / algorithm pairings before any run starts.
 
-See [Reordering](#reordering-graphity-reordered-and-reorder) for what `graphity-reordered` and `reorder` mean.
+See [Reordering](#reordering-graphity-reordered-and-reorder) and [In-adjacency](#in-adjacency-graphity-biadjacent-and-biadjacency) for what the pseudo-libraries and the structure-cost algorithms mean.
 
 ### Shapes
 
@@ -208,6 +208,15 @@ Graphity can permute node IDs into DFS-preorder (`Graphs.remapped(graph, NodeMap
 
 Reordering is a no-op on already ID-local shapes (`PATH`, `TREE`, `CHAIN_OF_CLIQUES`) and helps most on `GNP_*` and `*_SHUFFLED`. All shipped profiles run the reordered/`reorder` cases on the same shapes as their plain counterparts, so the `Graphity (reordered)` column is never partially empty. (The `big` profile used to restrict them to `GNP_SPARSE` and `GNP_DENSE_SHUFFLED` to save runtime, which left visible gaps in the report charts from 10⁶ nodes up.)
 
+## In-adjacency (`graphity-biadjacent` and `biadjacency`)
+
+`graph.biAdjacentGraph()` adds incoming adjacency to a graph that stores outgoing edges only, doubling its footprint. One algorithm in the suite reads it: `TopOrderAndLevels.of` takes in-degrees straight from the in-adjacency offsets in O(nodeCount), where a uni-adjacent graph leaves it scanning every edge in O(nodeCount + edgeCount). The suite measures both halves of that trade, in the same shape as reordering:
+
+- **`graphity-biadjacent`** is a *pseudo-library*: the identical `TopOrderAndLevels.of` call on a bi-adjacent graph, shown as a **`Graphity (bi-adjacent)`** column beside `Graphity`. The conversion happens in trial setup and is not part of the measured time.
+- **`biadjacency`** is a `graphity`-only algorithm timing `graph.biAdjacentGraph()` itself, in its own subsection next to the `reorder` cost. Building the in-adjacency is O(nodeCount + edgeCount) — the same order the algorithm saves — so the column and the cost together answer the only interesting question: after how many runs the structure pays for itself.
+
+The peer side of the same trade is **`symmetrize`**, a `webgraph`-only algorithm. WebGraph's `ConnectedComponents` requires a symmetric graph, which a `BVGraph` storing out-adjacency cannot provide, so the `wcc` column for WebGraph runs on a symmetric closure built once per trial with `Transform.symmetrizeOffline` and re-stored as a `BVGraph`. `symmetrize` prices that closure. Graphity needs nothing of the sort for components: `Components.wccsOf` is Union-Find over the out-edges.
+
 ## Datasets
 
 Real-world inputs are loaded from a normalised text edge-list — one edge per line, whitespace-separated source / target IDs, `#`-prefixed comments. IDs are remapped to `0..n-1` internally. Isolated nodes that have no edges cannot be represented in this format.
@@ -234,9 +243,9 @@ cd graphity-benchmarks
 ./run-benchmarks.sh report
 ```
 
-The `realworld` profile runs `scc`, `backedges` and `edgetypes` across all libraries on all five datasets, plus the `Graphity (reordered)` column and the `reorder` cost (see [Reordering](#reordering-graphity-reordered-and-reorder)) — so the reordering payoff can be read directly on irregular real inputs, where node IDs are typically not ID-local. `realworld-quick` runs the same cases restricted to `web-Google` only, as a fast smoke test. In the aggregated report the real-world results form their own chapter, with one row per dataset (instead of per shape). The run writes to `measurements/report-realworld-*.md` (times) and is promoted to `reports/versions/` by `report`.
+The `realworld` profile runs `scc`, `backedges`, `edgetypes` and `wcc` across all libraries on all five datasets, plus the `Graphity (reordered)` column and the `reorder` cost (see [Reordering](#reordering-graphity-reordered-and-reorder)) — so the reordering payoff can be read directly on irregular real inputs, where node IDs are typically not ID-local. `toporderandlevels` runs on `cit-Patents` alone, the only acyclic dataset of the five, and there with the `Graphity (bi-adjacent)` column as well; the `biadjacency` and `symmetrize` costs are measured beside them (see [In-adjacency](#in-adjacency-graphity-biadjacent-and-biadjacency)). `realworld-quick` rehearses every one of those cases on one dataset each — `web-Google` for the general ones, `cit-Patents` for levelling — as a fast smoke test. In the aggregated report the real-world results form their own chapter, with one row per dataset (instead of per shape). The run writes to `measurements/report-realworld-*.md` (times) and is promoted to `reports/versions/` by `report`.
 
-The shipped dataset profiles intentionally exclude `toporder` and `toporderandlevels` — public SNAP graphs are typically not acyclic after normalization, so DAG-only algorithms cannot be measured on them without further preprocessing. This applies to all five datasets, including the two citation networks (`cit-Patents`, `cit-HepPh`), which are close to a DAG by construction (papers/patents only cite earlier ones) but are not guaranteed acyclic after ID normalization — they are still run with `dag: false` and excluded from the DAG-only algorithms.
+`toporder` is not run on datasets at all, and `toporderandlevels` only on `cit-Patents`: public SNAP graphs are typically not acyclic after normalization, and the matrix validator checks `dataset.dag` against `Graphs.isDag` before a run starts. `cit-HepPh` is a citation network too, and close to a DAG by construction (papers only cite earlier ones), but it does contain cycles after ID normalization — it runs with `dag: false` and is excluded from the DAG-only algorithms.
 
 #### Peer stack sizes on large graphs (`jvm_stack` / `jvm_heap`)
 
@@ -260,7 +269,7 @@ There are two levels of output: the **scratch** `measurements/` directory (gitig
 `synthetic`/`realworld` runs land in `graphity-benchmarks/measurements/` as one file per matrix case: `<phase>-<profile>@<case>__<algorithm>__<libraries>.json` (and one `mem-<profile>@<libraries>.csv` per `mem` run) — no timestamp in these filenames; see [Resuming after a crash or interruption](#resuming-after-a-crash-or-interruption) below for why. `report` reads all of a profile's case files and turns them into a times Markdown report, `report-<profile>-<ts>.md` — this one *is* timestamped, with the time `report` itself was run. The times report contains:
 
 - an environment header (host, kernel, JVM, CPU, RAM, JMH parameters)
-- a performance section per algorithm — rows are graph shapes, columns are libraries (with a separate `Graphity (reordered)` column when the matrix runs `graphity-reordered`)
+- a performance section per algorithm — rows are graph shapes, columns are libraries (with a separate `Graphity (reordered)` or `Graphity (bi-adjacent)` column when the matrix runs those pseudo-libraries)
 - a separate real-world chapter for dataset runs, with one row per dataset instead of per shape
 - a memory-footprint section in *bytes per (node + edge)*
 - an allocation section in bytes per call
@@ -294,8 +303,8 @@ Caveat: the filename also encodes the library filter actually used for that invo
 
 It then immediately regenerates two summary reports per machine and kind, each with per-subsection **Times (ms/op)** and **Throughput (op/s)** tables plus bar-chart SVGs, and — for synthetic runs — memory and allocation chapters:
 
-- `reports/summary/<kind>-<machine>-peers.md` — the newest measured Graphity version, plus its reordered variant, against JGraphT, Guava and WebGraph
-- `reports/summary/<kind>-<machine>-history.md` — every measured Graphity version, each with its own reordered column where one was measured, without peers
+- `reports/summary/<kind>-<machine>-peers.md` — the newest measured Graphity version, plus its reordered and bi-adjacent variants, against JGraphT, Guava and WebGraph
+- `reports/summary/<kind>-<machine>-history.md` — every measured Graphity version, each with its own variant columns where they were measured, without peers
 - `reports/summary/fig/<kind>-<machine>-peers/` and `…-history/` — chart SVGs linked from the respective Markdown
 
 Both views come out of a single generator pass over the same source files, so they can never disagree. Splitting them keeps the peer comparison at a constant width: a new version only widens the history view.
@@ -304,7 +313,7 @@ Previous versions' data is never lost: the history view is generated from all `<
 
 Sections are matched across versions by **algorithm name and node count**, never by the section number. The numbers in a per-version report are a running index over the algorithms that had data in that run, so they shift as soon as an algorithm is added or missing — `Condense` entered the matrix after 2.0.0 and pushed `TopOrder` from 1.5 to 1.6, for example. Both summary views assign their own numbering from the union of all versions, in the canonical algorithm order, which is why an algorithm measured in only some versions shows up exactly once, with empty columns for the versions that lack it.
 
-Peer columns and the reordered column come from the newest version that measured them, which need not be the newest version overall: a release benchmarked without peers would otherwise drop them from the report. Every column states the version it belongs to, and in the peer view the same rule applies to the Graphity column itself, so a section the newest run skipped is still shown, labelled with the version whose numbers it holds.
+Peer columns and the variant columns come from the newest version that measured them, which need not be the newest version overall: a release benchmarked without peers would otherwise drop them from the report. Every column states the version it belongs to, and in the peer view the same rule applies to the Graphity column itself, so a section the newest run skipped is still shown, labelled with the version whose numbers it holds.
 
 Only `reports/` is committed; `measurements/` is scratch and gitignored.
 

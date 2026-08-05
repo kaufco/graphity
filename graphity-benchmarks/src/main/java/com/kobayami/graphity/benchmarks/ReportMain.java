@@ -67,26 +67,32 @@ public final class ReportMain {
       Map.entry("TopOrderAndLevels", "TopOrderAndLevels"),
       Map.entry("BackEdges", "BackEdges"),
       Map.entry("EdgeTypes", "EdgeTypes"),
-      Map.entry("Reorder", "Reorder (DFS-preorder) cost"));
+      Map.entry("Reorder", "Reorder (DFS-preorder) cost"),
+      Map.entry("BiAdjacency", "BiAdjacency (in-adjacency) cost"),
+      Map.entry("Symmetrize", "Symmetrize (WebGraph) cost"));
 
   /**
-   * Fixed algorithm order for the performance / allocation sub-chapters. {@code Reorder} — the
-   * one-time cost of {@code NodeMapping.reindex} plus {@code Graphs.remapped} — is deliberately
-   * last, as the closing subsection of chapter 1.
+   * Fixed algorithm order for the performance / allocation sub-chapters. The three structure
+   * costs come last, as the closing subsections of chapter 1: {@code Reorder} for
+   * {@code NodeMapping.reindex} plus {@code Graphs.remapped}, {@code BiAdjacency} for
+   * {@code Graph.biAdjacentGraph}, {@code Symmetrize} for WebGraph's symmetric closure. Each is
+   * an up-front price paid once for the variant column it belongs to.
    */
   private static final List<String> ALGO_ORDER = List.of(
       "Build", "Scc", "Wcc", "Ccs", "Condense", "TopOrder", "TopOrderAndLevels",
-      "BackEdges", "EdgeTypes", "Reorder");
+      "BackEdges", "EdgeTypes", "Reorder", "BiAdjacency", "Symmetrize");
 
   /**
-   * Libraries in the preferred display order. Graphity is the baseline; its DFS-preorder
-   * reordered variant sits immediately after it so the reordered speedup reads left-to-right.
+   * Libraries in the preferred display order. Graphity is the baseline; its two variants — the
+   * DFS-preorder reordered graph and the bi-adjacent one — sit immediately after it so their
+   * effect reads left-to-right against the plain column.
    */
   private static final List<String> LIB_ORDER =
-      List.of("graphity", "graphity-reordered", "jgrapht", "guava", "webgraph");
+      List.of("graphity", "graphity-reordered", "graphity-biadjacent", "jgrapht", "guava", "webgraph");
   private static final Map<String, String> LIB_DISPLAY = Map.of(
       "graphity", "Graphity",
       "graphity-reordered", "Graphity (reordered)",
+      "graphity-biadjacent", "Graphity (bi-adjacent)",
       "jgrapht", "JGraphT",
       "guava", "Guava",
       "webgraph", "WebGraph");
@@ -711,12 +717,17 @@ public final class ReportMain {
     if (library.equals("webgraph") && stem.startsWith("WebGraph")) stem = stem.substring("WebGraph".length());
     if (stem.endsWith("Benchmark")) stem = stem.substring(0, stem.length() - "Benchmark".length());
 
-    // Graphity's *Reordered benchmarks (e.g. SccReorderedBenchmark) run the same algorithm on
-    // a DFS-preorder reordered graph: fold them into the base algorithm key but tag them as the
-    // "graphity-reordered" pseudo-library so they render as a separate column.
+    // Graphity's variant benchmarks run the same algorithm on a transformed graph — a
+    // DFS-preorder reordered one (*ReorderedBenchmark) or a bi-adjacent one
+    // (*BiAdjacentBenchmark). Fold them into the base algorithm key but tag them as their own
+    // pseudo-library so they render as separate columns. "BiAdjacencyBenchmark" — the cost of
+    // building the in-adjacency — is not one of them: its stem ends in "BiAdjacency".
     if (library.equals("graphity") && stem.endsWith("Reordered")) {
       library = "graphity-reordered";
       stem = stem.substring(0, stem.length() - "Reordered".length());
+    } else if (library.equals("graphity") && stem.endsWith("BiAdjacent")) {
+      library = "graphity-biadjacent";
+      stem = stem.substring(0, stem.length() - "BiAdjacent".length());
     }
     return new Meta(library, stem);
   }

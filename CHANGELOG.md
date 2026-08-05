@@ -111,6 +111,23 @@ Graphity adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   directed, which left the spelled-out direction in `isOutTree` as the only exception; putting an
   undirected tree check beside it made that visible at the call site.
 
+- **Peer comparisons for weakly connected components and topological levelling.** The two
+  algorithms that had a Graphity column and nothing beside it now run against JGraphT, Guava and
+  WebGraph in the synthetic and real-world profiles: components through JGraphT's
+  `ConnectivityInspector`, a Guava Union-Find port and WebGraph's own `ConnectedComponents`;
+  levelling through one Kahn port per library that computes the order *and* the levels, so all
+  four do the same work. Every port is cross-validated against the others — components by
+  comparing the canonical partitions, levelling by comparing the level vectors — before a number
+  is measured.
+
+- **`Graphity (bi-adjacent)` report column, plus the price of the structures behind such a
+  column.** `TopOrderAndLevels` also runs on `graph.biAdjacentGraph()`, where it reads in-degrees
+  in O(nodeCount) instead of scanning every edge; until now no benchmark ever handed it a
+  bi-adjacent graph. Two new one-time-cost sections say what the structures cost:
+  `BiAdjacency (in-adjacency) cost` for `graph.biAdjacentGraph()`, and
+  `Symmetrize (WebGraph) cost` for the symmetric `BVGraph` that WebGraph's connected components
+  require and a graph storing out-adjacency only cannot provide.
+
 ### Deprecated
 
 - **`Graphs.isOutTree(graph)`** — use `Graphs.isTree(graph)`, which answers identically in every

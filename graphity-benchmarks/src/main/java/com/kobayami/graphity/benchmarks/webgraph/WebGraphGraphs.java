@@ -4,6 +4,7 @@ import com.kobayami.graphity.SortedIntView;
 import it.unimi.dsi.webgraph.ArrayListMutableGraph;
 import it.unimi.dsi.webgraph.BVGraph;
 import it.unimi.dsi.webgraph.ImmutableGraph;
+import it.unimi.dsi.webgraph.Transform;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -38,6 +39,13 @@ import java.util.stream.Stream;
  */
 public final class WebGraphGraphs {
 
+  /**
+   * Arcs per batch during offline symmetrization. WebGraph allocates two {@code int[]} of this
+   * size, so 4 M arcs cost 32 MB of scratch space and keep the batch count in the low hundreds
+   * even for the largest dataset measured here.
+   */
+  private static final int SYMMETRIZE_BATCH_SIZE = 4 * 1024 * 1024;
+
   private WebGraphGraphs() {}
 
   /**
@@ -68,6 +76,39 @@ public final class WebGraphGraphs {
       }
     } catch (IOException e) {
       throw new UncheckedBuildException("failed to build BVGraph", e);
+    }
+  }
+
+  /**
+   * Builds the symmetric closure of {@code g} as a {@link BVGraph} — the input WebGraph's
+   * {@link it.unimi.dsi.webgraph.algo.ConnectedComponents} requires and cannot derive itself.
+   *
+   * <p>A BVGraph stores out-adjacency only, so the symmetrization has to materialize the
+   * transpose. {@link Transform#symmetrizeOffline(ImmutableGraph, int, java.io.File)} does that
+   * through external batches rather than in RAM, which is what makes the operation survive the
+   * larger datasets. The result is then stored and re-loaded, exactly as
+   * {@link #fromGraphity(com.kobayami.graphity.Graph, Path)} does for the plain graph: a union
+   * view over a graph and its transpose would decode two bitstreams per successor list and is
+   * not a representation a WebGraph user would keep.
+   *
+   * @param g the graph to symmetrize
+   * @param tmpRoot workspace for the batch files and the stored graph; both are deleted before
+   *     this method returns
+   */
+  public static ImmutableGraph symmetrized(ImmutableGraph g, Path tmpRoot) {
+    try {
+      Path dir = Files.createTempDirectory(tmpRoot, "sym-");
+      try {
+        ImmutableGraph symmetric =
+            Transform.symmetrizeOffline(g, SYMMETRIZE_BATCH_SIZE, dir.toFile());
+        String basename = dir.resolve("s").toString();
+        BVGraph.store(symmetric, basename);
+        return BVGraph.load(basename);
+      } finally {
+        deleteTree(dir);
+      }
+    } catch (IOException e) {
+      throw new UncheckedBuildException("failed to symmetrize BVGraph", e);
     }
   }
 

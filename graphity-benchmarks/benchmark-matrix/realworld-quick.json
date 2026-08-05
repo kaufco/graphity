@@ -1,6 +1,6 @@
 {
   "name": "realworld-quick",
-  "description": "Quick dataset smoke profile (real-world edge lists from ../datasets). Includes the DFS-preorder reordered variant ('Graphity (reordered)' column) plus its one-time reorder cost. Perf-only.",
+  "description": "Quick dataset smoke profile (real-world edge lists from ../datasets). Includes the DFS-preorder reordered variant ('Graphity (reordered)' column) plus its one-time reorder cost, and rehearses every case of the full 'realworld' profile on one dataset each: web-Google for the general algorithms and weakly connected components, cit-Patents for topological levelling, which needs an acyclic graph. Perf-only.",
   "jmh": {
     "forks": 0,
     "warmup_iterations": 1,
@@ -35,9 +35,57 @@
       }
     },
     {
+      "name": "snap-wcc",
+      "libraries": ["graphity", "jgrapht", "guava", "webgraph"],
+      "algorithms": ["wcc"],
+      "phases": ["perf"],
+      "dataset": {
+        "dag": false,
+        "files": [
+          "../datasets/snap/web-Google.txt"
+        ]
+      }
+    },
+    {
+      "name": "snap-toporder-levels",
+      "libraries": ["graphity", "graphity-biadjacent", "jgrapht", "guava", "webgraph"],
+      "algorithms": ["toporderandlevels"],
+      "phases": ["perf"],
+      "dataset": {
+        "dag": true,
+        "files": [
+          "../datasets/snap/cit-Patents.txt"
+        ]
+      }
+    },
+    {
       "name": "reorder-cost",
       "libraries": ["graphity"],
       "algorithms": ["reorder"],
+      "phases": ["perf"],
+      "dataset": {
+        "dag": false,
+        "files": [
+          "../datasets/snap/web-Google.txt"
+        ]
+      }
+    },
+    {
+      "name": "biadjacency-cost",
+      "libraries": ["graphity"],
+      "algorithms": ["biadjacency"],
+      "phases": ["perf"],
+      "dataset": {
+        "dag": false,
+        "files": [
+          "../datasets/snap/web-Google.txt"
+        ]
+      }
+    },
+    {
+      "name": "symmetrize-cost",
+      "libraries": ["webgraph"],
+      "algorithms": ["symmetrize"],
       "phases": ["perf"],
       "dataset": {
         "dag": false,
