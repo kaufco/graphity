@@ -1,27 +1,26 @@
 #!/usr/bin/env python3
-"""Generate combined baseline reports from versioned ``<version>-<machine>.md`` source files.
+"""Generate the summary benchmark reports from versioned ``<version>-<kind>-<machine>.md`` files.
 
-Each invocation regenerates one combined ``<machine>.md`` per machine found in the
-source directory.  Each performance section in the combined file contains:
+Each invocation writes two files per ``(kind, machine)`` found in the source directory:
 
-1. **Times table** (ms/op) — raw values for all versions + libraries
-2. **Ops table** (op/s) — converted from times, normalised to newest Graphity = 100%
-3. **Bar chart** SVG linked from Markdown
+* ``<kind>-<machine>-peers.md`` — the newest measured Graphity version, plus its DFS-preorder
+  reordered variant, against JGraphT, Guava and WebGraph.
+* ``<kind>-<machine>-history.md`` — every measured Graphity version, each with its own
+  reordered column where one was measured, without peer libraries.
 
-If source files contain chapter 2 (Memory) and/or chapter 3 (Allocations) they are
-appended as additional chapters, also normalised to newest Graphity = 100%.
+Both carry the chapters their source files have: performance (times in ms/op and throughput
+in op/s), memory footprint and allocations, each normalised to the newest Graphity version
+and illustrated by bar-chart SVGs under ``fig/<kind>-<machine>-<view>/``.
 
 Conversion: ``op/s = 1000 / ms``.
 
 Usage::
 
-    # synthetic (default): reads baselines/synthetic/, writes baselines/synthetic/<machine>.md
+    # both views for every (kind, machine) under reports/versions/
     python3 times-to-ops.py
 
-    # real-world: reads baselines/realworld/, writes baselines/realworld/<machine>.md
-    python3 times-to-ops.py \\
-        --source-dir baselines/realworld \\
-        --output-dir baselines/realworld
+    # explicit directories
+    python3 times-to-ops.py --source-dir reports/versions --output-dir reports/summary
 
     # single-file conversion (for ad-hoc use)
     python3 times-to-ops.py --single IN.md OUT.md
@@ -36,6 +35,7 @@ import re
 import sys
 from collections import defaultdict
 from dataclasses import dataclass, field
+from enum import Enum
 from pathlib import Path
 
 MS_CELL = re.compile(
@@ -75,11 +75,11 @@ ALGO_ORDER = (
 MISSING = {"—", "-", ""}
 META_HEADERS = ("Nodes", "Edges", "Edges/Node")
 LIB_HEADERS = ("Graphity", "Graphity (reordered)", "JGraphT", "Guava", "WebGraph")
-# Peer libraries shown from the newest version that has peer data.
+# Columns taken from the newest version that measured them, in output order. The reordered
+# variant belongs here because it is measured per run, not per release.
 PEER_LIBS = ("Graphity (reordered)", "JGraphT", "Guava", "WebGraph")
 
 SERIES_COLORS = {
-    "Graphity (reordered)": "#0d9488",
     "JGraphT": "#16a34a",
     "Guava": "#ca8a04",
     "WebGraph": "#9333ea",
@@ -91,6 +91,25 @@ GRAPHITY_COLORS = [
     "#ea580c",
     "#4f46e5",
 ]
+# The history view shows one reordered column per version, so a single teal would make those
+# bars indistinguishable. The first entry is the colour the peer view has always used.
+REORDERED_COLORS = [
+    "#0d9488",
+    "#db2777",
+    "#65a30d",
+    "#7c3aed",
+    "#0369a1",
+]
+GRAPHITY_LABEL_RE = re.compile(
+    r"^Graphity \d+(?:\.\d+)*(?P<reordered> \(reordered\))?$"
+)
+
+
+class View(Enum):
+    """One of the two summary files written per ``(kind, machine)``."""
+
+    PEERS = "peers"
+    HISTORY = "history"
 
 
 # ---------------------------------------------------------------------------
@@ -556,6 +575,139 @@ def find_section(
 
 
 # ---------------------------------------------------------------------------
+# Column plans
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Column:
+    """One output column: its heading, the version report it comes from, and the column there."""
+
+    label: str
+    version: str
+    source: str
+
+    @property
+    def is_version(self) -> bool:
+        return self.source == "Graphity"
+
+
+@dataclass
+class RowFrame:
+    """The row axis of one section: the union of the rows of all contributing versions."""
+
+    keys: list[str] = field(default_factory=list)
+    shapes: list[str] = field(default_factory=list)
+    metas: list[dict[str, str]] = field(default_factory=list)
+    meta_columns: list[str] = field(default_factory=list)
+    key_column: str = "Shape"
+
+
+def _section_has_data(
+    sections: list[SectionTable], sid: SectionId, source: str
+) -> bool:
+    section = find_section(sections, sid)
+    if section is None or source not in section.lib_columns:
+        return False
+    return any(row.values.get(source) is not None for row in section.rows)
+
+
+def plan_columns(
+    view: View,
+    reports: list[ReportRef],
+    sections_by_version: dict[str, list[SectionTable]],
+    sid: SectionId,
+) -> list[Column]:
+    """Decide which version supplies which column of one section, in output order."""
+    if view is View.HISTORY:
+        columns = [Column(ref.label, ref.version, "Graphity") for ref in reports]
+        columns += [
+            Column(f"{ref.label} (reordered)", ref.version, "Graphity (reordered)")
+            for ref in reports
+            if _section_has_data(
+                sections_by_version.get(ref.version, []), sid, "Graphity (reordered)"
+            )
+        ]
+        return columns
+
+    # Peer view: one Graphity column plus one column per peer, each from the newest version
+    # that measured it. A release benchmarked without peers must not empty their columns.
+    columns = []
+    for source in ("Graphity", *PEER_LIBS):
+        for ref in reversed(reports):
+            if not _section_has_data(sections_by_version.get(ref.version, []), sid, source):
+                continue
+            label = (
+                ref.label if source == "Graphity"
+                else f"{ref.label} (reordered)" if source == "Graphity (reordered)"
+                else source
+            )
+            columns.append(Column(label, ref.version, source))
+            break
+    return columns
+
+
+def collect_rows(
+    columns: list[Column],
+    reports: list[ReportRef],
+    sections_by_version: dict[str, list[SectionTable]],
+    sid: SectionId,
+) -> RowFrame:
+    """Union the rows of every version that contributes a column, oldest version first."""
+    contributing = {column.version for column in columns}
+    frame = RowFrame()
+    for ref in reports:
+        if ref.version not in contributing:
+            continue
+        section = find_section(sections_by_version.get(ref.version, []), sid)
+        if section is None:
+            continue
+        frame.key_column = section.key_column
+        if not frame.meta_columns:
+            frame.meta_columns = section.meta_columns
+        for row in section.rows:
+            if row.key in frame.keys:
+                continue
+            frame.keys.append(row.key)
+            frame.shapes.append(row.shape)
+            frame.metas.append(row.meta)
+    return frame
+
+
+def build_matrix(
+    columns: list[Column],
+    sections_by_version: dict[str, list[SectionTable]],
+    sid: SectionId,
+    keys: list[str],
+) -> dict[str, list[float | None]]:
+    matrix: dict[str, list[float | None]] = {}
+    for column in columns:
+        section = find_section(sections_by_version.get(column.version, []), sid)
+        by_key = (
+            {} if section is None
+            else {row.key: row.values.get(column.source) for row in section.rows}
+        )
+        matrix[column.label] = [by_key.get(key) for key in keys]
+    return matrix
+
+
+def baseline_label_of(
+    columns: list[Column], matrix: dict[str, list[float | None]]
+) -> str:
+    """The newest Graphity column with data - the reference for all factors and percentages.
+
+    A benchmark that only older releases measured leaves the newest version's column empty.
+    Falling back to the newest version that measured the section keeps the factors, the
+    percentages and the chart of that section referring to the same column.
+    """
+    versions = [column.label for column in columns if column.is_version]
+    for label in reversed(versions):
+        if any(value is not None for value in matrix.get(label, [])):
+            return label
+    return versions[-1] if versions else ""
+
+
+# ---------------------------------------------------------------------------
 # Section-title helpers
 # ---------------------------------------------------------------------------
 
@@ -614,19 +766,22 @@ def _fmt_dataset_cell(dataset: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def graphity_color(index: int) -> str:
-    return GRAPHITY_COLORS[index % len(GRAPHITY_COLORS)]
-
-
-def series_color(label: str, graphity_labels: list[str]) -> str:
-    # Strip version from reordered label for color lookup
-    if "(reordered)" in label:
-        return SERIES_COLORS["Graphity (reordered)"]
-    if label in SERIES_COLORS:
-        return SERIES_COLORS[label]
-    if label in graphity_labels:
-        return graphity_color(graphity_labels.index(label))
-    return "#64748b"
+def assign_series_colors(labels: list[str]) -> dict[str, str]:
+    """Map series labels to colours: Graphity versions, reordered variants, then peers."""
+    colors: dict[str, str] = {}
+    plain = 0
+    reordered = 0
+    for label in labels:
+        match = GRAPHITY_LABEL_RE.match(label)
+        if match is None:
+            colors[label] = SERIES_COLORS.get(label, "#64748b")
+        elif match.group("reordered"):
+            colors[label] = REORDERED_COLORS[reordered % len(REORDERED_COLORS)]
+            reordered += 1
+        else:
+            colors[label] = GRAPHITY_COLORS[plain % len(GRAPHITY_COLORS)]
+            plain += 1
+    return colors
 
 
 def render_grouped_bar_svg(
@@ -698,11 +853,11 @@ def render_grouped_bar_svg(
         f'<rect x="0" y="0" width="{width}" height="{height}" fill="#ffffff"/>',
     ]
 
-    graphity_labels = [label for label, _ in series if label.startswith("Graphity ") and "(reordered)" not in label]
+    colors = assign_series_colors([label for label, _ in series])
 
     for i, (label, _) in enumerate(series):
         ly = (i + 1) * legend_row_h - 2
-        color = series_color(label, graphity_labels)
+        color = colors[label]
         parts.append(
             f'<rect x="{left}" y="{ly - 9}" width="12" height="12" rx="2" fill="{color}"/>'
         )
@@ -746,7 +901,7 @@ def render_grouped_bar_svg(
             pct = values[gi]
             if pct is None or pct <= 0:
                 continue
-            color = series_color(series_label, graphity_labels)
+            color = colors[series_label]
             bx = gx + si * (bar_w + bar_gap)
             by = y_of(pct)
             bh = y_floor - by
@@ -893,7 +1048,6 @@ def _build_perf_section(
     row_metas: list[dict[str, str]],
     meta_columns: list[str],
     baseline_label: str,
-    version_labels: list[str],
     machine: str,
     machine_fig_dir: Path,
     fig_slug_base: str,
@@ -953,22 +1107,12 @@ def _build_perf_section(
     lines.append("")
 
     # ── Chart ────────────────────────────────────────────────────────────────
-    # A benchmark that only exists in older releases has no data in the newest
-    # version, which would leave the whole chart empty. Normalise against the
-    # newest version that does have data so every Throughput table keeps a chart.
-    chart_baseline = baseline_label
-    if not any(v is not None for v in ms_matrix.get(baseline_label, [])):
-        for col in reversed(all_column_labels):
-            if col in version_labels and any(v is not None for v in ms_matrix[col]):
-                chart_baseline = col
-                break
-
     chart_series: list[tuple[str, list[float | None]]] = []
     for col in all_column_labels:
         pcts: list[float | None] = []
         for i in range(n):
             ms = ms_matrix[col][i]
-            baseline_ms = ms_matrix[chart_baseline][i] if chart_baseline in ms_matrix else None
+            baseline_ms = ms_matrix[baseline_label][i] if baseline_label in ms_matrix else None
             if ms is None or ms <= 0 or baseline_ms is None or baseline_ms <= 0:
                 pcts.append(None)
             else:
@@ -976,8 +1120,10 @@ def _build_perf_section(
         if any(v is not None for v in pcts):
             chart_series.append((col, pcts))
 
-    if chart_series:
-        svg = render_grouped_bar_svg(chart_labels, chart_series, chart_baseline, log_scale=False)
+    # A chart whose only series is the baseline is a row of bars at 100%. The peer view has one
+    # such block per Graphity-only algorithm and per node count above the peers' reach.
+    if any(label != baseline_label for label, _ in chart_series):
+        svg = render_grouped_bar_svg(chart_labels, chart_series, baseline_label, log_scale=False)
         if svg:
             fig_name = f"{section_fig_slug(fig_slug_base)}.svg"
             (machine_fig_dir / fig_name).write_text(svg, encoding="utf-8")
@@ -1158,10 +1304,9 @@ def _emit_bytes_chart(
         if any(p is not None for p in pcts):
             series.append((col, pcts))
 
-    if not series:
+    if not any(label != baseline_label for label, _ in series):
         return
 
-    graphity_labels = [label for label, _ in series if label.startswith("Graphity ") and "(reordered)" not in label]
     svg = render_grouped_bar_svg(chart_labels, series, baseline_label, log_scale=log_scale)
     if not svg:
         return
@@ -1180,11 +1325,12 @@ def build_combined_for_machine(
     machine: str,
     reports: list[ReportRef],
     output_dir: Path,
+    view: View,
 ) -> str:
     reports = sorted(reports, key=lambda r: r.version_key)
     newest = reports[-1]
 
-    fig_slug = f"{kind}-{machine}"
+    fig_slug = f"{kind}-{machine}-{view.value}"
     fig_dir = output_dir / "fig"
     machine_fig_dir = fig_dir / fig_slug
     if machine_fig_dir.exists():
@@ -1209,9 +1355,12 @@ def build_combined_for_machine(
     has_mem = any(times_mem.values())
     has_alloc = any(times_alloc.values())
 
-    # Column labels and baseline
-    version_labels = [r.label for r in reports]
     baseline_label = newest.label
+    # A benchmark the newest version did not measure falls back to the newest one that did,
+    # so the chapter intros cannot name a single baseline for every table.
+    baseline_note = (
+        f"**{baseline_label}**, or the newest version present in a table it is missing from"
+    )
 
     # Group perf sections by algorithm, renumbered from the union of all versions
     perf_groups = build_section_groups(times_perf, 1)
@@ -1235,12 +1384,28 @@ def build_combined_for_machine(
             shape_edges_per_node[shape] = edges / nodes
 
     # Build intro
-    intro_lines: list[str] = [
-        f"# Graphity Benchmark Comparison — {kind} / {machine}",
-        "",
-        "Benchmarked versions: " + ", ".join(f"`{r.version}`" for r in reports),
-        "",
-    ]
+    if view is View.PEERS:
+        intro_lines: list[str] = [
+            f"# Graphity vs. JGraphT, Guava and WebGraph — {kind} / {machine}",
+            "",
+            f"Graphity `{newest.version}` against the peer libraries. Peer numbers come from the "
+            f"newest run that measured them, which need not be the run of the newest Graphity "
+            f"version; every column states the version it belongs to. Blocks without a peer column "
+            f"are Graphity-only benchmarks or graph sizes beyond the peers' reach — for the "
+            f"comparison across Graphity versions see "
+            f"[`{kind}-{machine}-{View.HISTORY.value}.md`]({kind}-{machine}-{View.HISTORY.value}.md).",
+            "",
+        ]
+    else:
+        intro_lines = [
+            f"# Graphity Version History — {kind} / {machine}",
+            "",
+            "Benchmarked versions: " + ", ".join(f"`{r.version}`" for r in reports)
+            + ". Peer libraries are left out on purpose: they are re-measured per run, so a "
+            "moving peer column would say nothing about Graphity. For the comparison against "
+            f"them see [`{kind}-{machine}-{View.PEERS.value}.md`]({kind}-{machine}-{View.PEERS.value}.md).",
+            "",
+        ]
     if header:
         intro_lines += ["```", header, "```", ""]
 
@@ -1268,7 +1433,7 @@ def build_combined_for_machine(
     lines.append(
         f"Times (ms/op, lower is better) and throughput (op/s, higher is better) "
         f"for each algorithm and graph size. Non-baseline cells show the factor "
-        f"relative to **{baseline_label}** (= 100% in the throughput table)."
+        f"relative to {baseline_note} (= 100% in the throughput table)."
     )
     lines.append("")
 
@@ -1277,79 +1442,28 @@ def build_combined_for_machine(
         lines.append("")
 
         for sid, title in group.entries:
-            row_keys_ordered: list[str] = []
-            row_key_to_shape: dict[str, str] = {}
-            row_key_to_meta: dict[str, dict[str, str]] = {}
-            meta_columns_set: list[str] = []
-            key_column = "Shape"
-
-            for ref in reports:
-                sec = find_section(times_perf[ref.version], sid)
-                if sec is not None:
-                    key_column = sec.key_column
-                    if not meta_columns_set:
-                        meta_columns_set = sec.meta_columns
-                    for row in sec.rows:
-                        if row.key not in row_key_to_shape:
-                            row_keys_ordered.append(row.key)
-                            row_key_to_shape[row.key] = row.shape
-                            row_key_to_meta[row.key] = row.meta
-
-            if not row_keys_ordered:
+            columns = plan_columns(view, reports, times_perf, sid)
+            frame = collect_rows(columns, reports, times_perf, sid)
+            if not frame.keys:
                 continue
 
-            row_shapes = [row_key_to_shape[k] for k in row_keys_ordered]
-            row_metas = [row_key_to_meta[k] for k in row_keys_ordered]
-            n = len(row_keys_ordered)
+            ms_matrix = build_matrix(columns, times_perf, sid, frame.keys)
 
-            ms_matrix: dict[str, list[float | None]] = {}
-            for ref in reports:
-                sec = find_section(times_perf[ref.version], sid)
-                ms_matrix[ref.label] = (
-                    [None] * n if sec is None
-                    else [{row.key: row.values.get("Graphity") for row in sec.rows}.get(k) for k in row_keys_ordered]
-                )
-
-            section_reordered_label: str | None = None
-            for ref in reversed(reports):
-                sec = find_section(times_perf[ref.version], sid)
-                if sec is not None and "Graphity (reordered)" in sec.lib_columns:
-                    section_reordered_label = f"Graphity {ref.version} (reordered)"
-                    by_key_r = {row.key: row.values.get("Graphity (reordered)") for row in sec.rows}
-                    ms_matrix[section_reordered_label] = [by_key_r.get(k) for k in row_keys_ordered]
-                    break
-
-            for peer in ("JGraphT", "Guava", "WebGraph"):
-                for ref in reversed(reports):
-                    sec = find_section(times_perf[ref.version], sid)
-                    if sec is not None and peer in sec.lib_columns:
-                        by_key_p = {row.key: row.values.get(peer) for row in sec.rows}
-                        ms_matrix[peer] = [by_key_p.get(k) for k in row_keys_ordered]
-                        break
-
-            all_column_labels: list[str] = list(version_labels)
-            if section_reordered_label is not None:
-                all_column_labels.append(section_reordered_label)
-            for peer in ("JGraphT", "Guava", "WebGraph"):
-                if peer in ms_matrix:
-                    all_column_labels.append(peer)
-
-            if key_column == "Dataset":
-                chart_labels = list(row_shapes)  # keep dataset names as-is
+            if frame.key_column == "Dataset":
+                chart_labels = list(frame.shapes)  # keep dataset names as-is
             else:
-                chart_labels = [fmt_shape(row_key_to_shape[k]) for k in row_keys_ordered]
+                chart_labels = [fmt_shape(shape) for shape in frame.shapes]
 
             _build_perf_section(
                 lines,
-                key_column=key_column,
-                all_column_labels=all_column_labels,
+                key_column=frame.key_column,
+                all_column_labels=[column.label for column in columns],
                 ms_matrix=ms_matrix,
                 chart_labels=chart_labels,
-                row_shapes=row_shapes,
-                row_metas=row_metas,
-                meta_columns=meta_columns_set,
-                baseline_label=baseline_label,
-                version_labels=version_labels,
+                row_shapes=frame.shapes,
+                row_metas=frame.metas,
+                meta_columns=frame.meta_columns,
+                baseline_label=baseline_label_of(columns, ms_matrix),
                 machine=fig_slug,
                 machine_fig_dir=machine_fig_dir,
                 fig_slug_base=title,
@@ -1362,10 +1476,13 @@ def build_combined_for_machine(
     if has_mem:
         lines.append("## 2 Memory Footprint")
         lines.append("")
+        chart_note = (
+            " Two charts per section: *Graphity & WebGraph* (same league) and *All libraries*."
+            if view is View.PEERS else ""
+        )
         lines.append(
             f"Retained heap in bytes for a fully built graph. Lower is better. "
-            f"Baseline: **{baseline_label}** = 100%. "
-            f"Two charts per section: *Graphity & WebGraph* (same league) and *All libraries*."
+            f"Baseline (= 100%): {baseline_note}.{chart_note}"
         )
         lines.append("")
 
@@ -1375,13 +1492,13 @@ def build_combined_for_machine(
                     lines,
                     sid=sid,
                     title=title,
+                    view=view,
                     reports=reports,
-                    newest=newest,
                     sections_by_version=times_mem,
                     machine=fig_slug,
                     machine_fig_dir=machine_fig_dir,
                     table_title="Memory footprint in bytes (lower is better)",
-                    dual_charts=True,
+                    dual_charts=view is View.PEERS,
                 )
 
     # ── Chapter 3: Allocations ───────────────────────────────────────────────
@@ -1390,7 +1507,7 @@ def build_combined_for_machine(
         lines.append("")
         lines.append(
             f"Bytes allocated per algorithm invocation (JMH `-prof gc`). "
-            f"Lower is better. Baseline: **{baseline_label}** = 100%."
+            f"Lower is better. Baseline (= 100%): {baseline_note}."
         )
         lines.append("")
 
@@ -1403,8 +1520,8 @@ def build_combined_for_machine(
                     lines,
                     sid=sid,
                     title=title,
+                    view=view,
                     reports=reports,
-                    newest=newest,
                     sections_by_version=times_alloc,
                     machine=fig_slug,
                     machine_fig_dir=machine_fig_dir,
@@ -1424,8 +1541,8 @@ def _append_bytes_comparison_section(
     *,
     sid: SectionId,
     title: str,
+    view: View,
     reports: list[ReportRef],
-    newest: ReportRef,
     sections_by_version: dict[str, list[SectionTable]],
     machine: str,
     machine_fig_dir: Path,
@@ -1436,73 +1553,18 @@ def _append_bytes_comparison_section(
     shape_edges_lookup: dict[tuple[str, int], int] | None = None,
     shape_edges_per_node: dict[str, float] | None = None,
 ) -> None:
-    """Emit one bytes (memory/alloc) subsection with all versions as columns."""
-    row_keys_ordered: list[str] = []
-    row_key_to_shape: dict[str, str] = {}
-    row_key_to_meta: dict[str, dict[str, str]] = {}
-    meta_columns_set: list[str] = []
-    key_column = "Shape"
-
-    for ref in reports:
-        sec = find_section(sections_by_version.get(ref.version, []), sid)
-        if sec is not None:
-            key_column = sec.key_column
-            if not meta_columns_set:
-                meta_columns_set = sec.meta_columns
-            for row in sec.rows:
-                if row.key not in row_key_to_shape:
-                    row_keys_ordered.append(row.key)
-                    row_key_to_shape[row.key] = row.shape
-                    row_key_to_meta[row.key] = row.meta
-
-    if not row_keys_ordered:
+    """Emit one bytes (memory/alloc) subsection with the columns the view asks for."""
+    columns = plan_columns(view, reports, sections_by_version, sid)
+    frame = collect_rows(columns, reports, sections_by_version, sid)
+    if not frame.keys:
         return
 
-    n = len(row_keys_ordered)
-    row_shapes = [row_key_to_shape[k] for k in row_keys_ordered]
-    row_metas = [row_key_to_meta[k] for k in row_keys_ordered]
-
-    # Build bytes_matrix: {col_label: [value_per_row]}
-    # Column layout: Graphity versions, then peers
-    bytes_matrix: dict[str, list[float | None]] = {}
-    all_column_labels: list[str] = []
-
-    # Per-version Graphity columns
-    for ref in reports:
-        col_label = ref.label
-        sec = find_section(sections_by_version.get(ref.version, []), sid)
-        if sec is None or "Graphity" not in sec.lib_columns:
-            bytes_matrix[col_label] = [None] * n
-        else:
-            by_key = {row.key: row.values.get("Graphity") for row in sec.rows}
-            bytes_matrix[col_label] = [by_key.get(k) for k in row_keys_ordered]
-        all_column_labels.append(col_label)
-
-    # Peer columns from newest version with data
-    newest_with_data = newest
-    for ref in reversed(reports):
-        if find_section(sections_by_version.get(ref.version, []), sid) is not None:
-            newest_with_data = ref
-            break
-
-    peer_sec = find_section(sections_by_version.get(newest_with_data.version, []), sid)
-    for peer in ("Graphity (reordered)", "JGraphT", "Guava", "WebGraph"):
-        if peer_sec is not None and peer in peer_sec.lib_columns:
-            display = (
-                f"Graphity {newest_with_data.version} (reordered)"
-                if peer == "Graphity (reordered)"
-                else peer
-            )
-            by_key_p = {row.key: row.values.get(peer) for row in peer_sec.rows}
-            bytes_matrix[display] = [by_key_p.get(k) for k in row_keys_ordered]
-            all_column_labels.append(display)
-
-    baseline_label = newest.label
+    bytes_matrix = build_matrix(columns, sections_by_version, sid, frame.keys)
 
     chart_labels = []
-    for k in row_keys_ordered:
-        shape_fmt = fmt_shape(row_key_to_shape[k])
-        nodes_str = row_key_to_meta[k].get("Nodes", "").replace(" ", "")
+    for shape, meta in zip(frame.shapes, frame.metas):
+        shape_fmt = fmt_shape(shape)
+        nodes_str = meta.get("Nodes", "").replace(" ", "")
         if nodes_str.isdigit():
             chart_labels.append(f"{shape_fmt} {fmt_count(int(nodes_str))}")
         else:
@@ -1511,14 +1573,14 @@ def _append_bytes_comparison_section(
     _build_bytes_section(
         lines,
         title=title,
-        key_column=key_column,
-        all_column_labels=all_column_labels,
+        key_column=frame.key_column,
+        all_column_labels=[column.label for column in columns],
         bytes_matrix=bytes_matrix,
         chart_labels=chart_labels,
-        row_shapes=row_shapes,
-        row_metas=row_metas,
-        meta_columns=meta_columns_set,
-        baseline_label=baseline_label,
+        row_shapes=frame.shapes,
+        row_metas=frame.metas,
+        meta_columns=frame.meta_columns,
+        baseline_label=baseline_label_of(columns, bytes_matrix),
         machine=machine,
         machine_fig_dir=machine_fig_dir,
         table_title=table_title,
@@ -1556,16 +1618,18 @@ def generate_combined(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     for (kind, machine), refs in sorted(by_kind_machine.items()):
-        dst = output_dir / f"{kind}-{machine}.md"
-        dst.write_text(
-            build_combined_for_machine(kind, machine, refs, output_dir),
-            encoding="utf-8",
-        )
-        written.append(dst)
         versions = ", ".join(r.version for r in sorted(refs, key=lambda r: r.version_key))
-        fig_slug = f"{kind}-{machine}"
-        n_figs = len(list((output_dir / "fig" / fig_slug).glob("*.svg"))) if (output_dir / "fig" / fig_slug).exists() else 0
-        print(f"summary: {kind}-{machine}.md ← [{versions}] ({n_figs} figs)")
+        for view in View:
+            name = f"{kind}-{machine}-{view.value}"
+            dst = output_dir / f"{name}.md"
+            dst.write_text(
+                build_combined_for_machine(kind, machine, refs, output_dir, view),
+                encoding="utf-8",
+            )
+            written.append(dst)
+            fig_dir = output_dir / "fig" / name
+            n_figs = len(list(fig_dir.glob("*.svg"))) if fig_dir.exists() else 0
+            print(f"summary: {name}.md ← [{versions}] ({n_figs} figs)")
 
     return written
 
@@ -1595,8 +1659,8 @@ def main(argv: list[str] | None = None) -> int:
         "--output-dir",
         type=Path,
         default=default_output,
-        help="directory to write <kind>-<machine>.md summary files and fig/ "
-             f"(default: {default_output})",
+        help="directory to write the <kind>-<machine>-peers.md and -history.md summary files "
+             f"plus their fig/ subdirectories (default: {default_output})",
     )
     parser.add_argument(
         "--single",

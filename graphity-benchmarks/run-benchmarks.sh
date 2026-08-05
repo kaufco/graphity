@@ -1164,7 +1164,7 @@ cmd_report() {
   # Step 4 – regenerate summary reports (one call covers all kinds)
   if [[ $synth_promoted -eq 1 || $real_promoted -eq 1 ]] && \
      compgen -G "${REPORTS_DIR}/versions/"*.md >/dev/null 2>&1; then
-    banner "report — regenerating reports/summary/"
+    banner "report — regenerating reports/summary/ (peers and history view)"
     python3 "$OPS_SCRIPT" \
       --source-dir "${REPORTS_DIR}/versions" \
       --output-dir "${REPORTS_DIR}/summary"
@@ -1234,7 +1234,7 @@ Commands:
   synthetic <lib|all>            perf+alloc+mem on synthetic graphs (default profile: ${DEFAULT_SYNTHETIC_PROFILE}).
   realworld <lib|all>            perf on real-world SNAP datasets   (default profile: ${DEFAULT_REALWORLD_PROFILE}).
   report [version] [machine]     Merge JSON → promote to reports/versions/<version>-<kind>-<machine>.md →
-                                 regenerate reports/summary/<kind>-<machine>.md + chart SVGs.
+                                 regenerate reports/summary/<kind>-<machine>-{peers,history}.md + chart SVGs.
                                  Version defaults to the value in pom.xml (SNAPSHOT stripped).
                                  Machine is auto-derived from OS/CPU; override if needed.
 

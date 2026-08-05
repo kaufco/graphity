@@ -19,6 +19,9 @@ Thumbs.db
 # Benchmark raw measurements (gitignored scratch: JMH JSON, JOL CSV, intermediate MDs)
 graphity-benchmarks/measurements/
 
+# Bytecode cache of the report generator and its tests
+__pycache__/
+
 # Local benchmark datasets (downloaded, not versioned)
 graphity-benchmarks/datasets/*
 !graphity-benchmarks/datasets/README.md

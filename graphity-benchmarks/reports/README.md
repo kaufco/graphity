@@ -19,14 +19,15 @@ graphity-benchmarks/
 │   │   ├── 2.0.0-synthetic-macos-m5.md
 │   │   └── 2.0.0-realworld-ubuntu-ryzen-9950x.md
 │   │
-│   └── summary/               ← combined per-machine reports (THE files to look at)
-│       ├── synthetic-ubuntu-ryzen-9950x.md   ✓ open this one
-│       ├── synthetic-macos-m5.md           ✓ or this one
-│       ├── realworld-ubuntu-ryzen-9950x.md    ✓ or this one
+│   └── summary/               ← per-machine reports (THE files to look at)
+│       ├── synthetic-ubuntu-ryzen-9950x-peers.md     ✓ open this one
+│       ├── synthetic-ubuntu-ryzen-9950x-history.md   ✓ or this one
+│       ├── synthetic-macos-m5-peers.md
+│       ├── realworld-ubuntu-ryzen-9950x-peers.md
 │       └── fig/
-│           ├── synthetic-ubuntu-ryzen-9950x/
+│           ├── synthetic-ubuntu-ryzen-9950x-peers/
 │           │   └── *.svg
-│           └── realworld-ubuntu-ryzen-9950x/
+│           └── synthetic-ubuntu-ryzen-9950x-history/
 │               └── *.svg
 │
 ├── benchmark-matrix/          ← benchmark profile configs (JSON)
@@ -36,13 +37,24 @@ graphity-benchmarks/
 
 ## What to look at
 
-Open a file from **`reports/summary/`**. Each summary file combines all available
-Graphity versions and peer libraries for one machine into a single document:
+Open a file from **`reports/summary/`**. There are two per machine and kind, and they answer
+different questions:
+
+- **`<kind>-<machine>-peers.md`** — how the newest measured Graphity version compares to
+  JGraphT, Guava and WebGraph. Start here.
+- **`<kind>-<machine>-history.md`** — how the Graphity versions compare to each other, one
+  column per measured release. This is where a regression between two releases shows up.
+
+Both carry the same chapters:
 
 - **§1 Performance** — Times (ms/op, lower is better) and Throughput (op/s, higher is
   better) tables per algorithm × n-value, with bar-chart SVGs
 - **§2 Memory** — retained heap footprint in bytes (synthetic only)
 - **§3 Allocations** — bytes allocated per algorithm invocation (synthetic only)
+
+Percentages and factors are relative to the newest Graphity version in both views. Peer
+columns and reordered columns state the version whose run they come from, because a peer is
+not re-measured for every Graphity release.
 
 ## What is in `versions/`
 
@@ -54,8 +66,8 @@ File naming: `<version>-<kind>-<machine>.md`
 
 Their section numbers are a running index over the algorithms that had data in that
 run, so the same algorithm can carry different numbers in different files (`Condense`
-entered the matrix after 2.0.0 and pushed `TopOrder` from 1.5 to 1.6). `summary/`
-matches sections by algorithm and node count and assigns its own numbering, so the
+entered the matrix after 2.0.0 and pushed `TopOrder` from 1.5 to 1.6). Both summary views
+match sections by algorithm and node count and assign their own numbering, so the
 numbers in `versions/` are never authoritative.
 
 ## Adding new measurements
@@ -79,5 +91,12 @@ To regenerate `summary/` from existing `versions/` without new measurements:
 Or call the generator directly:
 
 ```bash
-python3 times-to-ops.py            # reads reports/versions/, writes reports/summary/
+python3 times-to-ops.py            # reads reports/versions/, writes both views to reports/summary/
+```
+
+Either way both views and both `fig/` directories are rewritten, so they cannot drift apart.
+After changing the generator, run its tests:
+
+```bash
+python3 test-times-to-ops.py
 ```

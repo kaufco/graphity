@@ -52,10 +52,10 @@ The runner is a single script with a three-step workflow — **clean → run →
 |                                | `datasets/` — loudly, and again in a closing "skipped phases" banner.                                |
 | `synthetic <lib\|all>`         | `perf`+`alloc`+`mem` on synthetic graphs (default profile: `full`)                                  |
 | `realworld <lib\|all>`         | `perf` on real-world SNAP datasets (default profile: `realworld`)                                   |
-| `report [version] [machine]`   | Merge JSON → times Markdown → promote to `reports/versions/` → regenerate summary report + chart SVGs.    |
+| `report [version] [machine]`   | Merge JSON → times Markdown → promote to `reports/versions/` → regenerate both summary views + chart SVGs. |
 |                                | Version defaults to the `pom.xml` value (SNAPSHOT suffix stripped); machine is auto-derived.        |
 
-`report` does not re-run benchmarks; it aggregates whatever JSON is present in `measurements/`. Because it merges per benchmark (newest run wins), running libraries separately and then calling `report` once produces a single combined report. `report` then copies the result into the versioned `reports/` archive and regenerates the per-machine combined Markdown with embedded Times and Ops tables and chart SVGs.
+`report` does not re-run benchmarks; it aggregates whatever JSON is present in `measurements/`. Because it merges per benchmark (newest run wins), running libraries separately and then calling `report` once produces a single merged report. `report` then copies the result into the versioned `reports/` archive and regenerates the two summary views per machine, with embedded Times and Ops tables and chart SVGs.
 
 ### Running one library at a time
 
@@ -292,15 +292,19 @@ Caveat: the filename also encodes the library filter actually used for that invo
 - synthetic runs → `reports/versions/<version>-synthetic-<machine>.md`
 - real-world runs → `reports/versions/<version>-realworld-<machine>.md`
 
-It then immediately regenerates the per-machine combined report:
+It then immediately regenerates two summary reports per machine and kind, each with per-subsection **Times (ms/op)** and **Throughput (op/s)** tables plus bar-chart SVGs, and — for synthetic runs — memory and allocation chapters:
 
-- `reports/summary/synthetic-<machine>.md` — comparison across all Graphity versions and peers, with per-subsection **Times (ms/op)** and **Throughput (op/s)** tables plus bar-chart SVGs; includes memory and allocation chapters
-- `reports/summary/realworld-<machine>.md` — same layout for real-world graphs (datasets as rows; performance only)
-- `reports/summary/fig/<kind>-<machine>/` — chart SVGs linked from the combined Markdown
+- `reports/summary/<kind>-<machine>-peers.md` — the newest measured Graphity version, plus its reordered variant, against JGraphT, Guava and WebGraph
+- `reports/summary/<kind>-<machine>-history.md` — every measured Graphity version, each with its own reordered column where one was measured, without peers
+- `reports/summary/fig/<kind>-<machine>-peers/` and `…-history/` — chart SVGs linked from the respective Markdown
 
-Previous versions' data is never lost: the combined report is generated from all `<version>-<machine>.md` source files present in the directory, so adding a new version just adds columns.
+Both views come out of a single generator pass over the same source files, so they can never disagree. Splitting them keeps the peer comparison at a constant width: a new version only widens the history view.
 
-Sections are matched across versions by **algorithm name and node count**, never by the section number. The numbers in a per-version report are a running index over the algorithms that had data in that run, so they shift as soon as an algorithm is added or missing — `Condense` entered the matrix after 2.0.0 and pushed `TopOrder` from 1.5 to 1.6, for example. The combined report assigns its own numbering from the union of all versions, in the canonical algorithm order, which is why an algorithm measured in only some versions shows up exactly once, with empty columns for the versions that lack it.
+Previous versions' data is never lost: the history view is generated from all `<version>-<kind>-<machine>.md` source files present in the directory, so adding a new version just adds columns. A section without peer data — a Graphity-only algorithm, or a node count beyond the peers' reach — stays in the peer view with a single Graphity column, so that view remains a complete report of the current version; its chart is omitted, because a lone bar at 100 % says nothing.
+
+Sections are matched across versions by **algorithm name and node count**, never by the section number. The numbers in a per-version report are a running index over the algorithms that had data in that run, so they shift as soon as an algorithm is added or missing — `Condense` entered the matrix after 2.0.0 and pushed `TopOrder` from 1.5 to 1.6, for example. Both summary views assign their own numbering from the union of all versions, in the canonical algorithm order, which is why an algorithm measured in only some versions shows up exactly once, with empty columns for the versions that lack it.
+
+Peer columns and the reordered column come from the newest version that measured them, which need not be the newest version overall: a release benchmarked without peers would otherwise drop them from the report. Every column states the version it belongs to, and in the peer view the same rule applies to the Graphity column itself, so a section the newest run skipped is still shown, labelled with the version whose numbers it holds.
 
 Only `reports/` is committed; `measurements/` is scratch and gitignored.
 

@@ -169,7 +169,7 @@ Measured on an AMD Ryzen 9 9950X with OpenJDK 25. The parenthesised factor is re
 
 #### Throughput @ 100k nodes (higher is better)
 
-![SCC at n = 100k](graphity-benchmarks/reports/summary/fig/synthetic-ubuntu-ryzen-9950x/1-2-2-scc-n-100-000.svg)
+![SCC at n = 100k](graphity-benchmarks/reports/summary/fig/synthetic-ubuntu-ryzen-9950x-peers/1-2-2-scc-n-100-000.svg)
 
 ### SCC on real-world graphs (SNAP datasets)
 
@@ -183,7 +183,7 @@ Measured on an AMD Ryzen 9 9950X with OpenJDK 25. The parenthesised factor is re
 
 #### Throughput (higher is better)
 
-![SCC on real-world graphs](graphity-benchmarks/reports/summary/fig/realworld-ubuntu-ryzen-9950x/1-1-scc-real-world-graphs.svg)
+![SCC on real-world graphs](graphity-benchmarks/reports/summary/fig/realworld-ubuntu-ryzen-9950x-peers/1-1-scc-real-world-graphs.svg)
 
 ### Memory — bytes per node + edge (lower is better)
 
@@ -195,8 +195,10 @@ Measured on an AMD Ryzen 9 9950X with OpenJDK 25. The parenthesised factor is re
 
 For full results — all algorithms (`Build`, `Sccs`, `Wccs`, `Ccs`, `TopOrder`, `TopOrderAndLevels`, `BackEdges`, `EdgeTypes`), graph sizes from 10k to 100M nodes, allocation counts, shuffled variants, and confidence-interval analysis — see the benchmark reports:
 
-- **Synthetic:** [`graphity-benchmarks/reports/summary/synthetic-ubuntu-ryzen-9950x.md`](graphity-benchmarks/reports/summary/synthetic-ubuntu-ryzen-9950x.md)
-- **Real-world (SNAP datasets):** [`graphity-benchmarks/reports/summary/realworld-ubuntu-ryzen-9950x.md`](graphity-benchmarks/reports/summary/realworld-ubuntu-ryzen-9950x.md)
+- **Synthetic:** [`graphity-benchmarks/reports/summary/synthetic-ubuntu-ryzen-9950x-peers.md`](graphity-benchmarks/reports/summary/synthetic-ubuntu-ryzen-9950x-peers.md)
+- **Real-world (SNAP datasets):** [`graphity-benchmarks/reports/summary/realworld-ubuntu-ryzen-9950x-peers.md`](graphity-benchmarks/reports/summary/realworld-ubuntu-ryzen-9950x-peers.md)
+
+How the numbers developed across Graphity releases is a separate report per machine, `…-history.md` next to the two above.
 
 ## Algorithms
 
@@ -231,8 +233,9 @@ For custom traversals, subclass `IterativeDfsTraverser` (or `BiAdjacentDfsTraver
 This README is the primary user-facing documentation. The API reference is a Javadoc site.
 
 - **API reference (Javadoc):** [kaufco.github.io/graphity](https://kaufco.github.io/graphity/). Tracks `main`; every release tag republishes it.
-- **Synthetic benchmark report:** [`graphity-benchmarks/reports/summary/synthetic-ubuntu-ryzen-9950x.md`](graphity-benchmarks/reports/summary/synthetic-ubuntu-ryzen-9950x.md) — per-shape, per-algorithm timings and throughput against JGraphT, Guava and WebGraph, plus memory and allocation chapters, with bar charts and a column per measured version.
-- **Real-world benchmark report:** [`graphity-benchmarks/reports/summary/realworld-ubuntu-ryzen-9950x.md`](graphity-benchmarks/reports/summary/realworld-ubuntu-ryzen-9950x.md) — SCC, BackEdges and EdgeTypes across five SNAP datasets up to 4.8M nodes.
+- **Synthetic benchmark report:** [`graphity-benchmarks/reports/summary/synthetic-ubuntu-ryzen-9950x-peers.md`](graphity-benchmarks/reports/summary/synthetic-ubuntu-ryzen-9950x-peers.md) — per-shape, per-algorithm timings and throughput against JGraphT, Guava and WebGraph, plus memory and allocation chapters, with bar charts.
+- **Real-world benchmark report:** [`graphity-benchmarks/reports/summary/realworld-ubuntu-ryzen-9950x-peers.md`](graphity-benchmarks/reports/summary/realworld-ubuntu-ryzen-9950x-peers.md) — SCC, BackEdges and EdgeTypes across five SNAP datasets up to 4.8M nodes.
+- **Version history:** [`graphity-benchmarks/reports/summary/synthetic-ubuntu-ryzen-9950x-history.md`](graphity-benchmarks/reports/summary/synthetic-ubuntu-ryzen-9950x-history.md) — the same measurements with one column per released version instead of the peer libraries.
 - **Changelog:** [CHANGELOG.md](CHANGELOG.md)
 
 ## Building, testing, and benchmarking from source
@@ -281,7 +284,7 @@ cd graphity-benchmarks
 ./run-benchmarks.sh report 2.1.0           # report as a specific version
 ```
 
-`synthetic` and `realworld` accept a library (`graphity`, `graphity-reordered`, `jgrapht`, `guava`, `webgraph`) or `all`. Each run writes JSON artifacts to `graphity-benchmarks/measurements/` (gitignored); `report` merges them, promotes to `reports/versions/<version>-<kind>-<machine>.md`, and regenerates the combined summary.
+`synthetic` and `realworld` accept a library (`graphity`, `graphity-reordered`, `jgrapht`, `guava`, `webgraph`) or `all`. Each run writes JSON artifacts to `graphity-benchmarks/measurements/` (gitignored); `report` merges them, promotes to `reports/versions/<version>-<kind>-<machine>.md`, and regenerates the summary views.
 
 **Profiles.** By default `synthetic` uses the `full` matrix (n = 10k and 100k, all libraries; hours-scale) and `realworld` uses `realworld`. Override with `--profile`:
 
@@ -300,7 +303,7 @@ cd graphity-benchmarks
 ./datasets/download-datasets.sh   # web-Google, wiki-Talk, soc-LiveJournal1, …
 ```
 
-**Reports.** Promoted results land in `reports/versions/` as `<version>-<kind>-<machine>.md` source files. The summary view (`reports/summary/<kind>-<machine>.md`) is regenerated automatically from all source files present — historical data from previous versions is never lost. Both reports and chart SVGs are committed to the repository.
+**Reports.** Promoted results land in `reports/versions/` as `<version>-<kind>-<machine>.md` source files. Two summary views are regenerated from all source files present: `reports/summary/<kind>-<machine>-peers.md` puts the newest measured version against the peer libraries, and `…-history.md` puts the measured versions against each other. Historical data from previous versions is never lost. Both reports and chart SVGs are committed to the repository.
 
 For JMH parameters, dataset support and the matrix schema, see [`graphity-benchmarks/README.md`](graphity-benchmarks/README.md).
 
