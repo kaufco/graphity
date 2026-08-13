@@ -142,10 +142,12 @@ for (int n = 0; n < source.nodeCount(); n++) {
 b.addPath(TopOrder.of(source));         // any IntList works
 ```
 
-Node IDs often come from somewhere else — block numbers in a control-flow graph, symbol IDs from a table — and then arrive in arbitrary order. Every edge-adding method has an `AndNodes` twin that creates what it references, so no caller has to track the highest ID:
+Node IDs often come from somewhere else — block numbers in a control-flow graph, symbol IDs from a table — and then arrive in arbitrary order, frequently as a flat list of pairs. Every edge-adding method has an `AndNodes` twin that creates what it references, so no caller has to track the highest ID:
 
 ```java
-b.addEdgeAndNodes(7, 3);                // 8 nodes now exist
+b.addEdgeAndNodes(7, 3);                     // 8 nodes now exist
+b.addEdgePairs(7, 5, 5, 3);                  // flat pair list: 7 -> 5, 5 -> 3
+b.addEdgePairsAndNodes(9, 7, 3, 9);          // 9 -> 7, 3 -> 9; 10 nodes now exist
 ```
 
 **Immutable graphs, safe to share across threads.** Once built, a `Graph` never changes. The same instance can be passed to multiple algorithms or threads without locking or defensive copying. Mutation happens exclusively through transformations (`subgraph`, `remap`, `condense`) that produce new graphs. The immutability is what makes the zero-copy result types and shared-graph parallelism safe by construction, not by convention.

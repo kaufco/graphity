@@ -1,18 +1,23 @@
 # Signs graphity-core and uploads it to Maven Central via the Central Publisher
 # Portal.
 #
-# Manual trigger only, deliberately not tied to the release tag: a tag may be
-# pushed for reasons that should not start a deploy, and re-running a deploy for
-# an already published version just produces a failed run.
+# Two triggers:
+#   * release.published — the regular way. Publishing a GitHub Release is the
+#     single act that starts a release; this workflow and deploy-javadoc.yml
+#     both hang off that one event. Only `published`, not `released`/`edited`:
+#     a later correction of the release notes must not start a second deploy.
+#   * workflow_dispatch — the fallback, for a release that already exists and
+#     for re-running a job that failed halfway.
 #
 # What the job does — and where it stops: it builds, tests, signs, uploads a
 # bundle and waits for the portal to validate it. That is all. Making the release
 # visible on Maven Central is a separate "Publish" in the portal, by hand,
 # because a published version can never be withdrawn.
 #
-# The `version` input changes nothing. It forces whoever starts the run to state
-# which version they believe they are publishing, and the job stops if that
-# disagrees with the POM.
+# The version comes from the release tag, or from the `version` input on a
+# manual run, and is checked against the POM. That check is the real guard: it
+# is the only place that notices when the release sits on something other than
+# the release commit — most likely because the sync has not run yet.
 #
 # Required repository secrets:
 #   GPG_PRIVATE_KEY         armored secret key (gpg --armor --export-secret-keys)
@@ -26,6 +31,8 @@
 name: Release to Maven Central
 
 on:
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       version:
@@ -52,6 +59,46 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # On a release event this is the tag, not the default branch: the
+          # bundle must be built from the commit the release points at.
+          ref: ${{ github.event.release.tag_name || github.ref }}
+
+      - name: Determine the version being published
+        id: target
+        # Both values are passed through the environment rather than
+        # interpolated into the script, so neither can be read as shell syntax.
+        env:
+          DISPATCH_VERSION: ${{ inputs.version }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          version="${DISPATCH_VERSION:-$RELEASE_TAG}"
+          # Tags are unprefixed by convention; a v-prefixed one still works.
+          version="${version#v}"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            echo "'$version' does not look like a release version." >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Refuse a version that is already on Central
+        # A second upload for a published version fails at the portal anyway,
+        # after the build. Failing here says why, and says it in ten seconds.
+        env:
+          VERSION: ${{ steps.target.outputs.version }}
+        run: |
+          set -euo pipefail
+          url="https://repo1.maven.org/maven2/com/kobayami/graphity-core/$VERSION/graphity-core-$VERSION.pom"
+          code="$(curl -sSI -o /dev/null -w '%{http_code}' --max-time 30 "$url" || echo 000)"
+          case "$code" in
+            200)
+              echo "graphity-core $VERSION is already on Maven Central. A published version cannot be replaced; release a new version instead." >&2
+              exit 1
+              ;;
+            404) echo "$VERSION is not on Central yet." ;;
+            *)   echo "Could not ask Central (HTTP $code); continuing." ;;
+          esac
 
       - name: Set up JDK 21 (Temurin)
         uses: actions/setup-java@v4
@@ -67,16 +114,15 @@ jobs:
           server-password: CENTRAL_TOKEN_PASSWORD
           gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
 
-      - name: Check the POM version against the input
-        # The input is passed through the environment rather than interpolated
-        # into the script, so it cannot be read as shell syntax.
+      - name: Check the POM version against the release
         env:
-          EXPECTED: ${{ inputs.version }}
+          EXPECTED: ${{ steps.target.outputs.version }}
         run: |
           set -euo pipefail
           pom="$(mvn -B -ntp -q help:evaluate -Dexpression=project.version -DforceStdout)"
           if [[ "$pom" != "$EXPECTED" ]]; then
             echo "The POM is at $pom, but this run was started for $EXPECTED." >&2
+            echo "Either the release does not sit on the release commit, or that commit has not been synced yet." >&2
             exit 1
           fi
           echo "Publishing $pom."

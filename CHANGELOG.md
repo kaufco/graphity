@@ -7,139 +7,43 @@ Graphity adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [Unreleased]
+## [2.1.0] — 2026-08-14
+
+Thirteen issues, grouped by label. Each links to the issue, which carries the problem, the
+alternatives and the measurements.
 
 ### Added
 
-- **`GraphBuilder` construction API.** Eighteen methods covering the patterns that previously
-  had to be written out by hand. All additive; existing code is unaffected.
+- API
+  - [Issue #1](../../issues/1) - GraphBuilder: construction API, strict validation and capacity hint
+  - [Issue #2](../../issues/2) - Make the edge indices of a transposed graph translatable
+  - [Issue #9](../../issues/9) - Let `NodeMapping.forSubgraph` take the selection as an int array
+- Algorithms
+  - [Issue #4](../../issues/4) - Add `Ancestry` - lowest common ancestor queries on trees and forests
+  - [Issue #5](../../issues/5) - Add `Biconnectivity` - bridges, articulation points and biconnected components
+  - [Issue #11](../../issues/11) - Shape predicates for the undirected reading of a graph
+- Benchmarks
+  - [Issue #13](../../issues/13) - Peer columns for weakly connected components and topological levelling
 
-  *Node allocation.* `addChild(parent)`, `addChildren(parent, count)`, `addParent(child)` and
-  `addParents(child, count)` add nodes and link them in one call, returning the first new ID.
+### Changed
 
-  *Edge batches.* `addEdges(source, int...)` complements the existing `IntList` overload,
-  `addInEdges(target, …)` is its fan-in counterpart, `addPath(…)` chains a sequence of
-  nodes, and `addEdgePairs(int...)` takes a flat list of alternating sources and targets.
-
-  *Parameter forms.* The fan-out, fan-in and path methods accept their node IDs as loose
-  arguments, as an `int[]`, or as an `IntList` — including the `SortedIntView` that
-  `outNodes(node)` and its relatives return, so a result of the library can be fed back into a
-  builder without being copied into an array first. `addEdges`, `addEdgesAndNodes`,
-  `addInEdges` and `addInEdgesAndNodes` became variable-arity in the process, which changes
-  neither their descriptor nor the meaning of any existing call.
-
-  *Creating nodes on reference.* Every edge-adding method has a twin with an `AndNodes`
-  suffix — `addEdgeAndNodes`, `addEdgesAndNodes`, `addInEdgesAndNodes`, `addPathAndNodes`,
-  `addEdgePairsAndNodes` — that raises the node count to cover the highest ID it references
-  instead of requiring the nodes to exist. This is what makes externally numbered input, such
-  as block IDs arriving in arbitrary order, work without tracking the maximum by hand.
-
-- **`GraphBuilder.strict()`** — opt-in validation of node references, throwing
-  `IndexOutOfBoundsException` instead of relying on assertions. Must be called before the first
-  edge, so a builder can never hold a mix of validated and unvalidated edges. Without it,
-  behaviour is unchanged.
-
-- **`GraphBuilder.ensureEdgeCapacity(totalEdges)`** — pre-sizes the internal edge storage when
-  the edge count is known or can be estimated, avoiding the reallocation and copying that
-  filling a growing list to millions of edges otherwise costs.
-
-- **`NodeMapping.forSubgraph(int...)`** — the parameter form that was missing next to the
-  existing `BitSet` and `IntList` overloads, so a selection that already is a plain `int[]`, or
-  just a handful of loose IDs, no longer has to be wrapped in an `IntArrayList` first. The IDs are
-  copied and sorted, leaving the caller's array unchanged; unlike the `IntList` form there is no
-  sortedness shortcut, since a plain array carries no such guarantee.
-
-- **`Components.biconnectivityOf(graph)`** — bridges, articulation points and biconnected
-  components in one depth-first pass, returned as a `Biconnectivity`. `bridges()` yields an
-  `Edges` collection with the lower node ID as source, `articulationPoints()` a sorted
-  `SortedIntView`, and `blocks()` an `EdgePartition` over edge indices, because blocks partition
-  the edges rather than the nodes — an articulation point belongs to every block that meets it.
-
-  The graph is read as undirected, like `ccsOf`, with the reading now stated explicitly: `a → b`
-  and `b → a` are one undirected edge rather than two, so a graph storing its undirected edges
-  symmetrically still has bridges, and both edge indices of such a pair land in the same block.
-  Self-loops are ignored and left unmapped. The traversal is iterative and verified on a path of
-  10^6 nodes. It is the most memory-hungry entry point in the library — during the pass it holds
-  up to 37 bytes per node and up to 8 bytes per edge, which the Javadoc states as a number rather
-  than as a complexity class.
-
-- **`Ancestry`** — ancestor queries on a forest of out-trees, built once via
-  `Ancestry.of(forest)` and then queried arbitrarily often: `lowestCommonAncestorOf(a, b)`,
-  `isAncestorOf(node, descendant)`, `depthOf(node)` and `parentOf(node)`. Preprocessing is a
-  heavy-path decomposition — O(nodeCount + edgeCount) to build, O(log nodeCount) per
-  lowest-common-ancestor query, and 12 bytes per node, an order of magnitude less than the
-  level tables that binary lifting or a sparse-table RMQ would need for the same queries.
-
-  Two nodes in different trees of the forest yield `-1`. A graph that is not a forest of
-  out-trees is rejected with `IllegalArgumentException` naming the offending node; for a forest
-  of in-trees, pass the transpose. Construction and queries are iterative and verified on a
-  chain of 10^6 nodes.
-
-- **Edge indices across a transpose.** `transposed()` keeps node IDs but not edge indices, so
-  edge metadata held in a parallel array could not be addressed while iterating a transpose.
-  Two additions close that gap: `Graphs.transposedEdgeMapping(graph)` translates every edge
-  index of `graph.transposed()` back to `graph` in one linear pass and is always total, and
-  `BiAdjacentGraph.transposedEdgeIndex(edgeIndex)` answers the same question for a single edge
-  in the opposite direction, in O(log nodeCount + log inDegree). Both `transposed()` methods now
-  document that edge indices are not preserved, and `Graphs.edgeMapping` documents that it
-  cannot be used for a transpose — with the identity node mapping it silently returns `-1`
-  entries, because a transpose swaps the two roles its lookup relies on.
-
-- **Undirected shape predicates on `Graphs`.** `isBipartite(graph)`, `isUndirectedTree(graph)`,
-  `isUndirectedForest(graph)` and `isWeaklyConnected(graph)` read the graph as undirected, like
-  `ccsOf` and `biconnectivityOf`: `a → b` and `b → a` are one undirected edge rather than two. A
-  graph storing an undirected structure symmetrically is therefore answered on its actual shape,
-  instead of on the two-cycle that every such edge forms under the directed reading — until now
-  every shape predicate read the graph as directed, and there was no connectivity predicate at all.
-
-  Self-loops are ignored, with one exception: `isBipartite` reports them as disqualifying, because
-  a node adjacent to itself belongs in neither class, and two-colorability is not a connectivity
-  question. An empty graph satisfies all four.
-
-  None of the four needs in-adjacency, so passing a plain `Graph` costs nothing over a
-  `BiAdjacentGraph`. `isBipartite` and `isWeaklyConnected` are O(nodeCount + edgeCount) and hold 10
-  and 5 bytes per node, each stopping as soon as the answer is settled. Holding two elements per
-  node is also why `isBipartite` is the one predicate limited in graph size: it requires
-  `nodeCount < 2^30` and throws `IllegalArgumentException` above that, rather than failing on an
-  array length that has overflowed. `isUndirectedTree` and
-  `isUndirectedForest` reject in O(1) when the edge count alone exceeds what a forest could store,
-  and otherwise cost O(nodeCount + edgeCount) plus one binary search per edge stored in both
-  directions, at 5 bytes per node.
-
-- **`Graphs.isTree(graph)`** — the canonical name for the check that `isOutTree` performs, with
-  identical behaviour. Throughout `Graphs` an unqualified predicate name reads the graph as
-  directed, which left the spelled-out direction in `isOutTree` as the only exception; putting an
-  undirected tree check beside it made that visible at the call site.
-
-- **Peer comparisons for weakly connected components and topological levelling.** The two
-  algorithms that had a Graphity column and nothing beside it now run against JGraphT, Guava and
-  WebGraph in the synthetic and real-world profiles: components through JGraphT's
-  `ConnectivityInspector`, a Guava Union-Find port and WebGraph's own `ConnectedComponents`;
-  levelling through one Kahn port per library that computes the order *and* the levels, so all
-  four do the same work. Every port is cross-validated against the others — components by
-  comparing the canonical partitions, levelling by comparing the level vectors — before a number
-  is measured.
-
-- **`Graphity (bi-adjacent)` report column, plus the price of the structures behind such a
-  column.** `TopOrderAndLevels` also runs on `graph.biAdjacentGraph()`, where it reads in-degrees
-  in O(nodeCount) instead of scanning every edge; until now no benchmark ever handed it a
-  bi-adjacent graph. Two new one-time-cost sections say what the structures cost:
-  `BiAdjacency (in-adjacency) cost` for `graph.biAdjacentGraph()`, and
-  `Symmetrize (WebGraph) cost` for the symmetric `BVGraph` that WebGraph's connected components
-  require and a graph storing out-adjacency only cannot provide.
+- Performance
+  - [Issue #3](../../issues/3) - Make the dedup set of `NodePartition.condense()` reset in constant time
+  - [Issue #6](../../issues/6) - Replace the `BitSet` of the reindexing DFS core with a packed bit array
+  - [Issue #7](../../issues/7) - Hold the DFS frame stack in a raw `long[]` instead of a `LongArrayList`
+  - [Issue #8](../../issues/8) - Give `Graphs.remapped` a fast path for mappings that keep every node
+- Benchmarks
+  - [Issue #12](../../issues/12) - Split the benchmark summary into a peer view and a version history
 
 ### Deprecated
 
-- **`Graphs.isOutTree(graph)`** — use `Graphs.isTree(graph)`, which answers identically in every
-  case. Only the name changed, and the old one still works. Whether it is removed in a later major
-  version is not decided, so it is not marked `forRemoval`.
+Both still work and neither is marked `forRemoval`.
 
-- **`Graphs.dfsReordered(graph)`** — reordering renumbers every node, so anything held outside the
-  graph and keyed by node ID has to be permuted along with it, and this method discards the only
-  thing that can do that. Code that reorders and keeps such data compiles, runs, and reads the
-  wrong entries. Use `NodeMapping.reindex(graph)` followed by `Graphs.remapped(graph, newToOld)`
-  and keep the mapping; the two calls are exactly what the method did. Nothing replaces it for now,
-  and it still works.
+- API
+  - [Issue #10](../../issues/10) - Deprecate `Graphs.dfsReordered` — use `NodeMapping.reindex(graph)`
+    and `Graphs.remapped(graph, newToOld)`, keeping the mapping
+  - [Issue #11](../../issues/11) - Deprecate `Graphs.isOutTree` — use `Graphs.isTree`, identical in every case
+    
 
 ## [2.0.0] — 2026-07-23
 

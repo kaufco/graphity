@@ -5,16 +5,19 @@
 # permissions for.
 #
 # Two triggers:
+#   * release.published — automatic run, the same event that starts the Maven
+#     deploy (release.yml), so publishing a GitHub Release is the only act a
+#     release needs. Only `published`, not `released`/`edited`: a later
+#     correction of the release notes must not redeploy. Deliberately not on
+#     push.tags as well — a release created from a new tag would fire both
+#     triggers.
 #   * workflow_dispatch — manual run, used before 1.0.0 to populate
 #     https://kaufco.github.io/graphity/ from main HEAD so the page is
-#     not blank.
-#   * push.tags — automatic run on release tags. Release tags are
-#     unprefixed (1.0.0, 2.0.0); the v-prefixed spelling is matched too, so
-#     a tag pushed out of habit still publishes the docs rather than
-#     silently doing nothing. The published Javadoc is the tag's snapshot
-#     at Pages root; a versioned layout (/javadoc/<version>/,
-#     /javadoc/latest/) can be introduced later without changing the
-#     trigger model.
+#     not blank, and as the fallback when a release already exists.
+#
+# The published Javadoc is the release's snapshot at Pages root; a versioned
+# layout (/javadoc/<version>/, /javadoc/latest/) can be introduced later
+# without changing the trigger model.
 #
 # GitHub Pages source must be set to "GitHub Actions" in the repository
 # settings — this workflow uses actions/deploy-pages, not a gh-pages
@@ -23,11 +26,9 @@
 name: Deploy Javadoc
 
 on:
+  release:
+    types: [published]
   workflow_dispatch:
-  push:
-    tags:
-      - '[0-9]+.[0-9]+.[0-9]+'
-      - 'v[0-9]+.[0-9]+.[0-9]+'
 
 permissions:
   contents: read
@@ -53,6 +54,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # On a release event this is the tag; a manual run takes the branch
+          # it was started from.
+          ref: ${{ github.event.release.tag_name || github.ref }}
 
       - name: Set up JDK 21 (Temurin)
         uses: actions/setup-java@v4

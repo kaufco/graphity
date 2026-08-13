@@ -30,11 +30,15 @@ import java.util.Arrays;
  *       each is reachable from the other <em>following edge directions</em>.</li>
  *   <li>{@code wccsOf} / {@code ccsOf} ignores edge direction - two nodes are in the same
  *       component if connected by any path, regardless of edge direction.</li>
- *   <li>{@code biconnectivityOf} ignores edge direction as well, and additionally reads
- *       {@code a → b} and {@code b → a} as one undirected edge rather than two.</li>
+ *   <li>{@code biconnectivityOf} ignores edge direction as well, and it is where the rule
+ *       below becomes visible: a reciprocal pair read as two edges would be a cycle, and no
+ *       symmetrically stored edge could ever be a bridge.</li>
  * </ul>
- * For graphs that represent undirected structures (with both a→b and b→a for each edge),
- * {@code ccsOf} is the natural choice. The result is identical to {@code wccsOf}.
+ * The undirected reading takes each stored edge as connecting both of its endpoints - the
+ * opposite edge does not have to exist - and counts a reciprocal pair {@code a → b} /
+ * {@code b → a} as one undirected edge rather than two. Storing undirected edges in both
+ * directions is therefore tolerated, not expected: a graph stored symmetrically is read
+ * exactly like the same structure stored with a single direction per edge.
  *
  * @see Sccs
  * @see NodePartition
@@ -129,10 +133,17 @@ public final class Components {
   }
 
   /**
-   * Computes the connected components of the given graph, treating it as undirected.
+   * Computes the connected components of the given graph, reading it as undirected.
    * <p>
-   * This is identical to {@link #wccsOf(Graph)} - for an undirected graph represented
-   * as a directed graph (with edges in both directions), WCCs and CCs are the same.
+   * Each stored edge connects both of its endpoints here, so the opposite edge does not have to
+   * exist, and a reciprocal pair {@code a → b} / {@code b → a} counts as one undirected edge
+   * rather than two. Storing undirected edges in both directions is tolerated, not expected:
+   * both forms give the same components. Self-loops contribute nothing to connectivity and are
+   * ignored.
+   * <p>
+   * This is identical to {@link #wccsOf(Graph)}, and not by coincidence: once connectivity is
+   * the question, ignoring edge direction is all the undirected reading amounts to. Both names
+   * exist so that a call can say which reading it means.
    * <p>
    * <strong>Time:</strong> O(nodeCount + edgeCount).<br>
    * <strong>Memory:</strong> O(nodeCount).
