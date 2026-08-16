@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 
@@ -81,6 +82,13 @@ public final class ReportMain {
   private static final List<String> ALGO_ORDER = List.of(
       "Build", "Scc", "Wcc", "Ccs", "Condense", "TopOrder", "TopOrderAndLevels",
       "BackEdges", "EdgeTypes", "Reorder", "BiAdjacency", "Symmetrize");
+
+  /**
+   * Algorithms measured on a self-loop-free dataset, because they only accept a DAG. Their
+   * real-world tables carry a note saying so — the measured graph differs from the file, which a
+   * reader comparing edge counts would otherwise have no way to know.
+   */
+  private static final Set<String> DAG_ONLY_ALGOS = Set.of("TopOrder", "TopOrderAndLevels");
 
   /**
    * Libraries in the preferred display order. Graphity is the baseline; its two variants — the
@@ -274,6 +282,17 @@ public final class ReportMain {
       out.println(line);
     }
     out.println();
+    if (DAG_ONLY_ALGOS.contains(algoKey)) {
+      out.println("Self-loops are dropped here: this algorithm requires a DAG, and a self-loop is a");
+      out.println("cycle. Every library in a row therefore reads the same graph, while the non-DAG");
+      out.println("tables measure each file unmodified.");
+      if (cells.containsKey("cit-Patents")) {
+        out.println();
+        out.println("For cit-Patents that means one skipped edge of 16,518,948 — patent 5489070 cites");
+        out.println("itself, and it is the graph's only cycle; Tarjan finds no non-trivial SCC.");
+      }
+      out.println();
+    }
   }
 
   private static void emitPerfAlgoSubsection(PrintStream out, int idx, String algoKey, List<PerfResult> rows) {

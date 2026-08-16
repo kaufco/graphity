@@ -73,6 +73,12 @@ ALGO_ORDER = (
     "BiAdjacency (in-adjacency) cost", "Symmetrize (WebGraph) cost",
 )
 
+# Algorithms measured on a self-loop-free graph, because they only accept a DAG. ReportMain writes
+# a note under its own real-world tables, but this script rebuilds the summary from the parsed
+# numbers, so the note has to be re-emitted here — otherwise it is missing from exactly the file
+# the README points readers to.
+DAG_ONLY_ALGOS = ("TopOrder", "TopOrderAndLevels")
+
 MISSING = {"—", "-", ""}
 META_HEADERS = ("Nodes", "Edges", "Edges/Node")
 # Graphity variants: the same algorithm on a different graph representation, each its own column
@@ -1086,9 +1092,25 @@ def _fmt_ms_factor(ms: float, baseline_ms: float | None, *, is_baseline: bool) -
     return f"{fmt_ms(ms)} ({factor:.1f}×)"
 
 
+def _dag_only_note(row_shapes: list[str]) -> list[str]:
+    """Prose for a real-world DAG table: the measured graph is not quite the file."""
+    note = [
+        "Self-loops are dropped for this algorithm: it requires a DAG, and a self-loop is a cycle.",
+        "Every library in a row reads that same graph; the other tables measure each file unmodified.",
+    ]
+    if "cit-Patents" in row_shapes:
+        note.append("")
+        note.append(
+            "For cit-Patents that is one edge of 16,518,948 — patent 5489070 cites itself, and that "
+            "loop is the graph's only cycle."
+        )
+    return [*note, ""]
+
+
 def _build_perf_section(
     lines: list[str],
     *,
+    algo: str,
     key_column: str,
     all_column_labels: list[str],
     ms_matrix: dict[str, list[float | None]],
@@ -1179,6 +1201,9 @@ def _build_perf_section(
             rel = f"fig/{machine}/{fig_name}"
             lines.append(f"![{_clean_heading(fig_slug_base)}]({rel})")
             lines.append("")
+
+    if key_column == "Dataset" and algo.split("—")[0].strip() in DAG_ONLY_ALGOS:
+        lines.extend(_dag_only_note(row_shapes))
 
 
 def _build_bytes_section(
@@ -1512,6 +1537,7 @@ def build_combined_for_machine(
 
             _build_perf_section(
                 lines,
+                algo=sid.algo,
                 key_column=frame.key_column,
                 all_column_labels=[column.label for column in columns],
                 ms_matrix=ms_matrix,

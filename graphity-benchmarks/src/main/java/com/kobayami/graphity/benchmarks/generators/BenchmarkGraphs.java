@@ -79,6 +79,11 @@ public final class BenchmarkGraphs {
    *
    * <p>{@code synthetic}: generate from ({@code shape}, {@code nodeCount}).
    * {@code dataset}: load edge-list from {@code datasetPath}.
+   *
+   * <p>{@code requireDag} doubles as the switch for dropping self-loops from a dataset — see
+   * {@link #loadDataset(String, boolean)}. Tying the two together is what keeps a DAG case
+   * comparable across libraries: every fixture in such a case passes {@code requireDag=true} and
+   * therefore measures the identical graph.
    */
   public static Graph fromInput(
       GraphShape shape,
@@ -90,7 +95,7 @@ public final class BenchmarkGraphs {
     Graph graph;
     graph = switch (mode) {
       case "synthetic" -> generate(shape, nodeCount);
-      case "dataset" -> loadDataset(datasetPath);
+      case "dataset" -> loadDataset(datasetPath, /*dropSelfLoops=*/ requireDag);
       default -> throw new IllegalArgumentException("unsupported inputMode: " + inputMode);
     };
     if (requireDag && !Graphs.isDag(graph)) {
@@ -99,19 +104,37 @@ public final class BenchmarkGraphs {
     return graph;
   }
 
+  /** Loads a dataset verbatim; equivalent to {@code loadDataset(datasetPath, false)}. */
+  public static Graph loadDataset(String datasetPath) {
+    return loadDataset(datasetPath, /*dropSelfLoops=*/ false);
+  }
+
   /**
    * Loads a dataset from normalized text edge-list format:
    * {@code <source> <target>} per line, optional {@code #}-comments.
+   *
+   * <p>{@code dropSelfLoops} skips edges whose endpoints are equal. It exists for the DAG-only
+   * algorithms: a self-loop is a cycle, so a single self-referencing row makes Kahn's algorithm
+   * refuse an otherwise acyclic graph. cit-Patents is exactly that case — patent 5489070 cites
+   * itself, and apart from that row the graph has no cycle at all (Tarjan finds no non-trivial
+   * SCC). Dropping the loop is therefore the smallest edit that makes the declared DAG one, and it
+   * stays confined to the DAG cases: SCC, edge types and WCC keep measuring the unmodified graph,
+   * which is what keeps them comparable to the earlier baselines.
+   *
+   * <p>The flag is part of the cache key. Both variants of one file can be live in the same JVM —
+   * a realworld run measures cit-Patents with loops for SCC and without them for levelling — and
+   * keying on the path alone would hand out whichever variant was built first.
    */
-  public static Graph loadDataset(String datasetPath) {
+  public static Graph loadDataset(String datasetPath, boolean dropSelfLoops) {
     if (datasetPath == null || datasetPath.isBlank()) {
       throw new IllegalArgumentException("datasetPath must be non-empty for inputMode=dataset");
     }
     Path path = Path.of(datasetPath).toAbsolutePath().normalize();
-    return DATASET_CACHE.computeIfAbsent(path.toString(), ignored -> readDataset(path));
+    String key = path + (dropSelfLoops ? "|noSelfLoops" : "");
+    return DATASET_CACHE.computeIfAbsent(key, ignored -> readDataset(path, dropSelfLoops));
   }
 
-  private static Graph readDataset(Path path) {
+  private static Graph readDataset(Path path, boolean dropSelfLoops) {
     if (!Files.isRegularFile(path)) {
       throw new IllegalArgumentException("dataset file not found: " + path);
     }
@@ -140,8 +163,14 @@ public final class BenchmarkGraphs {
         } catch (NumberFormatException e) {
           throw new IllegalArgumentException("invalid numeric ids at line " + lineNo + " in " + path, e);
         }
+        // The ids are registered before the loop check on purpose: skipping the node too would
+        // shift every dense id assigned after it, so the two cached variants of a file would no
+        // longer describe the same nodes.
         int source = getOrCreateId(builder, idMap, sourceRaw);
         int target = getOrCreateId(builder, idMap, targetRaw);
+        if (dropSelfLoops && source == target) {
+          continue;
+        }
         builder.addEdge(source, target);
       }
     } catch (IOException e) {

@@ -7,7 +7,7 @@ Graphity adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [2.1.0] — 2026-08-14
+## [2.1.0] — 2026-08-17
 
 Thirteen issues, grouped by label. Each links to the issue, which carries the problem, the
 alternatives and the measurements.

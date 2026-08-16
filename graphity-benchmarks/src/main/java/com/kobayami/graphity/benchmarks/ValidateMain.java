@@ -61,6 +61,15 @@ import java.util.Set;
  */
 public final class ValidateMain {
 
+  /**
+   * Algorithms that only accept a DAG. For those, a dataset is loaded without its self-loops, so
+   * that validation sees the same graph the JMH fixtures measure — there, the equivalent switch is
+   * the {@code requireDag} flag of the {@code *DagFixture} classes. Keep this in sync with
+   * {@code DAG_ALGOS} in run-benchmarks.sh, which rejects a matrix case that pairs one of these
+   * algorithms with {@code dataset.dag=false}.
+   */
+  private static final Set<String> DAG_ONLY_ALGORITHMS = Set.of("toporder", "toporderandlevels");
+
   private ValidateMain() {}
 
   public static void run(String[] args) throws Exception {
@@ -115,8 +124,9 @@ public final class ValidateMain {
             algorithm, libraries, Arrays.toString(nodeCounts), shapes);
       } else {
         List<String> datasetPaths = parseStringCsv(datasetsCsv);
+        boolean dropSelfLoops = DAG_ONLY_ALGORITHMS.contains(algorithm);
         for (String datasetPath : datasetPaths) {
-          com.kobayami.graphity.Graph template = BenchmarkGraphs.loadDataset(datasetPath);
+          com.kobayami.graphity.Graph template = BenchmarkGraphs.loadDataset(datasetPath, dropSelfLoops);
           validateCase(algorithm, libraries, null, template.nodeCount(), template, wgTmpRoot);
         }
         System.err.printf(Locale.ROOT,
