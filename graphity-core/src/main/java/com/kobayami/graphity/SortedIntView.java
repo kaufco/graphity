@@ -362,12 +362,10 @@ public final class SortedIntView extends AbstractIntList implements IntList, Ran
 
   @Override
   public boolean equals(@Nullable Object other) {
-    return switch (other) {
-      case null -> false;
-      case SortedIntView view -> equals(view);
-      case IntList intList -> equals(intList);
-      default -> super.equals(other);
-    };
+    if (other == null) return false;
+    if (other instanceof SortedIntView view) return equals(view);
+    if (other instanceof IntList intList) return equals(intList);
+    return super.equals(other);
   }
 
   /**

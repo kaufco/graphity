@@ -69,8 +69,8 @@
   </modules>
 
   <properties>
-    <maven.compiler.source>21</maven.compiler.source>
-    <maven.compiler.target>21</maven.compiler.target>
+    <maven.compiler.source>17</maven.compiler.source>
+    <maven.compiler.target>17</maven.compiler.target>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
     <fastutil.version>8.5.17</fastutil.version>
@@ -199,7 +199,7 @@
           <artifactId>maven-compiler-plugin</artifactId>
           <version>${compiler-plugin.version}</version>
           <configuration>
-            <release>21</release>
+            <release>17</release>
           </configuration>
         </plugin>
 
@@ -259,7 +259,7 @@
             <bottom><![CDATA[Copyright &#169; {inceptionYear}&#x2013;{currentYear} Marco Kaufmann. Apache License 2.0.]]></bottom>
 
             <links>
-              <link>https://docs.oracle.com/en/java/javase/21/docs/api/</link>
+              <link>https://docs.oracle.com/en/java/javase/17/docs/api/</link>
             </links>
             <linksource>true</linksource>
             <tags>

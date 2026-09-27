@@ -7,10 +7,24 @@ Graphity adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [2.2.0] — unreleased
+
+Adds the control-flow analyses a compiler pipeline starts with: dominators, iterated dominance
+frontiers, loop nesting forests, and constant-time ancestor tests. The library now builds and
+runs on Java 17.
+
+### Changed
+
+- Infrastructure
+  - [Issue #14](../../issues/14) - Support Java 17
+
+---
+
 ## [2.1.0] — 2026-08-17
 
-Thirteen issues, grouped by label. Each links to the issue, which carries the problem, the
-alternatives and the measurements.
+Adds construction and connectivity capabilities: GraphBuilder, ancestry queries,
+biconnectivity, and undirected shape predicates. A packed visited set and a raw frame stack
+make depth-first search use less memory and run faster.
 
 ### Added
 
@@ -40,9 +54,8 @@ alternatives and the measurements.
 Both still work and neither is marked `forRemoval`.
 
 - API
-  - [Issue #10](../../issues/10) - Deprecate `Graphs.dfsReordered` — use `NodeMapping.reindex(graph)`
-    and `Graphs.remapped(graph, newToOld)`, keeping the mapping
-  - [Issue #11](../../issues/11) - Deprecate `Graphs.isOutTree` — use `Graphs.isTree`, identical in every case
+  - [Issue #10](../../issues/10) - Deprecate `Graphs.dfsReordered`
+  - [Issue #11](../../issues/11) - Deprecate `Graphs.isOutTree`
     
 
 ## [2.0.0] — 2026-07-23

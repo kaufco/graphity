@@ -19,19 +19,24 @@ permissions:
 
 jobs:
   build:
-    name: Build & test (JDK 21)
+    name: Build & test (JDK ${{ matrix.java }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        # 17 is the baseline the library targets; 21 and 25 are the later LTS releases.
+        java: ['17', '21', '25']
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up JDK 21 (Temurin)
+      - name: Set up JDK ${{ matrix.java }} (Temurin)
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: ${{ matrix.java }}
           cache: maven
 
       - name: Build and test

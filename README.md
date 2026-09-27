@@ -4,7 +4,7 @@
 [![Javadoc](https://img.shields.io/badge/Javadoc-online-blue)](https://kaufco.github.io/graphity/)
 [![CI](https://github.com/kaufco/graphity/actions/workflows/ci.yml/badge.svg)](https://github.com/kaufco/graphity/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
-[![JDK](https://img.shields.io/badge/JDK-21%2B-blue)](https://adoptium.net/temurin/releases/?version=21)
+[![JDK](https://img.shields.io/badge/JDK-17%2B-blue)](https://adoptium.net/temurin/releases/?version=17)
 
 Graphity is a compact, high-performance Java library for analyzing directed and undirected graphs. It is built for compiler and analysis pipelines — abstract syntax trees, control- and data-flow graphs, dependency graphs — and more generally for anywhere you build a graph from your domain model, run analyses on it, and use the results.
 
@@ -40,7 +40,7 @@ dependencies {
 }
 ```
 
-Requires JDK 21 or newer.
+Requires JDK 17 or newer.
 
 ## Quick Start
 
