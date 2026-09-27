@@ -26,6 +26,9 @@ import java.util.Objects;
  * boolean inScope = ancestry.isAncestorOf(scope, symbol);
  * }</pre>
  *
+ * For constant-time ancestor tests and subtree views, derive a {@link PreorderAncestry} via
+ * {@link PreorderAncestry#of(Ancestry)}; it shares the arrays of this index.
+ * <p>
  * <strong>Time:</strong> O(nodeCount + edgeCount) for construction.<br>
  * <strong>Memory:</strong> 12 x nodeCount bytes for the result;
  * 12 x nodeCount bytes additional during construction.
@@ -33,22 +36,22 @@ import java.util.Objects;
  * @see Graphs#isForest(Graph)
  * @see Graph#transposed()
  */
-public final class Ancestry {
+public sealed class Ancestry permits PreorderAncestry {
 
   /** Parent of each node, {@code -1} for a tree root. */
-  private final int[] parent;
+  final int[] parent;
 
   /** Distance from the tree root, {@code 0} for a tree root. */
-  private final int[] depth;
+  final int[] depth;
 
   /**
    * Topmost node of the heavy chain containing each node. Jumping from a node to
    * {@code parent[chainHead[node]]} skips a whole chain, and every root-to-node path crosses
    * O(log nodeCount) chains.
    */
-  private final int[] chainHead;
+  final int[] chainHead;
 
-  private Ancestry(int[] parent, int[] depth, int[] chainHead) {
+  Ancestry(int[] parent, int[] depth, int[] chainHead) {
     this.parent = parent;
     this.depth = depth;
     this.chainHead = chainHead;
@@ -182,7 +185,7 @@ public final class Ancestry {
    * @return the lowest common ancestor, or {@code -1} if the nodes are in different trees
    * @throws IndexOutOfBoundsException if a node ID is out of range
    */
-  public int lowestCommonAncestorOf(int a, int b) {
+  public final int lowestCommonAncestorOf(int a, int b) {
     Objects.checkIndex(a, parent.length);
     Objects.checkIndex(b, parent.length);
 
@@ -205,7 +208,7 @@ public final class Ancestry {
    * lies on the path from {@code descendant} to its tree root. A node is its own ancestor.
    * <p>
    * <strong>Time:</strong> O(log nodeCount) - this is a lowest-common-ancestor query, not a
-   * constant-time interval test.
+   * constant-time interval test. O(1) on a {@link PreorderAncestry}.
    *
    * @param node       potential ancestor, a node ID in {@code 0..nodeCount()-1}
    * @param descendant potential descendant, a node ID in {@code 0..nodeCount()-1}
@@ -225,7 +228,7 @@ public final class Ancestry {
    * @return depth of the node
    * @throws IndexOutOfBoundsException if {@code node} is out of range
    */
-  public int depthOf(int node) {
+  public final int depthOf(int node) {
     Objects.checkIndex(node, parent.length);
     return depth[node];
   }
@@ -239,7 +242,7 @@ public final class Ancestry {
    * @return parent node ID, or {@code -1} for a tree root
    * @throws IndexOutOfBoundsException if {@code node} is out of range
    */
-  public int parentOf(int node) {
+  public final int parentOf(int node) {
     Objects.checkIndex(node, parent.length);
     return parent[node];
   }

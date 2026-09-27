@@ -13,6 +13,11 @@ Adds the control-flow analyses a compiler pipeline starts with: dominators, iter
 frontiers, loop nesting forests, and constant-time ancestor tests. The library now builds and
 runs on Java 17.
 
+### Added
+
+- API
+  - [Issue #15](../../issues/15) - Add `PreorderAncestry` - constant-time ancestor tests and subtree views
+
 ### Changed
 
 - Infrastructure

@@ -45,6 +45,11 @@ class DeepGraphStackSafetyTest {
     assertThat(ancestry.depthOf(DEEP - 1)).isEqualTo(DEEP - 1);
     assertThat(ancestry.lowestCommonAncestorOf(DEEP - 1, DEEP / 2)).isEqualTo(DEEP / 2);
     assertThat(ancestry.isAncestorOf(0, DEEP - 1)).isTrue();
+
+    PreorderAncestry preorder = PreorderAncestry.of(ancestry);
+    assertThat(preorder.subtreeSizeOf(0)).isEqualTo(DEEP);
+    assertThat(preorder.preorderIndexOf(DEEP - 1)).isEqualTo(DEEP - 1);
+    assertThat(preorder.isAncestorOf(DEEP / 2, DEEP - 1)).isTrue();
   }
 
   @Test

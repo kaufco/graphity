@@ -100,6 +100,7 @@ double[] weights = new double[graph.edgeCount()];
 | `EdgeTypes.of(graph)`      | `EdgeTypes`     | `typeOf(edgeIndex)`, `edgesOfType(TREE)`     |
 | `BackEdges.of(graph)`      | `Edges`         | `sourceNodes()`, `targetNodes()`             |
 | `Ancestry.of(forest)`      | `Ancestry`      | `lowestCommonAncestorOf(a, b)`, `depthOf()`  |
+| `PreorderAncestry.of(ancestry)` | `PreorderAncestry` | `isAncestorOf()` in O(1), `subtreeOf(node)`, `subtreeSizeOf()` |
 | `NodeMapping.of(...)`      | `NodeMapping`   | `inverse()`, `compose(other)`                |
 
 These types compose. `sccs.condense()` returns a `Graph` plus a `NodeMapping` from original nodes to SCC IDs that you can run further algorithms on; `nodeMapping.compose(other)` chains transformations and applies the result to your own metadata arrays in one step.
@@ -217,6 +218,7 @@ Graphity ships the following algorithms out of the box. All of them return typed
 | DFS edge classification (TREE / BACK / FORWARD / CROSS)         | `EdgeTypes.of(graph)`         |
 | Back edges                                                      | `BackEdges.of(graph)`         |
 | Lowest common ancestor (trees and forests)                      | `Ancestry.of(forest)`         |
+| Constant-time ancestor test and subtree views (trees and forests) | `PreorderAncestry.of(ancestry)` |
 | Shape predicates (`isDag`, `isForest`, `isTree`, `isPath`)      | `Graphs.isDag(graph)`         |
 | Shape predicates, undirected interpretation (`isBipartite`, `isUndirectedTree`, `isUndirectedForest`, `isWeaklyConnected`) | `Graphs.isBipartite(graph)` |
 | Condensation DAG                                                | `sccs.condense()`             |
