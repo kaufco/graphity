@@ -618,6 +618,114 @@ public final class Graphs {
   private record ForestInfo(int rootCount, int maxOutDegree) {}
 
   /**
+   * Returns the dominator tree as a graph: an edge {@code idom(n) -> n} for every node that has
+   * an immediate dominator.
+   * <p>
+   * Every root of the dominator forest - each entry, and each node only the virtual root above
+   * several entries dominates - has in-degree 0, and so has every unreachable node. The result
+   * is a forest of out-trees, ready for a traversal such as SSA renaming with
+   * {@link IterativeDfsTraverser#enterNode(int)} and {@code leaveNode(int)}. For ancestor
+   * queries, {@link Ancestry#of(Dominators)} is cheaper than {@code Ancestry.of(dominatorTree(d))}:
+   * it shares the immediate dominators instead of building and checking a graph.
+   * <p>
+   * Computed on every call, not cached - keep the result.
+   * <p>
+   * <strong>Time:</strong> O(nodeCount).<br>
+   * <strong>Memory:</strong> 4 x (nodeCount + 1) bytes plus 4 bytes per tree edge for the result.
+   *
+   * @param dominators the dominators to arrange as a tree
+   * @return the dominator tree, with the node IDs of the analyzed graph
+   */
+  public static Graph dominatorTree(Dominators dominators) {
+    var children = ParentForest.childrenOf(dominators.immediateDominator);
+    return new Graph(children.start(), children.nodes());
+  }
+
+  /**
+   * Returns the dominance frontiers as a graph: an edge {@code n -> m} whenever {@code m} is in
+   * the dominance frontier of {@code n}.
+   * <p>
+   * The dominance frontier of {@code n} holds the nodes where its dominance ends: {@code m} is in
+   * it if {@code n} dominates a predecessor of {@code m} but does not strictly dominate {@code m}.
+   * A node can be in its own frontier, so the result may have self-loops. Unreachable nodes have
+   * empty frontiers and appear in none.
+   * <p>
+   * Computed on every call, not cached - keep the result. The relation can grow quadratically
+   * in the node count, for example on a ladder of branches that all join at the end.
+   * <p>
+   * <strong>Time:</strong> O(nodeCount + edgeCount + frontierSize).<br>
+   * <strong>Memory:</strong> 4 x (nodeCount + 1 + frontierSize) bytes for the result;
+   * 4 x nodeCount bytes additional during computation. The predecessors come from the
+   * in-adjacency of the analyzed graph.
+   *
+   * @param dominators the dominators whose frontiers to compute
+   * @return the frontier relation, with the node IDs of the analyzed graph
+   * @throws IllegalArgumentException if the relation has more than {@code Integer.MAX_VALUE - 8}
+   *                                  pairs
+   */
+  public static Graph dominanceFrontiers(Dominators dominators) {
+    BiAdjacentGraph graph = dominators.graph;
+    int[] idom = dominators.immediateDominator;
+    int n = idom.length;
+    int[] inStart = graph.inAdjacencyStart;
+    int[] in = graph.inAdjacency;
+
+    // Walk up from every predecessor of m to just below idom(m), adding m on the way (Cooper,
+    // Harvey and Kennedy). A node already holding m means the rest of the walk is done, so every
+    // step adds a new pair. Run twice - count, then fill - so that each frontier comes out sorted
+    // without an intermediate pair buffer.
+    var lastAdded = new int[n];
+    var start = new int[n + 1];
+    Arrays.fill(lastAdded, -1);
+    long total = 0;
+    for (int m = 0; m < n; m++) {
+      if (!dominators.isReachable(m)) continue;
+      int stop = idom[m];
+      for (int i = inStart[m], end = inStart[m + 1]; i < end; i++) {
+        int runner = in[i];
+        if (!dominators.isReachable(runner)) continue;
+        while (runner != stop && lastAdded[runner] != m) {
+          lastAdded[runner] = m;
+          start[runner]++;
+          total++;
+          runner = idom[runner];
+        }
+      }
+    }
+    if (total > Integer.MAX_VALUE - 8) {
+      throw new IllegalArgumentException(
+          "the dominance frontier relation has " + total + " pairs, more than an array can hold");
+    }
+    int next = 0;
+    for (int node = 0; node < n; node++) {
+      int count = start[node];
+      start[node] = next;
+      next += count;
+    }
+    start[n] = next;
+    var frontier = new int[next];
+    Arrays.fill(lastAdded, -1);
+    for (int m = 0; m < n; m++) {
+      if (!dominators.isReachable(m)) continue;
+      int stop = idom[m];
+      for (int i = inStart[m], end = inStart[m + 1]; i < end; i++) {
+        int runner = in[i];
+        if (!dominators.isReachable(runner)) continue;
+        while (runner != stop && lastAdded[runner] != m) {
+          lastAdded[runner] = m;
+          frontier[start[runner]++] = m;
+          runner = idom[runner];
+        }
+      }
+    }
+    for (int node = n; node > 0; node--) {
+      start[node] = start[node - 1];
+    }
+    start[0] = 0;
+    return new Graph(start, frontier);
+  }
+
+  /**
    * Derives an edge mapping from a node mapping and two graphs.
    * <p>
    * For each edge in {@code newGraph}, looks up the corresponding edge in {@code oldGraph}

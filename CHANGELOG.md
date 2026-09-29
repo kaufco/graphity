@@ -17,6 +17,8 @@ runs on Java 17.
 
 - API
   - [Issue #15](../../issues/15) - Add `PreorderAncestry` - constant-time ancestor tests and subtree views
+- Algorithms
+  - [Issue #16](../../issues/16) - Add `Dominators` - dominator trees and dominance frontiers
 
 ### Changed
 

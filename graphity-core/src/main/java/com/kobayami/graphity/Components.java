@@ -177,8 +177,9 @@ public final class Components {
    * 29 x nodeCount bytes for the traversal state, up to 8 x nodeCount bytes for the collected
    * bridges before they are ordered, 4 x edgeCount bytes for the edge index translation and up
    * to 4 x edgeCount bytes for the edge stack, which grows on demand and never exceeds
-   * edgeCount entries - several times the size of the graph itself, and worth checking against
-   * the available heap on very large graphs.
+   * edgeCount entries, plus 4 x (nodeCount + edgeCount) bytes for the in-adjacency unless the
+   * graph is a {@link BiAdjacentGraph} - several times the size of the graph itself, and worth
+   * checking against the available heap on very large graphs.
    *
    * @param graph the graph to analyze
    * @return bridges, articulation points and blocks as a {@link Biconnectivity} instance

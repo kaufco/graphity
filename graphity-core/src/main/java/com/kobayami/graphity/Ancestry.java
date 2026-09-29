@@ -26,8 +26,10 @@ import java.util.Objects;
  * boolean inScope = ancestry.isAncestorOf(scope, symbol);
  * }</pre>
  *
- * For constant-time ancestor tests and subtree views, derive a {@link PreorderAncestry} via
- * {@link PreorderAncestry#of(Ancestry)}; it shares the arrays of this index.
+ * {@link #of(Dominators)} indexes a dominator tree the same way, so that {@code isAncestorOf}
+ * answers "dominates". For constant-time ancestor tests and subtree views, derive a
+ * {@link PreorderAncestry} via {@link PreorderAncestry#of(Ancestry)}; it shares the arrays of
+ * this index.
  * <p>
  * <strong>Time:</strong> O(nodeCount + edgeCount) for construction.<br>
  * <strong>Memory:</strong> 12 x nodeCount bytes for the result;
@@ -117,8 +119,65 @@ public sealed class Ancestry permits PreorderAncestry {
           "not a forest: node " + nodeOnCycle(parent, depth) + " lies on a cycle");
     }
 
+    return withHeavyChains(parent, depth, order);
+  }
+
+  /**
+   * Builds the ancestor index of a dominator tree. Equivalent to
+   * {@code Ancestry.of(Graphs.dominatorTree(dominators))}, but without building and checking the
+   * tree as a graph: the immediate dominators are shared as the parent array.
+   * <p>
+   * On the result, {@code isAncestorOf(a, b)} answers "{@code a} dominates {@code b}" and
+   * {@code lowestCommonAncestorOf(a, b)} returns the nearest common dominator, {@code -1} if only
+   * the virtual root above several entries dominates both. An unreachable node is an isolated
+   * root, so it is its own ancestor; check {@link Dominators#isReachable(int)} where that
+   * matters.
+   * <p>
+   * <strong>Time:</strong> O(nodeCount).<br>
+   * <strong>Memory:</strong> 8 x nodeCount bytes for the result, the parent array being shared;
+   * 20 x nodeCount bytes additional during computation.
+   *
+   * @param dominators the dominators whose tree to index
+   * @return the ancestor index of the dominator tree
+   */
+  public static Ancestry of(Dominators dominators) {
+    int[] parent = dominators.immediateDominator;
+    int n = parent.length;
+
+    // Children per node, then a BFS from all roots for a parents-first order and the depths.
+    // The dominator tree is acyclic by construction, so no check is needed.
+    var forest = ParentForest.childrenOf(parent);
+    int[] childStart = forest.start();
+    int[] children = forest.nodes();
+
+    var depth = new int[n];
+    var order = new int[n];
+    int head = 0;
+    int tail = 0;
+    for (int node = 0; node < n; node++) {
+      if (parent[node] < 0) order[tail++] = node;
+    }
+    while (head < tail) {
+      int node = order[head++];
+      for (int i = childStart[node], end = childStart[node + 1]; i < end; i++) {
+        int child = children[i];
+        depth[child] = depth[node] + 1;
+        order[tail++] = child;
+      }
+    }
+
+    return withHeavyChains(parent, depth, order);
+  }
+
+  /**
+   * Completes the index from the parents, the depths and an order in which every parent comes
+   * before its children.
+   */
+  private static Ancestry withHeavyChains(int[] parent, int[] depth, int[] order) {
+    int n = parent.length;
+
     // Subtree sizes, then the heaviest child per node. Children come after their parent in the
-    // BFS order, so a single backward pass accumulates the sizes.
+    // order, so a single backward pass accumulates the sizes.
     var subtreeSize = new int[n];
     Arrays.fill(subtreeSize, 1);
     var heavyChild = new int[n];

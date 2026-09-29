@@ -88,7 +88,7 @@ double[] weights = new double[graph.edgeCount()];
 
 **Direction is an interpretation, not a type.** Edges are stored as directed pairs, but nothing commits a graph to one reading. Where the distinction matters, both variants are available — `Components.sccsOf` reads the graph as directed, `Components.ccsOf` as undirected. An AST that is a tree for one analysis and a dependency graph for the next needs no conversion and no second copy. Reading a graph as undirected collapses `a → b` and `b → a` into one edge and ignores self-loops, so a graph that stores its undirected edges symmetrically behaves exactly like one that stores a single direction per edge.
 
-**`BiAdjacentGraph` for O(1) bidirectional access.** Opt-in via `graph.biAdjacentGraph()`. Doubles the storage to 8 B per (node + edge) and gives constant-time access in both directions — useful for Kahn's topological order, which then reads in-degrees in O(nodeCount) instead of scanning every edge, and for anything that walks predecessors, such as bidirectional BFS or ancestry queries. Connectivity is not among them: `Components.wccsOf` and `ccsOf` are Union-Find over the out-edges and need no in-adjacency.
+**`BiAdjacentGraph` for O(1) bidirectional access.** Opt-in via `graph.biAdjacentGraph()`. Doubles the storage to 8 B per (node + edge) and gives constant-time access in both directions — useful for Kahn's topological order, which then reads in-degrees in O(nodeCount) instead of scanning every edge, and for anything that walks predecessors, such as bidirectional BFS or ancestry queries. Connectivity is not among them: `Components.wccsOf` and `ccsOf` are Union-Find over the out-edges and need no in-adjacency. The control-flow analyses, which do walk predecessors, take a `BiAdjacentGraph` as input: the in-adjacency is built once, where the caller sees the cost, and shared by every analysis that needs it.
 
 **Algorithm results as first-class typed values.** Where other libraries hand you `Set<Set<V>>` or `Map<V, Integer>` and let you figure out the rest, Graphity returns a domain object with useful follow-ups:
 
@@ -101,6 +101,7 @@ double[] weights = new double[graph.edgeCount()];
 | `BackEdges.of(graph)`      | `Edges`         | `sourceNodes()`, `targetNodes()`             |
 | `Ancestry.of(forest)`      | `Ancestry`      | `lowestCommonAncestorOf(a, b)`, `depthOf()`  |
 | `PreorderAncestry.of(ancestry)` | `PreorderAncestry` | `isAncestorOf()` in O(1), `subtreeOf(node)`, `subtreeSizeOf()` |
+| `Dominators.of(cfg, entry)` | `Dominators` | `immediateDominatorOf()`, `Graphs.dominatorTree()`, `Graphs.dominanceFrontiers()`, `Ancestry.of(dominators)` |
 | `NodeMapping.of(...)`      | `NodeMapping`   | `inverse()`, `compose(other)`                |
 
 These types compose. `sccs.condense()` returns a `Graph` plus a `NodeMapping` from original nodes to SCC IDs that you can run further algorithms on; `nodeMapping.compose(other)` chains transformations and applies the result to your own metadata arrays in one step.
@@ -219,6 +220,9 @@ Graphity ships the following algorithms out of the box. All of them return typed
 | Back edges                                                      | `BackEdges.of(graph)`         |
 | Lowest common ancestor (trees and forests)                      | `Ancestry.of(forest)`         |
 | Constant-time ancestor test and subtree views (trees and forests) | `PreorderAncestry.of(ancestry)` |
+| Dominators, one or several entries (Lengauer-Tarjan)            | `Dominators.of(biAdjacentGraph, entries)` |
+| Dominator tree, dominance frontiers                             | `Graphs.dominatorTree(dominators)`, `Graphs.dominanceFrontiers(dominators)` |
+| Post-dominators, control dependence                             | `Dominators.of(cfg.transposed(), exits)`, `Graphs.dominanceFrontiers(postDominators).transposed()` |
 | Shape predicates (`isDag`, `isForest`, `isTree`, `isPath`)      | `Graphs.isDag(graph)`         |
 | Shape predicates, undirected interpretation (`isBipartite`, `isUndirectedTree`, `isUndirectedForest`, `isWeaklyConnected`) | `Graphs.isBipartite(graph)` |
 | Condensation DAG                                                | `sccs.condense()`             |
