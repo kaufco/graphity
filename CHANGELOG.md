@@ -19,6 +19,7 @@ runs on Java 17.
   - [Issue #15](../../issues/15) - Add `PreorderAncestry` - constant-time ancestor tests and subtree views
 - Algorithms
   - [Issue #16](../../issues/16) - Add `Dominators` - dominator trees and dominance frontiers
+  - [Issue #17](../../issues/17) - Add `IteratedDominanceFrontier` - phi placement for SSA construction
 
 ### Changed
 

@@ -32,6 +32,7 @@ import java.util.Objects;
  * Graph frontiers = Graphs.dominanceFrontiers(dominators);    // edge n -> m, m in DF(n)
  * var index = Ancestry.of(dominators);                        // "a dominates b" in O(log n)
  * boolean dominates = index.isAncestorOf(a, b);
+ * var phis = IteratedDominanceFrontier.of(dominators);        // phi placement
  * }</pre>
  *
  * There is no {@code dominates(a, b)} here: with the immediate dominators alone it would walk up
@@ -67,6 +68,7 @@ import java.util.Objects;
  *
  * @see Graphs#dominatorTree(Dominators)
  * @see Graphs#dominanceFrontiers(Dominators)
+ * @see IteratedDominanceFrontier
  * @see Ancestry#of(Dominators)
  */
 public final class Dominators {

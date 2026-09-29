@@ -648,7 +648,8 @@ public final class Graphs {
    * The dominance frontier of {@code n} holds the nodes where its dominance ends: {@code m} is in
    * it if {@code n} dominates a predecessor of {@code m} but does not strictly dominate {@code m}.
    * A node can be in its own frontier, so the result may have self-loops. Unreachable nodes have
-   * empty frontiers and appear in none.
+   * empty frontiers and appear in none. For phi placement, use {@link IteratedDominanceFrontier},
+   * which never materializes this relation.
    * <p>
    * Computed on every call, not cached - keep the result. The relation can grow quadratically
    * in the node count, for example on a ladder of branches that all join at the end.

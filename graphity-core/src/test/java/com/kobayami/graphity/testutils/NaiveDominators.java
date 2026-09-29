@@ -79,6 +79,31 @@ public final class NaiveDominators {
     return frontier;
   }
 
+  /**
+   * The iterated dominance frontier of {@code nodes}: the frontier of the set, then of the set
+   * joined with the result, until it no longer grows.
+   */
+  public boolean[] iteratedFrontier(boolean[][] frontiers, IntList nodes) {
+    int n = graph.nodeCount();
+    var source = new boolean[n];
+    for (int i = 0; i < nodes.size(); i++) source[nodes.getInt(i)] = true;
+    var result = new boolean[n];
+    boolean grew = true;
+    while (grew) {
+      grew = false;
+      for (int x = 0; x < n; x++) {
+        if (!source[x] && !result[x]) continue;
+        for (int m = 0; m < n; m++) {
+          if (frontiers[x][m] && !result[m]) {
+            result[m] = true;
+            grew = true;
+          }
+        }
+      }
+    }
+    return result;
+  }
+
   /** Breadth-first reachability from the entries, with {@code removed} taken out of the graph. */
   private static boolean[] reach(Graph graph, IntList entries, int removed) {
     int n = graph.nodeCount();
