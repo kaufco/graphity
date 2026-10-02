@@ -74,6 +74,20 @@ class DeepGraphStackSafetyTest {
   }
 
   @Test
+  void deepLoopsDoNotOverflowStack() {
+    // DEEP / 2 loops nested inside each other: i -> i + 1 down the first half, and a back edge
+    // from DEEP - 1 - i to i, so loop i encloses loop i + 1.
+    var builder = new GraphBuilder();
+    builder.addNodes(DEEP);
+    for (int i = 0; i + 1 < DEEP; i++) builder.addEdge(i, i + 1);
+    for (int i = 0; i < DEEP / 2; i++) builder.addEdge(DEEP - 1 - i, i);
+    Loops loops = Loops.of(builder.build().biAdjacentGraph(), 0);
+    assertThat(loops.loopCount()).isEqualTo(DEEP / 2);
+    assertThat(loops.loopDepthOf(DEEP / 2)).isEqualTo(DEEP / 2);
+    assertThat(loops.isReducible()).isTrue();
+  }
+
+  @Test
   void deepBiconnectivityDoesNotOverflowStack() {
     // Every edge of a path is a bridge and its own block, so the traversal descends DEEP levels
     // before the first block closes.

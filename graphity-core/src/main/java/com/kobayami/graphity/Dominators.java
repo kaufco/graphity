@@ -17,7 +17,7 @@ import java.util.Objects;
  * <p>
  * The analysis reads the predecessors of each node and so takes a {@link BiAdjacentGraph}. A
  * caller holding a plain {@link Graph} builds the in-adjacency once, at a visible cost, and can
- * hand the same graph to every other analysis that needs it:
+ * hand the same graph to {@link Loops} and the other analyses that need it:
  *
  * <pre>{@code
  * BiAdjacentGraph cfg = graph.biAdjacentGraph();   // +4 x (nodeCount + edgeCount) bytes

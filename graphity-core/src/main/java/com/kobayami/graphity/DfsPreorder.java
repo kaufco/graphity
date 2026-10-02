@@ -6,7 +6,7 @@ import java.util.Objects;
 
 /**
  * Depth-first preorder of the nodes reachable from a list of entries - the common first step of
- * the control-flow analyses, starting with {@link Dominators}.
+ * {@link Dominators} and {@link Loops}.
  * <p>
  * Preorder numbers start at 1. Number 0 is a virtual root above all entries, so that several
  * entries need no special case downstream: every entry the search starts from is a child of

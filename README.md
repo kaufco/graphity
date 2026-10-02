@@ -102,6 +102,7 @@ double[] weights = new double[graph.edgeCount()];
 | `Ancestry.of(forest)`      | `Ancestry`      | `lowestCommonAncestorOf(a, b)`, `depthOf()`  |
 | `PreorderAncestry.of(ancestry)` | `PreorderAncestry` | `isAncestorOf()` in O(1), `subtreeOf(node)`, `subtreeSizeOf()` |
 | `Dominators.of(cfg, entry)` | `Dominators` | `immediateDominatorOf()`, `Graphs.dominatorTree()`, `Graphs.dominanceFrontiers()`, `Ancestry.of(dominators)` |
+| `Loops.of(cfg, entry)`     | `Loops`         | `innermostLoopOf()`, `nodesOf(loop)`, `entriesOf(loop)`, `isReducible()` |
 | `NodeMapping.of(...)`      | `NodeMapping`   | `inverse()`, `compose(other)`                |
 
 These types compose. `sccs.condense()` returns a `Graph` plus a `NodeMapping` from original nodes to SCC IDs that you can run further algorithms on; `nodeMapping.compose(other)` chains transformations and applies the result to your own metadata arrays in one step.
@@ -223,6 +224,7 @@ Graphity ships the following algorithms out of the box. All of them return typed
 | Dominators, one or several entries (Lengauer-Tarjan)            | `Dominators.of(biAdjacentGraph, entries)` |
 | Dominator tree, dominance frontiers                             | `Graphs.dominatorTree(dominators)`, `Graphs.dominanceFrontiers(dominators)` |
 | Iterated dominance frontiers, phi placement (Sreedhar-Gao)      | `IteratedDominanceFrontier.of(dominators)` |
+| Loop nesting forest, irreducible loops included (Havlak)        | `Loops.of(biAdjacentGraph, entries)` |
 | Post-dominators, control dependence                             | `Dominators.of(cfg.transposed(), exits)`, `Graphs.dominanceFrontiers(postDominators).transposed()` |
 | Shape predicates (`isDag`, `isForest`, `isTree`, `isPath`)      | `Graphs.isDag(graph)`         |
 | Shape predicates, undirected interpretation (`isBipartite`, `isUndirectedTree`, `isUndirectedForest`, `isWeaklyConnected`) | `Graphs.isBipartite(graph)` |
