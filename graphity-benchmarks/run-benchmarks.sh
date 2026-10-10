@@ -105,12 +105,16 @@ validate_matrix() {
   python3 - "$matrix_file" <<'PY'
 import json, os, sys
 
+# Shapes of ControlFlowFixture (ControlFlowShape), for the control-flow analyses only.
+CONTROL_FLOW_SHAPES = {
+    "STRUCTURED", "IRREDUCIBLE", "LADDER", "CHAIN", "FAN_BEHIND_CHAIN", "SMALL_METHODS"
+}
 ALL_SHAPES = {
     "PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES",
     "DAG_GNP_SPARSE", "DAG_GNP_DENSE",
     "PATH_SHUFFLED", "TREE_SHUFFLED", "GNP_SPARSE_SHUFFLED", "GNP_DENSE_SHUFFLED",
     "CHAIN_OF_CLIQUES_SHUFFLED", "DAG_GNP_SPARSE_SHUFFLED", "DAG_GNP_DENSE_SHUFFLED"
-}
+} | CONTROL_FLOW_SHAPES
 GRAPH_FIXTURE_SHAPES = {
     "PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES",
     "PATH_SHUFFLED", "TREE_SHUFFLED", "GNP_SPARSE_SHUFFLED", "GNP_DENSE_SHUFFLED",
@@ -129,7 +133,14 @@ DAG_FIXTURE_SHAPES = {
 SUPPORTED_LIBS = {"graphity", "graphity-reordered", "graphity-biadjacent", "jgrapht", "guava", "webgraph"}
 SUPPORTED_ALGOS = {
     "build", "scc", "wcc", "ccs", "condense", "toporder", "toporderandlevels",
-    "backedges", "edgetypes", "reorder", "biadjacency", "symmetrize"
+    "backedges", "edgetypes", "reorder", "biadjacency", "symmetrize",
+    "dominators", "dominancefrontiers", "iterateddominancefrontier", "loops",
+    "dominatorancestry", "preorderancestry"
+}
+# No peer offers dominators or loop nesting, so these are Graphity-only sections.
+CONTROL_FLOW_ALGOS = {
+    "dominators", "dominancefrontiers", "iterateddominancefrontier", "loops",
+    "dominatorancestry", "preorderancestry"
 }
 ALGO_SUPPORTED_LIBS = {
     "build": {"graphity", "jgrapht", "guava", "webgraph"},
@@ -146,8 +157,10 @@ ALGO_SUPPORTED_LIBS = {
     "reorder": {"graphity"},
     "biadjacency": {"graphity"},
     "symmetrize": {"webgraph"},
+    **{algo: {"graphity"} for algo in CONTROL_FLOW_ALGOS},
 }
 ALGO_ALLOWED_SHAPES = {
+    **{algo: CONTROL_FLOW_SHAPES for algo in CONTROL_FLOW_ALGOS},
     "build": GRAPH_FIXTURE_SHAPES,
     "scc": GRAPH_FIXTURE_SHAPES,
     "backedges": GRAPH_FIXTURE_SHAPES,
@@ -417,6 +430,24 @@ BENCHMARK_FQNS = {
     },
     "symmetrize": {
         "webgraph": "com.kobayami.graphity.benchmarks.webgraph.WebGraphSymmetrizeBenchmark.symmetrize",
+    },
+    "dominators": {
+        "graphity": "com.kobayami.graphity.benchmarks.graphity.DominatorsBenchmark.dominators",
+    },
+    "dominancefrontiers": {
+        "graphity": "com.kobayami.graphity.benchmarks.graphity.DominanceFrontiersBenchmark.dominanceFrontiers",
+    },
+    "iterateddominancefrontier": {
+        "graphity": "com.kobayami.graphity.benchmarks.graphity.IteratedDominanceFrontierBenchmark.iteratedDominanceFrontier",
+    },
+    "loops": {
+        "graphity": "com.kobayami.graphity.benchmarks.graphity.LoopsBenchmark.loops",
+    },
+    "dominatorancestry": {
+        "graphity": "com.kobayami.graphity.benchmarks.graphity.DominatorAncestryBenchmark.dominatorAncestry",
+    },
+    "preorderancestry": {
+        "graphity": "com.kobayami.graphity.benchmarks.graphity.PreorderAncestryBenchmark.preorderAncestry",
     },
 }
 

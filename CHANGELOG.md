@@ -21,6 +21,8 @@ runs on Java 17.
   - [Issue #16](../../issues/16) - Add `Dominators` - dominator trees and dominance frontiers
   - [Issue #17](../../issues/17) - Add `IteratedDominanceFrontier` - phi placement for SSA construction
   - [Issue #18](../../issues/18) - Add `Loops` - loop nesting forest of a control-flow graph, irreducible loops included
+- Benchmarks
+  - [Issue #19](../../issues/19) - Benchmark the control-flow analyses on graphs shaped like control flow
 
 ### Changed
 

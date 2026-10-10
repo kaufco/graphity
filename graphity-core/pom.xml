@@ -58,6 +58,25 @@
         <artifactId>jacoco-maven-plugin</artifactId>
       </plugin>
       <plugin>
+        <!-- The graph generators and oracles of the tests, packaged for graphity-benchmarks so
+             both measure and test on the same shapes. The release profile skips it: it is a
+             build-internal artifact, not part of the published library. -->
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>testutils-jar</id>
+            <goals><goal>test-jar</goal></goals>
+            <configuration>
+              <skip>${graphity.skipTestJar}</skip>
+              <includes>
+                <include>com/kobayami/graphity/testutils/**</include>
+              </includes>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-source-plugin</artifactId>
         <executions>

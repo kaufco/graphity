@@ -131,6 +131,34 @@
         "nodeCount": [10000, 100000],
         "shape": ["PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "PATH_SHUFFLED", "GNP_DENSE_SHUFFLED", "CHAIN_OF_CLIQUES_SHUFFLED"]
       }
+    },
+    {
+      "name": "control-flow",
+      "libraries": ["graphity"],
+      "algorithms": ["dominators", "iterateddominancefrontier", "loops", "dominatorancestry", "preorderancestry"],
+      "params": {
+        "nodeCount": [10000, 100000],
+        "shape": ["STRUCTURED", "IRREDUCIBLE", "LADDER", "CHAIN", "FAN_BEHIND_CHAIN", "SMALL_METHODS"]
+      }
+    },
+    {
+      "name": "dominance-frontiers",
+      "libraries": ["graphity"],
+      "algorithms": ["dominancefrontiers"],
+      "params": {
+        "nodeCount": [10000, 100000],
+        "shape": ["STRUCTURED", "IRREDUCIBLE", "CHAIN", "SMALL_METHODS"]
+      }
+    },
+    {
+      "name": "dominance-frontiers-quadratic",
+      "description": "The frontier relation itself is quadratic on these shapes: about 12.5 and 25 million pairs at 10k nodes, more than an array holds at 100k.",
+      "libraries": ["graphity"],
+      "algorithms": ["dominancefrontiers"],
+      "params": {
+        "nodeCount": [10000],
+        "shape": ["LADDER", "FAN_BEHIND_CHAIN"]
+      }
     }
   ],
   "mem": {

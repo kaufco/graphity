@@ -13,6 +13,7 @@ import com.kobayami.graphity.SortedIntView;
 import com.kobayami.graphity.TopOrder;
 import com.kobayami.graphity.TopOrderAndLevels;
 import com.kobayami.graphity.benchmarks.common.BenchEdgePairs;
+import com.kobayami.graphity.benchmarks.controlflow.ControlFlowShape;
 import com.kobayami.graphity.benchmarks.generators.BenchmarkGraphs;
 import com.kobayami.graphity.benchmarks.generators.GraphShape;
 import com.kobayami.graphity.benchmarks.guava.GuavaBackEdges;
@@ -70,6 +71,19 @@ public final class ValidateMain {
    */
   private static final Set<String> DAG_ONLY_ALGORITHMS = Set.of("toporder", "toporderandlevels");
 
+  /**
+   * Algorithms measured on {@link ControlFlowShape} graphs. They are Graphity-only, so there
+   * is no peer output to cross-validate; generating the fixture graphs is the smoke test.
+   * Keep this in sync with {@code CONTROL_FLOW_ALGOS} in run-benchmarks.sh.
+   */
+  private static final Set<String> CONTROL_FLOW_ALGORITHMS = Set.of(
+      "dominators",
+      "dominancefrontiers",
+      "iterateddominancefrontier",
+      "loops",
+      "dominatorancestry",
+      "preorderancestry");
+
   private ValidateMain() {}
 
   public static void run(String[] args) throws Exception {
@@ -112,16 +126,29 @@ public final class ValidateMain {
           fail("synthetic mode requires both --nodes and --shapes");
         }
         int[] nodeCounts = parseIntCsv(nodesCsv);
-        List<GraphShape> shapes = parseShapes(shapesCsv);
-        for (int n : nodeCounts) {
-          for (GraphShape shape : shapes) {
-            com.kobayami.graphity.Graph template = BenchmarkGraphs.generate(shape, n);
-            validateCase(algorithm, libraries, shape, n, template, wgTmpRoot);
+        if (CONTROL_FLOW_ALGORITHMS.contains(algorithm)) {
+          List<ControlFlowShape> shapes = parseControlFlowShapes(shapesCsv);
+          for (int n : nodeCounts) {
+            for (ControlFlowShape shape : shapes) {
+              // Graphity-only; correctness is covered by the control-flow unit tests.
+              shape.generateAll(n, 42);
+            }
           }
+          System.err.printf(Locale.ROOT,
+              "validate ok: algorithm=%s libraries=%s nodes=%s shapes=%s%n",
+              algorithm, libraries, Arrays.toString(nodeCounts), shapes);
+        } else {
+          List<GraphShape> shapes = parseShapes(shapesCsv);
+          for (int n : nodeCounts) {
+            for (GraphShape shape : shapes) {
+              com.kobayami.graphity.Graph template = BenchmarkGraphs.generate(shape, n);
+              validateCase(algorithm, libraries, shape, n, template, wgTmpRoot);
+            }
+          }
+          System.err.printf(Locale.ROOT,
+              "validate ok: algorithm=%s libraries=%s nodes=%s shapes=%s%n",
+              algorithm, libraries, Arrays.toString(nodeCounts), shapes);
         }
-        System.err.printf(Locale.ROOT,
-            "validate ok: algorithm=%s libraries=%s nodes=%s shapes=%s%n",
-            algorithm, libraries, Arrays.toString(nodeCounts), shapes);
       } else {
         List<String> datasetPaths = parseStringCsv(datasetsCsv);
         boolean dropSelfLoops = DAG_ONLY_ALGORITHMS.contains(algorithm);
@@ -682,6 +709,13 @@ public final class ValidateMain {
     List<String> items = parseStringCsv(csv);
     List<GraphShape> out = new ArrayList<>();
     for (String item : items) out.add(GraphShape.valueOf(item));
+    return out;
+  }
+
+  private static List<ControlFlowShape> parseControlFlowShapes(String csv) {
+    List<String> items = parseStringCsv(csv);
+    List<ControlFlowShape> out = new ArrayList<>();
+    for (String item : items) out.add(ControlFlowShape.valueOf(item));
     return out;
   }
 

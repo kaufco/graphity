@@ -55,7 +55,8 @@ public final class ReportMain {
       "GNP_DENSE", "GNP_DENSE_SHUFFLED",
       "CHAIN_OF_CLIQUES", "CHAIN_OF_CLIQUES_SHUFFLED",
       "DAG_GNP_SPARSE", "DAG_GNP_SPARSE_SHUFFLED",
-      "DAG_GNP_DENSE", "DAG_GNP_DENSE_SHUFFLED");
+      "DAG_GNP_DENSE", "DAG_GNP_DENSE_SHUFFLED",
+      "STRUCTURED", "IRREDUCIBLE", "LADDER", "CHAIN", "FAN_BEHIND_CHAIN", "SMALL_METHODS");
 
   /** Canonical algorithm names (map from benchmark-class stem → displayed name). */
   private static final Map<String, String> ALGO_NAME = Map.ofEntries(
@@ -70,7 +71,14 @@ public final class ReportMain {
       Map.entry("EdgeTypes", "EdgeTypes"),
       Map.entry("Reorder", "Reorder (DFS-preorder) cost"),
       Map.entry("BiAdjacency", "BiAdjacency (in-adjacency) cost"),
-      Map.entry("Symmetrize", "Symmetrize (WebGraph) cost"));
+      Map.entry("Symmetrize", "Symmetrize (WebGraph) cost"),
+      Map.entry("Dominators", "Dominators"),
+      Map.entry("DominanceFrontiers", "Dominance frontiers"),
+      Map.entry("IteratedDominanceFrontier",
+          "Iterated dominance frontier (build + one query per variable)"),
+      Map.entry("Loops", "Loops"),
+      Map.entry("DominatorAncestry", "Ancestry of the dominator tree"),
+      Map.entry("PreorderAncestry", "PreorderAncestry of the dominator tree"));
 
   /**
    * Fixed algorithm order for the performance / allocation sub-chapters. The three structure
@@ -81,7 +89,10 @@ public final class ReportMain {
    */
   private static final List<String> ALGO_ORDER = List.of(
       "Build", "Scc", "Wcc", "Ccs", "Condense", "TopOrder", "TopOrderAndLevels",
-      "BackEdges", "EdgeTypes", "Reorder", "BiAdjacency", "Symmetrize");
+      "BackEdges", "EdgeTypes",
+      "Dominators", "DominanceFrontiers", "IteratedDominanceFrontier", "Loops",
+      "DominatorAncestry", "PreorderAncestry",
+      "Reorder", "BiAdjacency", "Symmetrize");
 
   /**
    * Algorithms measured on a self-loop-free dataset, because they only accept a DAG. Their

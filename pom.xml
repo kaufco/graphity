@@ -72,6 +72,9 @@
     <maven.compiler.source>17</maven.compiler.source>
     <maven.compiler.target>17</maven.compiler.target>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <!-- Set by the release profile, so that the test-utility jar of graphity-core never
+         reaches a Maven Central bundle. -->
+    <graphity.skipTestJar>false</graphity.skipTestJar>
 
     <fastutil.version>8.5.17</fastutil.version>
     <jspecify.version>1.0.0</jspecify.version>
@@ -90,6 +93,7 @@
     <shade-plugin.version>3.5.3</shade-plugin.version>
     <javadoc-plugin.version>3.11.2</javadoc-plugin.version>
     <source-plugin.version>3.3.1</source-plugin.version>
+    <jar-plugin.version>3.4.1</jar-plugin.version>
     <gpg-plugin.version>3.2.8</gpg-plugin.version>
     <central-publishing-plugin.version>0.11.0</central-publishing-plugin.version>
   </properties>
@@ -243,6 +247,12 @@
 
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-jar-plugin</artifactId>
+          <version>${jar-plugin.version}</version>
+        </plugin>
+
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-javadoc-plugin</artifactId>
           <version>${javadoc-plugin.version}</version>
           <configuration>
@@ -284,6 +294,9 @@
   <profiles>
     <profile>
       <id>release</id>
+      <properties>
+        <graphity.skipTestJar>true</graphity.skipTestJar>
+      </properties>
       <build>
         <plugins>
           <plugin>

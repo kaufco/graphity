@@ -34,6 +34,13 @@
       <groupId>com.kobayami</groupId>
       <artifactId>graphity-core</artifactId>
     </dependency>
+    <dependency>
+      <!-- The generators and oracles from the core tests (control-flow shapes, among others). -->
+      <groupId>com.kobayami</groupId>
+      <artifactId>graphity-core</artifactId>
+      <version>${project.version}</version>
+      <type>test-jar</type>
+    </dependency>
 
     <dependency>
       <groupId>org.openjdk.jmh</groupId>
