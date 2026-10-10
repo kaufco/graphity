@@ -19,9 +19,14 @@
 # layout (/javadoc/<version>/, /javadoc/latest/) can be introduced later
 # without changing the trigger model.
 #
-# GitHub Pages source must be set to "GitHub Actions" in the repository
-# settings — this workflow uses actions/deploy-pages, not a gh-pages
-# branch.
+# Two repository settings are prerequisites:
+#   * GitHub Pages source must be "GitHub Actions" — this workflow uses
+#     actions/deploy-pages, not a gh-pages branch.
+#   * The `github-pages` environment must allow tag deployments. By default it
+#     permits the default branch only, and a release run stands in the tag's
+#     ref, so it is rejected with "Tag X.Y.Z is not allowed to deploy to
+#     github-pages due to environment protection rules". Add a tag rule under
+#     Deployment branches and tags; until then, dispatch manually from main.
 
 name: Deploy Javadoc
 

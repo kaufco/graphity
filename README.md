@@ -237,7 +237,7 @@ For custom traversals, subclass `IterativeDfsTraverser` (or `BiAdjacentDfsTraver
 
 **Scope: structural analysis, not weighted optimization.** Graphity works on pure topology — components, ordering, edge classification, condensation, remapping. Weights and capacities are deliberately outside the data model, and with them the optimization domains built on top: flows and cuts, matching and assignment, TSP, colouring. For those, JGraphT is the right tool and a good one.
 
-**Memory compactness: WebGraph uses less memory.** Graphity stores 4 B per (node + edge) — constant regardless of topology. WebGraph's compressed BVGraph format achieves 0.9–2.4 B per element by exploiting locality and delta coding. On memory-limited machines with very large graphs, that difference matters. Graphity does not target this corner; its CSR layout is optimised for fast random access, not compression.
+**Memory compactness: WebGraph uses less memory.** Graphity stores 4 B per (node + edge) — constant regardless of topology. WebGraph's compressed BVGraph format achieves 0.16–2.38 B per element by exploiting locality and delta coding. On memory-limited machines with very large graphs, that difference matters. Graphity does not target this corner; its CSR layout is optimised for fast random access, not compression.
 
 ## Documentation
 
