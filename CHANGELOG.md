@@ -7,7 +7,7 @@ Graphity adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [2.2.0] — unreleased
+## [2.2.0] — 2026-10-13
 
 Adds the control-flow analyses a compiler pipeline starts with: dominators, iterated dominance
 frontiers, loop nesting forests, and constant-time ancestor tests. The library now builds and
