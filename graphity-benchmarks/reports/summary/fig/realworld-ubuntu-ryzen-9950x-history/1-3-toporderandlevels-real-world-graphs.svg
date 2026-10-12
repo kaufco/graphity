@@ -1,27 +1,33 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="200" height="388" viewBox="0 0 200 388" role="img">
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="420" viewBox="0 0 200 420" role="img">
 <style>text{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;font-size:11px;fill:#334155}.axis{stroke:#94a3b8;stroke-width:1;fill:none}.grid{stroke:#e2e8f0;stroke-width:1}.ylabel{fill:#64748b;font-size:10px}.tick{fill:#64748b;font-size:10px}.xlabel{font-size:10px}</style>
-<rect x="0" y="0" width="200" height="388" fill="#ffffff"/>
+<rect x="0" y="0" width="200" height="420" fill="#ffffff"/>
 <rect x="56" y="5" width="12" height="12" rx="2" fill="#2563eb"/>
 <text x="72" y="14" class="tick">Graphity 2.1.0</text>
-<rect x="56" y="21" width="12" height="12" rx="2" fill="#be123c"/>
-<text x="72" y="30" class="tick">Graphity 2.1.0 (bi-adjacent)</text>
-<line class="grid" x1="56" y1="292.0" x2="176" y2="292.0"/>
-<text class="tick" x="48" y="295.0" text-anchor="end">0%</text>
-<line class="grid" x1="56" y1="242.0" x2="176" y2="242.0"/>
-<text class="tick" x="48" y="245.0" text-anchor="end">25%</text>
+<rect x="56" y="21" width="12" height="12" rx="2" fill="#dc2626"/>
+<text x="72" y="30" class="tick">Graphity 2.2.0</text>
+<rect x="56" y="37" width="12" height="12" rx="2" fill="#be123c"/>
+<text x="72" y="46" class="tick">Graphity 2.1.0 (bi-adjacent)</text>
+<rect x="56" y="53" width="12" height="12" rx="2" fill="#047857"/>
+<text x="72" y="62" class="tick">Graphity 2.2.0 (bi-adjacent)</text>
+<line class="grid" x1="56" y1="324.0" x2="176" y2="324.0"/>
+<text class="tick" x="48" y="327.0" text-anchor="end">0%</text>
+<line class="grid" x1="56" y1="280.0" x2="176" y2="280.0"/>
+<text class="tick" x="48" y="283.0" text-anchor="end">25%</text>
+<line class="grid" x1="56" y1="236.0" x2="176" y2="236.0"/>
+<text class="tick" x="48" y="239.0" text-anchor="end">50%</text>
 <line class="grid" x1="56" y1="192.0" x2="176" y2="192.0"/>
-<text class="tick" x="48" y="195.0" text-anchor="end">50%</text>
-<line class="grid" x1="56" y1="142.0" x2="176" y2="142.0"/>
-<text class="tick" x="48" y="145.0" text-anchor="end">75%</text>
-<line class="grid" x1="56" y1="92.0" x2="176" y2="92.0"/>
-<text class="tick" x="48" y="95.0" text-anchor="end">100%</text>
-<line class="grid" x1="56" y1="72.0" x2="176" y2="72.0"/>
-<text class="tick" x="48" y="75.0" text-anchor="end">110%</text>
-<line class="axis" x1="56" y1="72" x2="56" y2="292"/>
-<line class="axis" x1="56" y1="292" x2="176" y2="292"/>
-<text class="ylabel" x="16" y="182.0" text-anchor="middle" transform="rotate(-90 16 182.0)">% of Graphity 2.1.0</text>
-<text class="xlabel" x="73.5" y="304.0" text-anchor="end" transform="rotate(-40 73.5 304.0)">cit-Patents</text>
-<rect x="56.0" y="92.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 2.1.0 · cit-Patents: 100%</title></rect>
-<rect x="75.0" y="91.4" width="16" height="200.6" fill="#be123c" rx="1"><title>Graphity 2.1.0 (bi-adjacent) · cit-Patents: 100%</title></rect>
-<line x1="56" y1="92.0" x2="176" y2="92.0" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4 3"/>
+<text class="tick" x="48" y="195.0" text-anchor="end">75%</text>
+<line class="grid" x1="56" y1="148.0" x2="176" y2="148.0"/>
+<text class="tick" x="48" y="151.0" text-anchor="end">100%</text>
+<line class="grid" x1="56" y1="104.0" x2="176" y2="104.0"/>
+<text class="tick" x="48" y="107.0" text-anchor="end">125%</text>
+<line class="axis" x1="56" y1="104" x2="56" y2="324"/>
+<line class="axis" x1="56" y1="324" x2="176" y2="324"/>
+<text class="ylabel" x="16" y="214.0" text-anchor="middle" transform="rotate(-90 16 214.0)">% of Graphity 2.2.0</text>
+<text class="xlabel" x="92.5" y="336.0" text-anchor="end" transform="rotate(-40 92.5 336.0)">cit-Patents</text>
+<rect x="56.0" y="137.5" width="16" height="186.5" fill="#2563eb" rx="1"><title>Graphity 2.1.0 · cit-Patents: 106%</title></rect>
+<rect x="75.0" y="148.0" width="16" height="176.0" fill="#dc2626" rx="1"><title>Graphity 2.2.0 · cit-Patents: 100%</title></rect>
+<rect x="94.0" y="136.9" width="16" height="187.1" fill="#be123c" rx="1"><title>Graphity 2.1.0 (bi-adjacent) · cit-Patents: 106%</title></rect>
+<rect x="113.0" y="144.3" width="16" height="179.7" fill="#047857" rx="1"><title>Graphity 2.2.0 (bi-adjacent) · cit-Patents: 102%</title></rect>
+<line x1="56" y1="148.0" x2="176" y2="148.0" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4 3"/>
 </svg>

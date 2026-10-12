@@ -167,10 +167,10 @@ Measured on an AMD Ryzen 9 9950X with OpenJDK 25. The parenthesised factor is re
 
 | Shape            | Graphity | JGraphT         | Guava           | WebGraph        |
 |------------------|---------:|----------------:|----------------:|----------------:|
-| Tree             | 2.24 ms  | 42.50 ms (19×)  | 41.79 ms (19×)  | 5.66 ms (2.5×)  |
-| GNP sparse       | 4.33 ms  | 109.1 ms (25×)  | 103.4 ms (24×)  | 10.40 ms (2.4×) |
-| GNP dense        | 7.39 ms  | 493.6 ms (67×)  | 428.8 ms (58×)  | 35.66 ms (4.8×) |
-| Chain of cliques | 2.62 ms  | 185.5 ms (71×)  | 112.8 ms (43×)  | 36.60 ms (14×)  |
+| Tree             | 2.153 ms | 49.38 ms (23×)  | 41.68 ms (19×)  | 5.713 ms (2.7×) |
+| GNP sparse       | 4.617 ms | 119.9 ms (26×)  | 115.9 ms (25×)  | 10.53 ms (2.3×) |
+| GNP dense        | 8.010 ms | 503.0 ms (63×)  | 584.2 ms (73×)  | 37.19 ms (4.6×) |
+| Chain of cliques | 2.509 ms | 177.4 ms (71×)  | 116.1 ms (46×)  | 37.72 ms (15×)  |
 
 #### Throughput @ 100k nodes (higher is better)
 
@@ -182,9 +182,9 @@ Measured on an AMD Ryzen 9 9950X with OpenJDK 25. The parenthesised factor is re
 
 | Dataset                                  | Graphity | JGraphT          | Guava            | WebGraph        |
 |------------------------------------------|---------:|-----------------:|-----------------:|----------------:|
-| web-Google (875k nodes, 5.1M edges)      | 41.0 ms  | 1265 ms (31×)    | 796 ms (19×)     | 235 ms (5.7×)   |
-| wiki-Talk (2.4M nodes, 5M edges)         | 59.8 ms  | 1539 ms (26×)    | 1556 ms (26×)    | 162 ms (2.7×)   |
-| soc-LiveJournal1 (4.8M nodes, 69M edges) | 1021 ms  | 23 907 ms (23×)  | 16 502 ms (16×)  | 4033 ms (4.0×)  |
+| web-Google (875k nodes, 5.1M edges)      | 44.45 ms | 1325.0 ms (30×)  | 807.0 ms (18×)   | 239.3 ms (5.4×) |
+| wiki-Talk (2.4M nodes, 5M edges)         | 62.68 ms | 1572.4 ms (25×)  | 1591.0 ms (25×)  | 153.0 ms (2.4×) |
+| soc-LiveJournal1 (4.8M nodes, 69M edges) | 1063.4 ms | 24532 ms (23×) | 17416 ms (16×) | 3949.5 ms (3.7×) |
 
 #### Throughput (higher is better)
 
