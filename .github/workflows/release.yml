@@ -114,11 +114,25 @@ jobs:
           server-password: CENTRAL_TOKEN_PASSWORD
           gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
 
+      - name: Pin Maven 3.9.16
+        # ubuntu-latest moved to Maven 3.10.0 on 2026-10-04. 3.10 writes
+        # maven-metadata-local.xml beside the version directory; plugin 0.11.0
+        # leaves it in the bundle and the portal rejects it ("does NOT have a
+        # .pom file"). 2.1.0 still ran on 3.9.16. Do not use the runner's mvn.
+        run: |
+          set -euo pipefail
+          curl -fsSL -o /tmp/maven.zip \
+            https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.16/apache-maven-3.9.16-bin.zip
+          echo "5af3b743dd8b876b5c45da33b676251e5f1687712644abb4ee519ca56e1d89ce  /tmp/maven.zip" | sha256sum -c -
+          unzip -q /tmp/maven.zip -d "$HOME/.local"
+          echo "$HOME/.local/apache-maven-3.9.16/bin" >> "$GITHUB_PATH"
+
       - name: Check the POM version against the release
         env:
           EXPECTED: ${{ steps.target.outputs.version }}
         run: |
           set -euo pipefail
+          mvn -v
           pom="$(mvn -B -ntp -q help:evaluate -Dexpression=project.version -DforceStdout)"
           if [[ "$pom" != "$EXPECTED" ]]; then
             echo "The POM is at $pom, but this run was started for $EXPECTED." >&2
