@@ -2,6 +2,8 @@
 
 ### Added
 
+- API
+  - [Issue #21](../../issues/21) - Add `Graph.edgeIndexOf` - find where an added edge ended up
 - Algorithms
   - [Issue #20](../../issues/20) - Contract a graph by a partition of your choosing
 

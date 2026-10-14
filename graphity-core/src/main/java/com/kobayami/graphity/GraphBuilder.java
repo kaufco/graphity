@@ -614,8 +614,9 @@ public final class GraphBuilder {
    * Builds an immutable {@link Graph} from the current state.
    * <p>
    * Adjacency lists are sorted ascending and deduplicated (duplicate edges are silently
-   * removed). The builder is not consumed - further modifications and subsequent builds
-   * are allowed.
+   * removed), so an added edge does not keep the position at which it was added;
+   * {@link Graph#edgeIndexOf(int, int)} finds its final edge index. The builder is not
+   * consumed - further modifications and subsequent builds are allowed.
    * <p>
    * <strong>Time:</strong> O(nodeCount + edgeCount x log d̄) where d̄ is the average
    * out-degree (sorting per node).<br>

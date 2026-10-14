@@ -301,6 +301,41 @@ class GraphBuilderFuzzTest {
     }
   }
 
+  /**
+   * Every added edge, duplicates included, is found by {@link Graph#edgeIndexOf} at an index that
+   * holds exactly that edge, and distinct edges never share an index - so the lookup is the
+   * insertion-to-index translation the builder does not return.
+   */
+  @Test
+  void edgeIndexOfTranslatesEveryInsertion() {
+    int duplicatesSeen = 0;
+    for (long seed = 0; seed < ITERATIONS; seed++) {
+      var edges = randomEdges(seed);
+      var g = edgeByEdge(edges);
+      var edgeOfInsertion = new int[edges.size()];
+      for (int k = 0; k < edges.size(); k++) {
+        int s = edges.sources()[k];
+        int t = edges.targets()[k];
+        int e = g.edgeIndexOf(s, t);
+        edgeOfInsertion[k] = e;
+        assertThat(e).as("insertion %d, %s", k, edges.describe()).isBetween(0, g.edgeCount() - 1);
+        assertThat(g.edgeSource(e)).isEqualTo(s);
+        assertThat(g.edgeTarget(e)).isEqualTo(t);
+      }
+      for (int a = 0; a < edges.size(); a++) {
+        for (int b = a + 1; b < edges.size(); b++) {
+          boolean same = edges.sources()[a] == edges.sources()[b]
+              && edges.targets()[a] == edges.targets()[b];
+          if (same) duplicatesSeen++;
+          assertThat(edgeOfInsertion[a] == edgeOfInsertion[b])
+              .as("insertions %d and %d, %s", a, b, edges.describe())
+              .isEqualTo(same);
+        }
+      }
+    }
+    assertThat(duplicatesSeen).as("duplicate insertions compared").isGreaterThan(50);
+  }
+
   // ---- helpers ----
 
   private static EdgeList randomEdges(long seed) {

@@ -212,6 +212,33 @@ public sealed class Graph permits BiAdjacentGraph {
   }
 
   /**
+   * Returns the edge index of the edge {@code source → target}, or {@code -1} if there is none.
+   * <p>
+   * {@link GraphBuilder#build()} sorts every adjacency list and merges duplicate edges, so the
+   * k-th added edge does not keep index k. This lookup translates an insertion to its final
+   * index; insertions that map to the same index are the duplicates that were merged:
+   *
+   * <pre>{@code
+   * int[] edgeOfInsertion = new int[insertions];
+   * for (int k = 0; k < insertions; k++) {
+   *     edgeOfInsertion[k] = graph.edgeIndexOf(sources[k], targets[k]);
+   * }
+   * }</pre>
+   *
+   * <strong>Time:</strong> O(log outDegree(source)) via binary search.
+   *
+   * @param source source node ID in {@code 0..nodeCount()-1}
+   * @param target target node ID; any value, an out-of-range one yields {@code -1}
+   * @return edge index in {@code 0..edgeCount()-1}, or {@code -1} if the edge does not exist
+   * @throws IndexOutOfBoundsException if {@code source} is out of range
+   */
+  public final int edgeIndexOf(int source, int target) {
+    Objects.checkIndex(source, nodeCount());
+    return SortedIntView.indexOfInRange(
+        outAdjacency, outAdjacencyStart[source], outAdjacencyStart[source + 1], target);
+  }
+
+  /**
    * Tests whether {@code node} has a self-loop (an edge to itself).
    * Equivalent to {@link #hasOutNode(int, int) hasOutNode(node, node)}.
    * <p>

@@ -165,6 +165,29 @@ class GraphTest {
   }
 
   @Test
+  void edgeIndexOfFindsEdgesAndReportsMissingOnes() {
+    // Edge indices: 0 -> 1 is 0, 0 -> 2 is 1, 1 -> 2 is 2, 2 -> 0 is 3.
+    var g = TestGraphs.of(3, 0, 1, 0, 2, 1, 2, 2, 0);
+    assertThat(g.edgeIndexOf(0, 1)).isZero();
+    assertThat(g.edgeIndexOf(0, 2)).isEqualTo(1);
+    assertThat(g.edgeIndexOf(1, 2)).isEqualTo(2);
+    assertThat(g.edgeIndexOf(2, 0)).isEqualTo(3);
+    assertThat(g.edgeIndexOf(1, 0)).isEqualTo(-1);
+    assertThat(g.edgeIndexOf(0, 0)).isEqualTo(-1);
+    assertThat(g.edgeIndexOf(0, 999)).isEqualTo(-1);
+    assertThat(g.edgeIndexOf(0, -1)).isEqualTo(-1);
+    assertThat(g.biAdjacentGraph().edgeIndexOf(2, 0)).isEqualTo(3);
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {-1, 3})
+  void edgeIndexOfRejectsSourceOutOfRange(int source) {
+    var g = TestGraphs.of(3, 0, 1);
+    assertThatThrownBy(() -> g.edgeIndexOf(source, 1))
+        .isInstanceOf(IndexOutOfBoundsException.class);
+  }
+
+  @Test
   void hasOutNodeRejectsMissingEdges() {
     var g = TestGraphs.of(3, 0, 1, 0, 2, 1, 2);
     assertThat(g.hasOutNode(0, 0)).isFalse();
