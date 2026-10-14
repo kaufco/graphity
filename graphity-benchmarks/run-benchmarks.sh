@@ -4,7 +4,7 @@
 # Usage:
 #   ./run-benchmarks.sh <command> [args]
 #   commands: clean | bench [version] | synthetic <lib|all> | realworld <lib|all>
-#             | report [version]
+#             | report [version] | ab <label> | compare <label-a> <label-b>
 #   'bench [version]' runs synthetic → realworld → report in one go; the
 #   individual commands do the same thing step by step.
 #   See './run-benchmarks.sh --help' for the full workflow.
@@ -15,32 +15,26 @@
 #   mvn -am -pl graphity-benchmarks package -DskipTests
 #
 # ─────────────────────────────────────────────────────────────────────────────
-# Methodology note — variance at n ≥ 10⁶
+# Methodology note — report runs versus A/B decisions
 # ─────────────────────────────────────────────────────────────────────────────
-# At n = 1M and above, several benchmarks show ±error/score in the 50–97% range
-# (observed in the n=1M runs of 2026-04-26). Root cause: GC pauses inside long
-# iterations, not insufficient measurement time. Lengthening iterations makes it
-# worse, not better — more allocation per iter accumulates more GC pressure.
+# The report profiles (quick, full, big) measure with one fork and few iterations.
+# That resolves the factors against the peer libraries, but not changes of a few
+# percent: report sections whose code did not change deviate by 9–14 % at p90 and
+# up to 28 % between runs, and at n ≥ 10⁶ GC pauses inside single iterations push
+# confidence half-widths to 50–97 %.
 #
-# Recommended JMH flags for 1M+ profiles (apply before relying on absolute
-# factors in any external communication):
+# For a decision between two Graphity states use the A/B profile instead:
 #
-#   -Xmx16G -XX:+UseZGC -XX:+AlwaysPreTouch -f 3 -wi 5 -w 3s -i 10 -r 5s
+#   ./run-benchmarks.sh ab before --cases scc,toporder    # on the old state
+#   ./run-benchmarks.sh ab after  --cases scc,toporder    # on the new state
+#   ./run-benchmarks.sh compare before after
 #
-# Mitigations in order of increasing effect:
-#   1. -f 3              — averages JIT-state lottery across forks
-#   2. -Xmx16G           — pushes Major GCs out of the measurement window
-#   3. -XX:+UseZGC       — sub-millisecond pauses, removes GC variance entirely
-#   4. shorter iters     — many short iters (10 × 5s) instead of few long ones
-#   5. taskset -c 0-15   — pin to one socket / fast cores
-#   6. AlwaysPreTouch    — heap allocated at startup, smoother first iters
-#
-# These flags are NOT yet applied to any standard profile — that work belongs
-# into the Release 1.1 benchmark round, which focuses on performance and memory
-# investigations rather than new algorithms. Until then, treat n=1M factors as
-# directional and quote ranges, not single numbers.
-#
-# Full discussion: Backlog.md → "Varianz-Reduktion bei n ≥ 10⁶".
+# benchmark-matrix/ab.json: Graphity only, PATH always among the shapes, 3 forks
+# (averages the JIT lottery, the strongest single lever), 10 short iterations,
+# -Xmx16g -XX:+UseZGC -XX:+AlwaysPreTouch against GC pauses. Each label lives in
+# measurements/ab/<label>/ with the measured commit in meta.json; 'compare' prints
+# means with half-widths and marks cases above 15 %. Methodology for any
+# performance claim: internal/ops/benchmark-protokoll.md.
 # ─────────────────────────────────────────────────────────────────────────────
 
 set -euo pipefail
@@ -216,6 +210,9 @@ for key in ("warmup_time", "measurement_time", "jvm_stack"):
 heap = jmh.get("jvm_heap", "")
 if heap != "" and (not isinstance(heap, str) or not heap.strip()):
     fail("jmh.jvm_heap must be a non-empty string when present")
+extra = jmh.get("jvm_args", "")
+if extra != "" and (not isinstance(extra, str) or not extra.strip()):
+    fail("jmh.jvm_args must be a non-empty string when present")
 
 cases = data.get("cases")
 if not isinstance(cases, list) or not cases:
@@ -340,7 +337,9 @@ it = jmh.get("measurement_iterations", 5)
 r = jmh.get("measurement_time", "500ms")
 stack = jmh.get("jvm_stack", "-Xss16m")
 heap = jmh.get("jvm_heap", "")
-print(f"{forks}\t{wi}\t{w}\t{it}\t{r}\t{stack}\t{heap}")
+extra = jmh.get("jvm_args", "")
+# Tab-separated for `read`; an empty field would collapse, so absent values become "-".
+print(f"{forks}\t{wi}\t{w}\t{it}\t{r}\t{stack}\t{heap or '-'}\t{extra or '-'}")
 PY
 }
 
@@ -585,7 +584,8 @@ PY
 run_validate_phase() {
   local matrix_file="$1"
   local phase="$2"
-  IFS=$'\t' read -r _ _ _ _ _ jvm_stack jvm_heap <<< "$(matrix_jmh_defaults "$matrix_file")"
+  IFS=$'\t' read -r _ _ _ _ _ jvm_stack jvm_heap _ <<< "$(matrix_jmh_defaults "$matrix_file")"
+  [[ "$jvm_heap" == "-" ]] && jvm_heap=""
   banner "validate — semantic quick-fail (${phase})"
   local -a jbase=(java "$jvm_stack")
   [[ -n "$jvm_heap" ]] && jbase+=("$jvm_heap")
@@ -593,6 +593,10 @@ run_validate_phase() {
   local case_idx=0
   while IFS=$'\x1f' read -r case_name algo libs nodes shapes datasets; do
     [[ -z "$algo" ]] && continue
+    if [[ -n "$CASE_FILTER" && ",${CASE_FILTER}," != *",${case_name},"* \
+          && ",${CASE_FILTER}," != *",${case_name}:${algo},"* ]]; then
+      continue
+    fi
     case_idx=$((case_idx + 1))
     echo "[validate/$case_idx] case=${case_name} algo=${algo} libs=${libs}"
     if [[ -n "$datasets" ]]; then
@@ -788,12 +792,19 @@ run_jmh_phase() {
   # reused as-is.
   local case_idx=0 n_run=0 n_cached=0
 
-  IFS=$'\t' read -r forks wi w it r jvm_stack jvm_heap <<< "$(matrix_jmh_defaults "$matrix_file")"
+  IFS=$'\t' read -r forks wi w it r jvm_stack jvm_heap jvm_args <<< "$(matrix_jmh_defaults "$matrix_file")"
+  [[ "$jvm_heap" == "-" ]] && jvm_heap=""
+  [[ "$jvm_args" == "-" ]] && jvm_args=""
 
   while IFS=$'\t' read -r -a fields; do
     [[ ${#fields[@]} -lt 4 ]] && continue
-    case_idx=$((case_idx + 1))
     local case_name="${fields[0]}"
+    # case_name is "<case>:<algorithm>"; --cases accepts either form.
+    if [[ -n "$CASE_FILTER" && ",${CASE_FILTER}," != *",${case_name%%:*},"* \
+          && ",${CASE_FILTER}," != *",${case_name},"* ]]; then
+      continue
+    fi
+    case_idx=$((case_idx + 1))
     local bench_regex="${fields[1]}"
     local case_key="${fields[2]}"
     local fqns_csv="${fields[3]}"
@@ -835,6 +846,9 @@ run_jmh_phase() {
 
     local -a cmd=(java "$jvm_stack")
     [[ -n "$jvm_heap" ]] && cmd+=("$jvm_heap")
+    # jvm_args holds several flags separated by spaces; split them deliberately.
+    # shellcheck disable=SC2206
+    [[ -n "$jvm_args" ]] && cmd+=($jvm_args)
     cmd+=(-jar "$JAR" -f "$forks" -wi "$wi" -w "$w" -i "$it" -r "$r")
     if [[ "$phase" == "alloc" ]]; then
       cmd+=(-prof gc)
@@ -844,7 +858,8 @@ run_jmh_phase() {
       cmd+=(-p "$p")
     done
     local fork_args="$jvm_stack"
-    [[ -n "$jvm_heap" ]] && fork_args="$jvm_stack $jvm_heap"
+    [[ -n "$jvm_heap" ]] && fork_args="$fork_args $jvm_heap"
+    [[ -n "$jvm_args" ]] && fork_args="$fork_args $jvm_args"
     local case_tmp="${case_out}.tmp.$$"
     cmd+=("$bench_regex" -jvmArgsAppend "$fork_args" -rf json -rff "$case_tmp")
 
@@ -894,7 +909,8 @@ run_alloc() {
 run_mem() {
   local matrix_file="$1" profile="$2"
   IFS=$'\t' read -r mem_enabled mem_nodes mem_shapes mem_libraries <<< "$(matrix_mem_tsv "$matrix_file" "$LIB_FILTER")"
-  IFS=$'\t' read -r _ _ _ _ _ _ jvm_heap <<< "$(matrix_jmh_defaults "$matrix_file")"
+  IFS=$'\t' read -r _ _ _ _ _ _ jvm_heap _ <<< "$(matrix_jmh_defaults "$matrix_file")"
+  [[ "$jvm_heap" == "-" ]] && jvm_heap=""
 
   banner "mem — ${profile}"
   if [[ "$mem_enabled" != "true" ]]; then
@@ -1264,6 +1280,222 @@ cmd_bench() {
   cmd_report "$version"
 }
 
+# measured_state -> JSON {"revision", "subject"}: the commit, plus a hash of uncommitted and
+# untracked changes to the library, the benchmarks and the POMs ("<sha>+<hash>"). Results are
+# attributed to this state; require_fresh_jar makes sure the jar was built from it.
+measured_state() {
+  python3 - "$(cd "${BENCH_DIR}/.." && pwd)" <<'PY'
+import hashlib, json, subprocess, sys
+repo = sys.argv[1]
+paths = ["graphity-core", "graphity-benchmarks/src", "pom.xml", "graphity-benchmarks/pom.xml"]
+def git(*args):
+    return subprocess.run(["git", "-C", repo, *args], capture_output=True, check=True).stdout
+try:
+    sha = git("rev-parse", "HEAD").decode().strip()
+    subject = git("log", "-1", "--format=%s").decode().strip()
+    diff = git("diff", "HEAD", "--", *paths)
+    untracked = [u for u in git("ls-files", "--others", "--exclude-standard", "-z", "--", *paths)
+                 .split(b"\0") if u]
+except (OSError, subprocess.CalledProcessError):
+    print(json.dumps({"revision": "unknown-git", "subject": ""}))
+    sys.exit(0)
+digest = hashlib.sha1(diff)
+for name in sorted(untracked):
+    digest.update(name)
+    with open(f"{repo}/{name.decode()}", "rb") as f:
+        digest.update(f.read())
+dirty = bool(diff) or bool(untracked)
+print(json.dumps({"revision": sha + ("+" + digest.hexdigest()[:12] if dirty else ""),
+                  "subject": subject}))
+PY
+}
+
+# require_fresh_jar: refuses to measure with a jar older than the sources it is built from;
+# otherwise the results of an old jar would be attributed to the current state.
+require_fresh_jar() {
+  python3 - "$JAR" "$(cd "${BENCH_DIR}/.." && pwd)" <<'PY'
+import os, sys
+jar, repo = sys.argv[1], sys.argv[2]
+roots = ["graphity-core/src/main", "graphity-core/src/test/java/com/kobayami/graphity/testutils",
+         "graphity-benchmarks/src/main"]
+files = ["pom.xml", "graphity-core/pom.xml", "graphity-benchmarks/pom.xml"]
+newest, newest_path = 0.0, ""
+candidates = [os.path.join(repo, f) for f in files]
+for root in roots:
+    for d, _, names in os.walk(os.path.join(repo, root)):
+        candidates.extend(os.path.join(d, n) for n in names)
+for path in candidates:
+    if os.path.isfile(path) and os.path.getmtime(path) > newest:
+        newest, newest_path = os.path.getmtime(path), path
+if newest > os.path.getmtime(jar):
+    sys.exit(f"error: {os.path.relpath(jar, repo)} is older than {os.path.relpath(newest_path, repo)}; "
+             "rebuild it first (from the repo root): mvn -am -pl graphity-benchmarks package -DskipTests")
+PY
+}
+
+# check_case_filter <matrix>: every name in --cases must be a case ("scc") or a case with its
+# algorithm ("toporder:toporderandlevels") of the matrix; a typo would otherwise measure nothing.
+check_case_filter() {
+  [[ -z "$CASE_FILTER" ]] && return 0
+  python3 - "$1" "$CASE_FILTER" <<'PY'
+import json, sys
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+known = set()
+for c in data["cases"]:
+    known.add(c["name"])
+    known.update(f"{c['name']}:{a}" for a in c["algorithms"])
+unknown = [x for x in sys.argv[2].split(",") if x and x not in known]
+if unknown:
+    sys.exit(f"error: --cases names unknown to {sys.argv[1]}: {', '.join(unknown)}; "
+             f"cases are: {', '.join(c['name'] for c in data['cases'])}")
+PY
+}
+
+# ab_write_meta <dir> <profile>
+# Records what an A/B label measures: the state from measured_state, subject, JDK, CPU. Refuses
+# to add to a label that holds measurements of another state - resume would mix two states. The
+# same state, uncommitted or not, resumes.
+ab_write_meta() {
+  local dir="$1" profile="$2"
+  local state java_version cpu
+  state="$(measured_state)"
+  java_version="$(java -version 2>&1 | head -1)"
+  cpu="$(grep -m1 'model name' /proc/cpuinfo 2>/dev/null | cut -d: -f2- | sed 's/^ *//' || true)"
+  [[ -z "$cpu" ]] && cpu="$(sysctl -n machdep.cpu.brand_string 2>/dev/null || echo unknown)"
+  python3 - "$dir/meta.json" "$profile" "$state" "$java_version" "$cpu" <<'PY'
+import datetime, json, os, sys
+path, profile, java, cpu = sys.argv[1], sys.argv[2], sys.argv[4], sys.argv[5]
+state = json.loads(sys.argv[3])
+if os.path.isfile(path):
+    old = json.load(open(path, encoding="utf-8"))
+    if old.get("revision") != state["revision"] or state["revision"] == "unknown-git":
+        raise SystemExit(
+            f"error: {os.path.dirname(path)} already holds measurements of {old.get('revision', '?')}, "
+            f"the current state is {state['revision']}; a resumed run would mix two states. "
+            "Use a new label or delete the directory.")
+meta = {
+    "profile": profile,
+    "revision": state["revision"],
+    "subject": state["subject"],
+    "java": java,
+    "cpu": cpu,
+    "startedAt": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+}
+json.dump(meta, open(path, "w", encoding="utf-8"), indent=2)
+PY
+}
+
+# cmd_ab <label>: perf phase of the A/B profile into measurements/ab/<label>/, isolated from
+# every other run - resume only ever reuses results of the same label.
+cmd_ab() {
+  local label="$1"
+  if [[ ! "$label" =~ ^[A-Za-z0-9._-]+$ || "$label" =~ ^\.+$ ]]; then
+    echo "error: 'ab' requires a label of letters, digits, '.', '_' or '-', e.g. 'before' or 'after'" >&2
+    exit 2
+  fi
+  local matrix_file profile_name
+  matrix_file="$(resolve_matrix_file "${PROFILE_OVERRIDE:-ab}")"
+  validate_matrix "$matrix_file"
+  check_case_filter "$matrix_file"
+  require_fresh_jar
+  profile_name="$(matrix_profile_name "$matrix_file")"
+  MEASUREMENTS="${BENCH_DIR}/measurements/ab/${label}"
+  mkdir -p "$MEASUREMENTS"
+  ab_write_meta "$MEASUREMENTS" "$profile_name"
+  LIB_FILTER=""
+  banner "ab — label '${label}', profile '${profile_name}'${CASE_FILTER:+, cases [${CASE_FILTER}]}"
+  run_perf "$matrix_file" "$profile_name"
+  echo
+  echo "→ JSON written to ${MEASUREMENTS}/. Measure the other state under a second label, then:"
+  echo "  $(basename "$0") compare <label-a> <label-b>"
+}
+
+# cmd_compare <label-a> <label-b>: B against A per (benchmark, params), with error bars.
+cmd_compare() {
+  local a="$1" b="$2"
+  if [[ -z "$a" || -z "$b" ]]; then
+    echo "error: 'compare' requires two labels measured with 'ab'" >&2
+    exit 2
+  fi
+  python3 - "${BENCH_DIR}/measurements/ab" "$a" "$b" <<'PY'
+import glob, json, math, os, sys
+
+root, label_a, label_b = sys.argv[1:]
+MAX_HALF_WIDTH = 15.0  # percent of the score; above it a case does not resolve small effects
+
+def load(label):
+    d = os.path.join(root, label)
+    if not os.path.isdir(d):
+        raise SystemExit(f"error: no measurements for label '{label}' under {root}/")
+    meta_path = os.path.join(d, "meta.json")
+    meta = json.load(open(meta_path, encoding="utf-8")) if os.path.isfile(meta_path) else {}
+    results = {}
+    for path in sorted(glob.glob(os.path.join(d, "perf-*@*.json"))):
+        for e in json.load(open(path, encoding="utf-8")):
+            params = e.get("params") or {}
+            key = (e["benchmark"], tuple(sorted((str(k), str(v)) for k, v in params.items())))
+            m = e["primaryMetric"]
+            # JMH writes a missing error as the string "NaN"; float() turns it into nan.
+            results[key] = (float(m["score"]), float(m.get("scoreError", "nan")),
+                            m.get("scoreUnit", ""))
+    return meta, results
+
+meta_a, res_a = load(label_a)
+meta_b, res_b = load(label_b)
+
+def describe(label, meta):
+    commit, _, changes = meta.get("revision", "unknown").partition("+")
+    state = f"`{commit[:12]}`" + (f" + uncommitted changes `{changes}`" if changes else "")
+    return f"- **{label}**: {state} {meta.get('subject', '')} ({meta.get('java', '?')}, {meta.get('cpu', '?')})"
+
+def half_width(score, err):
+    return 100.0 * err / score if score and not math.isnan(err) else float("nan")
+
+def fmt(x):
+    if math.isnan(x):
+        return "n/a"
+    return (f"{x:.1f}" if abs(x) >= 100 else f"{x:.2f}" if abs(x) >= 10
+            else f"{x:.3f}" if abs(x) >= 1 else f"{x:.4g}")
+
+def pct(x):
+    return "n/a" if math.isnan(x) else f"{fmt(x)} %"
+
+print(f"# A/B comparison: {label_b} against {label_a}\n")
+print(describe(label_a, meta_a))
+print(describe(label_b, meta_b))
+print()
+print(f"Scores are JMH means with 99.9 % confidence half-widths. B/A below 1 means B is faster. "
+      f"'noise' marks ratios whose distance from 1 is within the combined half-width; "
+      f"'wide' marks cases with a half-width above {MAX_HALF_WIDTH:.0f} % on either side.\n")
+print("| Benchmark | Params | A | ±A | B | ±B | B/A | ±B/A | |")
+print("|---|---|---:|---:|---:|---:|---:|---:|---|")
+keys = sorted(set(res_a) & set(res_b))
+wide = noise = 0
+for key in keys:
+    sa, ea, unit = res_a[key]
+    sb, eb, _ = res_b[key]
+    ha, hb = half_width(sa, ea), half_width(sb, eb)
+    ratio = sb / sa if sa else float("nan")
+    hr = math.sqrt(ha * ha + hb * hb) if not (math.isnan(ha) or math.isnan(hb)) else float("nan")
+    flags = []
+    if not math.isnan(hr) and abs(ratio - 1.0) * 100.0 <= hr:
+        flags.append("noise")
+        noise += 1
+    if (not math.isnan(ha) and ha > MAX_HALF_WIDTH) or (not math.isnan(hb) and hb > MAX_HALF_WIDTH):
+        flags.append("wide")
+        wide += 1
+    bench = key[0].rsplit(".", 2)[-2] + "." + key[0].rsplit(".", 1)[-1]
+    params = ", ".join(f"{k}={v}" for k, v in key[1])
+    print(f"| {bench} | {params} | {fmt(sa)} {unit} | {pct(ha)} | {fmt(sb)} {unit} | {pct(hb)} "
+          f"| {ratio:.3f} | {pct(hr)} | {' '.join(flags)} |")
+only_a = len(set(res_a) - set(res_b))
+only_b = len(set(res_b) - set(res_a))
+print()
+print(f"{len(keys)} case(s) compared, {noise} within noise, {wide} wider than {MAX_HALF_WIDTH:.0f} %."
+      + (f" {only_a} only in {label_a}, {only_b} only in {label_b}." if only_a or only_b else ""))
+PY
+}
+
 usage() {
   cat <<EOF
 Usage: $(basename "$0") <command> [args]
@@ -1290,6 +1522,13 @@ Commands:
                                  datasets/ contains no .txt files. 'version' is passed to report.
   synthetic <lib|all>            perf+alloc+mem on synthetic graphs (default profile: ${DEFAULT_SYNTHETIC_PROFILE}).
   realworld <lib|all>            perf on real-world SNAP datasets   (default profile: ${DEFAULT_REALWORLD_PROFILE}).
+  ab <label> [--cases a,b]       A/B measurement of the current state into measurements/ab/<label>/
+                                 (profile 'ab', perf only, Graphity only). Resume reuses only results
+                                 of the same label; a label refuses results of a second commit.
+                                 --cases limits the run to the named cases of the matrix
+                                 ('scc', or 'toporder:toporderandlevels' for one algorithm).
+  compare <label-a> <label-b>    Markdown table of B against A per case: means, 99.9 % half-widths,
+                                 B/A with combined half-width; flags 'noise' and 'wide' (> 15 %).
   report [version] [machine]     Merge JSON → promote to reports/versions/<version>-<kind>-<machine>.md →
                                  regenerate reports/summary/<kind>-<machine>-{peers,history}.md + chart SVGs.
                                  Version defaults to the value in pom.xml (SNAPSHOT stripped).
@@ -1302,6 +1541,7 @@ Profiles (--profile <name>):
   Synthetic:    quick   — fast dev loop, n = 10K/100K, all libs, perf+alloc (~minutes)
                 full    — full baseline, n = 10K/100K, all libs, perf+alloc (~hours) [default]
                 big     — large graphs, n = 1M/10M/100M, Graphity+reordered only, perf (~hours)
+                ab      — A/B decisions, Graphity only, 3 forks, n = 10K/100K/1M (used by 'ab')
   Real-world:   realworld       — all libs, all datasets, perf [default]
                 realworld-quick — smoke run, one dataset per case (~minutes)
 
@@ -1315,6 +1555,7 @@ Examples:
   $(basename "$0") report                            # regenerate summary from existing versions
   $(basename "$0") report 2.0.0
   $(basename "$0") report 2.0.0 macos-m5
+  $(basename "$0") ab before --cases scc && $(basename "$0") ab after --cases scc && $(basename "$0") compare before after
 EOF
 }
 
@@ -1327,8 +1568,9 @@ esac
 
 shift || true
 
-# Parse options (only --profile/--matrix are meaningful; run commands use positionals).
+# Parse options (--profile/--matrix and --cases; run commands use positionals).
 PROFILE_OVERRIDE=""
+CASE_FILTER=""
 POSARGS=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -1338,6 +1580,12 @@ while [[ $# -gt 0 ]]; do
       shift 2 ;;
     --profile=*|--matrix=*)
       PROFILE_OVERRIDE="${1#*=}"; shift ;;
+    --cases)
+      CASE_FILTER="${2:-}"
+      [[ -z "$CASE_FILTER" ]] && { echo "error: $1 requires a value" >&2; exit 2; }
+      shift 2 ;;
+    --cases=*)
+      CASE_FILTER="${1#*=}"; shift ;;
     -*)
       echo "error: unknown option '$1'" >&2; usage; exit 2 ;;
     *)
@@ -1351,6 +1599,8 @@ case "$cmd" in
   synthetic) run_kind synthetic "${POSARGS[0]:-}" "${PROFILE_OVERRIDE:-$DEFAULT_SYNTHETIC_PROFILE}" ;;
   realworld) run_kind realworld "${POSARGS[0]:-}" "${PROFILE_OVERRIDE:-$DEFAULT_REALWORLD_PROFILE}" ;;
   report)    cmd_report "${POSARGS[0]:-}" "${POSARGS[1]:-}" ;;
+  ab)        cmd_ab "${POSARGS[0]:-}" ;;
+  compare)   cmd_compare "${POSARGS[0]:-}" "${POSARGS[1]:-}" ;;
   *)
     echo "error: unknown command '$cmd'" >&2
     usage

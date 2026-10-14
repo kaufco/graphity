@@ -1,0 +1,82 @@
+{
+  "name": "ab",
+  "description": "A/B comparisons of two Graphity states: Graphity only, few shapes with PATH always included, 3 forks and many short iterations; large heap, ZGC and pre-touched memory against GC pauses at 10^6 nodes. Run with 'run-benchmarks.sh ab <label>' and narrow it with --cases to what the change touches.",
+  "jmh": {
+    "forks": 3,
+    "warmup_iterations": 5,
+    "warmup_time": "1s",
+    "measurement_iterations": 10,
+    "measurement_time": "1s",
+    "jvm_stack": "-Xss128m",
+    "jvm_heap": "-Xmx16g",
+    "jvm_args": "-XX:+UseZGC -XX:+AlwaysPreTouch"
+  },
+  "cases": [
+    {
+      "name": "build",
+      "libraries": ["graphity"],
+      "algorithms": ["build"],
+      "params": {
+        "nodeCount": [10000, 100000, 1000000],
+        "shape": ["PATH", "TREE", "GNP_SPARSE"]
+      }
+    },
+    {
+      "name": "scc",
+      "libraries": ["graphity"],
+      "algorithms": ["scc"],
+      "params": {
+        "nodeCount": [10000, 100000, 1000000],
+        "shape": ["PATH", "TREE", "GNP_SPARSE"]
+      }
+    },
+    {
+      "name": "components",
+      "libraries": ["graphity"],
+      "algorithms": ["wcc", "ccs"],
+      "params": {
+        "nodeCount": [10000, 100000, 1000000],
+        "shape": ["PATH", "TREE", "GNP_SPARSE"]
+      }
+    },
+    {
+      "name": "dfs-analysis",
+      "libraries": ["graphity"],
+      "algorithms": ["backedges", "edgetypes"],
+      "params": {
+        "nodeCount": [10000, 100000, 1000000],
+        "shape": ["PATH", "TREE", "GNP_SPARSE"]
+      }
+    },
+    {
+      "name": "toporder",
+      "libraries": ["graphity"],
+      "algorithms": ["toporder", "toporderandlevels"],
+      "params": {
+        "nodeCount": [10000, 100000, 1000000],
+        "shape": ["PATH", "TREE", "DAG_GNP_SPARSE"]
+      }
+    },
+    {
+      "name": "condense",
+      "libraries": ["graphity"],
+      "algorithms": ["condense"],
+      "params": {
+        "nodeCount": [10000, 100000],
+        "shape": ["PATH", "CHAIN_OF_CLIQUES", "GNP_DENSE"]
+      }
+    },
+    {
+      "name": "control-flow",
+      "libraries": ["graphity"],
+      "algorithms": ["dominators", "loops"],
+      "params": {
+        "nodeCount": [10000, 100000],
+        "shape": ["STRUCTURED", "IRREDUCIBLE", "CHAIN"]
+      }
+    }
+  ],
+  "mem": {
+    "enabled": false
+  }
+}

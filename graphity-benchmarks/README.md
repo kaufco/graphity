@@ -54,6 +54,8 @@ The runner is a single script with a three-step workflow — **clean → run →
 | `realworld <lib\|all>`         | `perf` on real-world SNAP datasets (default profile: `realworld`)                                   |
 | `report [version] [machine]`   | Merge JSON → times Markdown → promote to `reports/versions/` → regenerate both summary views + chart SVGs. |
 |                                | Version defaults to the `pom.xml` value (SNAPSHOT suffix stripped); machine is auto-derived.        |
+| `ab <label> [--cases a,b]`     | A/B measurement of the current state with the `ab` profile into `measurements/ab/<label>/`, with the commit in `meta.json` |
+| `compare <label-a> <label-b>`  | Markdown table of B against A: means, 99.9 % half-widths, B/A; flags `noise` and `wide` (> 15 %)     |
 
 `report` does not re-run benchmarks; it aggregates whatever JSON is present in `measurements/`. Because it merges per benchmark (newest run wins), running libraries separately and then calling `report` once produces a single merged report. `report` then copies the result into the versioned `reports/` archive and regenerates the two summary views per machine, with embedded Times and Ops tables and chart SVGs.
 
@@ -80,6 +82,7 @@ By default `synthetic` uses `full` and `realworld` uses `realworld`. Override wi
 | `quick`           | `synthetic all --profile quick`                         | all                   | 10⁴, 10⁵                          | perf+alloc | minutes           |
 | `full`            | `synthetic all`                                         | all                   | 10⁴, 10⁵                          | perf+alloc | hours             |
 | `big`             | `synthetic all --profile big`                           | Graphity + reordered  | 10⁶, 10⁷, (sparse-only) 10⁸       | perf       | hours             |
+| `ab`              | `ab <label> --cases …`                                  | Graphity              | 10⁴, 10⁵, 10⁶, few shapes         | perf       | minutes per case  |
 | `realworld-quick` | `realworld all --profile realworld-quick`               | all                   | web-Google only                   | perf       | minutes           |
 | `realworld`       | `realworld all`                                         | all                   | broader SNAP coverage             | perf       | hours             |
 
@@ -93,6 +96,7 @@ big   →  n = 10⁶/10⁷/10⁸, Graphity + reordered only, perf
 Use `bench` to run all three plus the report step in one go (see [Commands](#commands)). The real-world part needs the datasets on disk; if they are missing, `bench` skips that phase and says so both at the point of the skip and in a closing banner — see [Real-world graphs](#real-world-graphs-a-separate-run).
 
 - **`big`** is Graphity-only: at n ≥ 10⁶ the generalist peers (JGraphT/Guava object graphs) and WebGraph's in-RAM `ArrayListMutableGraph` build path run out of memory, and the peers' recursive DFS reference wrappers overflow the stack, whereas Graphity's algorithm cores are iterative. The 10⁸ tier is sparse-only because Graphity's int-indexed CSR caps out-adjacency at ~2.1 B edges. Each traversal algorithm is also run on a DFS-preorder reordered copy (see [Reordering](#reordering-graphity-reordered-and-reorder)).
+- **`ab`** is for decisions between two Graphity states, not for reports: 3 forks, 10 short iterations, `-Xmx16g -XX:+UseZGC -XX:+AlwaysPreTouch`, `PATH` always among the shapes. Measure each state under its own label and run `compare`.
 - **`realworld` / `realworld-quick`** run on real-world edge lists — see [Real-world graphs](#real-world-graphs-a-separate-run).
 
 ## Custom matrices

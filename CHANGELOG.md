@@ -8,6 +8,8 @@
 - Algorithms
   - [Issue #20](../../issues/20) - Contract a graph by a partition of your choosing
   - [Issue #23](../../issues/23) - Add `BfsDistances` and `Graphs.reachableFrom`
+- Benchmarks
+  - [Issue #24](../../issues/24) - Add a more precise benchmark profile for comparing two versions
 
 ---
 
