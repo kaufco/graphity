@@ -103,6 +103,7 @@ double[] weights = new double[graph.edgeCount()];
 | `PreorderAncestry.of(ancestry)` | `PreorderAncestry` | `isAncestorOf()` in O(1), `subtreeOf(node)`, `subtreeSizeOf()` |
 | `Dominators.of(cfg, entry)` | `Dominators` | `immediateDominatorOf()`, `Graphs.dominatorTree()`, `Graphs.dominanceFrontiers()`, `Ancestry.of(dominators)` |
 | `Loops.of(cfg, entry)`     | `Loops`         | `innermostLoopOf()`, `nodesOf(loop)`, `entriesOf(loop)`, `isReducible()` |
+| `BfsDistances.of(graph, source)` | `BfsDistances` | `distanceOf()`, `pathTo(node)`, `maxDistance()` |
 | `NodeMapping.of(...)`      | `NodeMapping`   | `inverse()`, `compose(other)`, `gather(values)` |
 
 These types compose. `sccs.condense()` returns a `Graph` plus a `NodeMapping` from original nodes to SCC IDs that you can run further algorithms on; `nodeMapping.compose(other)` chains transformations and applies the result to your own metadata arrays in one step.
@@ -216,6 +217,8 @@ Graphity ships the following algorithms out of the box. All of them return typed
 | Weakly connected components                                     | `Components.wccsOf(graph)`    |
 | Connected components (undirected interpretation)                | `Components.ccsOf(graph)`     |
 | Bridges, articulation points, biconnected components            | `Components.biconnectivityOf(graph)` |
+| Breadth-first distances and shortest paths, one or several sources | `BfsDistances.of(graph, sources)` |
+| Reachable nodes, sorted (input for subgraph extraction)         | `Graphs.reachableFrom(graph, sources)` |
 | Topological order (DFS reverse postorder)                       | `TopOrder.of(graph)`          |
 | Topological order with levels (Kahn's)                          | `TopOrderAndLevels.of(graph)` |
 | DFS edge classification (TREE / BACK / FORWARD / CROSS)         | `EdgeTypes.of(graph)`         |

@@ -7,6 +7,7 @@
   - [Issue #22](../../issues/22) - Carry per-node and per-edge data along mappings and partitions
 - Algorithms
   - [Issue #20](../../issues/20) - Contract a graph by a partition of your choosing
+  - [Issue #23](../../issues/23) - Add `BfsDistances` and `Graphs.reachableFrom`
 
 ---
 

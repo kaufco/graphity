@@ -1,6 +1,9 @@
 package com.kobayami.graphity;
 
+import it.unimi.dsi.fastutil.ints.IntList;
+import it.unimi.dsi.fastutil.ints.IntLists;
 import java.util.Arrays;
+import java.util.Objects;
 
 /**
  * Utility methods for graph transformations and shape checks.
@@ -33,6 +36,7 @@ import java.util.Arrays;
  *
  * // Subgraph extraction
  * Graph sub = Graphs.remapped(graph, NodeMapping.forSubgraph(selectedNodes));
+ * Graph reached = Graphs.remapped(graph, NodeMapping.forSubgraph(Graphs.reachableFrom(graph, entry)));
  *
  * // Custom permutation
  * Graph permuted = Graphs.remapped(graph, NodeMapping.forPermutation(order));
@@ -83,7 +87,7 @@ public final class Graphs {
    *         (not injective - cannot compute inverse)
    * @see NodeMapping#reindex(Graph)
    * @see NodeMapping#forSubgraph(java.util.BitSet)
-   * @see NodeMapping#forPermutation(it.unimi.dsi.fastutil.ints.IntList)
+   * @see NodeMapping#forPermutation(IntList)
    */
   public static Graph remapped(Graph graph, NodeMapping newToOld) {
     int newNodeCount = newToOld.mapping.length;
@@ -616,6 +620,93 @@ public final class Graphs {
   }
 
   private record ForestInfo(int rootCount, int maxOutDegree) {}
+
+  /**
+   * Returns the nodes reachable from {@code source}, the source included, in ascending order.
+   * <p>
+   * Equivalent to {@link #reachableFrom(Graph, IntList)} with a one-element list.
+   * <p>
+   * <strong>Time:</strong> O(nodeCount + edgeCount).<br>
+   * <strong>Memory:</strong> as for {@link #reachableFrom(Graph, IntList)}.
+   *
+   * @param graph  the graph to search
+   * @param source source node ID in {@code 0..nodeCount()-1}
+   * @return the reachable nodes, sorted ascending
+   * @throws IndexOutOfBoundsException if {@code source} is out of range
+   */
+  public static SortedIntView reachableFrom(Graph graph, int source) {
+    return reachableFrom(graph, IntLists.singleton(source));
+  }
+
+  /**
+   * Returns the nodes reachable from at least one of the given sources, the sources included,
+   * in ascending order.
+   * <p>
+   * Edges are followed in their direction; for the nodes that reach the sources, pass the
+   * transpose. Duplicate sources are ignored, an empty list gives an empty result. The result is
+   * sorted, so it extracts the reachable part directly:
+   *
+   * <pre>{@code
+   * Graph function = Graphs.remapped(cfg, NodeMapping.forSubgraph(Graphs.reachableFrom(cfg, entry)));
+   * }</pre>
+   *
+   * For distances and shortest paths, use {@link BfsDistances}.
+   * <p>
+   * <strong>Time:</strong> O(nodeCount + edgeCount).<br>
+   * <strong>Memory:</strong> 4 bytes per reachable node for the result. During the traversal,
+   * one bit per node and a queue that grows by doubling towards the reachable count, briefly up
+   * to 12 bytes per reachable node while it is copied.
+   *
+   * @param graph   the graph to search
+   * @param sources source node IDs, each in {@code 0..nodeCount()-1}
+   * @return the reachable nodes, sorted ascending
+   * @throws IndexOutOfBoundsException if a source is out of range
+   */
+  public static SortedIntView reachableFrom(Graph graph, IntList sources) {
+    Objects.requireNonNull(graph, "graph");
+    Objects.requireNonNull(sources, "sources");
+    int n = graph.nodeCount();
+    int sourceCount = sources.size();
+    for (int i = 0; i < sourceCount; i++) {
+      Objects.checkIndex(sources.getInt(i), n);
+    }
+    int[] out = graph.outAdjacencyStart;
+    int[] adj = graph.outAdjacency;
+    var visited = new long[(n >> 6) + 1];
+    // Every reachable node enters the queue exactly once, so the queue grows into the result.
+    // The initial capacity holds every distinct source.
+    var queue = new int[Math.min(n, Math.max(16, sourceCount))];
+    int tail = 0;
+    for (int i = 0; i < sourceCount; i++) {
+      int s = sources.getInt(i);
+      if ((visited[s >> 6] & (1L << s)) == 0) {
+        visited[s >> 6] |= 1L << s;
+        queue[tail++] = s;
+      }
+    }
+    for (int head = 0; head < tail; head++) {
+      int u = queue[head];
+      for (int e = out[u], end = out[u + 1]; e < end; e++) {
+        int v = adj[e];
+        if ((visited[v >> 6] & (1L << v)) == 0) {
+          visited[v >> 6] |= 1L << v;
+          if (tail == queue.length) {
+            queue = Arrays.copyOf(queue, (int) Math.min(n, 2L * queue.length));
+          }
+          queue[tail++] = v;
+        }
+      }
+    }
+    // The queue is done; refill it in ascending order from the bit set, at its exact length.
+    if (tail < queue.length) queue = Arrays.copyOf(queue, tail);
+    int k = 0;
+    for (int w = 0; w < visited.length; w++) {
+      for (long bits = visited[w]; bits != 0; bits &= bits - 1) {
+        queue[k++] = (w << 6) + Long.numberOfTrailingZeros(bits);
+      }
+    }
+    return SortedIntView.viewOf(queue, 0, tail);
+  }
 
   /**
    * Returns the dominator tree as a graph: an edge {@code idom(n) -> n} for every node that has
