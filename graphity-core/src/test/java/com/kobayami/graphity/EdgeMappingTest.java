@@ -2,6 +2,7 @@ package com.kobayami.graphity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatObject;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.junit.jupiter.api.Test;
 
@@ -53,5 +54,20 @@ class EdgeMappingTest {
     var composed = outer.compose(inner);
     assertThat(composed.isPartial()).isTrue();
     assertThat(composed.get(1)).isEqualTo(-1);
+  }
+
+  @Test
+  void gatherMovesEdgeValuesToTheNewNumbering() {
+    var em = new EdgeMapping(new int[] {2, -1, 1}, 2, true);
+    assertThat(em.gather(new int[] {5, 6, 7})).containsExactly(7, 0, 6);
+    assertThat(em.gather(new long[] {5, 6, 7})).containsExactly(7L, 0L, 6L);
+    assertThat(em.gather(new double[] {0.5, 1.5, 2.5})).containsExactly(2.5, 0.0, 1.5);
+    assertThatThrownBy(() -> em.gather(new int[] {5, 6}))
+        .isInstanceOf(IndexOutOfBoundsException.class);
+    assertThatThrownBy(() -> em.gather(new Integer[3], new Integer[2]))
+        .isInstanceOf(IllegalArgumentException.class);
+    Integer[] newValues = new Integer[3];
+    em.gather(new Integer[] {5, 6, 7}, newValues);
+    assertThat(newValues).containsExactly(7, null, 6);
   }
 }

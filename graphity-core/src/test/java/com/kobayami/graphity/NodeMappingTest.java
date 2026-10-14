@@ -332,4 +332,33 @@ class NodeMappingTest {
     assertThat(nm.get(2)).isEqualTo(2);
     assertThat(nm.get(3)).isEqualTo(3);
   }
+
+  // --- gather ---
+
+  @Test
+  void gatherMovesValuesToTheNewNumbering() {
+    // new -> old: 0 -> 2, 1 -> -1 (unmapped), 2 -> 0
+    var m = NodeMapping.of(new int[] {2, -1, 0});
+    assertThat(m.gather(new int[] {10, 11, 12})).containsExactly(12, 0, 10);
+    assertThat(m.gather(new long[] {10, 11, 12})).containsExactly(12L, 0L, 10L);
+    assertThat(m.gather(new double[] {1.5, 2.5, 3.5})).containsExactly(3.5, 0.0, 1.5);
+    String[] newValues = {"x", "keep", "y"};
+    m.gather(new String[] {"a", "b", "c"}, newValues);
+    assertThat(newValues).containsExactly("c", "keep", "a");
+  }
+
+  @Test
+  void gatherAlongASubgraph() {
+    var newToOld = NodeMapping.forSubgraph(1, 3);
+    assertThat(newToOld.gather(new int[] {0, 10, 20, 30})).containsExactly(10, 30);
+  }
+
+  @Test
+  void gatherRejectsWrongArrays() {
+    var m = NodeMapping.of(new int[] {2, 0});
+    assertThatThrownBy(() -> m.gather(new int[] {1, 2}))
+        .isInstanceOf(IndexOutOfBoundsException.class);
+    assertThatThrownBy(() -> m.gather(new String[] {"a", "b", "c"}, new String[3]))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
 }

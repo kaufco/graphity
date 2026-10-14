@@ -1,6 +1,11 @@
 package com.kobayami.graphity;
 
 import java.util.Arrays;
+import java.util.Objects;
+import java.util.function.BinaryOperator;
+import java.util.function.DoubleBinaryOperator;
+import java.util.function.IntBinaryOperator;
+import java.util.function.LongBinaryOperator;
 
 /**
  * Abstract base for unidirectional index mappings between two ID spaces.
@@ -142,6 +147,138 @@ public abstract sealed class IndexMapping permits NodeMapping, EdgeMapping, Node
       }
     }
     return result;
+  }
+
+  // --- gather: result[i] = values[mapping[i]], unmapped entries 0 or untouched ---
+
+  static int[] gather(int[] mapping, int[] values) {
+    Objects.requireNonNull(values, "values");
+    var result = new int[mapping.length];
+    for (int i = 0; i < result.length; i++) {
+      int source = mapping[i];
+      if (source >= 0) result[i] = values[source];
+    }
+    return result;
+  }
+
+  static long[] gather(int[] mapping, long[] values) {
+    Objects.requireNonNull(values, "values");
+    var result = new long[mapping.length];
+    for (int i = 0; i < result.length; i++) {
+      int source = mapping[i];
+      if (source >= 0) result[i] = values[source];
+    }
+    return result;
+  }
+
+  static double[] gather(int[] mapping, double[] values) {
+    Objects.requireNonNull(values, "values");
+    var result = new double[mapping.length];
+    for (int i = 0; i < result.length; i++) {
+      int source = mapping[i];
+      if (source >= 0) result[i] = values[source];
+    }
+    return result;
+  }
+
+  static <T> void gather(int[] mapping, T[] values, T[] result) {
+    Objects.requireNonNull(values, "values");
+    checkLength(result, mapping.length, "newValues");
+    for (int i = 0; i < mapping.length; i++) {
+      int source = mapping[i];
+      if (source >= 0) result[i] = values[source];
+    }
+  }
+
+  // --- reduce over the member CSR of a partition, members ascending within each group ---
+
+  static int[] reduce(int[] members, int[] memberStart, int indexCount, int[] values,
+      int identity, IntBinaryOperator combine) {
+    checkLength(values, indexCount, "values");
+    Objects.requireNonNull(combine, "combine");
+    int groups = memberStart.length - 1;
+    var result = new int[groups];
+    for (int g = 0; g < groups; g++) {
+      int acc = identity;
+      for (int i = memberStart[g], end = memberStart[g + 1]; i < end; i++) {
+        acc = combine.applyAsInt(acc, values[members[i]]);
+      }
+      result[g] = acc;
+    }
+    return result;
+  }
+
+  static long[] reduce(int[] members, int[] memberStart, int indexCount, long[] values,
+      long identity, LongBinaryOperator combine) {
+    checkLength(values, indexCount, "values");
+    Objects.requireNonNull(combine, "combine");
+    int groups = memberStart.length - 1;
+    var result = new long[groups];
+    for (int g = 0; g < groups; g++) {
+      long acc = identity;
+      for (int i = memberStart[g], end = memberStart[g + 1]; i < end; i++) {
+        acc = combine.applyAsLong(acc, values[members[i]]);
+      }
+      result[g] = acc;
+    }
+    return result;
+  }
+
+  static double[] reduce(int[] members, int[] memberStart, int indexCount, double[] values,
+      double identity, DoubleBinaryOperator combine) {
+    checkLength(values, indexCount, "values");
+    Objects.requireNonNull(combine, "combine");
+    int groups = memberStart.length - 1;
+    var result = new double[groups];
+    for (int g = 0; g < groups; g++) {
+      double acc = identity;
+      for (int i = memberStart[g], end = memberStart[g + 1]; i < end; i++) {
+        acc = combine.applyAsDouble(acc, values[members[i]]);
+      }
+      result[g] = acc;
+    }
+    return result;
+  }
+
+  static <T> void reduce(int[] members, int[] memberStart, int indexCount, T[] values,
+      T[] groupValues, BinaryOperator<T> combine) {
+    checkLength(values, indexCount, "values");
+    int groups = memberStart.length - 1;
+    checkLength(groupValues, groups, "groupValues");
+    Objects.requireNonNull(combine, "combine");
+    for (int g = 0; g < groups; g++) {
+      int i = memberStart[g];
+      int end = memberStart[g + 1];
+      if (i == end) continue;
+      T acc = values[members[i]];
+      for (i++; i < end; i++) {
+        acc = combine.apply(acc, values[members[i]]);
+      }
+      groupValues[g] = acc;
+    }
+  }
+
+  private static void checkLength(int[] array, int expected, String name) {
+    checkLength(Objects.requireNonNull(array, name).length, expected, name);
+  }
+
+  private static void checkLength(long[] array, int expected, String name) {
+    checkLength(Objects.requireNonNull(array, name).length, expected, name);
+  }
+
+  private static void checkLength(double[] array, int expected, String name) {
+    checkLength(Objects.requireNonNull(array, name).length, expected, name);
+  }
+
+  private static void checkLength(Object[] array, int expected, String name) {
+    checkLength(Objects.requireNonNull(array, name).length, expected, name);
+  }
+
+  private static void checkLength(int length, int expected, String name) {
+    if (length != expected) {
+      throw new IllegalArgumentException(
+          name + " has length " + length + ", expected " + expected);
+    }
   }
 
   /**

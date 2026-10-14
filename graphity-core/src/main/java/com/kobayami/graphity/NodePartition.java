@@ -2,6 +2,10 @@ package com.kobayami.graphity;
 
 import java.util.Arrays;
 import java.util.Objects;
+import java.util.function.BinaryOperator;
+import java.util.function.DoubleBinaryOperator;
+import java.util.function.IntBinaryOperator;
+import java.util.function.LongBinaryOperator;
 
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 
@@ -290,5 +294,81 @@ public sealed class NodePartition extends IndexMapping implements IndexPartition
     dagStart[groups] = dagAdj.size();
 
     return new Graph(dagStart, dagAdj.toIntArray());
+  }
+
+  /**
+   * Folds per-node values into one value per group: for each group, starting from
+   * {@code identity}, {@code combine} is applied to the values of its members in ascending
+   * member order. A group without members gets {@code identity}; nodes in no group are ignored.
+   *
+   * <pre>{@code
+   * int[] perGroup = partition.reduce(values, 0, Integer::sum);
+   * }</pre>
+   *
+   * <strong>Time:</strong> O(indexCount + groupCount).<br>
+   * <strong>Memory:</strong> 4 x groupCount bytes for the result.
+   *
+   * @param values   values indexed by node, of length {@link #indexCount()}
+   * @param identity start value of every group
+   * @param combine  folds the accumulated value with the next member's value
+   * @return one value per group, of length {@link #groupCount()}
+   * @throws IllegalArgumentException if {@code values.length != indexCount()}
+   */
+  public int[] reduce(int[] values, int identity, IntBinaryOperator combine) {
+    return reduce(members, memberStart, indexCount(), values, identity, combine);
+  }
+
+  /**
+   * Folds per-node values into one value per group, as {@link #reduce(int[], int,
+   * IntBinaryOperator)} does.
+   * <p>
+   * <strong>Time:</strong> O(indexCount + groupCount).<br>
+   * <strong>Memory:</strong> 8 x groupCount bytes for the result.
+   *
+   * @param values   values indexed by node, of length {@link #indexCount()}
+   * @param identity start value of every group
+   * @param combine  folds the accumulated value with the next member's value
+   * @return one value per group, of length {@link #groupCount()}
+   * @throws IllegalArgumentException if {@code values.length != indexCount()}
+   */
+  public long[] reduce(long[] values, long identity, LongBinaryOperator combine) {
+    return reduce(members, memberStart, indexCount(), values, identity, combine);
+  }
+
+  /**
+   * Folds per-node values into one value per group, as {@link #reduce(int[], int,
+   * IntBinaryOperator)} does.
+   * <p>
+   * <strong>Time:</strong> O(indexCount + groupCount).<br>
+   * <strong>Memory:</strong> 8 x groupCount bytes for the result.
+   *
+   * @param values   values indexed by node, of length {@link #indexCount()}
+   * @param identity start value of every group
+   * @param combine  folds the accumulated value with the next member's value
+   * @return one value per group, of length {@link #groupCount()}
+   * @throws IllegalArgumentException if {@code values.length != indexCount()}
+   */
+  public double[] reduce(double[] values, double identity, DoubleBinaryOperator combine) {
+    return reduce(members, memberStart, indexCount(), values, identity, combine);
+  }
+
+  /**
+   * Folds per-node objects into one object per group, written into an array the caller
+   * allocated: for each group with members, the fold starts from its first member's value and
+   * applies {@code combine} with each further member in ascending member order. A group without
+   * members keeps its entry in {@code groupValues}; nodes in no group are ignored.
+   * The two arrays must be distinct.
+   * <p>
+   * <strong>Time:</strong> O(indexCount + groupCount).
+   *
+   * @param <T>         element type
+   * @param values      values indexed by node, of length {@link #indexCount()}
+   * @param groupValues receives one value per group; length {@link #groupCount()}
+   * @param combine     folds the accumulated value with the next member's value
+   * @throws IllegalArgumentException if {@code values.length != indexCount()} or
+   *                                  {@code groupValues.length != groupCount()}
+   */
+  public <T> void reduce(T[] values, T[] groupValues, BinaryOperator<T> combine) {
+    reduce(members, memberStart, indexCount(), values, groupValues, combine);
   }
 }

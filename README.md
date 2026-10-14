@@ -103,19 +103,20 @@ double[] weights = new double[graph.edgeCount()];
 | `PreorderAncestry.of(ancestry)` | `PreorderAncestry` | `isAncestorOf()` in O(1), `subtreeOf(node)`, `subtreeSizeOf()` |
 | `Dominators.of(cfg, entry)` | `Dominators` | `immediateDominatorOf()`, `Graphs.dominatorTree()`, `Graphs.dominanceFrontiers()`, `Ancestry.of(dominators)` |
 | `Loops.of(cfg, entry)`     | `Loops`         | `innermostLoopOf()`, `nodesOf(loop)`, `entriesOf(loop)`, `isReducible()` |
-| `NodeMapping.of(...)`      | `NodeMapping`   | `inverse()`, `compose(other)`                |
+| `NodeMapping.of(...)`      | `NodeMapping`   | `inverse()`, `compose(other)`, `gather(values)` |
 
 These types compose. `sccs.condense()` returns a `Graph` plus a `NodeMapping` from original nodes to SCC IDs that you can run further algorithms on; `nodeMapping.compose(other)` chains transformations and applies the result to your own metadata arrays in one step.
 
-**Edge indices as the bridge to user metadata.** Edges have stable CSR positions. You hold edge-attached data in a parallel array of length `graph.edgeCount()`. `build()` sorts and deduplicates edges, so the order of insertion is not the order of edge indices; `graph.edgeIndexOf(source, target)` tells where an added edge ended up. When a transformation reorders or filters edges (subgraph, condensation, remap, transpose), Graphity returns the corresponding `EdgeMapping` so you can reindex your metadata array in one pass:
+**Edge indices as the bridge to user metadata.** Edges have stable CSR positions. You hold edge-attached data in a parallel array of length `graph.edgeCount()`. `build()` sorts and deduplicates edges, so the order of insertion is not the order of edge indices; `graph.edgeIndexOf(source, target)` tells where an added edge ended up. When a transformation reorders or filters edges (subgraph, condensation, remap, transpose), Graphity returns the corresponding `EdgeMapping` so you can reindex your metadata array in one pass, and a partition folds the data of merged nodes or edges into one value per group:
 
 ```java
 Graph transpose = graph.transposed();                            // node IDs kept, edge indices not
 EdgeMapping newToOld = Graphs.transposedEdgeMapping(graph);      // one linear pass, total
-double[] transposedWeights = new double[transpose.edgeCount()];
-for (int e = 0; e < transpose.edgeCount(); e++) {
-    transposedWeights[e] = weights[newToOld.get(e)];
-}
+double[] transposedWeights = newToOld.gather(weights);           // transposedWeights[e] = weights[newToOld.get(e)]
+
+Graph condensed = partition.condense();                          // partition: e.g. Components.sccsOf(graph)
+EdgePartition provenance = Graphs.edgePartition(condensed, graph, partition);
+double[] weightPerCondensedEdge = provenance.reduce(weights, 0.0, Double::sum);
 ```
 
 For a single edge instead of a full pass, `BiAdjacentGraph.transposedEdgeIndex(edgeIndex)` answers the same question in the other direction.

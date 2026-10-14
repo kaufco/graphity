@@ -23,7 +23,8 @@ import java.util.BitSet;
  * </ul>
  * Call {@link #inverse()} to obtain the reverse direction.
  * Use {@link Graphs#remapped(Graph, NodeMapping)} to apply a mapping to a graph.
- * Use {@link #compose(NodeMapping)} to chain multiple mappings.
+ * Use {@link #compose(NodeMapping)} to chain multiple mappings, and {@link #gather(int[])} to
+ * carry per-node data along.
  *
  * <pre>{@code
  * // Reindexing for cache-friendly layout (DFS preorder)
@@ -211,6 +212,76 @@ public final class NodeMapping extends IndexMapping {
     int[] comp = computeCompose(this.mapping, inner.mapping);
     int valid = countValid(comp);
     return new NodeMapping(comp, valid, valid < comp.length);
+  }
+
+  /**
+   * Carries per-node data from the target space of this mapping into its source space:
+   * {@code result[i] = values[get(i)]}, and {@code 0} where {@code i} is unmapped.
+   * <p>
+   * For a mapping from new to old indices, as the factories produce it, this moves an array
+   * indexed by old nodes to the new numbering:
+   *
+   * <pre>{@code
+   * int[] newValues = newToOld.gather(oldValues);
+   * }</pre>
+   *
+   * <strong>Time:</strong> O(n) where n = source space size.<br>
+   * <strong>Memory:</strong> 4 x n bytes for the result.
+   *
+   * @param values values indexed by the target space; must cover every mapped target
+   * @return values indexed by the source space, of length n
+   * @throws IndexOutOfBoundsException if a mapped target lies outside {@code values}
+   */
+  public int[] gather(int[] values) {
+    return gather(mapping, values);
+  }
+
+  /**
+   * Carries per-node data from the target space into the source space, as
+   * {@link #gather(int[])} does.
+   * <p>
+   * <strong>Time:</strong> O(n) where n = source space size.<br>
+   * <strong>Memory:</strong> 8 x n bytes for the result.
+   *
+   * @param values values indexed by the target space; must cover every mapped target
+   * @return values indexed by the source space, {@code 0} where unmapped
+   * @throws IndexOutOfBoundsException if a mapped target lies outside {@code values}
+   */
+  public long[] gather(long[] values) {
+    return gather(mapping, values);
+  }
+
+  /**
+   * Carries per-node data from the target space into the source space, as
+   * {@link #gather(int[])} does.
+   * <p>
+   * <strong>Time:</strong> O(n) where n = source space size.<br>
+   * <strong>Memory:</strong> 8 x n bytes for the result.
+   *
+   * @param values values indexed by the target space; must cover every mapped target
+   * @return values indexed by the source space, {@code 0} where unmapped
+   * @throws IndexOutOfBoundsException if a mapped target lies outside {@code values}
+   */
+  public double[] gather(double[] values) {
+    return gather(mapping, values);
+  }
+
+  /**
+   * Carries per-node objects from the target space into an array the caller allocated for the
+   * source space: {@code newValues[i] = values[get(i)]}, and {@code newValues[i]} untouched
+   * where {@code i} is unmapped. References are copied, not the objects. The two arrays must
+   * be distinct; if an exception is thrown, {@code newValues} may be partly written.
+   * <p>
+   * <strong>Time:</strong> O(n) where n = source space size.
+   *
+   * @param <T>       element type
+   * @param values    values indexed by the target space; must cover every mapped target
+   * @param newValues receives the values indexed by the source space; length n
+   * @throws IllegalArgumentException if {@code newValues.length} is not the source space size
+   * @throws IndexOutOfBoundsException if a mapped target lies outside {@code values}
+   */
+  public <T> void gather(T[] values, T[] newValues) {
+    gather(mapping, values, newValues);
   }
 
   /**

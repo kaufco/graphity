@@ -96,4 +96,29 @@ class EdgePartitionTest {
     assertThatThrownBy(() -> sampleEdgePartition().sizeOf(groupId))
         .isInstanceOf(IndexOutOfBoundsException.class);
   }
+
+  // --- reduce ---
+
+  @Test
+  void reduceFoldsTheMembersOfEachGroup() {
+    var p = sampleEdgePartition();
+    // groups: {0, 1}, {3}, {5}; edges 2 and 4 are in no group
+    assertThat(p.reduce(new int[] {1, 2, 100, 4, 100, 8}, 0, Integer::sum)).containsExactly(3, 4, 8);
+    assertThat(p.reduce(new long[] {1, 2, 100, 4, 100, 8}, 1L, (a, b) -> a * b))
+        .containsExactly(2L, 4L, 8L);
+    assertThat(p.reduce(new double[] {1, 2, 100, 4, 100, 8}, 0.0, Math::max))
+        .containsExactly(2.0, 4.0, 8.0);
+    String[] groupValues = new String[3];
+    p.reduce(new String[] {"a", "b", "x", "c", "y", "d"}, groupValues, String::concat);
+    assertThat(groupValues).containsExactly("ab", "c", "d");
+  }
+
+  @Test
+  void reduceRejectsArraysOfTheWrongLength() {
+    var p = sampleEdgePartition();
+    assertThatThrownBy(() -> p.reduce(new int[5], 0, Integer::sum))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> p.reduce(new String[6], new String[2], String::concat))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
 }

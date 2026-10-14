@@ -248,4 +248,31 @@ class NodePartitionTest {
     assertThatThrownBy(() -> NodePartition.of(graph, new int[] {-1, -1}, Integer.MAX_VALUE))
         .isInstanceOf(IllegalArgumentException.class);
   }
+
+  // --- reduce ---
+
+  @Test
+  void reduceGivesEmptyGroupsTheIdentityAndKeepsTheirObjectEntry() {
+    var graph = TestGraphs.of(4);
+    var p = NodePartition.of(graph, new int[] {1, -1, 1, 0}, 3);
+    // group 0 = {3}, group 1 = {0, 2}, group 2 empty; node 1 in no group
+    assertThat(p.reduce(new int[] {1, 100, 2, 7}, 0, Integer::sum)).containsExactly(7, 3, 0);
+    assertThat(p.reduce(new int[] {1, 100, 2, 7}, -1, Math::max)).containsExactly(7, 2, -1);
+    assertThat(p.reduce(new long[] {1, 100, 2, 7}, 0L, Long::sum)).containsExactly(7L, 3L, 0L);
+    assertThat(p.reduce(new double[] {1, 100, 2, 7}, 0.5, Double::sum))
+        .containsExactly(7.5, 3.5, 0.5);
+    assertThatThrownBy(() -> p.reduce(new int[3], 0, Integer::sum))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> p.reduce(new String[4], new String[2], String::concat))
+        .isInstanceOf(IllegalArgumentException.class);
+    String[] groupValues = {null, null, "untouched"};
+    p.reduce(new String[] {"a", "x", "b", "c"}, groupValues, String::concat);
+    assertThat(groupValues).containsExactly("c", "ab", "untouched");
+  }
+
+  @Test
+  void reduceFoldsInAscendingMemberOrder() {
+    var p = NodePartition.of(TestGraphs.of(3), new int[] {0, 0, 0}, 1);
+    assertThat(p.reduce(new int[] {1, 2, 3}, 0, (acc, v) -> acc * 10 + v)).containsExactly(123);
+  }
 }

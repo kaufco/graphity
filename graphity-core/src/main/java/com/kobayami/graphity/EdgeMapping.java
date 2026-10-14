@@ -11,19 +11,16 @@ package com.kobayami.graphity;
  * edge 0 is the first out-edge of node 0, edge 1 the second, etc.
  * <p>
  * Instances are created via {@link Graphs#edgeMapping(Graph, Graph, NodeMapping)}.
- * Use {@link #inverse()} to obtain the reverse direction, and
- * {@link #compose(EdgeMapping)} to chain multiple mappings.
+ * Use {@link #inverse()} to obtain the reverse direction,
+ * {@link #compose(EdgeMapping)} to chain multiple mappings, and {@link #gather(int[])} to carry
+ * per-edge data along.
  *
  * <pre>{@code
  * // Derive edge mapping from node mapping
  * EdgeMapping em = Graphs.edgeMapping(newGraph, oldGraph, nodeMapping);
  *
- * // Translate edge metadata, skipping edges with no correspondence in the old graph
- * double[] newWeights = new double[newGraph.edgeCount()];
- * for (int i = 0; i < newGraph.edgeCount(); i++) {
- *     int oldEdge = em.get(i);
- *     if (oldEdge >= 0) newWeights[i] = oldWeights[oldEdge];
- * }
+ * // Translate edge metadata; edges with no correspondence in the old graph get 0
+ * double[] newWeights = em.gather(oldWeights);
  * }</pre>
  *
  * @see IndexMapping
@@ -73,5 +70,75 @@ public final class EdgeMapping extends IndexMapping {
     int[] comp = computeCompose(this.mapping, inner.mapping);
     int valid = countValid(comp);
     return new EdgeMapping(comp, valid, valid < comp.length);
+  }
+
+  /**
+   * Carries per-edge data from the target space of this mapping into its source space:
+   * {@code result[i] = values[get(i)]}, and {@code 0} where {@code i} is unmapped.
+   * <p>
+   * For a mapping from new to old indices, as the factories produce it, this moves an array
+   * indexed by old edges to the new numbering:
+   *
+   * <pre>{@code
+   * int[] newValues = newToOld.gather(oldValues);
+   * }</pre>
+   *
+   * <strong>Time:</strong> O(n) where n = source space size.<br>
+   * <strong>Memory:</strong> 4 x n bytes for the result.
+   *
+   * @param values values indexed by the target space; must cover every mapped target
+   * @return values indexed by the source space, of length n
+   * @throws IndexOutOfBoundsException if a mapped target lies outside {@code values}
+   */
+  public int[] gather(int[] values) {
+    return gather(mapping, values);
+  }
+
+  /**
+   * Carries per-edge data from the target space into the source space, as
+   * {@link #gather(int[])} does.
+   * <p>
+   * <strong>Time:</strong> O(n) where n = source space size.<br>
+   * <strong>Memory:</strong> 8 x n bytes for the result.
+   *
+   * @param values values indexed by the target space; must cover every mapped target
+   * @return values indexed by the source space, {@code 0} where unmapped
+   * @throws IndexOutOfBoundsException if a mapped target lies outside {@code values}
+   */
+  public long[] gather(long[] values) {
+    return gather(mapping, values);
+  }
+
+  /**
+   * Carries per-edge data from the target space into the source space, as
+   * {@link #gather(int[])} does.
+   * <p>
+   * <strong>Time:</strong> O(n) where n = source space size.<br>
+   * <strong>Memory:</strong> 8 x n bytes for the result.
+   *
+   * @param values values indexed by the target space; must cover every mapped target
+   * @return values indexed by the source space, {@code 0} where unmapped
+   * @throws IndexOutOfBoundsException if a mapped target lies outside {@code values}
+   */
+  public double[] gather(double[] values) {
+    return gather(mapping, values);
+  }
+
+  /**
+   * Carries per-edge objects from the target space into an array the caller allocated for the
+   * source space: {@code newValues[i] = values[get(i)]}, and {@code newValues[i]} untouched
+   * where {@code i} is unmapped. References are copied, not the objects. The two arrays must
+   * be distinct; if an exception is thrown, {@code newValues} may be partly written.
+   * <p>
+   * <strong>Time:</strong> O(n) where n = source space size.
+   *
+   * @param <T>       element type
+   * @param values    values indexed by the target space; must cover every mapped target
+   * @param newValues receives the values indexed by the source space; length n
+   * @throws IllegalArgumentException if {@code newValues.length} is not the source space size
+   * @throws IndexOutOfBoundsException if a mapped target lies outside {@code values}
+   */
+  public <T> void gather(T[] values, T[] newValues) {
+    gather(mapping, values, newValues);
   }
 }

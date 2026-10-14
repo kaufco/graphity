@@ -4,6 +4,7 @@
 
 - API
   - [Issue #21](../../issues/21) - Add `Graph.edgeIndexOf` - find where an added edge ended up
+  - [Issue #22](../../issues/22) - Carry per-node and per-edge data along mappings and partitions
 - Algorithms
   - [Issue #20](../../issues/20) - Contract a graph by a partition of your choosing
 
