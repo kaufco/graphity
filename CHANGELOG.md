@@ -1,9 +1,9 @@
-# Changelog
+## [2.3.0] — unreleased
 
-All notable changes to Graphity are documented in this file.
+### Added
 
-The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
-Graphity adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+- Algorithms
+  - [Issue #20](../../issues/20) - Contract a graph by a partition of your choosing
 
 ---
 

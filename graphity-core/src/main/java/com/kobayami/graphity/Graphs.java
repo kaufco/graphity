@@ -851,7 +851,8 @@ public final class Graphs {
    * Derives an edge partition from a node partition and two graphs.
    * <p>
    * Maps original edge indices to condensed edge indices. Intra-group edges (edges where
-   * both source and target belong to the same group) are unmapped ({@code -1}).
+   * both source and target belong to the same group) are unmapped ({@code -1}), and so are
+   * edges from or to a node in no group.
    * Multiple original cross-group edges that connect the same pair of groups map to
    * the same condensed edge (many-to-one mapping).
    * <p>
@@ -864,7 +865,8 @@ public final class Graphs {
    *
    * @param condensedGraph the condensation graph (from {@link NodePartition#condense()})
    * @param originalGraph  the original graph
-   * @param partition      node partition mapping (from {@link Components})
+   * @param partition      node partition mapping (from {@link Components} or
+   *                       {@link NodePartition#of(Graph, int[], int)})
    * @return edge partition from original edge indices to condensed edge indices
    */
   public static EdgePartition edgePartition(Graph condensedGraph, Graph originalGraph, NodePartition partition) {
@@ -880,11 +882,12 @@ public final class Graphs {
     // Forward pass: for each original edge, find the condensed edge (if cross-group).
     for (int origNode = 0; origNode < originalGraph.nodeCount(); origNode++) {
       int sourceGroup = partition.get(origNode);
+      if (sourceGroup < 0) continue;
       int origEnd = origStart[origNode + 1];
       for (int ei = origStart[origNode]; ei < origEnd; ei++) {
         int origTarget = origAdj[ei];
         int targetGroup = partition.get(origTarget);
-        if (sourceGroup != targetGroup) {
+        if (sourceGroup != targetGroup && targetGroup >= 0) {
           int condEdgeIdx = SortedIntView.indexOfInRange(
               condAdj, condStart[sourceGroup], condStart[sourceGroup + 1], targetGroup);
           mapping[ei] = condEdgeIdx;

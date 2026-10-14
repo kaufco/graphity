@@ -3,6 +3,7 @@ package com.kobayami.graphity;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.kobayami.graphity.testutils.TestGraphs;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -165,5 +166,86 @@ class NodePartitionTest {
         new int[] {0, 2, 3, 4});
     var condensed = p.condense();
     assertThat(condensed.outNodes(0).toIntArray()).containsExactly(1, 2);
+  }
+
+  // --- of(Graph, int[], int) ---
+
+  @Test
+  void ofGroupsNodesAsGiven() {
+    // 0 -> 1 -> 2 -> 3, 3 -> 0; groups {0, 1} and {2, 3}.
+    var graph = TestGraphs.of(4, 0, 1, 1, 2, 2, 3, 3, 0);
+    var p = NodePartition.of(graph, new int[] {0, 0, 1, 1}, 2);
+    assertThat(p.groupCount()).isEqualTo(2);
+    assertThat(p.nodeCount()).isEqualTo(4);
+    assertThat(p.isPartial()).isFalse();
+    assertThat(p.nodesOf(0).toIntArray()).containsExactly(0, 1);
+    assertThat(p.nodesOf(1).toIntArray()).containsExactly(2, 3);
+    var condensed = p.condense();
+    assertThat(condensed.outNodes(0).toIntArray()).containsExactly(1);
+    assertThat(condensed.outNodes(1).toIntArray()).containsExactly(0);
+  }
+
+  @Test
+  void ofLeavesUngroupedNodesOutOfTheCondensation() {
+    // 0 -> 1 -> 2, 0 -> 2; node 1 in no group.
+    var graph = TestGraphs.of(3, 0, 1, 1, 2, 0, 2);
+    var p = NodePartition.of(graph, new int[] {0, -1, 1}, 2);
+    assertThat(p.isPartial()).isTrue();
+    assertThat(p.size()).isEqualTo(2);
+    assertThat(p.get(1)).isEqualTo(-1);
+    assertThat(p.contains(1)).isFalse();
+    var condensed = p.condense();
+    assertThat(condensed.edgeCount()).isEqualTo(1);
+    assertThat(condensed.hasOutNode(0, 1)).isTrue();
+    // Edge indices: 0 -> 1 is 0, 0 -> 2 is 1, 1 -> 2 is 2.
+    var provenance = Graphs.edgePartition(condensed, graph, p);
+    assertThat(provenance.edgesOf(0).toIntArray()).containsExactly(1);
+    assertThat(provenance.get(0)).isEqualTo(-1);
+    assertThat(provenance.get(2)).isEqualTo(-1);
+  }
+
+  @Test
+  void ofKeepsEmptyGroupsAsIsolatedNodes() {
+    var graph = TestGraphs.of(2, 0, 1);
+    var p = NodePartition.of(graph, new int[] {2, 0}, 4);
+    assertThat(p.sizeOf(1)).isZero();
+    assertThat(p.sizeOf(3)).isZero();
+    var condensed = p.condense();
+    assertThat(condensed.nodeCount()).isEqualTo(4);
+    assertThat(condensed.edgeCount()).isEqualTo(1);
+    assertThat(condensed.hasOutNode(2, 0)).isTrue();
+  }
+
+  @Test
+  void ofCopiesTheArray() {
+    var graph = TestGraphs.of(2, 0, 1);
+    int[] groupOf = {0, 1};
+    var p = NodePartition.of(graph, groupOf, 2);
+    groupOf[0] = 1;
+    assertThat(p.get(0)).isZero();
+  }
+
+  @Test
+  void ofOnAnEmptyGraph() {
+    var p = NodePartition.of(emptyGraph(), new int[0], 0);
+    assertThat(p.groupCount()).isZero();
+    assertThat(p.condense().nodeCount()).isZero();
+    var withGroups = NodePartition.of(emptyGraph(), new int[0], 2);
+    assertThat(withGroups.condense().nodeCount()).isEqualTo(2);
+  }
+
+  @Test
+  void ofRejectsInvalidInput() {
+    var graph = TestGraphs.of(2, 0, 1);
+    assertThatThrownBy(() -> NodePartition.of(graph, new int[] {0}, 1))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> NodePartition.of(graph, new int[] {0, 1}, 1))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> NodePartition.of(graph, new int[] {0, -2}, 1))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> NodePartition.of(graph, new int[] {-1, -1}, -1))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> NodePartition.of(graph, new int[] {-1, -1}, Integer.MAX_VALUE))
+        .isInstanceOf(IllegalArgumentException.class);
   }
 }

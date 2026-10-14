@@ -3,10 +3,10 @@ package com.kobayami.graphity;
 /**
  * A partition of indices into disjoint groups, with efficient reverse lookup.
  * <p>
- * Every index (node ID or edge index) belongs to exactly one group, identified by a
+ * Each index (node ID or edge index) belongs to at most one group, identified by a
  * group ID in {@code 0..groupCount()-1}. The forward direction (index → group) is
- * provided by {@link IndexMapping#get(int)}. The reverse direction (group → indices)
- * is provided by {@link #indicesOf(int)}.
+ * provided by {@link IndexMapping#get(int)}, with {@code -1} for an index in no group. The
+ * reverse direction (group → indices) is provided by {@link #indicesOf(int)}.
  * <p>
  * Concrete implementations provide domain-specific convenience methods:
  * <ul>
@@ -29,11 +29,12 @@ public sealed interface IndexPartition permits NodePartition, EdgePartition {
   int groupCount();
 
   /**
-   * Returns the total number of indices in this partition (nodes or edges).
+   * Returns the size of the partitioned index space (nodes or edges), including indices in no
+   * group.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @return total index count, summed over all groups
+   * @return size of the index space
    */
   int indexCount();
 
