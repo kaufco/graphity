@@ -1,5 +1,8 @@
 ## [2.3.0] — unreleased
 
+Adds contraction by a partition of your choosing, per-node and per-edge data along mappings
+and partitions, edge lookup after `build()`, and BFS distances and reachability.
+
 ### Added
 
 - API
