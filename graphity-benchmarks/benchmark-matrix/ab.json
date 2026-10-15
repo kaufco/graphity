@@ -22,6 +22,16 @@
       }
     },
     {
+      "name": "adjacency-traversal",
+      "libraries": ["graphity"],
+      "algorithms": ["outtraversal", "intraversal"],
+      "params": {
+        "nodeCount": [10000, 100000, 1000000],
+        "shape": ["PATH", "TREE", "GNP_SPARSE"]
+      },
+      "phases": ["perf"]
+    },
+    {
       "name": "scc",
       "libraries": ["graphity"],
       "algorithms": ["scc"],

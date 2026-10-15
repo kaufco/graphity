@@ -12,6 +12,7 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -72,6 +73,8 @@ public final class ReportMain {
       Map.entry("Reorder", "Reorder (DFS-preorder) cost"),
       Map.entry("BiAdjacency", "BiAdjacency (in-adjacency) cost"),
       Map.entry("Symmetrize", "Symmetrize (WebGraph) cost"),
+      Map.entry("OutAdjacencyTraversal", "Out-adjacency traversal (outNodes, no algorithm)"),
+      Map.entry("InAdjacencyTraversal", "In-adjacency traversal (inNodes, no algorithm)"),
       Map.entry("Dominators", "Dominators"),
       Map.entry("DominanceFrontiers", "Dominance frontiers"),
       Map.entry("IteratedDominanceFrontier",
@@ -88,7 +91,8 @@ public final class ReportMain {
    * an up-front price paid once for the variant column it belongs to.
    */
   private static final List<String> ALGO_ORDER = List.of(
-      "Build", "Scc", "Wcc", "Ccs", "Condense", "TopOrder", "TopOrderAndLevels",
+      "Build", "OutAdjacencyTraversal", "InAdjacencyTraversal",
+      "Scc", "Wcc", "Ccs", "Condense", "TopOrder", "TopOrderAndLevels",
       "BackEdges", "EdgeTypes",
       "Dominators", "DominanceFrontiers", "IteratedDominanceFrontier", "Loops",
       "DominatorAncestry", "PreorderAncestry",
@@ -157,7 +161,7 @@ public final class ReportMain {
       List<PerfResult> perf, List<AllocResult> alloc, List<MemResult> mem,
       Path perfPath, Path allocPath, Path memPath) {
 
-    emitHeader(out, profile);
+    emitHeader(out, profile, perf, alloc, !mem.isEmpty());
 
     if (perf.isEmpty()) {
       out.println("## 1 · Performance\n\n*(no perf input — skipped)*\n");
@@ -184,7 +188,8 @@ public final class ReportMain {
     emitSourcesFooter(out, perfPath, allocPath, memPath);
   }
 
-  private static void emitHeader(PrintStream out, String profile) {
+  private static void emitHeader(PrintStream out, String profile, List<PerfResult> perf,
+      List<AllocResult> alloc, boolean hasMemory) {
     out.println("# Graphity Benchmark Report");
     out.println();
     out.println("```");
@@ -220,8 +225,55 @@ public final class ReportMain {
     } catch (Throwable ignored) {
       // RAM line omitted if MXBean unavailable
     }
+    emitRevisions(out, perf, alloc, hasMemory);
     out.println("```");
     out.println();
+  }
+
+  /**
+   * The Graphity revisions the measurements come from, over the performance and allocation
+   * results: one line when they share one, otherwise one line per revision with its case count.
+   * A revision with "+" carries uncommitted changes, identified by a hash of the diff. Results from
+   * before revisions were recorded count as "unknown". Memory rows carry no revision.
+   */
+  private static void emitRevisions(
+      PrintStream out, List<PerfResult> perf, List<AllocResult> alloc, boolean hasMemory) {
+    Map<String, Integer> cases = new LinkedHashMap<>();
+    Map<String, String> subjects = new HashMap<>();
+    for (PerfResult r : perf) countRevision(cases, subjects, r.revision(), r.subject());
+    for (AllocResult r : alloc) countRevision(cases, subjects, r.revision(), r.subject());
+    if (cases.size() == 1) {
+      String rev = cases.keySet().iterator().next();
+      out.printf(Locale.ROOT, "Revision:     %s%n", describeRevision(rev, subjects.get(rev)));
+    } else if (cases.size() > 1) {
+      out.printf(Locale.ROOT, "Revisions:    %d, the report combines runs of different states%n",
+          cases.size());
+      for (Map.Entry<String, Integer> e : cases.entrySet()) {
+        out.printf(Locale.ROOT, "              %s (%d case%s)%n",
+            describeRevision(e.getKey(), subjects.get(e.getKey())), e.getValue(),
+            e.getValue() == 1 ? "" : "s");
+      }
+    }
+    if (hasMemory) {
+      out.println("Memory:       revision not recorded per row");
+    }
+  }
+
+  private static void countRevision(
+      Map<String, Integer> cases, Map<String, String> subjects, String revision, String subject) {
+    String rev = revision == null || revision.isEmpty() ? "unknown" : revision;
+    cases.merge(rev, 1, Integer::sum);
+    if (subject != null && !subject.isEmpty()) subjects.putIfAbsent(rev, subject);
+  }
+
+  private static String describeRevision(String revision, String subject) {
+    if (revision.equals("unknown")) return "unknown (measured before revisions were recorded)";
+    if (revision.equals("unknown-git")) return "unknown (git was not available when measured)";
+    int plus = revision.indexOf('+');
+    String commit = plus < 0 ? revision : revision.substring(0, plus);
+    String shortRev = commit.substring(0, Math.min(12, commit.length()))
+        + (plus < 0 ? "" : " + uncommitted changes " + revision.substring(plus + 1));
+    return subject == null ? shortRev : shortRev + " \"" + subject + "\"";
   }
 
   // ---- Section 1: Performance -----------------------------------------
@@ -663,7 +715,8 @@ public final class ReportMain {
           : datasetName(asStr(params.get("inputMode")), asStr(params.get("datasetPath")));
 
       Meta meta = parseBenchmarkName(benchmark);
-      out.add(new PerfResult(benchmark, meta.library, meta.algoKey, shape, nodeCount, score, err, dataset));
+      out.add(new PerfResult(benchmark, meta.library, meta.algoKey, shape, nodeCount, score, err,
+          dataset, asStr(e.get("measuredRevision")), asStr(e.get("measuredSubject"))));
     }
     return out;
   }
@@ -690,7 +743,8 @@ public final class ReportMain {
       if (bytesPerOp == null) continue;  // no gc metric recorded — skip silently
 
       Meta meta = parseBenchmarkName(benchmark);
-      out.add(new AllocResult(benchmark, meta.library, meta.algoKey, shape, nodeCount, bytesPerOp, dataset));
+      out.add(new AllocResult(benchmark, meta.library, meta.algoKey, shape, nodeCount, bytesPerOp, dataset,
+          asStr(e.get("measuredRevision")), asStr(e.get("measuredSubject"))));
     }
     return out;
   }
@@ -981,12 +1035,14 @@ public final class ReportMain {
    */
   record PerfResult(
       String benchmarkFull, String library, String algoKey,
-      String shape, int nodeCount, double score, double scoreError, String dataset) {}
+      String shape, int nodeCount, double score, double scoreError, String dataset,
+      String revision, String subject) {}
 
   /** One row from the alloc JSON (only gc.alloc.rate.norm extracted). */
   record AllocResult(
       String benchmarkFull, String library, String algoKey,
-      String shape, int nodeCount, double bytesPerOp, String dataset) {}
+      String shape, int nodeCount, double bytesPerOp, String dataset, String revision,
+      String subject) {}
 
   /** One row from the mem CSV. */
   record MemResult(String library, String shape, int nodes, int edges, long totalBytes) {}

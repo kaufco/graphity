@@ -1,0 +1,171 @@
+{
+  "name": "medium",
+  "description": "Between quick and full: every benchmark of the full matrix, all libraries, at 10^6 nodes, where memory effects become visible. Sparse shapes only - dense ones at 10^6 nodes exhaust the peers' memory - and one fork with more warm-up and measurement than quick.",
+  "jmh": {
+    "forks": 1,
+    "warmup_iterations": 2,
+    "warmup_time": "1s",
+    "measurement_iterations": 3,
+    "measurement_time": "1s",
+    "jvm_stack": "-Xss512m",
+    "jvm_heap": "-Xmx24g"
+  },
+  "cases": [
+    {
+      "name": "build",
+      "libraries": ["graphity", "jgrapht", "guava", "webgraph"],
+      "algorithms": ["build"],
+      "params": {
+        "nodeCount": [1000000],
+        "shape": ["PATH", "TREE", "GNP_SPARSE", "CHAIN_OF_CLIQUES", "GNP_SPARSE_SHUFFLED"]
+      }
+    },
+    {
+      "name": "adjacency-traversal",
+      "libraries": ["graphity"],
+      "algorithms": ["outtraversal", "intraversal"],
+      "params": {
+        "nodeCount": [1000000],
+        "shape": ["PATH", "TREE", "GNP_SPARSE", "CHAIN_OF_CLIQUES", "GNP_SPARSE_SHUFFLED"]
+      },
+      "phases": ["perf"]
+    },
+    {
+      "name": "scc",
+      "libraries": ["graphity", "jgrapht", "guava", "webgraph"],
+      "algorithms": ["scc"],
+      "params": {
+        "nodeCount": [1000000],
+        "shape": ["PATH", "TREE", "GNP_SPARSE", "CHAIN_OF_CLIQUES", "GNP_SPARSE_SHUFFLED"]
+      }
+    },
+    {
+      "name": "toporder",
+      "libraries": ["graphity", "jgrapht", "guava", "webgraph"],
+      "algorithms": ["toporder"],
+      "params": {
+        "nodeCount": [1000000],
+        "shape": ["PATH", "TREE", "DAG_GNP_SPARSE", "DAG_GNP_SPARSE_SHUFFLED"]
+      }
+    },
+    {
+      "name": "dfs-analysis",
+      "libraries": ["graphity", "jgrapht", "guava", "webgraph"],
+      "algorithms": ["backedges", "edgetypes"],
+      "params": {
+        "nodeCount": [1000000],
+        "shape": ["PATH", "TREE", "GNP_SPARSE", "CHAIN_OF_CLIQUES", "GNP_SPARSE_SHUFFLED"]
+      }
+    },
+    {
+      "name": "wcc",
+      "libraries": ["graphity", "jgrapht", "guava", "webgraph"],
+      "algorithms": ["wcc"],
+      "params": {
+        "nodeCount": [1000000],
+        "shape": ["PATH", "TREE", "GNP_SPARSE", "CHAIN_OF_CLIQUES", "GNP_SPARSE_SHUFFLED"]
+      }
+    },
+    {
+      "name": "ccs-graphity",
+      "libraries": ["graphity"],
+      "algorithms": ["ccs"],
+      "params": {
+        "nodeCount": [1000000],
+        "shape": ["PATH", "TREE", "GNP_SPARSE", "CHAIN_OF_CLIQUES", "GNP_SPARSE_SHUFFLED"]
+      }
+    },
+    {
+      "name": "toporder-levels",
+      "libraries": ["graphity", "graphity-biadjacent", "jgrapht", "guava", "webgraph"],
+      "algorithms": ["toporderandlevels"],
+      "params": {
+        "nodeCount": [1000000],
+        "shape": ["PATH", "TREE", "DAG_GNP_SPARSE", "DAG_GNP_SPARSE_SHUFFLED"]
+      }
+    },
+    {
+      "name": "condense-graphity",
+      "libraries": ["graphity"],
+      "algorithms": ["condense"],
+      "params": {
+        "nodeCount": [1000000],
+        "shape": ["PATH", "CHAIN_OF_CLIQUES", "DAG_GNP_SPARSE"]
+      }
+    },
+    {
+      "name": "reordered-graph-algos",
+      "libraries": ["graphity-reordered"],
+      "algorithms": ["scc", "wcc", "ccs", "backedges", "edgetypes"],
+      "phases": ["perf"],
+      "params": {
+        "nodeCount": [1000000],
+        "shape": ["PATH", "TREE", "GNP_SPARSE", "CHAIN_OF_CLIQUES", "GNP_SPARSE_SHUFFLED"]
+      }
+    },
+    {
+      "name": "reordered-dag-algos",
+      "libraries": ["graphity-reordered"],
+      "algorithms": ["toporder", "toporderandlevels"],
+      "phases": ["perf"],
+      "params": {
+        "nodeCount": [1000000],
+        "shape": ["PATH", "TREE", "DAG_GNP_SPARSE", "DAG_GNP_SPARSE_SHUFFLED"]
+      }
+    },
+    {
+      "name": "reorder-cost",
+      "libraries": ["graphity"],
+      "algorithms": ["reorder"],
+      "phases": ["perf"],
+      "params": {
+        "nodeCount": [1000000],
+        "shape": ["PATH", "TREE", "GNP_SPARSE", "CHAIN_OF_CLIQUES", "GNP_SPARSE_SHUFFLED"]
+      }
+    },
+    {
+      "name": "biadjacency-cost",
+      "libraries": ["graphity"],
+      "algorithms": ["biadjacency"],
+      "phases": ["perf"],
+      "params": {
+        "nodeCount": [1000000],
+        "shape": ["PATH", "TREE", "GNP_SPARSE", "CHAIN_OF_CLIQUES", "GNP_SPARSE_SHUFFLED"]
+      }
+    },
+    {
+      "name": "symmetrize-cost",
+      "libraries": ["webgraph"],
+      "algorithms": ["symmetrize"],
+      "phases": ["perf"],
+      "params": {
+        "nodeCount": [1000000],
+        "shape": ["PATH", "TREE", "GNP_SPARSE", "CHAIN_OF_CLIQUES", "GNP_SPARSE_SHUFFLED"]
+      }
+    },
+    {
+      "name": "control-flow",
+      "libraries": ["graphity"],
+      "algorithms": ["dominators", "iterateddominancefrontier", "loops", "dominatorancestry", "preorderancestry"],
+      "params": {
+        "nodeCount": [1000000],
+        "shape": ["STRUCTURED", "IRREDUCIBLE", "LADDER", "CHAIN", "FAN_BEHIND_CHAIN", "SMALL_METHODS"]
+      }
+    },
+    {
+      "name": "dominance-frontiers",
+      "libraries": ["graphity"],
+      "algorithms": ["dominancefrontiers"],
+      "params": {
+        "nodeCount": [1000000],
+        "shape": ["STRUCTURED", "IRREDUCIBLE", "CHAIN", "SMALL_METHODS"]
+      }
+    }
+  ],
+  "mem": {
+    "enabled": true,
+    "nodes": [1000000],
+    "shapes": ["GNP_SPARSE"],
+    "libraries": ["graphity", "jgrapht", "guava", "webgraph"]
+  }
+}

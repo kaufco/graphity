@@ -128,6 +128,7 @@ SUPPORTED_LIBS = {"graphity", "graphity-reordered", "graphity-biadjacent", "jgra
 SUPPORTED_ALGOS = {
     "build", "scc", "wcc", "ccs", "condense", "toporder", "toporderandlevels",
     "backedges", "edgetypes", "reorder", "biadjacency", "symmetrize",
+    "outtraversal", "intraversal",
     "dominators", "dominancefrontiers", "iterateddominancefrontier", "loops",
     "dominatorancestry", "preorderancestry"
 }
@@ -151,6 +152,8 @@ ALGO_SUPPORTED_LIBS = {
     "reorder": {"graphity"},
     "biadjacency": {"graphity"},
     "symmetrize": {"webgraph"},
+    "outtraversal": {"graphity"},
+    "intraversal": {"graphity"},
     **{algo: {"graphity"} for algo in CONTROL_FLOW_ALGOS},
 }
 ALGO_ALLOWED_SHAPES = {
@@ -171,6 +174,8 @@ ALGO_ALLOWED_SHAPES = {
     # ones, so their construction cost is measured over the full shape set.
     "biadjacency": GRAPH_FIXTURE_SHAPES,
     "symmetrize": GRAPH_FIXTURE_SHAPES,
+    "outtraversal": GRAPH_FIXTURE_SHAPES,
+    "intraversal": GRAPH_FIXTURE_SHAPES,
 }
 SUPPORTED_PHASES = {"perf", "alloc"}
 DAG_ALGOS = {"toporder", "toporderandlevels"}
@@ -430,6 +435,12 @@ BENCHMARK_FQNS = {
     "symmetrize": {
         "webgraph": "com.kobayami.graphity.benchmarks.webgraph.WebGraphSymmetrizeBenchmark.symmetrize",
     },
+    "outtraversal": {
+        "graphity": "com.kobayami.graphity.benchmarks.graphity.OutAdjacencyTraversalBenchmark.outAdjacencyTraversal",
+    },
+    "intraversal": {
+        "graphity": "com.kobayami.graphity.benchmarks.graphity.InAdjacencyTraversalBenchmark.inAdjacencyTraversal",
+    },
     "dominators": {
         "graphity": "com.kobayami.graphity.benchmarks.graphity.DominatorsBenchmark.dominators",
     },
@@ -587,6 +598,7 @@ run_validate_phase() {
   IFS=$'\t' read -r _ _ _ _ _ jvm_stack jvm_heap _ <<< "$(matrix_jmh_defaults "$matrix_file")"
   [[ "$jvm_heap" == "-" ]] && jvm_heap=""
   banner "validate — semantic quick-fail (${phase})"
+  VALIDATION_FAILED=()
   local -a jbase=(java "$jvm_stack")
   [[ -n "$jvm_heap" ]] && jbase+=("$jvm_heap")
   jbase+=(-jar "$JAR" validate)
@@ -599,17 +611,18 @@ run_validate_phase() {
     fi
     case_idx=$((case_idx + 1))
     echo "[validate/$case_idx] case=${case_name} algo=${algo} libs=${libs}"
+    local -a vargs=(--algorithm "$algo" --libraries "$libs")
     if [[ -n "$datasets" ]]; then
-      "${jbase[@]}" \
-        --algorithm "$algo" \
-        --libraries "$libs" \
-        --datasets "$datasets"
+      vargs+=(--datasets "$datasets")
     else
-      "${jbase[@]}" \
-        --algorithm "$algo" \
-        --libraries "$libs" \
-        --nodes "$nodes" \
-        --shapes "$shapes"
+      vargs+=(--nodes "$nodes" --shapes "$shapes")
+    fi
+    # A library that fails here - a wrong result, or out of memory or stack at a large n - skips
+    # this case's measurement; the other cases still run.
+    if ! "${jbase[@]}" "${vargs[@]}"; then
+      echo "[validate/$case_idx] FAILED: case=${case_name} algo=${algo} — measurement skipped"
+      VALIDATION_FAILED+=("${case_name}:${algo}")
+      FAILED_MEASUREMENTS+=("${phase}/validate/${case_name}:${algo}")
     fi
   done < <(matrix_validate_cases_tsv "$matrix_file" "$phase" "$LIB_FILTER")
 }
@@ -646,8 +659,10 @@ print(json.dumps({
 PY
 }
 
-# Adds a "measuredAt" (ISO 8601, UTC) field and the "libraryVersion" of the measured library
-# to every entry of a JMH JSON result array, in place. The report tooling (ReportMain.java's hand-rolled
+# Adds a "measuredAt" (ISO 8601, UTC) field, the "libraryVersion" of the measured library and
+# the measured revision ("measuredRevision": commit, plus a hash of uncommitted changes;
+# "measuredSubject": the commit subject) to every entry of a JMH JSON result array, in place.
+# ReportMain prints the revisions a report combines. The report tooling (ReportMain.java's hand-rolled
 # JSON parser) reads results into a generic map and only looks up the keys it
 # knows about, so an extra field is silently ignored there — this is purely
 # provenance data for anyone inspecting the raw JSON later, since the
@@ -658,6 +673,8 @@ stamp_measured_at() {
 import datetime, json, sys
 path = sys.argv[1]
 versions = json.loads(sys.argv[2])
+revision = versions.get("revision", "unknown")
+subject = versions.get("subject", "")
 def lib_of(fqn):
     # com.kobayami.graphity.benchmarks.<package>.<Class>.<method>
     parts = fqn.split(".")
@@ -677,6 +694,8 @@ now = datetime.datetime.now(datetime.timezone.utc).isoformat()
 for entry in data:
     entry["measuredAt"] = now
     entry["libraryVersion"] = versions.get(lib_of(entry.get("benchmark", "")), "unknown")
+    entry["measuredRevision"] = revision
+    entry["measuredSubject"] = subject
 with open(path, "w", encoding="utf-8") as f:
     json.dump(data, f, indent=2)
 PY
@@ -813,6 +832,26 @@ if run_combos > 0:
 PY
 }
 
+# count_missing_results <result.json> <regex> <param_spec...>: how many (benchmark, combo) results
+# of one JMH run are missing. Without -foe, JMH skips a failing benchmark and carries on, so a
+# crash shows up only as a hole in the result file.
+count_missing_results() {
+  local result="$1" regex="$2"; shift 2
+  python3 - "$result" "$regex" "$@" <<'PY'
+import itertools, json, re, sys
+result, regex, specs = sys.argv[1], sys.argv[2], sys.argv[3:]
+fqns = [re.sub(r"\\(.)", r"\1", f) for f in regex.removeprefix("^(?:").removesuffix(")$").split("|") if f]
+space = [(k, v.split(",")) for k, v in (x.split("=", 1) for x in specs if "=" in x)]
+keys = [k for k, _ in space]
+combos = [tuple(zip(keys, vals)) for vals in itertools.product(*[v for _, v in space])] or [()]
+have = set()
+for e in json.load(open(result, encoding="utf-8")):
+    p = e.get("params") or {}
+    have.add((e.get("benchmark"), tuple((k, str(p.get(k))) for k in keys)))
+print(sum(1 for f in fqns for c in combos if (f, c) not in have))
+PY
+}
+
 # merge_case_result <dest.json> <base.json> [<overlay.json>]
 # Combines two JMH result arrays, deduplicating by (benchmark, params); entries
 # from <overlay> win over <base>. Used to fold freshly measured combos on top of
@@ -884,6 +923,10 @@ run_jmh_phase() {
       continue
     fi
     case_idx=$((case_idx + 1))
+    if [[ " ${VALIDATION_FAILED[*]} " == *" ${case_name} "* ]]; then
+      echo "[$phase/$case_idx] case=${case_name} — skipped, validation failed"
+      continue
+    fi
     local bench_regex="${fields[1]}"
     local case_key="${fields[2]}"
     local fqns_csv="${fields[3]}"
@@ -948,6 +991,12 @@ run_jmh_phase() {
     # mark this one case as failed and let the rest keep running.
     if "${cmd[@]}" 2>&1 | tee -a "$case_log"; then
       if [[ -f "$case_tmp" ]]; then
+        local missing
+        missing="$(count_missing_results "$case_tmp" "$run_regex" "${run_params[@]}")"
+        if [[ "$missing" -gt 0 ]]; then
+          echo "[$phase/$case_idx] WARNING: case=${case_name} — ${missing} result(s) missing, a benchmark failed (see ${case_log})" | tee -a "$case_log"
+          FAILED_MEASUREMENTS+=("${phase}/${profile}/${case_name} (${missing} result(s) missing)")
+        fi
         stamp_measured_at "$case_tmp"
         # Fold freshly measured combos on top of the reused ones (fresh wins).
         merge_case_result "$case_out" "$reuse_json" "$case_tmp"
@@ -1133,6 +1182,8 @@ LIB_FILTER=""
 # rest of the run via `set -e` — it's just reported, and re-running the same
 # command retries only what's still missing.
 FAILED_MEASUREMENTS=()
+# Cases whose validation failed in the current phase; run_jmh_phase skips them.
+VALIDATION_FAILED=()
 # Accumulates whole phases that were skipped because a precondition was missing
 # (currently only: real-world datasets not downloaded). Reported in its own
 # banner at the very end so a multi-hour `bench` run cannot silently produce a
@@ -1704,6 +1755,7 @@ Libraries (for synthetic / realworld):
 Profiles (--profile <name>):
   Synthetic:    quick   — fast dev loop, n = 10K/100K, all libs, perf+alloc (~minutes)
                 full    — full baseline, n = 10K/100K, all libs, perf+alloc (~hours) [default]
+                medium  — every benchmark at n = 1M, all libs, sparse shapes, perf+alloc (~hours)
                 big     — large graphs, n = 1M/10M/100M, Graphity+reordered only, perf (~hours)
                 ab      — A/B decisions, Graphity only, 3 forks, n = 10K/100K/1M (used by 'ab')
   Real-world:   realworld       — all libs, all datasets, perf [default]

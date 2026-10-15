@@ -185,6 +185,9 @@ public final class ValidateMain {
         // "toporderandlevels" case below runs Kahn over the bi-adjacent graph as well and
         // requires the same levels as the uni-adjacent path.
       }
+      case "outtraversal", "intraversal" -> {
+        // Sums node IDs over the adjacency lists; nothing to cross-validate.
+      }
       case "symmetrize" -> {
         // Same: a wrong symmetric closure would make WebGraph's components disagree with
         // Graphity's under the "wcc" case, which is where the symmetrization is exercised.

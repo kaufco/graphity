@@ -68,7 +68,9 @@ VARIANT_SUFFIX_RE = re.compile(r"\s*—\s*(?P<variant>.+)$")
 # version report. Algorithms not listed here (e.g. the memory sub-chapters) keep
 # the relative order they have in the source files.
 ALGO_ORDER = (
-    "Build", "SCC", "WCC", "CCs", "Condense", "TopOrder", "TopOrderAndLevels",
+    "Build", "Out-adjacency traversal (outNodes, no algorithm)",
+    "In-adjacency traversal (inNodes, no algorithm)",
+    "SCC", "WCC", "CCs", "Condense", "TopOrder", "TopOrderAndLevels",
     "BackEdges", "EdgeTypes", "Reorder (DFS-preorder) cost",
     "BiAdjacency (in-adjacency) cost", "Symmetrize (WebGraph) cost",
 )
