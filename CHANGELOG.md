@@ -10,6 +10,7 @@
   - [Issue #23](../../issues/23) - Add `BfsDistances` and `Graphs.reachableFrom`
 - Benchmarks
   - [Issue #24](../../issues/24) - Add a more precise benchmark profile for comparing two versions
+  - [Issue #25](../../issues/25) - Reuse peer measurements across benchmark runs
 
 ---
 

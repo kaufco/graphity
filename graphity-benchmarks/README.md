@@ -47,6 +47,7 @@ The runner is a single script with a three-step workflow — **clean → run →
 | Command                        | Effect                                                                                              |
 |--------------------------------|-----------------------------------------------------------------------------------------------------|
 | `clean`                        | Delete run artifacts (JSON/CSV/MD/log) from `measurements/`                                              |
+| `clean --lib <a,b>` / `--keep-peers` | Remove only the results of the named libraries (`--keep-peers`: the three Graphity variants), keep the rest as cache |
 | `bench [version]`              | Run all phases in sequence: `synthetic full` → `synthetic big` → `realworld` → `report` (~3 h total). |
 |                                | `version` is handed to the `report` step. Skips realworld if no dataset files are found under        |
 |                                | `datasets/` — loudly, and again in a closing "skipped phases" banner.                                |
@@ -56,6 +57,8 @@ The runner is a single script with a three-step workflow — **clean → run →
 |                                | Version defaults to the `pom.xml` value (SNAPSHOT suffix stripped); machine is auto-derived.        |
 | `ab <label> [--cases a,b]`     | A/B measurement of the current state with the `ab` profile into `measurements/ab/<label>/`, with the commit in `meta.json` |
 | `compare <label-a> <label-b>`  | Markdown table of B against A: means, 99.9 % half-widths, B/A; flags `noise` and `wide` (> 15 %)     |
+
+Results in `measurements/` are reused across runs only while each entry's library version and JDK match the current ones: a new Graphity commit or working tree is measured again, the JGraphT, Guava and WebGraph columns are kept. Memory CSVs are reused on the same terms. Changes to the generators, fixtures or peer adapters do not show in a peer's version; after such a change, run `clean --lib jgrapht,guava,webgraph` as well.
 
 `report` does not re-run benchmarks; it aggregates whatever JSON is present in `measurements/`. Because it merges per benchmark (newest run wins), running libraries separately and then calling `report` once produces a single merged report. `report` then copies the result into the versioned `reports/` archive and regenerates the two summary views per machine, with embedded Times and Ops tables and chart SVGs.
 

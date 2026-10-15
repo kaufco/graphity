@@ -614,22 +614,69 @@ run_validate_phase() {
   done < <(matrix_validate_cases_tsv "$matrix_file" "$phase" "$LIB_FILTER")
 }
 
-# Adds a "measuredAt" (ISO 8601, UTC) field to every entry of a JMH JSON
-# result array, in place. The report tooling (ReportMain.java's hand-rolled
+# library_versions -> JSON object: the version every library is measured at, plus the JDK and
+# the measured state. Peers carry their Maven version from the parent POM; the Graphity variants
+# carry the state from measured_state (commit, plus a hash of uncommitted and untracked changes).
+# A cached result is reused only while its library's entry and the JDK still match
+# (compute_case_resume). Changes to generators, fixtures or peer adapters do not show in a peer's
+# version; after such a change, `clean --lib jgrapht,guava,webgraph` as well.
+library_versions() {
+  local state jdk
+  state="$(measured_state)"
+  jdk="$(java -XshowSettings:properties -version 2>&1 | awk -F'= ' '/^ *java\.version =/{print $2; exit}')"
+  python3 - "$(cd "${BENCH_DIR}/.." && pwd)/pom.xml" "$state" "$jdk" <<'PY'
+import json, re, sys
+pom, state, jdk = sys.argv[1], json.loads(sys.argv[2]), sys.argv[3]
+text = open(pom, encoding="utf-8").read()
+def prop(name):
+    m = re.search(rf"<{re.escape(name)}>([^<]+)</{re.escape(name)}>", text)
+    return m.group(1).strip() if m else "unknown"
+graphity = "git:" + state["revision"]
+print(json.dumps({
+    "graphity": graphity,
+    "graphity-reordered": graphity,
+    "graphity-biadjacent": graphity,
+    "jgrapht": prop("jgrapht.version"),
+    "guava": prop("guava.version"),
+    "webgraph": prop("webgraph.version"),
+    "jdk": jdk,
+    "revision": state["revision"],
+    "subject": state["subject"],
+}))
+PY
+}
+
+# Adds a "measuredAt" (ISO 8601, UTC) field and the "libraryVersion" of the measured library
+# to every entry of a JMH JSON result array, in place. The report tooling (ReportMain.java's hand-rolled
 # JSON parser) reads results into a generic map and only looks up the keys it
 # knows about, so an extra field is silently ignored there — this is purely
 # provenance data for anyone inspecting the raw JSON later, since the
 # filename itself no longer carries a timestamp.
 stamp_measured_at() {
   local json_file="$1"
-  python3 - "$json_file" <<'PY'
+  python3 - "$json_file" "$LIBRARY_VERSIONS" <<'PY'
 import datetime, json, sys
 path = sys.argv[1]
+versions = json.loads(sys.argv[2])
+def lib_of(fqn):
+    # com.kobayami.graphity.benchmarks.<package>.<Class>.<method>
+    parts = fqn.split(".")
+    if len(parts) < 3:
+        return ""
+    pkg, cls = parts[-3], parts[-2]
+    if pkg == "graphity":
+        if cls.endswith("ReorderedBenchmark"):
+            return "graphity-reordered"
+        if cls.endswith("BiAdjacentBenchmark"):
+            return "graphity-biadjacent"
+        return "graphity"
+    return pkg
 with open(path, encoding="utf-8") as f:
     data = json.load(f)
 now = datetime.datetime.now(datetime.timezone.utc).isoformat()
 for entry in data:
     entry["measuredAt"] = now
+    entry["libraryVersion"] = versions.get(lib_of(entry.get("benchmark", "")), "unknown")
 with open(path, "w", encoding="utf-8") as f:
     json.dump(data, f, indent=2)
 PY
@@ -645,22 +692,45 @@ PY
 # expected benchmark FQN of the case has a result for it, so a partially-run
 # combo is re-measured rather than silently accepted.
 #
-# Writes the reusable entries (all FQNs of every fully-covered combo) as a JSON
-# array to <reuse_dest>. Prints to stdout:
+# Writes the reusable entries (every current entry of an expected FQN, also in combos
+# that are not complete) as a JSON array to <reuse_dest>. Prints to stdout:
 #   STATS\t<total_combos>\t<run_combos>\t<reused_combos>
 #   PARAM\t<key=csv>            (one per param key; ONLY the values still to run)
+#   REGEX\t<regex>              (only the FQNs that miss a result in some combo)
 # When <run_combos> is 0 there are no PARAM lines and the caller skips JMH and
 # just materializes the reuse array as the case output.
 compute_case_resume() {
   local reuse_dest="$1" phase="$2" fqns_csv="$3"; shift 3
-  python3 - "$reuse_dest" "$MEASUREMENTS" "$phase" "$fqns_csv" "$@" <<'PY'
+  python3 - "$reuse_dest" "$MEASUREMENTS" "$phase" "$fqns_csv" "$LIBRARY_VERSIONS" "$@" <<'PY'
 import glob, itertools, json, os, sys
 
 reuse_dest = sys.argv[1]
 results_dir = sys.argv[2]
 phase = sys.argv[3]
 fqns = [x for x in sys.argv[4].split(",") if x]
-specs = sys.argv[5:]
+versions = json.loads(sys.argv[5])
+specs = sys.argv[6:]
+def lib_of(fqn):
+    # com.kobayami.graphity.benchmarks.<package>.<Class>.<method>
+    parts = fqn.split(".")
+    if len(parts) < 3:
+        return ""
+    pkg, cls = parts[-3], parts[-2]
+    if pkg == "graphity":
+        if cls.endswith("ReorderedBenchmark"):
+            return "graphity-reordered"
+        if cls.endswith("BiAdjacentBenchmark"):
+            return "graphity-biadjacent"
+        return "graphity"
+    return pkg
+
+def current(entry):
+    """A cached entry counts only if it was measured at today's library version and JDK. Without
+    git the Graphity state is unknown, and an unknown state is never current."""
+    lib = lib_of(entry.get("benchmark", ""))
+    version = versions.get(lib)
+    return (entry.get("libraryVersion") == version and "unknown-git" not in (version or "")
+            and entry.get("jdkVersion") == versions.get("jdk"))
 
 # Ordered param space: [(key, [values...]), ...] exactly as passed to `-p`.
 param_space = []
@@ -687,7 +757,7 @@ for path in sorted(glob.glob(os.path.join(results_dir, f"{phase}-*@*.json")), ke
     for entry in data:
         bm = entry.get("benchmark", "")
         p = entry.get("params") or {}
-        if not all(k in p for k in keys):
+        if not all(k in p for k in keys) or not current(entry):
             continue
         combo_key = tuple((k, str(p[k])) for k in keys)
         present.setdefault(combo_key, set()).add(bm)
@@ -708,13 +778,17 @@ for combo in uncovered:
     for k in keys:
         run_values[k].add(combo[k])
 
-reuse_entries = []
-for combo in covered:
+# Reuse every current entry, also from incomplete combos: when only Graphity is stale, the peer
+# results of the same combos stay, and only the FQNs that miss a result are run (REGEX).
+reuse_entries, missing_fqns = [], set()
+for combo in combos:
     ck = combo_key_of(combo)
     for fqn in fqns:
         e = stored.get((fqn, ck))
         if e is not None:
             reuse_entries.append(e)
+        else:
+            missing_fqns.add(fqn)
 json.dump(reuse_entries, open(reuse_dest, "w", encoding="utf-8"), indent=2)
 
 if uncovered:
@@ -733,6 +807,9 @@ print(f"STATS\t{total}\t{run_combos}\t{reused}")
 if run_combos > 0:
     for (k, _), fvals in zip(param_space, filtered):
         print(f"PARAM\t{k}={','.join(fvals)}")
+    import re
+    run_fqns = [f for f in fqns if f in missing_fqns]
+    print("REGEX\t^(?:" + "|".join(re.escape(f) for f in run_fqns) + ")$")
 PY
 }
 
@@ -786,11 +863,13 @@ run_jmh_phase() {
   # profile measured earlier). If nothing is missing the case is materialized
   # from the reused entries with no JMH run at all.
   #
-  # Run `clean` for a full rerun from scratch; if you change the matrix's `jmh`
-  # block (forks/warmup/measurement/stack/heap) between two runs, `clean` first
-  # — nothing here detects that the settings changed, and stale combos would be
-  # reused as-is.
+  # A cached combo is reused only while every entry was measured at the current
+  # library version and JDK (library_versions): a changed Graphity commit or
+  # working tree re-measures the Graphity columns and keeps the peers. If you
+  # change the matrix's `jmh` block (forks/warmup/measurement/stack/heap)
+  # between two runs, `clean` first — nothing detects that the settings changed.
   local case_idx=0 n_run=0 n_cached=0
+  [[ -z "$LIBRARY_VERSIONS" ]] && LIBRARY_VERSIONS="$(library_versions)"
 
   IFS=$'\t' read -r forks wi w it r jvm_stack jvm_heap jvm_args <<< "$(matrix_jmh_defaults "$matrix_file")"
   [[ "$jvm_heap" == "-" ]] && jvm_heap=""
@@ -816,11 +895,12 @@ run_jmh_phase() {
     # entries are captured so the case output stays complete and self-contained.
     local reuse_json="${case_out}.reuse.$$"
     local -a run_params=()
-    local total_combos=0 run_combos=0 reused_combos=0
+    local total_combos=0 run_combos=0 reused_combos=0 run_regex=""
     while IFS=$'\t' read -r tag rest; do
       case "$tag" in
         STATS) IFS=$'\t' read -r total_combos run_combos reused_combos <<< "$rest" ;;
         PARAM) run_params+=("$rest") ;;
+        REGEX) run_regex="$rest" ;;
       esac
     done < <(compute_case_resume "$reuse_json" "$phase" "$fqns_csv" "${fields[@]:4}")
 
@@ -861,7 +941,7 @@ run_jmh_phase() {
     [[ -n "$jvm_heap" ]] && fork_args="$fork_args $jvm_heap"
     [[ -n "$jvm_args" ]] && fork_args="$fork_args $jvm_args"
     local case_tmp="${case_out}.tmp.$$"
-    cmd+=("$bench_regex" -jvmArgsAppend "$fork_args" -rf json -rff "$case_tmp")
+    cmd+=("${run_regex:-$bench_regex}" -jvmArgsAppend "$fork_args" -rf json -rff "$case_tmp")
 
     # Guarded call (not a bare pipeline statement): a crashing/OOM-killed
     # library must not abort the whole script via `set -e` — it should only
@@ -929,10 +1009,16 @@ run_mem() {
   [[ -z "$libs_key" ]] && libs_key="none"
   local out="${MEASUREMENTS}/mem-${profile}@${libs_key}.csv"
 
-  if [[ -f "$out" ]]; then
-    echo "mem — already in measurements/, skipping (${out})"
+  # A CSV is reused only while the versions it was measured at (written next to it) still match.
+  [[ -z "$LIBRARY_VERSIONS" ]] && LIBRARY_VERSIONS="$(library_versions)"
+  local versions_now
+  versions_now="$(python3 -c 'import json, sys; v = json.loads(sys.argv[1]); print(json.dumps({l: v.get(l) for l in sys.argv[2].split(",") if l} | {"jdk": v.get("jdk")}, sort_keys=True))' "$LIBRARY_VERSIONS" "$mem_libraries")"
+  if [[ -f "$out" && -f "${out}.versions" && "$versions_now" != *unknown-git* \
+        && "$(cat "${out}.versions")" == "$versions_now" ]]; then
+    echo "mem — already in measurements/ at the current versions, skipping (${out})"
     return
   fi
+  rm -f "$out" "${out}.versions"
 
   local -a mem_args=(mem -o "${out}.tmp.$$")
   [[ -n "$mem_nodes" ]] && mem_args+=(-n "$mem_nodes")
@@ -945,6 +1031,7 @@ run_mem() {
 
   if "${mem_cmd[@]}"; then
     mv -f "${out}.tmp.$$" "$out"
+    printf '%s\n' "$versions_now" > "${out}.versions"
     echo "mem CSV → $out"
   else
     rm -f "${out}.tmp.$$"
@@ -1069,16 +1156,75 @@ PY
 }
 
 cmd_clean() {
+  if [[ -n "$CLEAN_LIBS" ]]; then
+    cmd_clean_libs "$CLEAN_LIBS"
+    return
+  fi
   banner "clean — removing run artifacts from measurements/"
   local n=0 f
   shopt -s nullglob
   for f in "${MEASUREMENTS}"/perf-*.json "${MEASUREMENTS}"/alloc-*.json "${MEASUREMENTS}"/mem-*.csv \
+           "${MEASUREMENTS}"/mem-*.csv.versions \
            "${MEASUREMENTS}"/report-*.md "${MEASUREMENTS}"/*.log; do
     rm -f "$f"
     n=$((n + 1))
   done
   shopt -u nullglob
   echo "removed ${n} file(s) from ${MEASUREMENTS}/ (this is also the resumable-run cache — next run starts fully fresh)"
+}
+
+# cmd_clean_libs <lib,lib,...>: drops only the results of the named libraries from the JSON
+# files of measurements/ and keeps everything else as resume cache. Memory CSVs are per run
+# rather than per entry (run_mem skips an existing file), so a CSV with a row of a named library
+# is removed as a whole; memory measurement takes minutes, not hours.
+cmd_clean_libs() {
+  local libs="$1"
+  banner "clean — removing results of [${libs}] from measurements/, keeping the rest"
+  python3 - "$MEASUREMENTS" "$libs" <<'PY'
+import csv, glob, json, os, sys
+results_dir, libs = sys.argv[1], set(x.strip() for x in sys.argv[2].split(",") if x.strip())
+def lib_of(fqn):
+    # com.kobayami.graphity.benchmarks.<package>.<Class>.<method>
+    parts = fqn.split(".")
+    if len(parts) < 3:
+        return ""
+    pkg, cls = parts[-3], parts[-2]
+    if pkg == "graphity":
+        if cls.endswith("ReorderedBenchmark"):
+            return "graphity-reordered"
+        if cls.endswith("BiAdjacentBenchmark"):
+            return "graphity-biadjacent"
+        return "graphity"
+    return pkg
+entries_removed = files_removed = 0
+for path in sorted(glob.glob(os.path.join(results_dir, "perf-*.json"))
+                   + glob.glob(os.path.join(results_dir, "alloc-*.json"))):
+    try:
+        data = json.load(open(path, encoding="utf-8"))
+    except Exception:
+        continue
+    kept = [e for e in data if lib_of(e.get("benchmark", "")) not in libs]
+    if len(kept) == len(data):
+        continue
+    entries_removed += len(data) - len(kept)
+    if kept:
+        json.dump(kept, open(path, "w", encoding="utf-8"), indent=2)
+    else:
+        os.remove(path)
+        files_removed += 1
+for path in sorted(glob.glob(os.path.join(results_dir, "mem-*.csv"))):
+    with open(path, encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+    if any(r.get("library") in libs for r in rows):
+        os.remove(path)
+        if os.path.isfile(path + ".versions"):
+            os.remove(path + ".versions")
+        files_removed += 1
+for path in glob.glob(os.path.join(results_dir, "report-*.md")):
+    os.remove(path)
+    files_removed += 1
+print(f"removed {entries_removed} result(s) and {files_removed} file(s); the rest stays as resume cache")
+PY
 }
 
 # run_kind <synthetic|realworld> <lib|all> <profile>
@@ -1103,6 +1249,8 @@ run_kind() {
   local matrix_file profile_name
   matrix_file="$(resolve_matrix_file "$profile")"
   validate_matrix "$matrix_file"
+  check_case_filter "$matrix_file"
+  snapshot_state
   profile_name="$(matrix_profile_name "$matrix_file")"
 
   banner "${kind} — profile '${profile_name}', libraries [${lib}]"
@@ -1333,6 +1481,15 @@ if newest > os.path.getmtime(jar):
 PY
 }
 
+# snapshot_state: checks the jar and records the library versions once per invocation, at the
+# start, so that every phase of a run - `bench` runs several - attributes its results to the state
+# the jar was checked against. A source saved during a long run changes nothing for that run.
+snapshot_state() {
+  [[ -n "$LIBRARY_VERSIONS" ]] && return 0
+  require_fresh_jar
+  LIBRARY_VERSIONS="$(library_versions)"
+}
+
 # check_case_filter <matrix>: every name in --cases must be a case ("scc") or a case with its
 # algorithm ("toporder:toporderandlevels") of the matrix; a typo would otherwise measure nothing.
 check_case_filter() {
@@ -1358,7 +1515,8 @@ PY
 ab_write_meta() {
   local dir="$1" profile="$2"
   local state java_version cpu
-  state="$(measured_state)"
+  # The snapshot of this invocation if there is one, so meta.json and the entries agree.
+  state="${LIBRARY_VERSIONS:-$(measured_state)}"
   java_version="$(java -version 2>&1 | head -1)"
   cpu="$(grep -m1 'model name' /proc/cpuinfo 2>/dev/null | cut -d: -f2- | sed 's/^ *//' || true)"
   [[ -z "$cpu" ]] && cpu="$(sysctl -n machdep.cpu.brand_string 2>/dev/null || echo unknown)"
@@ -1397,7 +1555,7 @@ cmd_ab() {
   matrix_file="$(resolve_matrix_file "${PROFILE_OVERRIDE:-ab}")"
   validate_matrix "$matrix_file"
   check_case_filter "$matrix_file"
-  require_fresh_jar
+  snapshot_state
   profile_name="$(matrix_profile_name "$matrix_file")"
   MEASUREMENTS="${BENCH_DIR}/measurements/ab/${label}"
   mkdir -p "$MEASUREMENTS"
@@ -1505,8 +1663,12 @@ Workflow — from a clean slate to committed reports with charts:
   0. ./datasets/download-datasets.sh          # once per machine: fetch the SNAP datasets
        (they are gitignored; without them the realworld phase is skipped)
   1. $(basename "$0") clean                   # wipe measurements/ (old JSON etc.)
-       Mandatory before comparing two code states: measurements/ doubles as the
-       resume cache and is reused as-is, so stale results would be kept.
+       measurements/ doubles as the resume cache. Results are reused only while
+       their library version and JDK match, so a new Graphity state is measured
+       again on its own; 'clean --keep-peers' drops Graphity explicitly and keeps
+       JGraphT, Guava and WebGraph. After a change to generators, fixtures or peer
+       adapters, also 'clean --lib jgrapht,guava,webgraph': those do not show in a
+       peer's version.
   2. $(basename "$0") bench [version]         # complete ~3h run: synthetic full + big + realworld + report
      — OR run individual steps:
      $(basename "$0") synthetic <lib|all>     # synthetic full (n = 10K / 100K, all libraries)
@@ -1517,6 +1679,8 @@ Workflow — from a clean slate to committed reports with charts:
 
 Commands:
   clean                          Delete run artifacts (JSON/CSV/MD/log) from measurements/.
+  clean --lib <a,b,...>          Remove only the results of the named libraries; keep the rest as cache.
+  clean --keep-peers             Same as --lib graphity,graphity-reordered,graphity-biadjacent.
   bench [version]                Run all phases in sequence: synthetic full → big → realworld → report.
                                  Skips realworld (loudly, and again in the closing summary) if
                                  datasets/ contains no .txt files. 'version' is passed to report.
@@ -1568,9 +1732,12 @@ esac
 
 shift || true
 
-# Parse options (--profile/--matrix and --cases; run commands use positionals).
+# Parse options (--profile/--matrix, --cases, and --lib/--keep-peers for clean; run commands
+# use positionals).
 PROFILE_OVERRIDE=""
 CASE_FILTER=""
+CLEAN_LIBS=""
+LIBRARY_VERSIONS=""
 POSARGS=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -1586,12 +1753,33 @@ while [[ $# -gt 0 ]]; do
       shift 2 ;;
     --cases=*)
       CASE_FILTER="${1#*=}"; shift ;;
+    --lib)
+      CLEAN_LIBS="${2:-}"
+      [[ -z "$CLEAN_LIBS" ]] && { echo "error: $1 requires a value" >&2; exit 2; }
+      shift 2 ;;
+    --lib=*)
+      CLEAN_LIBS="${1#*=}"; shift ;;
+    --keep-peers)
+      CLEAN_LIBS="graphity,graphity-reordered,graphity-biadjacent"; shift ;;
     -*)
       echo "error: unknown option '$1'" >&2; usage; exit 2 ;;
     *)
       POSARGS+=("$1"); shift ;;
   esac
 done
+
+if [[ -n "$CLEAN_LIBS" ]]; then
+  if [[ "$cmd" != "clean" ]]; then
+    echo "error: --lib and --keep-peers belong to 'clean'" >&2
+    exit 2
+  fi
+  for lib in ${CLEAN_LIBS//,/ }; do
+    if [[ "$SUPPORTED_LIBS" != *" $lib "* ]]; then
+      echo "error: unknown library '$lib'; supported:${SUPPORTED_LIBS}" >&2
+      exit 2
+    fi
+  done
+fi
 
 case "$cmd" in
   clean)     cmd_clean ;;
