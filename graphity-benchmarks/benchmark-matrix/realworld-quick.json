@@ -5,8 +5,8 @@
     "forks": 0,
     "warmup_iterations": 1,
     "warmup_time": "300ms",
-    "measurement_iterations": 3,
-    "measurement_time": "500ms",
+    "measurement_iterations": 5,
+    "measurement_time": "100ms",
     "jvm_stack": "-Xss16m"
   },
   "cases": [

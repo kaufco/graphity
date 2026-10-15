@@ -1,12 +1,13 @@
 {
   "name": "medium",
-  "description": "Between quick and full: every benchmark of the full matrix, all libraries, at 10^6 nodes, where memory effects become visible. Sparse shapes only - dense ones at 10^6 nodes exhaust the peers' memory - and one fork with more warm-up and measurement than quick.",
+  "description": "Between quick and full: every benchmark of the full matrix, all libraries, at 10^6 nodes, where memory effects become visible. Sparse shapes only - dense ones at 10^6 nodes exhaust the peers' memory - and one fork with the window scheme of 'big': 5 windows of 100 ms after one 2 s warm-up window.",
   "jmh": {
     "forks": 1,
-    "warmup_iterations": 2,
-    "warmup_time": "1s",
-    "measurement_iterations": 3,
-    "measurement_time": "1s",
+    "warmup_iterations": 1,
+    "warmup_time": "2s",
+    "measurement_iterations": 5,
+    "measurement_time": "100ms",
+    "alloc_measurement_iterations": 2,
     "jvm_stack": "-Xss512m",
     "jvm_heap": "-Xmx24g"
   },

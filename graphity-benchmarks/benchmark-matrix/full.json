@@ -1,12 +1,13 @@
 {
   "name": "full",
-  "description": "Balanced full profile (~1-2h target): all libs on 10k/100k, no >100k cases.",
+  "description": "Full algorithm and library coverage on 10k/100k nodes, seven shapes (GNP_DENSE_SHUFFLED dropped: shuffling a uniform random graph yields a uniform random graph). 15 windows of 100 ms after 2 s of warm-up (10 windows of 200 ms; shorter warm-up left a trend inside the measurement); the report reads the third-fastest window. Allocation is near-deterministic and measures 2 windows.",
   "jmh": {
     "forks": 1,
-    "warmup_iterations": 1,
-    "warmup_time": "1s",
-    "measurement_iterations": 3,
-    "measurement_time": "1s",
+    "warmup_iterations": 10,
+    "warmup_time": "200ms",
+    "measurement_iterations": 15,
+    "measurement_time": "100ms",
+    "alloc_measurement_iterations": 2,
     "jvm_stack": "-Xss128m"
   },
   "cases": [
@@ -16,7 +17,7 @@
       "algorithms": ["build"],
       "params": {
         "nodeCount": [10000, 100000],
-        "shape": ["PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "PATH_SHUFFLED", "GNP_DENSE_SHUFFLED", "CHAIN_OF_CLIQUES_SHUFFLED"]
+        "shape": ["PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "PATH_SHUFFLED", "CHAIN_OF_CLIQUES_SHUFFLED"]
       }
     },
     {
@@ -25,7 +26,7 @@
       "algorithms": ["outtraversal", "intraversal"],
       "params": {
         "nodeCount": [10000, 100000],
-        "shape": ["PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "PATH_SHUFFLED", "GNP_DENSE_SHUFFLED", "CHAIN_OF_CLIQUES_SHUFFLED"]
+        "shape": ["PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "PATH_SHUFFLED", "CHAIN_OF_CLIQUES_SHUFFLED"]
       },
       "phases": ["perf"]
     },
@@ -35,7 +36,7 @@
       "algorithms": ["scc"],
       "params": {
         "nodeCount": [10000, 100000],
-        "shape": ["PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "PATH_SHUFFLED", "GNP_DENSE_SHUFFLED", "CHAIN_OF_CLIQUES_SHUFFLED"]
+        "shape": ["PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "PATH_SHUFFLED", "CHAIN_OF_CLIQUES_SHUFFLED"]
       }
     },
     {
@@ -53,7 +54,7 @@
       "algorithms": ["backedges", "edgetypes"],
       "params": {
         "nodeCount": [10000, 100000],
-        "shape": ["PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "PATH_SHUFFLED", "GNP_DENSE_SHUFFLED", "CHAIN_OF_CLIQUES_SHUFFLED"]
+        "shape": ["PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "PATH_SHUFFLED", "CHAIN_OF_CLIQUES_SHUFFLED"]
       }
     },
     {
@@ -62,7 +63,7 @@
       "algorithms": ["wcc"],
       "params": {
         "nodeCount": [10000, 100000],
-        "shape": ["PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "PATH_SHUFFLED", "GNP_DENSE_SHUFFLED", "CHAIN_OF_CLIQUES_SHUFFLED"]
+        "shape": ["PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "PATH_SHUFFLED", "CHAIN_OF_CLIQUES_SHUFFLED"]
       }
     },
     {
@@ -71,7 +72,7 @@
       "algorithms": ["ccs"],
       "params": {
         "nodeCount": [10000, 100000],
-        "shape": ["PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "PATH_SHUFFLED", "GNP_DENSE_SHUFFLED", "CHAIN_OF_CLIQUES_SHUFFLED"]
+        "shape": ["PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "PATH_SHUFFLED", "CHAIN_OF_CLIQUES_SHUFFLED"]
       }
     },
     {
@@ -99,7 +100,7 @@
       "phases": ["perf"],
       "params": {
         "nodeCount": [10000, 100000],
-        "shape": ["PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "PATH_SHUFFLED", "GNP_DENSE_SHUFFLED", "CHAIN_OF_CLIQUES_SHUFFLED"]
+        "shape": ["PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "PATH_SHUFFLED", "CHAIN_OF_CLIQUES_SHUFFLED"]
       }
     },
     {
@@ -119,7 +120,7 @@
       "phases": ["perf"],
       "params": {
         "nodeCount": [10000, 100000],
-        "shape": ["PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "PATH_SHUFFLED", "GNP_DENSE_SHUFFLED", "CHAIN_OF_CLIQUES_SHUFFLED"]
+        "shape": ["PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "PATH_SHUFFLED", "CHAIN_OF_CLIQUES_SHUFFLED"]
       }
     },
     {
@@ -129,7 +130,7 @@
       "phases": ["perf"],
       "params": {
         "nodeCount": [10000, 100000],
-        "shape": ["PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "PATH_SHUFFLED", "GNP_DENSE_SHUFFLED", "CHAIN_OF_CLIQUES_SHUFFLED"]
+        "shape": ["PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "PATH_SHUFFLED", "CHAIN_OF_CLIQUES_SHUFFLED"]
       }
     },
     {
@@ -139,7 +140,7 @@
       "phases": ["perf"],
       "params": {
         "nodeCount": [10000, 100000],
-        "shape": ["PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "PATH_SHUFFLED", "GNP_DENSE_SHUFFLED", "CHAIN_OF_CLIQUES_SHUFFLED"]
+        "shape": ["PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "PATH_SHUFFLED", "CHAIN_OF_CLIQUES_SHUFFLED"]
       }
     },
     {
@@ -174,7 +175,7 @@
   "mem": {
     "enabled": true,
     "nodes": [10000, 100000],
-    "shapes": ["PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "PATH_SHUFFLED", "GNP_DENSE_SHUFFLED", "CHAIN_OF_CLIQUES_SHUFFLED"],
+    "shapes": ["PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "PATH_SHUFFLED", "CHAIN_OF_CLIQUES_SHUFFLED"],
     "libraries": ["graphity", "jgrapht", "guava", "webgraph"]
   }
 }

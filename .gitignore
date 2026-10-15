@@ -18,6 +18,8 @@ Thumbs.db
 
 # Benchmark raw measurements (gitignored scratch: JMH JSON, JOL CSV, intermediate MDs)
 graphity-benchmarks/measurements/
+# Benchmark input graphs as binary CSR files (regenerated on demand)
+graphity-benchmarks/graph-cache/
 
 # Bytecode cache of the report generator and its tests
 __pycache__/

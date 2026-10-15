@@ -15,6 +15,7 @@ and partitions, edge lookup after `build()`, and BFS distances and reachability.
   - [Issue #24](../../issues/24) - Add a more precise benchmark profile for comparing two versions
   - [Issue #25](../../issues/25) - Reuse peer measurements across benchmark runs
   - [Issue #26](../../issues/26) - Benchmark report: record the revision, add a medium profile and traversal-only benchmarks
+  - [Issue #39](../../issues/39) - Shorten benchmark runs: short windows, a near-best estimate, cached graphs
 
 ---
 

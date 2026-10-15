@@ -3,10 +3,11 @@
   "description": "Developer quick loop (~minutes): focused matrix with all four libraries on 10k/100k.",
   "jmh": {
     "forks": 0,
-    "warmup_iterations": 1,
-    "warmup_time": "300ms",
-    "measurement_iterations": 3,
-    "measurement_time": "500ms",
+    "warmup_iterations": 10,
+    "warmup_time": "200ms",
+    "measurement_iterations": 5,
+    "measurement_time": "100ms",
+    "alloc_measurement_iterations": 2,
     "jvm_stack": "-Xss16m"
   },
   "cases": [
@@ -16,7 +17,7 @@
       "algorithms": ["build"],
       "params": {
         "nodeCount": [10000, 100000],
-        "shape": ["PATH", "GNP_SPARSE", "GNP_DENSE", "PATH_SHUFFLED", "GNP_DENSE_SHUFFLED"]
+        "shape": ["PATH", "GNP_SPARSE", "GNP_DENSE", "PATH_SHUFFLED"]
       }
     },
     {
@@ -35,7 +36,7 @@
       "algorithms": ["scc"],
       "params": {
         "nodeCount": [10000, 100000],
-        "shape": ["PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "PATH_SHUFFLED", "GNP_DENSE_SHUFFLED"]
+        "shape": ["PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "PATH_SHUFFLED"]
       }
     },
     {
@@ -53,7 +54,7 @@
       "algorithms": ["backedges", "edgetypes"],
       "params": {
         "nodeCount": [10000, 100000],
-        "shape": ["PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "PATH_SHUFFLED", "GNP_DENSE_SHUFFLED"]
+        "shape": ["PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "PATH_SHUFFLED"]
       }
     },
     {
@@ -125,7 +126,7 @@
   "mem": {
     "enabled": true,
     "nodes": [10000, 100000],
-    "shapes": ["PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "PATH_SHUFFLED", "GNP_DENSE_SHUFFLED"],
+    "shapes": ["PATH", "TREE", "GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "PATH_SHUFFLED"],
     "libraries": ["graphity", "jgrapht", "guava", "webgraph"]
   }
 }

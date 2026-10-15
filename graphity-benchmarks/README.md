@@ -4,7 +4,7 @@ JMH-based microbenchmark suite for Graphity, with [JGraphT](https://jgrapht.org/
 
 This module is a development artifact — it is not published to Maven Central and is not part of the Graphity release. Reports generated here back the public claims in the main [`README.md`](../README.md); a more detailed public-facing benchmark report is planned with the 1.0.0 release.
 
-> **Status:** stable enough for the Graphity 1.0 baseline numbers. Variance handling at n ≥ 10⁶ is on the 1.1 work list — see [Variance at large n](#variance-at-large-n).
+> **Status:** since 2.3.0 the report profiles measure short windows and report a near-best window instead of the mean — see [JMH parameters](#jmh-parameters-jmh-block) and [Variance at large n](#variance-at-large-n).
 
 ## Quick start
 
@@ -48,7 +48,7 @@ The runner is a single script with a three-step workflow — **clean → run →
 |--------------------------------|-----------------------------------------------------------------------------------------------------|
 | `clean`                        | Delete run artifacts (JSON/CSV/MD/log) from `measurements/`                                              |
 | `clean --lib <a,b>` / `--keep-peers` | Remove only the results of the named libraries (`--keep-peers`: the three Graphity variants), keep the rest as cache |
-| `bench [version]`              | Run all phases in sequence: `synthetic full` → `synthetic big` → `realworld` → `report` (~3 h total). |
+| `bench [version]`              | Run all phases in sequence: `synthetic full` → `synthetic big` → `realworld` → `report` (~1.5 h with cached peers, ~3 h without). |
 |                                | `version` is handed to the `report` step. Skips realworld if no dataset files are found under        |
 |                                | `datasets/` — loudly, and again in a closing "skipped phases" banner.                                |
 | `synthetic <lib\|all>`         | `perf`+`alloc`+`mem` on synthetic graphs (default profile: `full`)                                  |
@@ -193,7 +193,7 @@ DAG-only shapes (`toporder`, `toporderandlevels`):
 
 `condense` accepts every shape from both groups. It measures `NodePartition.condense()` on the SCC partition, and its cost scales with the *group* count rather than the node count — so the useful axis is how many SCCs a shape produces at a given `nodeCount`: `DAG_GNP_SPARSE` and `PATH` yield one group per node, `CHAIN_OF_CLIQUES` roughly one per 32 nodes, and `GNP_DENSE` collapses into a single giant SCC.
 
-Shuffled variants (`*_SHUFFLED`) take the corresponding base shape and randomise node IDs. Topology is unchanged; ID-locality is broken. They are the basis for measuring how much each library's locality assumptions are worth — relevant in particular for compression-based representations like WebGraph's BVGraph.
+Shuffled variants (`*_SHUFFLED`) take the corresponding base shape and randomise node IDs. Topology is unchanged; ID-locality is broken. They are the basis for measuring how much each library's locality assumptions are worth — relevant in particular for compression-based representations like WebGraph's BVGraph. The synthetic profiles no longer run `GNP_DENSE_SHUFFLED`: shuffling the IDs of a uniform random graph yields a uniform random graph, and over 58 cases its time matched `GNP_DENSE` with a median ratio of 1.000. The shape itself remains available for custom matrices.
 
 ### JMH parameters (`jmh` block)
 
@@ -206,8 +206,25 @@ Shuffled variants (`*_SHUFFLED`) take the corresponding base shape and randomise
 | `measurement_time`       | Time per measurement iteration (e.g. `2s`)             |
 | `jvm_stack`              | `-Xss` value passed to the JMH JVM (e.g. `-Xss16m`)    |
 | `jvm_heap`               | optional `-Xmx` value passed to the JVM (e.g. `-Xmx64g`) |
+| `alloc_measurement_iterations` | optional; measurement iterations of the `alloc` phase (default: `measurement_iterations`) |
 
-Practical defaults: `forks = 0` and short windows for fast feedback during development; `forks = 1` (or higher) and longer windows when comparing libraries.
+The report profiles measure in short windows of 100 ms: `full` and `quick` take 15 windows after 2 s of warm-up (10 windows of 200 ms), `big`, `medium` and `realworld`, whose calls take up to half a minute, 5 windows after one 2 s warm-up window — a call longer than a window fills it alone. Warm-up shorter than 2 s left a measurable trend: after 0.3 s the first windows ran 10–20 % slower than the last. Allocation per call barely varies, so the `alloc` phase measures 2 windows after the same warm-up.
+
+The report does not show the JMH mean but a near-best window: the third-fastest of 15 or more windows, the second-fastest of 5 or more. Timing noise — interrupts, scheduling, frequency changes — only ever slows a window down, so a near-best window is closer to the undisturbed cost and steadier than the mean; skipping the fastest ones guards against the rare window that comes out implausibly fast. The rule is the same for every library, so the factors between them are unaffected. Versions reported before 2.3.0 show the mean, which comes out a few percent slower for unchanged code; the history view says so.
+
+### Machine setup
+
+On Linux the runner pins every measuring JVM (validation, JMH and its forks, memory) with `taskset` to the CPUs that share the L3 cache of CPU 0 — on a Ryzen 9950X one of its two CCDs — so the scheduler cannot move a benchmark to a core with a cold cache. `BENCH_CPUS=<list>` picks other CPUs, `BENCH_CPUS=none` disables pinning. The runner warns when the frequency governor is not `performance`; set it before a long run:
+
+```bash
+sudo cpupower frequency-set -g performance
+```
+
+Runs are strictly sequential. Two cases at once would compete for memory bandwidth even on separate L3 caches.
+
+### Graph cache
+
+Every forked JVM needs its input graph, and generating it (or parsing a SNAP edge list) costs seconds from 10⁷ nodes on. The suite therefore writes each generated, loaded or reordered graph once as binary CSR arrays to `graph-cache/` (gitignored), and every later JVM reads the file instead. The loaded graph is identical to the generated one; each JVM still starts fresh. File names carry a hash of the generating code (generators, `GraphBuilder`, and for reordered graphs the whole library), so a code change is never served from a stale file; writing a graph removes the files of the same graph from older code states. Delete the directory to reclaim the space — `big` needs about 10–20 GB.
 
 ## Reordering (`graphity-reordered` and `reorder`)
 
@@ -283,7 +300,7 @@ There are two levels of output: the **scratch** `measurements/` directory (gitig
 - a separate real-world chapter for dataset runs, with one row per dataset instead of per shape
 - a memory-footprint section in *bytes per (node + edge)*
 - an allocation section in bytes per call
-- a precision summary that lists relative confidence-interval widths, sorted by descending error
+- a precision summary that lists the relative spread of each case (interquartile range of its windows over the reported value), sorted by descending spread
 
 Numbers in cells follow the format `value (factor×)`, where the factor is relative to Graphity.
 
@@ -298,7 +315,8 @@ In practice:
 - Interrupting a multi-hour `bench` run and re-running the same command later only redoes whatever file is still missing — not the whole run.
 - A crashing or OOM-killed library no longer aborts the rest of the run: that one case is marked failed and the run continues with everything else. `run-benchmarks.sh` lists every failed case at the end and exits non-zero, but only after attempting all of them.
 - Deleting a specific case's JSON file by hand (e.g. because you suspect it's stale) makes exactly that case rerun next time; everything else is left alone.
-- **A full rerun from scratch requires `clean` first.** Nothing detects "the matrix or its `jmh` settings changed since last time" — if you edit a profile's `forks`/`warmup`/`measurement`/`stack`/`heap` (or its cases) between two runs and don't `clean`, the leftover files from the old settings are silently reused as "already done". `measurements/` is scratch and gitignored specifically so `clean` is always a cheap, safe reset.
+- **Changed iteration settings are detected; other matrix changes are not.** A cached result is reused only if it was measured with the profile's current forks, iteration counts and window lengths. A changed `jvm_stack`/`jvm_heap`/`jvm_args` is not detected — after such an edit, run `clean` first. `measurements/` is scratch and gitignored specifically so `clean` is always a cheap, safe reset.
+- **Validation and memory follow the cache.** A case validates only the libraries whose results are missing, plus JGraphT as an oracle when a Graphity column is among them — the validation compares libraries with each other, so Graphity alone would be checked against nothing. Memory is measured and cached per library (`mem-<profile>@<library>.csv`).
 
 Each case's JSON file carries a `measuredAt` (ISO 8601 UTC) field on every entry, added right before the atomic rename — the filename itself has no timestamp, but the data does. (`mem`'s CSV output has no equivalent column; the CSV file's own mtime is the only provenance there.) The date shown in a generated report's header is unrelated to this: it's simply when `report` itself was run.
 
@@ -329,10 +347,6 @@ Only `reports/` is committed; `measurements/` is scratch and gitignored.
 
 ## Variance at large n
 
-At n ≥ 10⁶, several benchmarks show 50–97 % CI half-widths. The cause is GC pauses inside the long measurement iterations rather than insufficient measurement time — *lengthening* iterations makes the variance worse, not better. The recommended JMH flags for the 1.1 benchmark round are:
+Reports before 2.3.0 showed 50–97 % CI half-widths at n ≥ 10⁶. Most of that was arithmetic: JMH reports the 99.9 % confidence half-width, which with three iterations is about 18 times the standard deviation, so a spread of 1.5 % between iterations came out as ±27 %. With two iterations it is not computed at all. The rest were GC pauses inside single long iterations. The short windows and the near-best estimate address both; the spread in the precision summary is the honest measure of a case.
 
-```text
--Xmx16G -XX:+UseZGC -XX:+AlwaysPreTouch -f 3 -wi 5 -w 3s -i 10 -r 5s
-```
-
-They are not yet baked into any shipped profile. Until the 1.1 round, treat 1M-node factors as directional and quote ranges rather than single numbers.
+What one fork cannot resolve is the difference between runs — JIT decisions, code and heap layout, machine drift. Report sections whose code did not change deviated by 9–14 % at p90 and up to 28 % between runs. For a decision between two Graphity states use the A/B profile (3 forks, ZGC, pre-touched heap) and `compare`.

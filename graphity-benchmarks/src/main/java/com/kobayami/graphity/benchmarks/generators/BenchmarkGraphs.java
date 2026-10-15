@@ -3,6 +3,7 @@ package com.kobayami.graphity.benchmarks.generators;
 import com.kobayami.graphity.Graph;
 import com.kobayami.graphity.GraphBuilder;
 import com.kobayami.graphity.Graphs;
+import com.kobayami.graphity.NodeMapping;
 import com.kobayami.graphity.SortedIntView;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 
@@ -50,8 +51,78 @@ public final class BenchmarkGraphs {
     return generate(shape, n, DEFAULT_SEED);
   }
 
+  /**
+   * Generates the graph of ({@code shape}, {@code n}, {@code seed}), or loads it from the
+   * {@link GraphCache} when the cache is enabled.
+   */
   public static Graph generate(GraphShape shape, int n, long seed) {
     if (n < 2) throw new IllegalArgumentException("n must be >= 2, got " + n);
+    return GraphCache.get(syntheticLabel(shape, n, seed), syntheticKey(shape, n, seed),
+        GraphCache.PRODUCING_CODE, () -> generateFresh(shape, n, seed));
+  }
+
+  /**
+   * The DFS-preorder reordering ({@code NodeMapping.reindex} plus {@code Graphs.remapped}) of the
+   * input that {@link #fromInput} resolves, cached like the input itself. The reordering is the
+   * setup of the reordered benchmark columns; at 10^8 nodes it takes seconds per forked JVM.
+   */
+  public static Graph reorderedFromInput(
+      GraphShape shape,
+      int nodeCount,
+      String inputMode,
+      String datasetPath,
+      boolean requireDag) {
+    String label;
+    String key;
+    if (isDatasetMode(inputMode)) {
+      Path path = datasetFile(datasetPath);
+      label = datasetLabel(path, requireDag);
+      key = datasetKey(path, requireDag);
+    } else {
+      label = syntheticLabel(shape, nodeCount, DEFAULT_SEED);
+      key = syntheticKey(shape, nodeCount, DEFAULT_SEED);
+    }
+    return GraphCache.get(label + "-reordered", key + "|reordered", GraphCache.REORDERING_CODE, () -> {
+      Graph base = fromInput(shape, nodeCount, inputMode, datasetPath, requireDag);
+      return Graphs.remapped(base, NodeMapping.reindex(base));
+    });
+  }
+
+  private static String syntheticLabel(GraphShape shape, int n, long seed) {
+    return shape + "-" + n + (seed == DEFAULT_SEED ? "" : "-seed" + Long.toHexString(seed));
+  }
+
+  private static String syntheticKey(GraphShape shape, int n, long seed) {
+    return "synthetic|" + shape + "|" + n + "|" + seed;
+  }
+
+  private static boolean isDatasetMode(String inputMode) {
+    return inputMode != null && inputMode.trim().equalsIgnoreCase("dataset");
+  }
+
+  private static Path datasetFile(String datasetPath) {
+    if (datasetPath == null || datasetPath.isBlank()) {
+      throw new IllegalArgumentException("datasetPath must be non-empty for inputMode=dataset");
+    }
+    return Path.of(datasetPath).toAbsolutePath().normalize();
+  }
+
+  private static String datasetLabel(Path path, boolean dropSelfLoops) {
+    String name = path.getFileName().toString().replaceFirst("\\.[^.]*$", "");
+    return name + (dropSelfLoops ? "-noSelfLoops" : "");
+  }
+
+  /** A dataset's cache key covers its content through size and modification time. */
+  private static String datasetKey(Path path, boolean dropSelfLoops) {
+    try {
+      return "dataset|" + path + "|" + Files.size(path) + "|" + Files.getLastModifiedTime(path).toMillis()
+          + "|" + dropSelfLoops;
+    } catch (IOException e) {
+      throw new IllegalArgumentException("dataset file not readable: " + path, e);
+    }
+  }
+
+  private static Graph generateFresh(GraphShape shape, int n, long seed) {
     return switch (shape) {
       case PATH -> path(n);
       case TREE -> randomTree(n, seed);
@@ -126,12 +197,15 @@ public final class BenchmarkGraphs {
    * keying on the path alone would hand out whichever variant was built first.
    */
   public static Graph loadDataset(String datasetPath, boolean dropSelfLoops) {
-    if (datasetPath == null || datasetPath.isBlank()) {
-      throw new IllegalArgumentException("datasetPath must be non-empty for inputMode=dataset");
-    }
-    Path path = Path.of(datasetPath).toAbsolutePath().normalize();
+    Path path = datasetFile(datasetPath);
     String key = path + (dropSelfLoops ? "|noSelfLoops" : "");
-    return DATASET_CACHE.computeIfAbsent(key, ignored -> readDataset(path, dropSelfLoops));
+    return DATASET_CACHE.computeIfAbsent(key, ignored -> {
+      if (!Files.isRegularFile(path)) {
+        throw new IllegalArgumentException("dataset file not found: " + path);
+      }
+      return GraphCache.get(datasetLabel(path, dropSelfLoops), datasetKey(path, dropSelfLoops),
+          GraphCache.PRODUCING_CODE, () -> readDataset(path, dropSelfLoops));
+    });
   }
 
   private static Graph readDataset(Path path, boolean dropSelfLoops) {

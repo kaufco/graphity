@@ -1,12 +1,12 @@
 {
   "name": "big",
-  "description": "Large-graph scaling matrix: Graphity only (peers are dropped from 1M nodes up — JGraphT/Guava object graphs and WebGraph's in-RAM ArrayListMutableGraph build path OOM, and the peers' recursive DFS reference wrappers overflow the stack, whereas Graphity's cores are iterative). 1M/10M cover the standard shape set; 100M is sparse-only because Graphity's int-indexed CSR caps out-adjacency at ~2.1B edges, so GNP_DENSE (deg 30) and CHAIN_OF_CLIQUES (deg ~31) would overflow at 100M. Each traversal algorithm is also run on a DFS-preorder reordered graph (graphity-reordered pseudo-lib → 'Graphity (reordered)' column), and the one-time reorder cost is captured by the graphity-only 'reorder' algorithm. The reordered/reorder-cost cases cover exactly the same shapes as their plain counterparts, so the 'Graphity (reordered)' column is populated for every row of every table instead of leaving gaps in the report charts (it used to be limited to GNP_SPARSE and GNP_DENSE_SHUFFLED to save runtime, which left GNP_DENSE and CHAIN_OF_CLIQUES blank from 1M nodes up). Reduced iterations and perf-only (no alloc); memory footprint still comes from the cheap JOL 'mem' phase.",
+  "description": "Large-graph scaling matrix: Graphity only (peers are dropped from 1M nodes up — JGraphT/Guava object graphs and WebGraph's in-RAM ArrayListMutableGraph build path OOM, and the peers' recursive DFS reference wrappers overflow the stack, whereas Graphity's cores are iterative). 1M/10M cover the standard shape set; 100M is sparse-only because Graphity's int-indexed CSR caps out-adjacency at ~2.1B edges, so GNP_DENSE (deg 30) and CHAIN_OF_CLIQUES (deg ~31) would overflow at 100M. Each traversal algorithm is also run on a DFS-preorder reordered graph (graphity-reordered pseudo-lib → 'Graphity (reordered)' column), and the one-time reorder cost is captured by the graphity-only 'reorder' algorithm. The reordered/reorder-cost cases cover exactly the same shapes as their plain counterparts, so the 'Graphity (reordered)' column is populated for every row of every table instead of leaving gaps in the report charts (it used to be limited to two shapes to save runtime, which left GNP_DENSE and CHAIN_OF_CLIQUES blank from 1M nodes up). GNP_DENSE_SHUFFLED is dropped like in 'full'. Calls take up to half a minute here, so 5 windows of 100 ms after one 2 s warm-up window — a call longer than a window fills it alone; the report reads the second-fastest window. Perf-only (no alloc); memory footprint still comes from the cheap JOL 'mem' phase.",
   "jmh": {
     "forks": 1,
     "warmup_iterations": 1,
-    "warmup_time": "1s",
-    "measurement_iterations": 2,
-    "measurement_time": "1s",
+    "warmup_time": "2s",
+    "measurement_iterations": 5,
+    "measurement_time": "100ms",
     "jvm_stack": "-Xss128m",
     "jvm_heap": "-Xmx32g"
   },
@@ -18,7 +18,7 @@
       "phases": ["perf"],
       "params": {
         "nodeCount": [1000000, 10000000],
-        "shape": ["GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "GNP_DENSE_SHUFFLED"]
+        "shape": ["GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES"]
       }
     },
     {
@@ -28,7 +28,7 @@
       "phases": ["perf"],
       "params": {
         "nodeCount": [1000000, 10000000],
-        "shape": ["GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "GNP_DENSE_SHUFFLED"]
+        "shape": ["GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES"]
       }
     },
     {
@@ -38,7 +38,7 @@
       "phases": ["perf"],
       "params": {
         "nodeCount": [1000000, 10000000],
-        "shape": ["GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "GNP_DENSE_SHUFFLED"]
+        "shape": ["GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES"]
       }
     },
     {
@@ -68,7 +68,7 @@
       "phases": ["perf"],
       "params": {
         "nodeCount": [1000000, 10000000],
-        "shape": ["GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "GNP_DENSE_SHUFFLED"]
+        "shape": ["GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES"]
       }
     },
     {
@@ -138,7 +138,7 @@
       "phases": ["perf"],
       "params": {
         "nodeCount": [1000000, 10000000],
-        "shape": ["GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "GNP_DENSE_SHUFFLED"]
+        "shape": ["GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES"]
       }
     },
     {
@@ -158,7 +158,7 @@
       "phases": ["perf"],
       "params": {
         "nodeCount": [1000000, 10000000],
-        "shape": ["GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES", "GNP_DENSE_SHUFFLED"]
+        "shape": ["GNP_SPARSE", "GNP_DENSE", "CHAIN_OF_CLIQUES"]
       }
     },
     {

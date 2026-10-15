@@ -1422,11 +1422,15 @@ def build_combined_for_machine(
     times_mem: dict[str, list[SectionTable]] = {}
     times_alloc: dict[str, list[SectionTable]] = {}
     header = ""
+    # Reports without an "Estimate:" header line predate the near-best estimate and show the mean.
+    mean_versions: list[str] = []
 
     for ref in reports:
         text = ref.path.read_text(encoding="utf-8")
         if ref.version == newest.version:
             header = extract_header_block(text) or ""
+        if "Estimate:" not in (extract_header_block(text) or ""):
+            mean_versions.append(ref.version)
         times_perf[ref.version] = parse_times_perf_chapter(text)
         times_mem[ref.version] = parse_bytes_chapter(text, 2)
         times_alloc[ref.version] = parse_bytes_chapter(text, 3)
@@ -1487,6 +1491,13 @@ def build_combined_for_machine(
             + ". Peer libraries are left out on purpose: they are re-measured per run, so a "
             "moving peer column would say nothing about Graphity. For the comparison against "
             f"them see [`{kind}-{machine}-{View.PEERS.value}.md`]({kind}-{machine}-{View.PEERS.value}.md).",
+            "",
+        ]
+    if view is View.HISTORY and mean_versions and len(mean_versions) < len(reports):
+        intro_lines += [
+            "Versions " + ", ".join(f"`{v}`" for v in mean_versions)
+            + " report the mean over all measurement windows; the later ones a near-best window "
+            "(`Estimate` below), which comes out a few percent faster for unchanged code.",
             "",
         ]
     if header:

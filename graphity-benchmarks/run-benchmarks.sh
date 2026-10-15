@@ -17,11 +17,14 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # Methodology note — report runs versus A/B decisions
 # ─────────────────────────────────────────────────────────────────────────────
-# The report profiles (quick, full, big) measure with one fork and few iterations.
-# That resolves the factors against the peer libraries, but not changes of a few
-# percent: report sections whose code did not change deviate by 9–14 % at p90 and
-# up to 28 % between runs, and at n ≥ 10⁶ GC pauses inside single iterations push
-# confidence half-widths to 50–97 %.
+# The report profiles (quick, full, big, realworld) measure with one fork and short
+# windows of 100 ms: 15 after 2 s of warm-up up to 10⁵ nodes, 5 after one 2 s warm-up
+# window beyond that. The report reads the third-fastest of 15 windows (second-fastest
+# of 5) — timing noise only slows a window down, so a near-best window is steadier
+# than the mean. Within a run the windows of a case spread by about 1.5 %, but one
+# fork cannot average the JIT and layout differences between runs: report sections
+# whose code did not change deviated by 9–14 % at p90 and up to 28 % between runs.
+# That resolves the factors against the peer libraries, not changes of a few percent.
 #
 # For a decision between two Graphity states use the A/B profile instead:
 #
@@ -208,6 +211,9 @@ for key in ("forks", "warmup_iterations", "measurement_iterations"):
     v = jmh.get(key, 1)
     if not isinstance(v, int) or v < 0:
         fail(f"jmh.{key} must be a non-negative integer")
+alloc_it = jmh.get("alloc_measurement_iterations", 1)
+if not isinstance(alloc_it, int) or alloc_it < 1:
+    fail("jmh.alloc_measurement_iterations must be a positive integer when present")
 for key in ("warmup_time", "measurement_time", "jvm_stack"):
     v = jmh.get(key, "")
     if not isinstance(v, str) or not v.strip():
@@ -343,8 +349,10 @@ r = jmh.get("measurement_time", "500ms")
 stack = jmh.get("jvm_stack", "-Xss16m")
 heap = jmh.get("jvm_heap", "")
 extra = jmh.get("jvm_args", "")
+# Allocation per call barely varies, so the alloc phase may measure fewer windows than perf.
+alloc_it = jmh.get("alloc_measurement_iterations", it)
 # Tab-separated for `read`; an empty field would collapse, so absent values become "-".
-print(f"{forks}\t{wi}\t{w}\t{it}\t{r}\t{stack}\t{heap or '-'}\t{extra or '-'}")
+print(f"{forks}\t{wi}\t{w}\t{it}\t{r}\t{stack}\t{heap or '-'}\t{extra or '-'}\t{alloc_it}")
 PY
 }
 
@@ -592,6 +600,34 @@ for c in data.get("cases", []):
 PY
 }
 
+# phase_settings <matrix> <phase> -> JSON with the JMH settings the phase measures with; the resume
+# cache reuses only entries measured with exactly these.
+phase_settings() {
+  local matrix_file="$1" phase="$2" forks wi w it r alloc_it
+  IFS=$'\t' read -r forks wi w it r _ _ _ alloc_it <<< "$(matrix_jmh_defaults "$matrix_file")"
+  [[ "$phase" == "alloc" ]] && it="$alloc_it"
+  printf '{"forks": %s, "wi": %s, "w": "%s", "it": %s, "r": "%s"}' "$forks" "$wi" "$w" "$it" "$r"
+}
+
+# validation_plan <matrix> <phase> -> one line "<case>:<algo>\t<lib,lib,...>" per case: the
+# libraries whose results are missing from the cache, pseudo-libraries counted as graphity.
+validation_plan() {
+  local matrix_file="$1" phase="$2" settings
+  settings="$(phase_settings "$matrix_file" "$phase")"
+  while IFS=$'\t' read -r -a fields; do
+    [[ ${#fields[@]} -lt 4 ]] && continue
+    local missing="" tag rest libs="" fqn lib
+    while IFS=$'\t' read -r tag rest; do
+      [[ "$tag" == "MISSING" ]] && missing="$rest"
+    done < <(compute_case_resume /dev/null "$phase" "${fields[3]}" "$settings" "${fields[@]:4}")
+    for fqn in ${missing//,/ }; do
+      lib="$(awk -F. '{print $(NF-2)}' <<< "$fqn")"
+      [[ ",${libs}," == *",${lib},"* ]] || libs="${libs:+${libs},}${lib}"
+    done
+    printf '%s\t%s\n' "${fields[0]}" "$libs"
+  done < <(matrix_cases_tsv "$matrix_file" "$phase" "$LIB_FILTER")
+}
+
 run_validate_phase() {
   local matrix_file="$1"
   local phase="$2"
@@ -599,7 +635,10 @@ run_validate_phase() {
   [[ "$jvm_heap" == "-" ]] && jvm_heap=""
   banner "validate — semantic quick-fail (${phase})"
   VALIDATION_FAILED=()
-  local -a jbase=(java "$jvm_stack")
+  [[ -z "$LIBRARY_VERSIONS" ]] && LIBRARY_VERSIONS="$(library_versions)"
+  local plan
+  plan="$(validation_plan "$matrix_file" "$phase")"
+  local -a jbase=(${PIN_CMD[@]+"${PIN_CMD[@]}"} java "$jvm_stack" "$GRAPH_CACHE_PROP")
   [[ -n "$jvm_heap" ]] && jbase+=("$jvm_heap")
   jbase+=(-jar "$JAR" validate)
   local case_idx=0
@@ -610,6 +649,21 @@ run_validate_phase() {
       continue
     fi
     case_idx=$((case_idx + 1))
+    # Only the libraries that will be measured are validated. The validation compares libraries
+    # with each other, so a Graphity column measured alone is checked against JGraphT.
+    local missing vlibs="" lib
+    missing="$(awk -F'\t' -v k="${case_name}:${algo}" '$1 == k { print $2; exit }' <<< "$plan")"
+    for lib in ${libs//,/ }; do
+      if [[ ",${missing}," == *",${lib},"* \
+            || ( "$lib" == "jgrapht" && ",${missing}," == *",graphity,"* ) ]]; then
+        vlibs="${vlibs:+${vlibs},}${lib}"
+      fi
+    done
+    if [[ -z "$vlibs" ]]; then
+      echo "[validate/$case_idx] case=${case_name} algo=${algo} — all results cached, skipped"
+      continue
+    fi
+    libs="$vlibs"
     echo "[validate/$case_idx] case=${case_name} algo=${algo} libs=${libs}"
     local -a vargs=(--algorithm "$algo" --libraries "$libs")
     if [[ -n "$datasets" ]]; then
@@ -701,7 +755,7 @@ with open(path, "w", encoding="utf-8") as f:
 PY
 }
 
-# compute_case_resume <reuse_dest.json> <phase> <fqns_csv> <param_spec...>
+# compute_case_resume <reuse_dest.json> <phase> <fqns_csv> <settings_json> <param_spec...>
 #
 # Cross-profile resume for a single case. Scans EVERY `<phase>-*@*.json` in
 # measurements/ (not just this profile's file) and decides, per param-combo
@@ -712,23 +766,38 @@ PY
 # combo is re-measured rather than silently accepted.
 #
 # Writes the reusable entries (every current entry of an expected FQN, also in combos
-# that are not complete) as a JSON array to <reuse_dest>. Prints to stdout:
+# that are not complete) as a JSON array to <reuse_dest>. <settings_json> holds the JMH settings
+# of the phase ({"forks", "wi", "w", "it", "r"}); an entry measured with other settings is stale.
+# Prints to stdout:
 #   STATS\t<total_combos>\t<run_combos>\t<reused_combos>
+#   MISSING\t<fqn,fqn,...>      (the FQNs that miss a result in some combo; empty if none)
 #   PARAM\t<key=csv>            (one per param key; ONLY the values still to run)
 #   REGEX\t<regex>              (only the FQNs that miss a result in some combo)
 # When <run_combos> is 0 there are no PARAM lines and the caller skips JMH and
 # just materializes the reuse array as the case output.
 compute_case_resume() {
-  local reuse_dest="$1" phase="$2" fqns_csv="$3"; shift 3
-  python3 - "$reuse_dest" "$MEASUREMENTS" "$phase" "$fqns_csv" "$LIBRARY_VERSIONS" "$@" <<'PY'
-import glob, itertools, json, os, sys
+  local reuse_dest="$1" phase="$2" fqns_csv="$3" settings="$4"; shift 4
+  python3 - "$reuse_dest" "$MEASUREMENTS" "$phase" "$fqns_csv" "$LIBRARY_VERSIONS" "$settings" "$@" <<'PY'
+import glob, itertools, json, os, re, sys
 
 reuse_dest = sys.argv[1]
 results_dir = sys.argv[2]
 phase = sys.argv[3]
 fqns = [x for x in sys.argv[4].split(",") if x]
 versions = json.loads(sys.argv[5])
-specs = sys.argv[6:]
+settings = json.loads(sys.argv[6])
+specs = sys.argv[7:]
+
+def millis(text):
+    """'100ms', '1s' (matrix) and '100 ms', '1 s' (JMH JSON) alike."""
+    m = re.fullmatch(r"\s*([\d.]+)\s*(ns|us|ms|s|m|min)?\s*", str(text))
+    if not m:
+        return None
+    factor = {"ns": 1e-6, "us": 1e-3, "ms": 1, "s": 1000, "m": 60000, "min": 60000}[m[2] or "s"]
+    return float(m[1]) * factor
+
+expected_settings = (int(settings["forks"]), int(settings["wi"]), millis(settings["w"]),
+                     int(settings["it"]), millis(settings["r"]))
 def lib_of(fqn):
     # com.kobayami.graphity.benchmarks.<package>.<Class>.<method>
     parts = fqn.split(".")
@@ -744,12 +813,17 @@ def lib_of(fqn):
     return pkg
 
 def current(entry):
-    """A cached entry counts only if it was measured at today's library version and JDK. Without
-    git the Graphity state is unknown, and an unknown state is never current."""
+    """A cached entry counts only if it was measured at today's library version and JDK, and with
+    the profile's current JMH settings. Without git the Graphity state is unknown, and an unknown
+    state is never current."""
     lib = lib_of(entry.get("benchmark", ""))
     version = versions.get(lib)
+    measured_settings = (entry.get("forks"), entry.get("warmupIterations"),
+                         millis(entry.get("warmupTime", "")), entry.get("measurementIterations"),
+                         millis(entry.get("measurementTime", "")))
     return (entry.get("libraryVersion") == version and "unknown-git" not in (version or "")
-            and entry.get("jdkVersion") == versions.get("jdk"))
+            and entry.get("jdkVersion") == versions.get("jdk")
+            and measured_settings == expected_settings)
 
 # Ordered param space: [(key, [values...]), ...] exactly as passed to `-p`.
 param_space = []
@@ -823,6 +897,7 @@ else:
 total = len(combos)
 reused = total - run_combos
 print(f"STATS\t{total}\t{run_combos}\t{reused}")
+print("MISSING\t" + ",".join(f for f in fqns if f in missing_fqns))
 if run_combos > 0:
     for (k, _), fvals in zip(param_space, filtered):
         print(f"PARAM\t{k}={','.join(fvals)}")
@@ -910,9 +985,12 @@ run_jmh_phase() {
   local case_idx=0 n_run=0 n_cached=0
   [[ -z "$LIBRARY_VERSIONS" ]] && LIBRARY_VERSIONS="$(library_versions)"
 
-  IFS=$'\t' read -r forks wi w it r jvm_stack jvm_heap jvm_args <<< "$(matrix_jmh_defaults "$matrix_file")"
+  IFS=$'\t' read -r forks wi w it r jvm_stack jvm_heap jvm_args alloc_it <<< "$(matrix_jmh_defaults "$matrix_file")"
   [[ "$jvm_heap" == "-" ]] && jvm_heap=""
   [[ "$jvm_args" == "-" ]] && jvm_args=""
+  [[ "$phase" == "alloc" ]] && it="$alloc_it"
+  local settings
+  settings="$(phase_settings "$matrix_file" "$phase")"
 
   while IFS=$'\t' read -r -a fields; do
     [[ ${#fields[@]} -lt 4 ]] && continue
@@ -945,7 +1023,7 @@ run_jmh_phase() {
         PARAM) run_params+=("$rest") ;;
         REGEX) run_regex="$rest" ;;
       esac
-    done < <(compute_case_resume "$reuse_json" "$phase" "$fqns_csv" "${fields[@]:4}")
+    done < <(compute_case_resume "$reuse_json" "$phase" "$fqns_csv" "$settings" "${fields[@]:4}")
 
     if [[ "$total_combos" -eq 0 ]]; then
       rm -f "$reuse_json"
@@ -967,7 +1045,7 @@ run_jmh_phase() {
     echo "[$phase/$case_idx] case=${case_name} — ${run_combos} combo(s) to run, ${reused_combos} reused" | tee "$case_log"
     rm -f /tmp/jmh.lock
 
-    local -a cmd=(java "$jvm_stack")
+    local -a cmd=(${PIN_CMD[@]+"${PIN_CMD[@]}"} java "$jvm_stack" "$GRAPH_CACHE_PROP")
     [[ -n "$jvm_heap" ]] && cmd+=("$jvm_heap")
     # jvm_args holds several flags separated by spaces; split them deliberately.
     # shellcheck disable=SC2206
@@ -980,7 +1058,7 @@ run_jmh_phase() {
     for p in "${run_params[@]}"; do
       cmd+=(-p "$p")
     done
-    local fork_args="$jvm_stack"
+    local fork_args="$jvm_stack $GRAPH_CACHE_PROP"
     [[ -n "$jvm_heap" ]] && fork_args="$fork_args $jvm_heap"
     [[ -n "$jvm_args" ]] && fork_args="$fork_args $jvm_args"
     local case_tmp="${case_out}.tmp.$$"
@@ -1051,42 +1129,41 @@ run_mem() {
   # written atomically. The mem CLI's own -o file is flushed row-by-row but
   # TRUNCATED on every invocation, so pointing two separate attempts at the
   # same path would destroy a crashed run's partial progress — write once,
-  # atomically, and skip if the final file already exists. Keyed by the
-  # actually-selected libraries so `synthetic graphity` and a later
-  # `synthetic jgrapht` don't collide on the same file.
-  local libs_key="${mem_libraries//,/-}"
-  [[ -z "$libs_key" ]] && libs_key="none"
-  local out="${MEASUREMENTS}/mem-${profile}@${libs_key}.csv"
-
-  # A CSV is reused only while the versions it was measured at (written next to it) still match.
+  # atomically, and skip if the final file is current. One file per library, so
+  # that a new Graphity state measures Graphity again and keeps the peers.
   [[ -z "$LIBRARY_VERSIONS" ]] && LIBRARY_VERSIONS="$(library_versions)"
-  local versions_now
-  versions_now="$(python3 -c 'import json, sys; v = json.loads(sys.argv[1]); print(json.dumps({l: v.get(l) for l in sys.argv[2].split(",") if l} | {"jdk": v.get("jdk")}, sort_keys=True))' "$LIBRARY_VERSIONS" "$mem_libraries")"
-  if [[ -f "$out" && -f "${out}.versions" && "$versions_now" != *unknown-git* \
-        && "$(cat "${out}.versions")" == "$versions_now" ]]; then
-    echo "mem — already in measurements/ at the current versions, skipping (${out})"
-    return
-  fi
-  rm -f "$out" "${out}.versions"
+  local lib
+  for lib in ${mem_libraries//,/ }; do
+    local out="${MEASUREMENTS}/mem-${profile}@${lib}.csv"
 
-  local -a mem_args=(mem -o "${out}.tmp.$$")
-  [[ -n "$mem_nodes" ]] && mem_args+=(-n "$mem_nodes")
-  [[ -n "$mem_shapes" ]] && mem_args+=(-s "$mem_shapes")
-  [[ -n "$mem_libraries" ]] && mem_args+=(-l "$mem_libraries")
+    # A CSV is reused only while the versions it was measured at (written next to it) still match.
+    local versions_now
+    versions_now="$(python3 -c 'import json, sys; v = json.loads(sys.argv[1]); print(json.dumps({sys.argv[2]: v.get(sys.argv[2]), "jdk": v.get("jdk")}, sort_keys=True))' "$LIBRARY_VERSIONS" "$lib")"
+    if [[ -f "$out" && -f "${out}.versions" && "$versions_now" != *unknown-git* \
+          && "$(cat "${out}.versions")" == "$versions_now" ]]; then
+      echo "mem — ${lib} already in measurements/ at the current versions, skipping (${out})"
+      continue
+    fi
+    rm -f "$out" "${out}.versions"
 
-  local -a mem_cmd=(java)
-  [[ -n "$jvm_heap" ]] && mem_cmd+=("$jvm_heap")
-  mem_cmd+=(-jar "$JAR" "${mem_args[@]}")
+    local -a mem_args=(mem -o "${out}.tmp.$$" -l "$lib")
+    [[ -n "$mem_nodes" ]] && mem_args+=(-n "$mem_nodes")
+    [[ -n "$mem_shapes" ]] && mem_args+=(-s "$mem_shapes")
 
-  if "${mem_cmd[@]}"; then
-    mv -f "${out}.tmp.$$" "$out"
-    printf '%s\n' "$versions_now" > "${out}.versions"
-    echo "mem CSV → $out"
-  else
-    rm -f "${out}.tmp.$$"
-    echo "mem FAILED (${profile})" >&2
-    FAILED_MEASUREMENTS+=("mem/${profile}/${libs_key}")
-  fi
+    local -a mem_cmd=(${PIN_CMD[@]+"${PIN_CMD[@]}"} java "$GRAPH_CACHE_PROP")
+    [[ -n "$jvm_heap" ]] && mem_cmd+=("$jvm_heap")
+    mem_cmd+=(-jar "$JAR" "${mem_args[@]}")
+
+    if "${mem_cmd[@]}"; then
+      mv -f "${out}.tmp.$$" "$out"
+      printf '%s\n' "$versions_now" > "${out}.versions"
+      echo "mem CSV → $out"
+    else
+      rm -f "${out}.tmp.$$"
+      echo "mem FAILED (${profile}, ${lib})" >&2
+      FAILED_MEASUREMENTS+=("mem/${profile}/${lib}")
+    fi
+  done
 }
 
 # merge_json_across_profiles <phase> <dest.json> <profile1> [<profile2> ...]
@@ -1120,22 +1197,29 @@ PY
 }
 
 # merge_mem_csv_across_profiles <dest.csv> <profile1> [<profile2> ...]
-# Concatenates JOL CSV files from multiple profiles (header from first file only).
+# Merges the JOL CSV files of the given profiles into one, one row per (library, shape, nodes);
+# a newer file wins. Fails if no file exists.
 merge_mem_csv_across_profiles() {
   local dest="$1"; shift
-  local header_done=0
-  for p in "$@"; do
-    local f
-    f=$(ls -t "${MEASUREMENTS}"/mem-"${p}"@*.csv 2>/dev/null | head -1 || true)
-    [[ -z "$f" ]] && continue
-    if [[ $header_done -eq 0 ]]; then
-      cat "$f" > "$dest"
-      header_done=1
-    else
-      tail -n +2 "$f" >> "$dest"
-    fi
-  done
-  [[ $header_done -eq 1 ]]  # return true if at least one file found
+  python3 - "$dest" "$MEASUREMENTS" "$@" <<'PY'
+import glob, os, sys
+dest, results, profiles = sys.argv[1], sys.argv[2], sys.argv[3:]
+files = sorted((f for p in profiles for f in glob.glob(os.path.join(results, f"mem-{p}@*.csv"))),
+               key=os.path.getmtime)
+header, rows = None, {}
+for path in files:
+    lines = [l for l in open(path, encoding="utf-8").read().splitlines() if l.strip()]
+    if not lines:
+        continue
+    header = header or lines[0]
+    for line in lines[1:]:
+        parts = line.split(",")
+        rows[tuple(p.strip() for p in parts[:3])] = line
+if header is None:
+    sys.exit(1)
+with open(dest, "w", encoding="utf-8") as f:
+    f.write("\n".join([header, *rows.values()]) + "\n")
+PY
 }
 
 # run_report_merged <kind> <out.md> <profile1> [<profile2> ...]
@@ -1184,6 +1268,12 @@ LIB_FILTER=""
 FAILED_MEASUREMENTS=()
 # Cases whose validation failed in the current phase; run_jmh_phase skips them.
 VALIDATION_FAILED=()
+# Generated, loaded and reordered input graphs as binary CSR files, written once and read by every
+# later JVM (BenchmarkGraphs). The keys cover the generating code, so stale files are never read.
+GRAPH_CACHE="${BENCH_DIR}/graph-cache"
+GRAPH_CACHE_PROP="-Dgraphity.bench.graphCache=${GRAPH_CACHE}"
+# Prefix for every measuring java invocation, set by resolve_pinning; JMH forks inherit it.
+PIN_CMD=()
 # Accumulates whole phases that were skipped because a precondition was missing
 # (currently only: real-world datasets not downloaded). Reported in its own
 # banner at the very end so a multi-hour `bench` run cannot silently produce a
@@ -1447,7 +1537,7 @@ cmd_report() {
 
 cmd_bench() {
   local version="${1:-}"
-  banner "bench — complete run: synthetic full + big + realworld + report (~3 h)"
+  banner "bench — complete run: synthetic full + big + realworld + report (~1 h with cached peers)"
 
   banner "bench [1/4] — synthetic full (all libraries, n = 10K / 100K)"
   run_kind synthetic all "$DEFAULT_SYNTHETIC_PROFILE"
@@ -1539,6 +1629,39 @@ snapshot_state() {
   [[ -n "$LIBRARY_VERSIONS" ]] && return 0
   require_fresh_jar
   LIBRARY_VERSIONS="$(library_versions)"
+  resolve_pinning
+}
+
+# resolve_pinning: pins the measuring JVMs to the CPUs sharing one L3 cache (on a Ryzen 9950X one of
+# the two CCDs), so the scheduler cannot move a benchmark to a core with a cold cache. Runs stay
+# sequential: two benchmarks at once would compete for memory bandwidth even on separate caches.
+# BENCH_CPUS=<list> picks the CPUs (taskset syntax), BENCH_CPUS=none disables pinning.
+resolve_pinning() {
+  PIN_CMD=()
+  local cpus="${BENCH_CPUS:-auto}"
+  [[ "$cpus" == "none" ]] && return 0
+  if ! command -v taskset >/dev/null 2>&1; then
+    [[ "$cpus" != "auto" ]] && echo "warning: BENCH_CPUS is set, but taskset is not available — not pinning" >&2
+    return 0
+  fi
+  if [[ "$cpus" == "auto" ]]; then
+    cpus=""
+    local dir
+    for dir in /sys/devices/system/cpu/cpu0/cache/index*; do
+      if [[ "$(cat "$dir/level" 2>/dev/null)" == "3" ]]; then
+        cpus="$(cat "$dir/shared_cpu_list" 2>/dev/null)"
+      fi
+    done
+    [[ -z "$cpus" ]] && return 0
+  fi
+  PIN_CMD=(taskset -c "$cpus")
+  echo "pinning benchmark JVMs to CPUs ${cpus} (one L3 cache; BENCH_CPUS=none disables)"
+  local governor
+  governor="$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null || true)"
+  if [[ -n "$governor" && "$governor" != "performance" ]]; then
+    echo "warning: CPU frequency governor is '${governor}', not 'performance'; measurements drift more." >&2
+    echo "         sudo cpupower frequency-set -g performance" >&2
+  fi
 }
 
 # check_case_filter <matrix>: every name in --cases must be a case ("scc") or a case with its
@@ -1720,7 +1843,7 @@ Workflow — from a clean slate to committed reports with charts:
        JGraphT, Guava and WebGraph. After a change to generators, fixtures or peer
        adapters, also 'clean --lib jgrapht,guava,webgraph': those do not show in a
        peer's version.
-  2. $(basename "$0") bench [version]         # complete ~3h run: synthetic full + big + realworld + report
+  2. $(basename "$0") bench [version]         # complete run: synthetic full + big + realworld + report (~1 h with cached peers, ~3 h without)
      — OR run individual steps:
      $(basename "$0") synthetic <lib|all>     # synthetic full (n = 10K / 100K, all libraries)
      $(basename "$0") synthetic <lib|all> --profile big   # large graphs (n = 1M+, Graphity only)
@@ -1762,7 +1885,7 @@ Profiles (--profile <name>):
                 realworld-quick — smoke run, one dataset per case (~minutes)
 
 Examples:
-  $(basename "$0") bench                             # complete run (~3h) + report, version from pom.xml
+  $(basename "$0") bench                             # complete run + report, version from pom.xml
   $(basename "$0") bench 2.2.0                       # same, promoted as version 2.2.0
   $(basename "$0") clean && $(basename "$0") bench   # clean slate then full run
   $(basename "$0") synthetic all                     # full synthetic only

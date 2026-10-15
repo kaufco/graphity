@@ -225,6 +225,7 @@ public final class ReportMain {
     } catch (Throwable ignored) {
       // RAM line omitted if MXBean unavailable
     }
+    out.println("Estimate:     near-best window - 3rd-fastest of 15 or more, 2nd-fastest of 5 or more");
     emitRevisions(out, perf, alloc, hasMemory);
     out.println("```");
     out.println();
@@ -663,25 +664,27 @@ public final class ReportMain {
     out.println("## 4 · Precision Summary");
     out.println();
     out.println(
-        "> *All performance benchmarks sorted by relative error (`±error / score`) descending. "
-        + "JMH reports `±error` as the 99.9% CI half-width. Memory measurements are single-trial "
-        + "(no error bar). Allocation precision is identical to the perf precision shown here.*");
+        "> *All performance benchmarks sorted by relative spread (`spread / score`) descending. "
+        + "The score is the near-best measurement window (see `Estimate` in the header), the "
+        + "spread the interquartile range of all windows. Results without per-window data fall "
+        + "back to the JMH mean and its 99.9% CI half-width. Memory measurements are single-trial "
+        + "(no spread).*");
     out.println();
 
-    out.println("| Benchmark | Shape | Nodes | Score [ms/op] | ±Error | Rel |");
+    out.println("| Benchmark | Shape | Nodes | Score [ms/op] | Spread | Rel |");
     out.println("|---|---|---:|---:|---:|---:|");
 
     List<PerfResult> sorted = new ArrayList<>(perf);
     sorted.sort(Comparator.comparingDouble((PerfResult r) ->
-        r.score == 0 ? Double.MAX_VALUE : -Math.abs(r.scoreError / r.score)));
+        r.score == 0 ? Double.MAX_VALUE : -Math.abs(r.spread / r.score)));
 
     for (PerfResult r : sorted) {
-      double rel = r.score == 0 ? 0 : Math.abs(r.scoreError / r.score) * 100.0;
+      double rel = r.score == 0 ? 0 : Math.abs(r.spread / r.score) * 100.0;
       String rowLabel = r.dataset != null ? r.dataset : r.shape;
       String nodesLabel = r.dataset != null ? "—" : fmtInt(r.nodeCount);
       out.printf(Locale.ROOT, "| %s | %s | %s | %s | %s | %.0f%% |%n",
           shortBenchmarkName(r.benchmarkFull),
-          rowLabel, nodesLabel, fmtMs(r.score), fmtMs(r.scoreError), rel);
+          rowLabel, nodesLabel, fmtMs(r.score), fmtMs(r.spread), rel);
     }
     out.println();
   }
@@ -706,8 +709,17 @@ public final class ReportMain {
     List<PerfResult> out = new ArrayList<>();
     for (Map<String, Object> e : parseJmhArray(path)) {
       String benchmark = (String) e.get("benchmark");
-      double score = asDouble(getNested(e, "primaryMetric", "score"));
-      double err = asDouble(getNested(e, "primaryMetric", "scoreError"));
+      double[] windows = rawWindows(getNested(e, "primaryMetric", "rawData"));
+      boolean higherIsBetter = "thrpt".equals(e.get("mode"));
+      double score;
+      double err;
+      if (windows.length > 0) {
+        score = nearBest(windows, higherIsBetter);
+        err = interquartileRange(windows);
+      } else {
+        score = asDouble(getNested(e, "primaryMetric", "score"));
+        err = asDouble(getNested(e, "primaryMetric", "scoreError"));
+      }
       Map<String, Object> params = castMap(e.get("params"));
       String shape = params == null ? "?" : asStr(params.get("shape"));
       int nodeCount = params == null ? 0 : asInt(params.get("nodeCount"));
@@ -719,6 +731,36 @@ public final class ReportMain {
           dataset, asStr(e.get("measuredRevision")), asStr(e.get("measuredSubject"))));
     }
     return out;
+  }
+
+  /** The per-window scores of all forks, sorted ascending. */
+  private static double[] rawWindows(Object rawData) {
+    if (!(rawData instanceof List<?> forks)) return new double[0];
+    List<Double> values = new ArrayList<>();
+    for (Object fork : forks) {
+      if (fork instanceof List<?> windows) {
+        for (Object w : windows) values.add(asDouble(w));
+      }
+    }
+    return values.stream().mapToDouble(Double::doubleValue).sorted().toArray();
+  }
+
+  /**
+   * The reported value: a near-best window, the third-best of 15 or more, the second-best of 5 or
+   * more, otherwise the best. Timing noise only slows a window down, so a near-best window is closer
+   * to the undisturbed cost and steadier than the mean; skipping the best ones guards against a
+   * window that comes out implausibly fast.
+   */
+  static double nearBest(double[] sortedAscending, boolean higherIsBetter) {
+    int n = sortedAscending.length;
+    int k = n >= 15 ? 3 : n >= 5 ? 2 : 1;
+    return higherIsBetter ? sortedAscending[n - k] : sortedAscending[k - 1];
+  }
+
+  /** Distance between the lower and the upper quartile window (nearest rank). */
+  static double interquartileRange(double[] sortedAscending) {
+    int n = sortedAscending.length;
+    return sortedAscending[(int) Math.ceil(0.75 * (n - 1))] - sortedAscending[(int) Math.floor(0.25 * (n - 1))];
   }
 
   static List<AllocResult> loadAlloc(Path path) throws IOException {
@@ -1035,7 +1077,7 @@ public final class ReportMain {
    */
   record PerfResult(
       String benchmarkFull, String library, String algoKey,
-      String shape, int nodeCount, double score, double scoreError, String dataset,
+      String shape, int nodeCount, double score, double spread, String dataset,
       String revision, String subject) {}
 
   /** One row from the alloc JSON (only gc.alloc.rate.norm extracted). */
