@@ -1,37 +1,42 @@
 # Graphity vs. JGraphT, Guava and WebGraph — synthetic / ubuntu-ryzen-9950x
 
-Graphity `2.2.0` against the peer libraries. Peer numbers come from the newest run that measured them, which need not be the run of the newest Graphity version; every column states the version it belongs to. Blocks without a peer column are Graphity-only benchmarks or graph sizes beyond the peers' reach — for the comparison across Graphity versions see [`synthetic-ubuntu-ryzen-9950x-history.md`](synthetic-ubuntu-ryzen-9950x-history.md).
+Graphity `2.3.0` against the peer libraries. Peer numbers come from the newest run that measured them, which need not be the run of the newest Graphity version; every column states the version it belongs to. Blocks without a peer column are Graphity-only benchmarks or graph sizes beyond the peers' reach — for the comparison across Graphity versions see [`synthetic-ubuntu-ryzen-9950x-history.md`](synthetic-ubuntu-ryzen-9950x-history.md).
 
 ```
 Profile:      synthetic
-Timestamp:    2026-10-11 14:31:16
+Timestamp:    2026-10-16 04:51:31
 JDK:          OpenJDK 64-Bit Server VM 25.0.2 (Amazon.com Inc.)
 OS:           Ubuntu 25.10, kernel 6.17.0-41-generic (amd64)
 CPU:          AMD Ryzen 9 9950X 16-Core Processor (32 logical cores)
 RAM:          89.7 GiB
+Estimate:     near-best window - 3rd-fastest of 15 or more, 2nd-fastest of 5 or more
+Revision:     303d801d508b + uncommitted changes b4b1cd1fe72e "Prepare 2.3.0 release"
+Memory:       revision not recorded per row
 ```
 
 ## Contents
 
 - [1 Performance](#1-performance)
   - [1.1 Build](#11-build)
-  - [1.2 SCC](#12-scc)
-  - [1.3 WCC](#13-wcc)
-  - [1.4 CCs](#14-ccs)
-  - [1.5 Condense](#15-condense)
-  - [1.6 TopOrder](#16-toporder)
-  - [1.7 TopOrderAndLevels](#17-toporderandlevels)
-  - [1.8 BackEdges](#18-backedges)
-  - [1.9 EdgeTypes](#19-edgetypes)
-  - [1.10 Reorder (DFS-preorder) cost](#110-reorder-dfs-preorder-cost)
-  - [1.11 BiAdjacency (in-adjacency) cost](#111-biadjacency-in-adjacency-cost)
-  - [1.12 Symmetrize (WebGraph) cost](#112-symmetrize-webgraph-cost)
-  - [1.13 Dominators](#113-dominators)
-  - [1.14 Dominance frontiers](#114-dominance-frontiers)
-  - [1.15 Iterated dominance frontier (build + one query per variable)](#115-iterated-dominance-frontier-build-one-query-per-variable)
-  - [1.16 Loops](#116-loops)
-  - [1.17 Ancestry of the dominator tree](#117-ancestry-of-the-dominator-tree)
-  - [1.18 PreorderAncestry of the dominator tree](#118-preorderancestry-of-the-dominator-tree)
+  - [1.2 Out-adjacency traversal (outNodes, no algorithm)](#12-out-adjacency-traversal-outnodes-no-algorithm)
+  - [1.3 In-adjacency traversal (inNodes, no algorithm)](#13-in-adjacency-traversal-innodes-no-algorithm)
+  - [1.4 SCC](#14-scc)
+  - [1.5 WCC](#15-wcc)
+  - [1.6 CCs](#16-ccs)
+  - [1.7 Condense](#17-condense)
+  - [1.8 TopOrder](#18-toporder)
+  - [1.9 TopOrderAndLevels](#19-toporderandlevels)
+  - [1.10 BackEdges](#110-backedges)
+  - [1.11 EdgeTypes](#111-edgetypes)
+  - [1.12 Reorder (DFS-preorder) cost](#112-reorder-dfs-preorder-cost)
+  - [1.13 BiAdjacency (in-adjacency) cost](#113-biadjacency-in-adjacency-cost)
+  - [1.14 Symmetrize (WebGraph) cost](#114-symmetrize-webgraph-cost)
+  - [1.15 Dominators](#115-dominators)
+  - [1.16 Dominance frontiers](#116-dominance-frontiers)
+  - [1.17 Iterated dominance frontier (build + one query per variable)](#117-iterated-dominance-frontier-build-one-query-per-variable)
+  - [1.18 Loops](#118-loops)
+  - [1.19 Ancestry of the dominator tree](#119-ancestry-of-the-dominator-tree)
+  - [1.20 PreorderAncestry of the dominator tree](#120-preorderancestry-of-the-dominator-tree)
 - [2 Memory Footprint](#2-memory-footprint)
   - [2.1 Total Graph Size](#21-total-graph-size)
   - [2.2 Bytes per Element  `totalBytes / (Nodes + Edges)`](#22-bytes-per-element-totalbytes-nodes-edges)
@@ -54,1436 +59,1471 @@ RAM:          89.7 GiB
 
 ## 1 Performance
 
-Times (ms/op, lower is better) and throughput (op/s, higher is better) for each algorithm and graph size. Non-baseline cells show the factor relative to **Graphity 2.2.0**, or the newest version present in a table it is missing from (= 100% in the throughput table).
+Times (ms/op, lower is better) and throughput (op/s, higher is better) for each algorithm and graph size. Non-baseline cells show the factor relative to **Graphity 2.3.0**, or the newest version present in a table it is missing from (= 100% in the throughput table).
 
 ### 1.1 Build
 
 #### Times @ 10k nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 | JGraphT | Guava | WebGraph |
+| Shape | Graphity 2.3.0 | JGraphT | Guava | WebGraph |
 |---|---:|---:|---:|---:|
-| Path<br><sub>10k nodes, 10k edges</sub> | 0.083 ms | 1.041 ms (13×) | 0.363 ms (4.4×) | 2.151 ms (26×) |
-| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 0.084 ms | 1.200 ms (14×) | 0.593 ms (7.1×) | 2.857 ms (34×) |
-| Tree<br><sub>10k nodes, 10k edges</sub> | 0.093 ms | 1.221 ms (13×) | 0.524 ms (5.6×) | 2.602 ms (28×) |
-| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 0.163 ms | 4.210 ms (26×) | 1.931 ms (12×) | 7.975 ms (49×) |
-| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 1.650 ms | 61.46 ms (37×) | 38.25 ms (23×) | 45.80 ms (28×) |
-| GNP dense shfld.<br><sub>10k nodes, 299.6k edges</sub> | 1.614 ms | 61.19 ms (38×) | 39.39 ms (24×) | 44.34 ms (27×) |
-| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 1.622 ms | 45.39 ms (28×) | 8.373 ms (5.2×) | 6.531 ms (4.0×) |
-| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 1.650 ms | 61.18 ms (37×) | 20.60 ms (12×) | 44.64 ms (27×) |
+| Path<br><sub>10k nodes, 10k edges</sub> | 0.083 ms | 1.111 ms (13×) | 0.372 ms (4.5×) | 2.260 ms (27×) |
+| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 0.084 ms | 1.115 ms (13×) | 0.555 ms (6.6×) | 2.936 ms (35×) |
+| Tree<br><sub>10k nodes, 10k edges</sub> | 0.093 ms | 1.153 ms (12×) | 0.526 ms (5.7×) | 2.559 ms (28×) |
+| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 0.171 ms | 4.088 ms (24×) | 2.145 ms (13×) | 7.956 ms (47×) |
+| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 1.569 ms | 55.01 ms (35×) | 31.20 ms (20×) | 43.27 ms (28×) |
+| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 1.600 ms | 40.13 ms (25×) | 9.044 ms (5.7×) | 6.600 ms (4.1×) |
+| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 1.606 ms | 57.04 ms (36×) | 17.65 ms (11×) | 43.73 ms (27×) |
 
 #### Throughput @ 10k nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 | JGraphT | Guava | WebGraph |
+| Shape | Graphity 2.3.0 | JGraphT | Guava | WebGraph |
 |---|---:|---:|---:|---:|
-| Path<br><sub>10k nodes, 10k edges</sub> | 12 048 op/s | 960.6 op/s (8.0%) | 2 755 op/s (22.9%) | 464.9 op/s (3.9%) |
-| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 11 905 op/s | 833.3 op/s (7.0%) | 1 686 op/s (14.2%) | 350.0 op/s (2.9%) |
-| Tree<br><sub>10k nodes, 10k edges</sub> | 10 753 op/s | 819.0 op/s (7.6%) | 1 908 op/s (17.7%) | 384.3 op/s (3.6%) |
-| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 6 135 op/s | 237.5 op/s (3.9%) | 517.9 op/s (8.4%) | 125.4 op/s (2.0%) |
-| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 606.1 op/s | 16.27 op/s (2.7%) | 26.14 op/s (4.3%) | 21.84 op/s (3.6%) |
-| GNP dense shfld.<br><sub>10k nodes, 299.6k edges</sub> | 619.6 op/s | 16.34 op/s (2.6%) | 25.39 op/s (4.1%) | 22.55 op/s (3.6%) |
-| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 616.5 op/s | 22.03 op/s (3.6%) | 119.4 op/s (19.4%) | 153.1 op/s (24.8%) |
-| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 606.1 op/s | 16.34 op/s (2.7%) | 48.54 op/s (8.0%) | 22.40 op/s (3.7%) |
+| Path<br><sub>10k nodes, 10k edges</sub> | 12 048 op/s | 900.1 op/s (7.5%) | 2 688 op/s (22.3%) | 442.5 op/s (3.7%) |
+| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 11 905 op/s | 896.9 op/s (7.5%) | 1 802 op/s (15.1%) | 340.6 op/s (2.9%) |
+| Tree<br><sub>10k nodes, 10k edges</sub> | 10 753 op/s | 867.3 op/s (8.1%) | 1 901 op/s (17.7%) | 390.8 op/s (3.6%) |
+| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 5 848 op/s | 244.6 op/s (4.2%) | 466.2 op/s (8.0%) | 125.7 op/s (2.1%) |
+| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 637.3 op/s | 18.18 op/s (2.9%) | 32.06 op/s (5.0%) | 23.11 op/s (3.6%) |
+| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 625.0 op/s | 24.92 op/s (4.0%) | 110.6 op/s (17.7%) | 151.5 op/s (24.2%) |
+| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 622.7 op/s | 17.53 op/s (2.8%) | 56.66 op/s (9.1%) | 22.87 op/s (3.7%) |
 
 ![1.1.1 Build @ n = 10 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-1-1-build-n-10-000.svg)
 
 #### Times @ 100k nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 | JGraphT | Guava | WebGraph |
+| Shape | Graphity 2.3.0 | JGraphT | Guava | WebGraph |
 |---|---:|---:|---:|---:|
-| Path<br><sub>100k nodes, 100k edges</sub> | 0.696 ms | 15.49 ms (22×) | 5.517 ms (7.9×) | 20.03 ms (29×) |
-| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 0.698 ms | 26.62 ms (38×) | 12.53 ms (18×) | 28.11 ms (40×) |
-| Tree<br><sub>100k nodes, 100k edges</sub> | 1.111 ms | 27.47 ms (25×) | 10.91 ms (9.8×) | 29.45 ms (27×) |
-| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 2.274 ms | 101.4 ms (45×) | 59.74 ms (26×) | 86.14 ms (38×) |
-| GNP dense<br><sub>100k nodes, 3M edges</sub> | 17.48 ms | 1631.8 ms (93×) | 1157.5 ms (66×) | 563.3 ms (32×) |
-| GNP dense shfld.<br><sub>100k nodes, 3M edges</sub> | 17.50 ms | 1605.5 ms (92×) | 1174.8 ms (67×) | 521.3 ms (30×) |
-| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 17.45 ms | 896.3 ms (51×) | 103.5 ms (5.9×) | 64.30 ms (3.7×) |
-| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 16.96 ms | 1585.8 ms (94×) | 774.0 ms (46×) | 534.8 ms (32×) |
+| Path<br><sub>100k nodes, 100k edges</sub> | 0.693 ms | 14.04 ms (20×) | 4.043 ms (5.8×) | 21.64 ms (31×) |
+| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 0.695 ms | 23.03 ms (33×) | 8.956 ms (13×) | 29.21 ms (42×) |
+| Tree<br><sub>100k nodes, 100k edges</sub> | 1.101 ms | 25.14 ms (23×) | 8.092 ms (7.3×) | 28.09 ms (26×) |
+| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 2.278 ms | 95.96 ms (42×) | 47.37 ms (21×) | 85.02 ms (37×) |
+| GNP dense<br><sub>100k nodes, 3M edges</sub> | 17.57 ms | 1498.0 ms (85×) | 965.5 ms (55×) | 542.8 ms (31×) |
+| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 17.14 ms | 818.9 ms (48×) | 93.49 ms (5.5×) | 63.61 ms (3.7×) |
+| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 17.10 ms | 1482.1 ms (87×) | 612.9 ms (36×) | 508.0 ms (30×) |
 
 #### Throughput @ 100k nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 | JGraphT | Guava | WebGraph |
+| Shape | Graphity 2.3.0 | JGraphT | Guava | WebGraph |
 |---|---:|---:|---:|---:|
-| Path<br><sub>100k nodes, 100k edges</sub> | 1 437 op/s | 64.54 op/s (4.5%) | 181.3 op/s (12.6%) | 49.92 op/s (3.5%) |
-| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 1 433 op/s | 37.57 op/s (2.6%) | 79.81 op/s (5.6%) | 35.57 op/s (2.5%) |
-| Tree<br><sub>100k nodes, 100k edges</sub> | 900.1 op/s | 36.40 op/s (4.0%) | 91.64 op/s (10.2%) | 33.96 op/s (3.8%) |
-| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 439.8 op/s | 9.862 op/s (2.2%) | 16.74 op/s (3.8%) | 11.61 op/s (2.6%) |
-| GNP dense<br><sub>100k nodes, 3M edges</sub> | 57.19 op/s | 0.613 op/s (1.1%) | 0.864 op/s (1.5%) | 1.775 op/s (3.1%) |
-| GNP dense shfld.<br><sub>100k nodes, 3M edges</sub> | 57.16 op/s | 0.623 op/s (1.1%) | 0.851 op/s (1.5%) | 1.918 op/s (3.4%) |
-| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 57.32 op/s | 1.116 op/s (1.9%) | 9.662 op/s (16.9%) | 15.55 op/s (27.1%) |
-| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 58.97 op/s | 0.631 op/s (1.1%) | 1.292 op/s (2.2%) | 1.870 op/s (3.2%) |
+| Path<br><sub>100k nodes, 100k edges</sub> | 1 443 op/s | 71.21 op/s (4.9%) | 247.3 op/s (17.1%) | 46.21 op/s (3.2%) |
+| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 1 439 op/s | 43.42 op/s (3.0%) | 111.7 op/s (7.8%) | 34.23 op/s (2.4%) |
+| Tree<br><sub>100k nodes, 100k edges</sub> | 908.3 op/s | 39.77 op/s (4.4%) | 123.6 op/s (13.6%) | 35.60 op/s (3.9%) |
+| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 439.0 op/s | 10.42 op/s (2.4%) | 21.11 op/s (4.8%) | 11.76 op/s (2.7%) |
+| GNP dense<br><sub>100k nodes, 3M edges</sub> | 56.93 op/s | 0.668 op/s (1.2%) | 1.036 op/s (1.8%) | 1.842 op/s (3.2%) |
+| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 58.35 op/s | 1.221 op/s (2.1%) | 10.70 op/s (18.3%) | 15.72 op/s (26.9%) |
+| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 58.48 op/s | 0.675 op/s (1.2%) | 1.632 op/s (2.8%) | 1.969 op/s (3.4%) |
 
 ![1.1.2 Build @ n = 100 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-1-2-build-n-100-000.svg)
 
 #### Times @ 1M nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
-| GNP sparse<br><sub>1M nodes, 3M edges</sub> | 24.02 ms |
-| GNP dense<br><sub>1M nodes, 30M edges</sub> | 181.1 ms |
-| GNP dense shfld.<br><sub>1M nodes, 30M edges</sub> | 169.9 ms |
-| Chain of cliques<br><sub>1M nodes, 31.1M edges</sub> | 167.1 ms |
+| GNP sparse<br><sub>1M nodes, 3M edges</sub> | 27.59 ms |
+| GNP dense<br><sub>1M nodes, 30M edges</sub> | 169.7 ms |
+| Chain of cliques<br><sub>1M nodes, 31.1M edges</sub> | 166.0 ms |
 
 #### Throughput @ 1M nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
-| GNP sparse<br><sub>1M nodes, 3M edges</sub> | 41.63 op/s |
-| GNP dense<br><sub>1M nodes, 30M edges</sub> | 5.522 op/s |
-| GNP dense shfld.<br><sub>1M nodes, 30M edges</sub> | 5.886 op/s |
-| Chain of cliques<br><sub>1M nodes, 31.1M edges</sub> | 5.984 op/s |
+| GNP sparse<br><sub>1M nodes, 3M edges</sub> | 36.24 op/s |
+| GNP dense<br><sub>1M nodes, 30M edges</sub> | 5.893 op/s |
+| Chain of cliques<br><sub>1M nodes, 31.1M edges</sub> | 6.024 op/s |
 
 #### Times @ 10M nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
-| GNP sparse<br><sub>10M nodes, 30M edges</sub> | 243.3 ms |
-| GNP dense<br><sub>10M nodes, 299.6M edges</sub> | 2326.6 ms |
-| GNP dense shfld.<br><sub>10M nodes, 299.6M edges</sub> | 2301.9 ms |
-| Chain of cliques<br><sub>10M nodes, 310.8M edges</sub> | 1846.2 ms |
+| GNP sparse<br><sub>10M nodes, 30M edges</sub> | 242.5 ms |
+| GNP dense<br><sub>10M nodes, 299.6M edges</sub> | 1739.0 ms |
+| Chain of cliques<br><sub>10M nodes, 310.8M edges</sub> | 2061.3 ms |
 
 #### Throughput @ 10M nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
-| GNP sparse<br><sub>10M nodes, 30M edges</sub> | 4.110 op/s |
-| GNP dense<br><sub>10M nodes, 299.6M edges</sub> | 0.430 op/s |
-| GNP dense shfld.<br><sub>10M nodes, 299.6M edges</sub> | 0.434 op/s |
-| Chain of cliques<br><sub>10M nodes, 310.8M edges</sub> | 0.542 op/s |
+| GNP sparse<br><sub>10M nodes, 30M edges</sub> | 4.124 op/s |
+| GNP dense<br><sub>10M nodes, 299.6M edges</sub> | 0.575 op/s |
+| Chain of cliques<br><sub>10M nodes, 310.8M edges</sub> | 0.485 op/s |
 
 #### Times @ 100M nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
-| GNP sparse<br><sub>100M nodes, 300M edges</sub> | 2986.8 ms |
+| GNP sparse<br><sub>100M nodes, 300M edges</sub> | 2457.0 ms |
 
 #### Throughput @ 100M nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
-| GNP sparse<br><sub>100M nodes, 300M edges</sub> | 0.335 op/s |
+| GNP sparse<br><sub>100M nodes, 300M edges</sub> | 0.407 op/s |
 
-### 1.2 SCC
+### 1.2 Out-adjacency traversal (outNodes, no algorithm)
 
 #### Times @ 10k nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) | JGraphT | Guava | WebGraph |
-|---|---:|---:|---:|---:|---:|
-| Path<br><sub>10k nodes, 10k edges</sub> | 0.106 ms | 0.106 ms (1.0×) | 0.749 ms (7.1×) | 0.813 ms (7.7×) | 0.348 ms (3.3×) |
-| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 0.135 ms | 0.106 ms (0.8×) | 1.235 ms (9.1×) | 1.348 ms (10.0×) | 0.493 ms (3.7×) |
-| Tree<br><sub>10k nodes, 10k edges</sub> | 0.105 ms | 0.086 ms (0.8×) | 1.108 ms (11×) | 1.101 ms (10×) | 0.470 ms (4.5×) |
-| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 0.245 ms | 0.112 ms (0.5×) | 2.219 ms (9.1×) | 2.512 ms (10×) | 0.861 ms (3.5×) |
-| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 0.550 ms | 0.386 ms (0.7×) | 29.16 ms (53×) | 22.23 ms (40×) | 2.359 ms (4.3×) |
-| GNP dense shfld.<br><sub>10k nodes, 299.6k edges</sub> | 0.576 ms | 0.379 ms (0.7×) | 29.73 ms (52×) | 27.34 ms (47×) | 2.377 ms (4.1×) |
-| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 0.261 ms | 0.266 ms (1.0×) | 22.65 ms (87×) | 6.822 ms (26×) | 3.359 ms (13×) |
-| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 0.349 ms | 0.264 ms (0.8×) | 24.54 ms (70×) | 9.666 ms (28×) | 2.065 ms (5.9×) |
+| Shape | Graphity 2.3.0 |
+|---|---:|
+| Path<br><sub>10k nodes, 10k edges</sub> | 0.014 ms |
+| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 0.014 ms |
+| Tree<br><sub>10k nodes, 10k edges</sub> | 0.010 ms |
+| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 0.017 ms |
+| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 0.048 ms |
+| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 0.051 ms |
+| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 0.053 ms |
 
 #### Throughput @ 10k nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) | JGraphT | Guava | WebGraph |
-|---|---:|---:|---:|---:|---:|
-| Path<br><sub>10k nodes, 10k edges</sub> | 9 434 op/s | 9 434 op/s (100%) | 1 335 op/s (14.2%) | 1 230 op/s (13.0%) | 2 874 op/s (30.5%) |
-| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 7 407 op/s | 9 434 op/s (127%) | 809.7 op/s (10.9%) | 741.8 op/s (10.0%) | 2 028 op/s (27.4%) |
-| Tree<br><sub>10k nodes, 10k edges</sub> | 9 524 op/s | 11 628 op/s (122%) | 902.5 op/s (9.5%) | 908.3 op/s (9.5%) | 2 128 op/s (22.3%) |
-| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 4 082 op/s | 8 929 op/s (219%) | 450.7 op/s (11.0%) | 398.1 op/s (9.8%) | 1 161 op/s (28.5%) |
-| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 1 818 op/s | 2 591 op/s (142%) | 34.30 op/s (1.9%) | 44.99 op/s (2.5%) | 423.9 op/s (23.3%) |
-| GNP dense shfld.<br><sub>10k nodes, 299.6k edges</sub> | 1 736 op/s | 2 639 op/s (152%) | 33.63 op/s (1.9%) | 36.58 op/s (2.1%) | 420.7 op/s (24.2%) |
-| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 3 831 op/s | 3 759 op/s (98.1%) | 44.16 op/s (1.2%) | 146.6 op/s (3.8%) | 297.7 op/s (7.8%) |
-| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 2 865 op/s | 3 788 op/s (132%) | 40.75 op/s (1.4%) | 103.5 op/s (3.6%) | 484.3 op/s (16.9%) |
-
-![1.2.1 SCC @ n = 10 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-2-1-scc-n-10-000.svg)
+| Shape | Graphity 2.3.0 |
+|---|---:|
+| Path<br><sub>10k nodes, 10k edges</sub> | 71 429 op/s |
+| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 71 429 op/s |
+| Tree<br><sub>10k nodes, 10k edges</sub> | 100 000 op/s |
+| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 58 824 op/s |
+| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 20 833 op/s |
+| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 19 608 op/s |
+| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 18 868 op/s |
 
 #### Times @ 100k nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) | JGraphT | Guava | WebGraph |
-|---|---:|---:|---:|---:|---:|
-| Path<br><sub>100k nodes, 100k edges</sub> | 1.021 ms | 1.030 ms (1.0×) | 16.76 ms (16×) | 24.68 ms (24×) | 3.364 ms (3.3×) |
-| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 2.236 ms | 1.052 ms (0.5×) | 60.90 ms (27×) | 52.78 ms (24×) | 5.556 ms (2.5×) |
-| Tree<br><sub>100k nodes, 100k edges</sub> | 2.153 ms | 1.303 ms (0.6×) | 49.38 ms (23×) | 41.68 ms (19×) | 5.713 ms (2.7×) |
-| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 4.617 ms | 2.220 ms (0.5×) | 119.9 ms (26×) | 115.9 ms (25×) | 10.53 ms (2.3×) |
-| GNP dense<br><sub>100k nodes, 3M edges</sub> | 8.010 ms | 4.693 ms (0.6×) | 503.0 ms (63×) | 584.2 ms (73×) | 37.19 ms (4.6×) |
-| GNP dense shfld.<br><sub>100k nodes, 3M edges</sub> | 8.094 ms | 4.517 ms (0.6×) | 546.7 ms (68×) | 481.1 ms (59×) | 35.15 ms (4.3×) |
-| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 2.509 ms | 2.645 ms (1.1×) | 177.4 ms (71×) | 116.1 ms (46×) | 37.72 ms (15×) |
-| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 4.904 ms | 2.789 ms (0.6×) | 382.6 ms (78×) | 152.9 ms (31×) | 30.57 ms (6.2×) |
+| Shape | Graphity 2.3.0 |
+|---|---:|
+| Path<br><sub>100k nodes, 100k edges</sub> | 0.169 ms |
+| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 0.170 ms |
+| Tree<br><sub>100k nodes, 100k edges</sub> | 0.404 ms |
+| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 0.658 ms |
+| GNP dense<br><sub>100k nodes, 3M edges</sub> | 1.134 ms |
+| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 0.517 ms |
+| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 0.514 ms |
 
 #### Throughput @ 100k nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) | JGraphT | Guava | WebGraph |
-|---|---:|---:|---:|---:|---:|
-| Path<br><sub>100k nodes, 100k edges</sub> | 979.4 op/s | 970.9 op/s (99.1%) | 59.66 op/s (6.1%) | 40.52 op/s (4.1%) | 297.3 op/s (30.4%) |
-| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 447.2 op/s | 950.6 op/s (213%) | 16.42 op/s (3.7%) | 18.95 op/s (4.2%) | 180.0 op/s (40.2%) |
-| Tree<br><sub>100k nodes, 100k edges</sub> | 464.5 op/s | 767.5 op/s (165%) | 20.25 op/s (4.4%) | 23.99 op/s (5.2%) | 175.0 op/s (37.7%) |
-| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 216.6 op/s | 450.5 op/s (208%) | 8.340 op/s (3.9%) | 8.628 op/s (4.0%) | 94.98 op/s (43.9%) |
-| GNP dense<br><sub>100k nodes, 3M edges</sub> | 124.8 op/s | 213.1 op/s (171%) | 1.988 op/s (1.6%) | 1.712 op/s (1.4%) | 26.89 op/s (21.5%) |
-| GNP dense shfld.<br><sub>100k nodes, 3M edges</sub> | 123.5 op/s | 221.4 op/s (179%) | 1.829 op/s (1.5%) | 2.079 op/s (1.7%) | 28.45 op/s (23.0%) |
-| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 398.6 op/s | 378.1 op/s (94.9%) | 5.637 op/s (1.4%) | 8.613 op/s (2.2%) | 26.51 op/s (6.7%) |
-| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 203.9 op/s | 358.6 op/s (176%) | 2.614 op/s (1.3%) | 6.540 op/s (3.2%) | 32.71 op/s (16.0%) |
+| Shape | Graphity 2.3.0 |
+|---|---:|
+| Path<br><sub>100k nodes, 100k edges</sub> | 5 917 op/s |
+| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 5 882 op/s |
+| Tree<br><sub>100k nodes, 100k edges</sub> | 2 475 op/s |
+| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 1 520 op/s |
+| GNP dense<br><sub>100k nodes, 3M edges</sub> | 881.8 op/s |
+| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 1 934 op/s |
+| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 1 946 op/s |
 
-![1.2.2 SCC @ n = 100 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-2-2-scc-n-100-000.svg)
-
-#### Times @ 1M nodes (ms/op, lower is better)
-
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
-|---|---:|---:|
-| GNP sparse<br><sub>1M nodes, 3M edges</sub> | 86.77 ms | 25.87 ms (0.3×) |
-| GNP dense<br><sub>1M nodes, 30M edges</sub> | 246.1 ms | 61.93 ms (0.3×) |
-| GNP dense shfld.<br><sub>1M nodes, 30M edges</sub> | 248.1 ms | 62.57 ms (0.3×) |
-| Chain of cliques<br><sub>1M nodes, 31.1M edges</sub> | 26.51 ms | 26.54 ms (1.0×) |
-
-#### Throughput @ 1M nodes (op/s, higher is better)
-
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
-|---|---:|---:|
-| GNP sparse<br><sub>1M nodes, 3M edges</sub> | 11.52 op/s | 38.65 op/s (335%) |
-| GNP dense<br><sub>1M nodes, 30M edges</sub> | 4.063 op/s | 16.15 op/s (397%) |
-| GNP dense shfld.<br><sub>1M nodes, 30M edges</sub> | 4.031 op/s | 15.98 op/s (397%) |
-| Chain of cliques<br><sub>1M nodes, 31.1M edges</sub> | 37.72 op/s | 37.67 op/s (99.9%) |
-
-![1.2.3 SCC @ n = 1 000 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-2-3-scc-n-1-000-000.svg)
-
-#### Times @ 10M nodes (ms/op, lower is better)
-
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
-|---|---:|---:|
-| GNP sparse<br><sub>10M nodes, 30M edges</sub> | 3120.3 ms | 757.2 ms (0.2×) |
-| GNP dense<br><sub>10M nodes, 299.6M edges</sub> | 6783.8 ms | 3038.0 ms (0.4×) |
-| GNP dense shfld.<br><sub>10M nodes, 299.6M edges</sub> | 6754.9 ms | 3578.0 ms (0.5×) |
-| Chain of cliques<br><sub>10M nodes, 310.8M edges</sub> | 256.3 ms | 274.0 ms (1.1×) |
-
-#### Throughput @ 10M nodes (op/s, higher is better)
-
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
-|---|---:|---:|
-| GNP sparse<br><sub>10M nodes, 30M edges</sub> | 0.320 op/s | 1.321 op/s (412%) |
-| GNP dense<br><sub>10M nodes, 299.6M edges</sub> | 0.147 op/s | 0.329 op/s (223%) |
-| GNP dense shfld.<br><sub>10M nodes, 299.6M edges</sub> | 0.148 op/s | 0.279 op/s (189%) |
-| Chain of cliques<br><sub>10M nodes, 310.8M edges</sub> | 3.902 op/s | 3.650 op/s (93.5%) |
-
-![1.2.4 SCC @ n = 10 000 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-2-4-scc-n-10-000-000.svg)
-
-#### Times @ 100M nodes (ms/op, lower is better)
-
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
-|---|---:|---:|
-| GNP sparse<br><sub>100M nodes, 300M edges</sub> | 36545 ms | 9918.4 ms (0.3×) |
-
-#### Throughput @ 100M nodes (op/s, higher is better)
-
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
-|---|---:|---:|
-| GNP sparse<br><sub>100M nodes, 300M edges</sub> | 0.027 op/s | 0.101 op/s (368%) |
-
-![1.2.5 SCC @ n = 100 000 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-2-5-scc-n-100-000-000.svg)
-
-### 1.3 WCC
+### 1.3 In-adjacency traversal (inNodes, no algorithm)
 
 #### Times @ 10k nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) | JGraphT | Guava | WebGraph |
-|---|---:|---:|---:|---:|---:|
-| Path<br><sub>10k nodes, 10k edges</sub> | 0.036 ms | 0.042 ms (1.2×) | 0.814 ms (23×) | 0.781 ms (22×) | 0.954 ms (26×) |
-| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 0.046 ms | 0.042 ms (0.9×) | 1.086 ms (24×) | 1.331 ms (29×) | 1.124 ms (24×) |
-| Tree<br><sub>10k nodes, 10k edges</sub> | 0.038 ms | 0.039 ms (1.0×) | 1.252 ms (33×) | 1.037 ms (27×) | 0.805 ms (21×) |
-| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 0.102 ms | 0.081 ms (0.8×) | 2.049 ms (20×) | 2.546 ms (25×) | 1.163 ms (11×) |
-| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 0.531 ms | 0.537 ms (1.0×) | 32.13 ms (61×) | 23.57 ms (44×) | 4.674 ms (8.8×) |
-| GNP dense shfld.<br><sub>10k nodes, 299.6k edges</sub> | 0.528 ms | 0.525 ms (1.0×) | 34.89 ms (66×) | 27.16 ms (51×) | 4.730 ms (9.0×) |
-| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 0.581 ms | 0.589 ms (1.0×) | 12.95 ms (22×) | 9.549 ms (16×) | 4.927 ms (8.5×) |
-| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 0.648 ms | 0.620 ms (1.0×) | 16.02 ms (25×) | 14.44 ms (22×) | 2.606 ms (4.0×) |
+| Shape | Graphity 2.3.0 |
+|---|---:|
+| Path<br><sub>10k nodes, 10k edges</sub> | 0.014 ms |
+| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 0.014 ms |
+| Tree<br><sub>10k nodes, 10k edges</sub> | 0.014 ms |
+| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 0.017 ms |
+| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 0.050 ms |
+| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 0.054 ms |
+| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 0.056 ms |
 
 #### Throughput @ 10k nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) | JGraphT | Guava | WebGraph |
-|---|---:|---:|---:|---:|---:|
-| Path<br><sub>10k nodes, 10k edges</sub> | 27 778 op/s | 23 810 op/s (85.7%) | 1 229 op/s (4.4%) | 1 280 op/s (4.6%) | 1 048 op/s (3.8%) |
-| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 21 739 op/s | 23 810 op/s (110%) | 920.8 op/s (4.2%) | 751.3 op/s (3.5%) | 889.7 op/s (4.1%) |
-| Tree<br><sub>10k nodes, 10k edges</sub> | 26 316 op/s | 25 641 op/s (97.4%) | 798.7 op/s (3.0%) | 964.3 op/s (3.7%) | 1 242 op/s (4.7%) |
-| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 9 804 op/s | 12 346 op/s (126%) | 488.0 op/s (5.0%) | 392.8 op/s (4.0%) | 859.8 op/s (8.8%) |
-| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 1 883 op/s | 1 862 op/s (98.9%) | 31.12 op/s (1.7%) | 42.42 op/s (2.3%) | 213.9 op/s (11.4%) |
-| GNP dense shfld.<br><sub>10k nodes, 299.6k edges</sub> | 1 894 op/s | 1 905 op/s (101%) | 28.66 op/s (1.5%) | 36.82 op/s (1.9%) | 211.4 op/s (11.2%) |
-| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 1 721 op/s | 1 698 op/s (98.6%) | 77.25 op/s (4.5%) | 104.7 op/s (6.1%) | 203.0 op/s (11.8%) |
-| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 1 543 op/s | 1 613 op/s (105%) | 62.41 op/s (4.0%) | 69.24 op/s (4.5%) | 383.7 op/s (24.9%) |
-
-![1.3.1 WCC @ n = 10 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-3-1-wcc-n-10-000.svg)
+| Shape | Graphity 2.3.0 |
+|---|---:|
+| Path<br><sub>10k nodes, 10k edges</sub> | 71 429 op/s |
+| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 71 429 op/s |
+| Tree<br><sub>10k nodes, 10k edges</sub> | 71 429 op/s |
+| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 58 824 op/s |
+| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 20 000 op/s |
+| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 18 519 op/s |
+| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 17 857 op/s |
 
 #### Times @ 100k nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) | JGraphT | Guava | WebGraph |
-|---|---:|---:|---:|---:|---:|
-| Path<br><sub>100k nodes, 100k edges</sub> | 0.395 ms | 0.357 ms (0.9×) | 18.60 ms (47×) | 11.88 ms (30×) | 9.112 ms (23×) |
-| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 1.291 ms | 0.356 ms (0.3×) | 48.53 ms (38×) | 24.14 ms (19×) | 11.75 ms (9.1×) |
-| Tree<br><sub>100k nodes, 100k edges</sub> | 0.665 ms | 0.732 ms (1.1×) | 59.60 ms (90×) | 23.02 ms (35×) | 9.231 ms (14×) |
-| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 1.800 ms | 1.572 ms (0.9×) | 119.6 ms (66×) | 69.85 ms (39×) | 15.98 ms (8.9×) |
-| GNP dense<br><sub>100k nodes, 3M edges</sub> | 6.096 ms | 6.263 ms (1.0×) | 644.8 ms (106×) | 365.1 ms (60×) | 55.03 ms (9.0×) |
-| GNP dense shfld.<br><sub>100k nodes, 3M edges</sub> | 6.158 ms | 6.194 ms (1.0×) | 631.2 ms (103×) | 426.7 ms (69×) | 54.32 ms (8.8×) |
-| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 6.479 ms | 6.018 ms (0.9×) | 155.6 ms (24×) | 110.4 ms (17×) | 50.55 ms (7.8×) |
-| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 6.054 ms | 5.936 ms (1.0×) | 292.5 ms (48×) | 283.5 ms (47×) | 35.87 ms (5.9×) |
+| Shape | Graphity 2.3.0 |
+|---|---:|
+| Path<br><sub>100k nodes, 100k edges</sub> | 0.170 ms |
+| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 0.171 ms |
+| Tree<br><sub>100k nodes, 100k edges</sub> | 0.170 ms |
+| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 0.669 ms |
+| GNP dense<br><sub>100k nodes, 3M edges</sub> | 1.238 ms |
+| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 0.538 ms |
+| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 0.540 ms |
 
 #### Throughput @ 100k nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) | JGraphT | Guava | WebGraph |
-|---|---:|---:|---:|---:|---:|
-| Path<br><sub>100k nodes, 100k edges</sub> | 2 532 op/s | 2 801 op/s (111%) | 53.77 op/s (2.1%) | 84.18 op/s (3.3%) | 109.7 op/s (4.3%) |
-| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 774.6 op/s | 2 809 op/s (363%) | 20.61 op/s (2.7%) | 41.42 op/s (5.3%) | 85.11 op/s (11.0%) |
-| Tree<br><sub>100k nodes, 100k edges</sub> | 1 504 op/s | 1 366 op/s (90.8%) | 16.78 op/s (1.1%) | 43.44 op/s (2.9%) | 108.3 op/s (7.2%) |
-| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 555.6 op/s | 636.1 op/s (115%) | 8.361 op/s (1.5%) | 14.32 op/s (2.6%) | 62.56 op/s (11.3%) |
-| GNP dense<br><sub>100k nodes, 3M edges</sub> | 164.0 op/s | 159.7 op/s (97.3%) | 1.551 op/s (0.9%) | 2.739 op/s (1.7%) | 18.17 op/s (11.1%) |
-| GNP dense shfld.<br><sub>100k nodes, 3M edges</sub> | 162.4 op/s | 161.4 op/s (99.4%) | 1.584 op/s (1.0%) | 2.344 op/s (1.4%) | 18.41 op/s (11.3%) |
-| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 154.3 op/s | 166.2 op/s (108%) | 6.427 op/s (4.2%) | 9.058 op/s (5.9%) | 19.78 op/s (12.8%) |
-| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 165.2 op/s | 168.5 op/s (102%) | 3.419 op/s (2.1%) | 3.527 op/s (2.1%) | 27.88 op/s (16.9%) |
+| Shape | Graphity 2.3.0 |
+|---|---:|
+| Path<br><sub>100k nodes, 100k edges</sub> | 5 882 op/s |
+| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 5 848 op/s |
+| Tree<br><sub>100k nodes, 100k edges</sub> | 5 882 op/s |
+| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 1 495 op/s |
+| GNP dense<br><sub>100k nodes, 3M edges</sub> | 807.8 op/s |
+| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 1 859 op/s |
+| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 1 852 op/s |
 
-![1.3.2 WCC @ n = 100 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-3-2-wcc-n-100-000.svg)
-
-#### Times @ 1M nodes (ms/op, lower is better)
-
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
-|---|---:|---:|
-| GNP sparse<br><sub>1M nodes, 3M edges</sub> | 19.97 ms | 16.39 ms (0.8×) |
-| GNP dense<br><sub>1M nodes, 30M edges</sub> | 67.53 ms | 69.74 ms (1.0×) |
-| GNP dense shfld.<br><sub>1M nodes, 30M edges</sub> | 68.44 ms | 68.78 ms (1.0×) |
-| Chain of cliques<br><sub>1M nodes, 31.1M edges</sub> | 50.92 ms | 50.64 ms (1.0×) |
-
-#### Throughput @ 1M nodes (op/s, higher is better)
-
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
-|---|---:|---:|
-| GNP sparse<br><sub>1M nodes, 3M edges</sub> | 50.08 op/s | 61.02 op/s (122%) |
-| GNP dense<br><sub>1M nodes, 30M edges</sub> | 14.81 op/s | 14.34 op/s (96.8%) |
-| GNP dense shfld.<br><sub>1M nodes, 30M edges</sub> | 14.61 op/s | 14.54 op/s (99.5%) |
-| Chain of cliques<br><sub>1M nodes, 31.1M edges</sub> | 19.64 op/s | 19.75 op/s (101%) |
-
-![1.3.3 WCC @ n = 1 000 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-3-3-wcc-n-1-000-000.svg)
-
-#### Times @ 10M nodes (ms/op, lower is better)
-
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
-|---|---:|---:|
-| GNP sparse<br><sub>10M nodes, 30M edges</sub> | 569.5 ms | 447.4 ms (0.8×) |
-| GNP dense<br><sub>10M nodes, 299.6M edges</sub> | 4580.5 ms | 4418.3 ms (1.0×) |
-| GNP dense shfld.<br><sub>10M nodes, 299.6M edges</sub> | 3734.0 ms | 4399.7 ms (1.2×) |
-| Chain of cliques<br><sub>10M nodes, 310.8M edges</sub> | 594.1 ms | 561.6 ms (0.9×) |
-
-#### Throughput @ 10M nodes (op/s, higher is better)
-
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
-|---|---:|---:|
-| GNP sparse<br><sub>10M nodes, 30M edges</sub> | 1.756 op/s | 2.235 op/s (127%) |
-| GNP dense<br><sub>10M nodes, 299.6M edges</sub> | 0.218 op/s | 0.226 op/s (104%) |
-| GNP dense shfld.<br><sub>10M nodes, 299.6M edges</sub> | 0.268 op/s | 0.227 op/s (84.9%) |
-| Chain of cliques<br><sub>10M nodes, 310.8M edges</sub> | 1.683 op/s | 1.781 op/s (106%) |
-
-![1.3.4 WCC @ n = 10 000 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-3-4-wcc-n-10-000-000.svg)
-
-#### Times @ 100M nodes (ms/op, lower is better)
-
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
-|---|---:|---:|
-| GNP sparse<br><sub>100M nodes, 300M edges</sub> | 9600.9 ms | 6010.4 ms (0.6×) |
-
-#### Throughput @ 100M nodes (op/s, higher is better)
-
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
-|---|---:|---:|
-| GNP sparse<br><sub>100M nodes, 300M edges</sub> | 0.104 op/s | 0.166 op/s (160%) |
-
-![1.3.5 WCC @ n = 100 000 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-3-5-wcc-n-100-000-000.svg)
-
-### 1.4 CCs
+### 1.4 SCC
 
 #### Times @ 10k nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
-|---|---:|---:|
-| Path<br><sub>10k nodes, 10k edges</sub> | 0.043 ms | 0.037 ms (0.9×) |
-| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 0.058 ms | 0.036 ms (0.6×) |
-| Tree<br><sub>10k nodes, 10k edges</sub> | 0.039 ms | 0.044 ms (1.1×) |
-| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 0.110 ms | 0.087 ms (0.8×) |
-| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 0.530 ms | 0.530 ms (1.0×) |
-| GNP dense shfld.<br><sub>10k nodes, 299.6k edges</sub> | 0.535 ms | 0.535 ms (1.0×) |
-| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 0.586 ms | 0.556 ms (0.9×) |
-| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 0.648 ms | 0.625 ms (1.0×) |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) | JGraphT | Guava | WebGraph |
+|---|---:|---:|---:|---:|---:|
+| Path<br><sub>10k nodes, 10k edges</sub> | 0.106 ms | 0.106 ms (1.0×) | 0.763 ms (7.2×) | 0.674 ms (6.4×) | 0.347 ms (3.3×) |
+| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 0.134 ms | 0.104 ms (0.8×) | 1.263 ms (9.4×) | 1.194 ms (8.9×) | 0.492 ms (3.7×) |
+| Tree<br><sub>10k nodes, 10k edges</sub> | 0.103 ms | 0.084 ms (0.8×) | 1.136 ms (11×) | 1.085 ms (11×) | 0.481 ms (4.7×) |
+| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 0.232 ms | 0.110 ms (0.5×) | 2.189 ms (9.4×) | 2.241 ms (9.7×) | 0.840 ms (3.6×) |
+| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 0.533 ms | 0.400 ms (0.8×) | 20.54 ms (39×) | 19.72 ms (37×) | 2.357 ms (4.4×) |
+| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 0.260 ms | 0.260 ms (1.0×) | 8.923 ms (34×) | 4.842 ms (19×) | 3.357 ms (13×) |
+| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 0.342 ms | 0.255 ms (0.7×) | 13.57 ms (40×) | 7.107 ms (21×) | 2.084 ms (6.1×) |
 
 #### Throughput @ 10k nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
-|---|---:|---:|
-| Path<br><sub>10k nodes, 10k edges</sub> | 23 256 op/s | 27 027 op/s (116%) |
-| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 17 241 op/s | 27 778 op/s (161%) |
-| Tree<br><sub>10k nodes, 10k edges</sub> | 25 641 op/s | 22 727 op/s (88.6%) |
-| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 9 091 op/s | 11 494 op/s (126%) |
-| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 1 887 op/s | 1 887 op/s (100%) |
-| GNP dense shfld.<br><sub>10k nodes, 299.6k edges</sub> | 1 869 op/s | 1 869 op/s (100%) |
-| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 1 706 op/s | 1 799 op/s (105%) |
-| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 1 543 op/s | 1 600 op/s (104%) |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) | JGraphT | Guava | WebGraph |
+|---|---:|---:|---:|---:|---:|
+| Path<br><sub>10k nodes, 10k edges</sub> | 9 434 op/s | 9 434 op/s (100%) | 1 311 op/s (13.9%) | 1 484 op/s (15.7%) | 2 882 op/s (30.5%) |
+| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 7 463 op/s | 9 615 op/s (129%) | 791.8 op/s (10.6%) | 837.5 op/s (11.2%) | 2 033 op/s (27.2%) |
+| Tree<br><sub>10k nodes, 10k edges</sub> | 9 709 op/s | 11 905 op/s (123%) | 880.3 op/s (9.1%) | 921.7 op/s (9.5%) | 2 079 op/s (21.4%) |
+| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 4 310 op/s | 9 091 op/s (211%) | 456.8 op/s (10.6%) | 446.2 op/s (10.4%) | 1 190 op/s (27.6%) |
+| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 1 876 op/s | 2 500 op/s (133%) | 48.69 op/s (2.6%) | 50.71 op/s (2.7%) | 424.3 op/s (22.6%) |
+| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 3 846 op/s | 3 846 op/s (100%) | 112.1 op/s (2.9%) | 206.5 op/s (5.4%) | 297.9 op/s (7.7%) |
+| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 2 924 op/s | 3 922 op/s (134%) | 73.66 op/s (2.5%) | 140.7 op/s (4.8%) | 479.8 op/s (16.4%) |
 
-![1.4.1 CCs @ n = 10 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-4-1-ccs-n-10-000.svg)
+![1.4.1 SCC @ n = 10 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-4-1-scc-n-10-000.svg)
 
 #### Times @ 100k nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
-|---|---:|---:|
-| Path<br><sub>100k nodes, 100k edges</sub> | 0.398 ms | 0.399 ms (1.0×) |
-| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 1.276 ms | 0.403 ms (0.3×) |
-| Tree<br><sub>100k nodes, 100k edges</sub> | 0.644 ms | 0.720 ms (1.1×) |
-| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 1.836 ms | 1.515 ms (0.8×) |
-| GNP dense<br><sub>100k nodes, 3M edges</sub> | 6.177 ms | 6.129 ms (1.0×) |
-| GNP dense shfld.<br><sub>100k nodes, 3M edges</sub> | 6.303 ms | 6.203 ms (1.0×) |
-| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 5.949 ms | 5.961 ms (1.0×) |
-| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 6.078 ms | 6.133 ms (1.0×) |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) | JGraphT | Guava | WebGraph |
+|---|---:|---:|---:|---:|---:|
+| Path<br><sub>100k nodes, 100k edges</sub> | 1.118 ms | 1.027 ms (0.9×) | 15.26 ms (14×) | 21.46 ms (19×) | 3.401 ms (3.0×) |
+| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 2.279 ms | 1.040 ms (0.5×) | 46.48 ms (20×) | 45.40 ms (20×) | 5.508 ms (2.4×) |
+| Tree<br><sub>100k nodes, 100k edges</sub> | 2.159 ms | 1.285 ms (0.6×) | 41.51 ms (19×) | 38.09 ms (18×) | 5.712 ms (2.6×) |
+| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 4.400 ms | 2.152 ms (0.5×) | 109.6 ms (25×) | 87.01 ms (20×) | 10.30 ms (2.3×) |
+| GNP dense<br><sub>100k nodes, 3M edges</sub> | 7.751 ms | 4.474 ms (0.6×) | 446.5 ms (58×) | 333.1 ms (43×) | 36.12 ms (4.7×) |
+| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 2.614 ms | 2.616 ms (1.0×) | 166.0 ms (64×) | 108.0 ms (41×) | 37.02 ms (14×) |
+| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 5.033 ms | 2.732 ms (0.5×) | 379.0 ms (75×) | 175.2 ms (35×) | 31.00 ms (6.2×) |
 
 #### Throughput @ 100k nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
-|---|---:|---:|
-| Path<br><sub>100k nodes, 100k edges</sub> | 2 513 op/s | 2 506 op/s (99.7%) |
-| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 783.7 op/s | 2 481 op/s (317%) |
-| Tree<br><sub>100k nodes, 100k edges</sub> | 1 553 op/s | 1 389 op/s (89.4%) |
-| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 544.7 op/s | 660.1 op/s (121%) |
-| GNP dense<br><sub>100k nodes, 3M edges</sub> | 161.9 op/s | 163.2 op/s (101%) |
-| GNP dense shfld.<br><sub>100k nodes, 3M edges</sub> | 158.7 op/s | 161.2 op/s (102%) |
-| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 168.1 op/s | 167.8 op/s (99.8%) |
-| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 164.5 op/s | 163.1 op/s (99.1%) |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) | JGraphT | Guava | WebGraph |
+|---|---:|---:|---:|---:|---:|
+| Path<br><sub>100k nodes, 100k edges</sub> | 894.5 op/s | 973.7 op/s (109%) | 65.51 op/s (7.3%) | 46.60 op/s (5.2%) | 294.0 op/s (32.9%) |
+| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 438.8 op/s | 961.5 op/s (219%) | 21.51 op/s (4.9%) | 22.03 op/s (5.0%) | 181.6 op/s (41.4%) |
+| Tree<br><sub>100k nodes, 100k edges</sub> | 463.2 op/s | 778.2 op/s (168%) | 24.09 op/s (5.2%) | 26.26 op/s (5.7%) | 175.1 op/s (37.8%) |
+| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 227.3 op/s | 464.7 op/s (204%) | 9.124 op/s (4.0%) | 11.49 op/s (5.1%) | 97.10 op/s (42.7%) |
+| GNP dense<br><sub>100k nodes, 3M edges</sub> | 129.0 op/s | 223.5 op/s (173%) | 2.240 op/s (1.7%) | 3.002 op/s (2.3%) | 27.69 op/s (21.5%) |
+| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 382.6 op/s | 382.3 op/s (99.9%) | 6.024 op/s (1.6%) | 9.259 op/s (2.4%) | 27.01 op/s (7.1%) |
+| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 198.7 op/s | 366.0 op/s (184%) | 2.639 op/s (1.3%) | 5.708 op/s (2.9%) | 32.25 op/s (16.2%) |
 
-![1.4.2 CCs @ n = 100 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-4-2-ccs-n-100-000.svg)
+![1.4.2 SCC @ n = 100 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-4-2-scc-n-100-000.svg)
 
 #### Times @ 1M nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
 |---|---:|---:|
-| GNP sparse<br><sub>1M nodes, 3M edges</sub> | 20.46 ms | 17.11 ms (0.8×) |
-| GNP dense<br><sub>1M nodes, 30M edges</sub> | 67.57 ms | 67.67 ms (1.0×) |
-| GNP dense shfld.<br><sub>1M nodes, 30M edges</sub> | 71.04 ms | 69.03 ms (1.0×) |
-| Chain of cliques<br><sub>1M nodes, 31.1M edges</sub> | 50.58 ms | 50.61 ms (1.0×) |
+| GNP sparse<br><sub>1M nodes, 3M edges</sub> | 83.52 ms | 26.19 ms (0.3×) |
+| GNP dense<br><sub>1M nodes, 30M edges</sub> | 239.7 ms | 61.88 ms (0.3×) |
+| Chain of cliques<br><sub>1M nodes, 31.1M edges</sub> | 26.41 ms | 26.47 ms (1.0×) |
 
 #### Throughput @ 1M nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
 |---|---:|---:|
-| GNP sparse<br><sub>1M nodes, 3M edges</sub> | 48.87 op/s | 58.46 op/s (120%) |
-| GNP dense<br><sub>1M nodes, 30M edges</sub> | 14.80 op/s | 14.78 op/s (99.9%) |
-| GNP dense shfld.<br><sub>1M nodes, 30M edges</sub> | 14.08 op/s | 14.49 op/s (103%) |
-| Chain of cliques<br><sub>1M nodes, 31.1M edges</sub> | 19.77 op/s | 19.76 op/s (99.9%) |
+| GNP sparse<br><sub>1M nodes, 3M edges</sub> | 11.97 op/s | 38.19 op/s (319%) |
+| GNP dense<br><sub>1M nodes, 30M edges</sub> | 4.172 op/s | 16.16 op/s (387%) |
+| Chain of cliques<br><sub>1M nodes, 31.1M edges</sub> | 37.87 op/s | 37.78 op/s (99.8%) |
 
-![1.4.3 CCs @ n = 1 000 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-4-3-ccs-n-1-000-000.svg)
+![1.4.3 SCC @ n = 1 000 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-4-3-scc-n-1-000-000.svg)
 
 #### Times @ 10M nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
 |---|---:|---:|
-| GNP sparse<br><sub>10M nodes, 30M edges</sub> | 615.4 ms | 445.8 ms (0.7×) |
-| GNP dense<br><sub>10M nodes, 299.6M edges</sub> | 4620.4 ms | 4435.6 ms (1.0×) |
-| GNP dense shfld.<br><sub>10M nodes, 299.6M edges</sub> | 4689.5 ms | 4352.3 ms (0.9×) |
-| Chain of cliques<br><sub>10M nodes, 310.8M edges</sub> | 598.6 ms | 557.8 ms (0.9×) |
+| GNP sparse<br><sub>10M nodes, 30M edges</sub> | 3055.4 ms | 716.1 ms (0.2×) |
+| GNP dense<br><sub>10M nodes, 299.6M edges</sub> | 6885.2 ms | 2873.4 ms (0.4×) |
+| Chain of cliques<br><sub>10M nodes, 310.8M edges</sub> | 283.3 ms | 281.5 ms (1.0×) |
 
 #### Throughput @ 10M nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
 |---|---:|---:|
-| GNP sparse<br><sub>10M nodes, 30M edges</sub> | 1.625 op/s | 2.243 op/s (138%) |
-| GNP dense<br><sub>10M nodes, 299.6M edges</sub> | 0.216 op/s | 0.225 op/s (104%) |
-| GNP dense shfld.<br><sub>10M nodes, 299.6M edges</sub> | 0.213 op/s | 0.230 op/s (108%) |
-| Chain of cliques<br><sub>10M nodes, 310.8M edges</sub> | 1.671 op/s | 1.793 op/s (107%) |
+| GNP sparse<br><sub>10M nodes, 30M edges</sub> | 0.327 op/s | 1.396 op/s (427%) |
+| GNP dense<br><sub>10M nodes, 299.6M edges</sub> | 0.145 op/s | 0.348 op/s (240%) |
+| Chain of cliques<br><sub>10M nodes, 310.8M edges</sub> | 3.530 op/s | 3.552 op/s (101%) |
 
-![1.4.4 CCs @ n = 10 000 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-4-4-ccs-n-10-000-000.svg)
+![1.4.4 SCC @ n = 10 000 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-4-4-scc-n-10-000-000.svg)
 
 #### Times @ 100M nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
 |---|---:|---:|
-| GNP sparse<br><sub>100M nodes, 300M edges</sub> | 8594.8 ms | 6004.0 ms (0.7×) |
+| GNP sparse<br><sub>100M nodes, 300M edges</sub> | 36155 ms | 9842.1 ms (0.3×) |
 
 #### Throughput @ 100M nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
 |---|---:|---:|
-| GNP sparse<br><sub>100M nodes, 300M edges</sub> | 0.116 op/s | 0.167 op/s (143%) |
+| GNP sparse<br><sub>100M nodes, 300M edges</sub> | 0.028 op/s | 0.102 op/s (367%) |
 
-![1.4.5 CCs @ n = 100 000 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-4-5-ccs-n-100-000-000.svg)
+![1.4.5 SCC @ n = 100 000 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-4-5-scc-n-100-000-000.svg)
 
-### 1.5 Condense
+### 1.5 WCC
+
+#### Times @ 10k nodes (ms/op, lower is better)
+
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) | JGraphT | Guava | WebGraph |
+|---|---:|---:|---:|---:|---:|
+| Path<br><sub>10k nodes, 10k edges</sub> | 0.040 ms | 0.036 ms (0.9×) | 0.839 ms (21×) | 0.720 ms (18×) | 0.864 ms (22×) |
+| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 0.056 ms | 0.042 ms (0.8×) | 1.062 ms (19×) | 1.235 ms (22×) | 1.017 ms (18×) |
+| Tree<br><sub>10k nodes, 10k edges</sub> | 0.038 ms | 0.039 ms (1.0×) | 1.246 ms (33×) | 0.941 ms (25×) | 0.687 ms (18×) |
+| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 0.095 ms | 0.089 ms (0.9×) | 2.088 ms (22×) | 2.473 ms (26×) | 1.066 ms (11×) |
+| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 0.513 ms | 0.512 ms (1.0×) | 14.50 ms (28×) | 22.65 ms (44×) | 4.431 ms (8.6×) |
+| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 0.572 ms | 0.571 ms (1.0×) | 8.927 ms (16×) | 9.144 ms (16×) | 4.730 ms (8.3×) |
+| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 0.633 ms | 0.572 ms (0.9×) | 9.382 ms (15×) | 13.34 ms (21×) | 2.438 ms (3.9×) |
+
+#### Throughput @ 10k nodes (op/s, higher is better)
+
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) | JGraphT | Guava | WebGraph |
+|---|---:|---:|---:|---:|---:|
+| Path<br><sub>10k nodes, 10k edges</sub> | 25 000 op/s | 27 778 op/s (111%) | 1 192 op/s (4.8%) | 1 389 op/s (5.6%) | 1 157 op/s (4.6%) |
+| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 17 857 op/s | 23 810 op/s (133%) | 941.6 op/s (5.3%) | 809.7 op/s (4.5%) | 983.3 op/s (5.5%) |
+| Tree<br><sub>10k nodes, 10k edges</sub> | 26 316 op/s | 25 641 op/s (97.4%) | 802.6 op/s (3.0%) | 1 063 op/s (4.0%) | 1 456 op/s (5.5%) |
+| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 10 526 op/s | 11 236 op/s (107%) | 478.9 op/s (4.5%) | 404.4 op/s (3.8%) | 938.1 op/s (8.9%) |
+| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 1 949 op/s | 1 953 op/s (100%) | 68.96 op/s (3.5%) | 44.15 op/s (2.3%) | 225.7 op/s (11.6%) |
+| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 1 748 op/s | 1 751 op/s (100%) | 112.0 op/s (6.4%) | 109.4 op/s (6.3%) | 211.4 op/s (12.1%) |
+| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 1 580 op/s | 1 748 op/s (111%) | 106.6 op/s (6.7%) | 74.94 op/s (4.7%) | 410.2 op/s (26.0%) |
+
+![1.5.1 WCC @ n = 10 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-5-1-wcc-n-10-000.svg)
+
+#### Times @ 100k nodes (ms/op, lower is better)
+
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) | JGraphT | Guava | WebGraph |
+|---|---:|---:|---:|---:|---:|
+| Path<br><sub>100k nodes, 100k edges</sub> | 0.395 ms | 0.400 ms (1.0×) | 14.51 ms (37×) | 11.36 ms (29×) | 8.595 ms (22×) |
+| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 1.228 ms | 0.392 ms (0.3×) | 41.33 ms (34×) | 26.05 ms (21×) | 10.75 ms (8.8×) |
+| Tree<br><sub>100k nodes, 100k edges</sub> | 0.632 ms | 0.713 ms (1.1×) | 44.03 ms (70×) | 20.77 ms (33×) | 8.299 ms (13×) |
+| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 1.772 ms | 1.525 ms (0.9×) | 84.45 ms (48×) | 54.94 ms (31×) | 14.68 ms (8.3×) |
+| GNP dense<br><sub>100k nodes, 3M edges</sub> | 6.078 ms | 6.004 ms (1.0×) | 515.0 ms (85×) | 338.6 ms (56×) | 48.08 ms (7.9×) |
+| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 5.791 ms | 5.672 ms (1.0×) | 121.2 ms (21×) | 110.0 ms (19×) | 49.67 ms (8.6×) |
+| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 5.883 ms | 5.888 ms (1.0×) | 220.5 ms (37×) | 298.2 ms (51×) | 31.10 ms (5.3×) |
+
+#### Throughput @ 100k nodes (op/s, higher is better)
+
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) | JGraphT | Guava | WebGraph |
+|---|---:|---:|---:|---:|---:|
+| Path<br><sub>100k nodes, 100k edges</sub> | 2 532 op/s | 2 500 op/s (98.8%) | 68.94 op/s (2.7%) | 88.04 op/s (3.5%) | 116.3 op/s (4.6%) |
+| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 814.3 op/s | 2 551 op/s (313%) | 24.19 op/s (3.0%) | 38.39 op/s (4.7%) | 93.02 op/s (11.4%) |
+| Tree<br><sub>100k nodes, 100k edges</sub> | 1 582 op/s | 1 403 op/s (88.6%) | 22.71 op/s (1.4%) | 48.15 op/s (3.0%) | 120.5 op/s (7.6%) |
+| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 564.3 op/s | 655.7 op/s (116%) | 11.84 op/s (2.1%) | 18.20 op/s (3.2%) | 68.13 op/s (12.1%) |
+| GNP dense<br><sub>100k nodes, 3M edges</sub> | 164.5 op/s | 166.6 op/s (101%) | 1.942 op/s (1.2%) | 2.953 op/s (1.8%) | 20.80 op/s (12.6%) |
+| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 172.7 op/s | 176.3 op/s (102%) | 8.251 op/s (4.8%) | 9.091 op/s (5.3%) | 20.13 op/s (11.7%) |
+| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 170.0 op/s | 169.8 op/s (99.9%) | 4.535 op/s (2.7%) | 3.353 op/s (2.0%) | 32.15 op/s (18.9%) |
+
+![1.5.2 WCC @ n = 100 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-5-2-wcc-n-100-000.svg)
+
+#### Times @ 1M nodes (ms/op, lower is better)
+
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
+|---|---:|---:|
+| GNP sparse<br><sub>1M nodes, 3M edges</sub> | 21.40 ms | 17.45 ms (0.8×) |
+| GNP dense<br><sub>1M nodes, 30M edges</sub> | 67.67 ms | 66.93 ms (1.0×) |
+| Chain of cliques<br><sub>1M nodes, 31.1M edges</sub> | 50.41 ms | 50.15 ms (1.0×) |
+
+#### Throughput @ 1M nodes (op/s, higher is better)
+
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
+|---|---:|---:|
+| GNP sparse<br><sub>1M nodes, 3M edges</sub> | 46.73 op/s | 57.29 op/s (123%) |
+| GNP dense<br><sub>1M nodes, 30M edges</sub> | 14.78 op/s | 14.94 op/s (101%) |
+| Chain of cliques<br><sub>1M nodes, 31.1M edges</sub> | 19.84 op/s | 19.94 op/s (101%) |
+
+![1.5.3 WCC @ n = 1 000 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-5-3-wcc-n-1-000-000.svg)
+
+#### Times @ 10M nodes (ms/op, lower is better)
+
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
+|---|---:|---:|
+| GNP sparse<br><sub>10M nodes, 30M edges</sub> | 590.8 ms | 406.0 ms (0.7×) |
+| GNP dense<br><sub>10M nodes, 299.6M edges</sub> | 3441.2 ms | 3251.8 ms (0.9×) |
+| Chain of cliques<br><sub>10M nodes, 310.8M edges</sub> | 518.9 ms | 521.1 ms (1.0×) |
+
+#### Throughput @ 10M nodes (op/s, higher is better)
+
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
+|---|---:|---:|
+| GNP sparse<br><sub>10M nodes, 30M edges</sub> | 1.693 op/s | 2.463 op/s (146%) |
+| GNP dense<br><sub>10M nodes, 299.6M edges</sub> | 0.291 op/s | 0.308 op/s (106%) |
+| Chain of cliques<br><sub>10M nodes, 310.8M edges</sub> | 1.927 op/s | 1.919 op/s (99.6%) |
+
+![1.5.4 WCC @ n = 10 000 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-5-4-wcc-n-10-000-000.svg)
+
+#### Times @ 100M nodes (ms/op, lower is better)
+
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
+|---|---:|---:|
+| GNP sparse<br><sub>100M nodes, 300M edges</sub> | 8807.1 ms | 7245.4 ms (0.8×) |
+
+#### Throughput @ 100M nodes (op/s, higher is better)
+
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
+|---|---:|---:|
+| GNP sparse<br><sub>100M nodes, 300M edges</sub> | 0.114 op/s | 0.138 op/s (122%) |
+
+![1.5.5 WCC @ n = 100 000 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-5-5-wcc-n-100-000-000.svg)
+
+### 1.6 CCs
+
+#### Times @ 10k nodes (ms/op, lower is better)
+
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
+|---|---:|---:|
+| Path<br><sub>10k nodes, 10k edges</sub> | 0.042 ms | 0.036 ms (0.9×) |
+| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 0.045 ms | 0.041 ms (0.9×) |
+| Tree<br><sub>10k nodes, 10k edges</sub> | 0.044 ms | 0.038 ms (0.9×) |
+| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 0.082 ms | 0.089 ms (1.1×) |
+| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 0.516 ms | 0.512 ms (1.0×) |
+| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 0.582 ms | 0.569 ms (1.0×) |
+| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 0.632 ms | 0.607 ms (1.0×) |
+
+#### Throughput @ 10k nodes (op/s, higher is better)
+
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
+|---|---:|---:|
+| Path<br><sub>10k nodes, 10k edges</sub> | 23 810 op/s | 27 778 op/s (117%) |
+| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 22 222 op/s | 24 390 op/s (110%) |
+| Tree<br><sub>10k nodes, 10k edges</sub> | 22 727 op/s | 26 316 op/s (116%) |
+| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 12 195 op/s | 11 236 op/s (92.1%) |
+| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 1 938 op/s | 1 953 op/s (101%) |
+| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 1 718 op/s | 1 757 op/s (102%) |
+| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 1 582 op/s | 1 647 op/s (104%) |
+
+![1.6.1 CCs @ n = 10 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-6-1-ccs-n-10-000.svg)
+
+#### Times @ 100k nodes (ms/op, lower is better)
+
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
+|---|---:|---:|
+| Path<br><sub>100k nodes, 100k edges</sub> | 0.359 ms | 0.359 ms (1.0×) |
+| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 1.314 ms | 0.362 ms (0.3×) |
+| Tree<br><sub>100k nodes, 100k edges</sub> | 0.664 ms | 0.747 ms (1.1×) |
+| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 1.756 ms | 1.559 ms (0.9×) |
+| GNP dense<br><sub>100k nodes, 3M edges</sub> | 6.012 ms | 5.998 ms (1.0×) |
+| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 5.678 ms | 5.683 ms (1.0×) |
+| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 5.926 ms | 6.068 ms (1.0×) |
+
+#### Throughput @ 100k nodes (op/s, higher is better)
+
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
+|---|---:|---:|
+| Path<br><sub>100k nodes, 100k edges</sub> | 2 786 op/s | 2 786 op/s (100%) |
+| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 761.0 op/s | 2 762 op/s (363%) |
+| Tree<br><sub>100k nodes, 100k edges</sub> | 1 506 op/s | 1 339 op/s (88.9%) |
+| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 569.5 op/s | 641.4 op/s (113%) |
+| GNP dense<br><sub>100k nodes, 3M edges</sub> | 166.3 op/s | 166.7 op/s (100%) |
+| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 176.1 op/s | 176.0 op/s (99.9%) |
+| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 168.7 op/s | 164.8 op/s (97.7%) |
+
+![1.6.2 CCs @ n = 100 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-6-2-ccs-n-100-000.svg)
+
+#### Times @ 1M nodes (ms/op, lower is better)
+
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
+|---|---:|---:|
+| GNP sparse<br><sub>1M nodes, 3M edges</sub> | 22.02 ms | 16.34 ms (0.7×) |
+| GNP dense<br><sub>1M nodes, 30M edges</sub> | 68.75 ms | 64.90 ms (0.9×) |
+| Chain of cliques<br><sub>1M nodes, 31.1M edges</sub> | 49.23 ms | 50.53 ms (1.0×) |
+
+#### Throughput @ 1M nodes (op/s, higher is better)
+
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
+|---|---:|---:|
+| GNP sparse<br><sub>1M nodes, 3M edges</sub> | 45.41 op/s | 61.19 op/s (135%) |
+| GNP dense<br><sub>1M nodes, 30M edges</sub> | 14.55 op/s | 15.41 op/s (106%) |
+| Chain of cliques<br><sub>1M nodes, 31.1M edges</sub> | 20.31 op/s | 19.79 op/s (97.4%) |
+
+![1.6.3 CCs @ n = 1 000 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-6-3-ccs-n-1-000-000.svg)
+
+#### Times @ 10M nodes (ms/op, lower is better)
+
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
+|---|---:|---:|
+| GNP sparse<br><sub>10M nodes, 30M edges</sub> | 589.4 ms | 405.6 ms (0.7×) |
+| GNP dense<br><sub>10M nodes, 299.6M edges</sub> | 3362.6 ms | 3218.0 ms (1.0×) |
+| Chain of cliques<br><sub>10M nodes, 310.8M edges</sub> | 518.4 ms | 517.2 ms (1.0×) |
+
+#### Throughput @ 10M nodes (op/s, higher is better)
+
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
+|---|---:|---:|
+| GNP sparse<br><sub>10M nodes, 30M edges</sub> | 1.697 op/s | 2.465 op/s (145%) |
+| GNP dense<br><sub>10M nodes, 299.6M edges</sub> | 0.297 op/s | 0.311 op/s (104%) |
+| Chain of cliques<br><sub>10M nodes, 310.8M edges</sub> | 1.929 op/s | 1.933 op/s (100%) |
+
+![1.6.4 CCs @ n = 10 000 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-6-4-ccs-n-10-000-000.svg)
+
+#### Times @ 100M nodes (ms/op, lower is better)
+
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
+|---|---:|---:|
+| GNP sparse<br><sub>100M nodes, 300M edges</sub> | 8738.0 ms | 7211.5 ms (0.8×) |
+
+#### Throughput @ 100M nodes (op/s, higher is better)
+
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
+|---|---:|---:|
+| GNP sparse<br><sub>100M nodes, 300M edges</sub> | 0.114 op/s | 0.139 op/s (121%) |
+
+![1.6.5 CCs @ n = 100 000 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-6-5-ccs-n-100-000-000.svg)
+
+### 1.7 Condense
 
 #### Times @ 1k nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
-| Path<br><sub>1k nodes, 1k edges</sub> | 0.011 ms |
-| GNP dense<br><sub>1k nodes, 30k edges</sub> | 0.008 ms |
-| Chain of cliques<br><sub>1k nodes, 31.1k edges</sub> | 0.024 ms |
-| DAG GNP sparse | 0.017 ms |
+| Path<br><sub>1k nodes, 1k edges</sub> | 0.010 ms |
+| GNP dense<br><sub>1k nodes, 30k edges</sub> | 0.007 ms |
+| Chain of cliques<br><sub>1k nodes, 31.1k edges</sub> | 0.021 ms |
+| DAG GNP sparse | 0.016 ms |
 
 #### Throughput @ 1k nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
-| Path<br><sub>1k nodes, 1k edges</sub> | 90 909 op/s |
-| GNP dense<br><sub>1k nodes, 30k edges</sub> | 125 000 op/s |
-| Chain of cliques<br><sub>1k nodes, 31.1k edges</sub> | 41 667 op/s |
-| DAG GNP sparse | 58 824 op/s |
+| Path<br><sub>1k nodes, 1k edges</sub> | 100 000 op/s |
+| GNP dense<br><sub>1k nodes, 30k edges</sub> | 142 857 op/s |
+| Chain of cliques<br><sub>1k nodes, 31.1k edges</sub> | 47 619 op/s |
+| DAG GNP sparse | 62 500 op/s |
 
 #### Times @ 10k nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
 | Path<br><sub>10k nodes, 10k edges</sub> | 0.080 ms |
-| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 0.092 ms |
-| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 0.185 ms |
+| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 0.098 ms |
+| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 0.200 ms |
 | DAG GNP sparse | 0.261 ms |
 
 #### Throughput @ 10k nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
 | Path<br><sub>10k nodes, 10k edges</sub> | 12 500 op/s |
-| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 10 870 op/s |
-| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 5 405 op/s |
+| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 10 204 op/s |
+| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 5 000 op/s |
 | DAG GNP sparse | 3 831 op/s |
 
 #### Times @ 100k nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
-| Path<br><sub>100k nodes, 100k edges</sub> | 0.768 ms |
-| GNP dense<br><sub>100k nodes, 3M edges</sub> | 1.591 ms |
-| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 1.852 ms |
-| DAG GNP sparse | 3.641 ms |
+| Path<br><sub>100k nodes, 100k edges</sub> | 0.764 ms |
+| GNP dense<br><sub>100k nodes, 3M edges</sub> | 1.572 ms |
+| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 1.908 ms |
+| DAG GNP sparse | 3.590 ms |
 
 #### Throughput @ 100k nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
-| Path<br><sub>100k nodes, 100k edges</sub> | 1 302 op/s |
-| GNP dense<br><sub>100k nodes, 3M edges</sub> | 628.5 op/s |
-| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 540.0 op/s |
-| DAG GNP sparse | 274.6 op/s |
+| Path<br><sub>100k nodes, 100k edges</sub> | 1 309 op/s |
+| GNP dense<br><sub>100k nodes, 3M edges</sub> | 636.1 op/s |
+| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 524.1 op/s |
+| DAG GNP sparse | 278.6 op/s |
 
-### 1.6 TopOrder
+### 1.8 TopOrder
 
 #### Times @ 10k nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) | JGraphT | Guava | WebGraph |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) | JGraphT | Guava | WebGraph |
 |---|---:|---:|---:|---:|---:|
-| Path<br><sub>10k nodes, 10k edges</sub> | 0.067 ms | 0.067 ms (1.0×) | 0.430 ms (6.4×) | 0.412 ms (6.1×) | 0.561 ms (8.4×) |
-| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 0.070 ms | 0.052 ms (0.7×) | 0.674 ms (9.6×) | 0.907 ms (13×) | 0.440 ms (6.3×) |
-| Tree<br><sub>10k nodes, 10k edges</sub> | 0.049 ms | 0.037 ms (0.8×) | 0.705 ms (14×) | 0.779 ms (16×) | 0.605 ms (12×) |
-| Tree shfld. | 0.050 ms | 0.047 ms (0.9×) | 0.734 ms (15×) | 0.698 ms (14×) | 0.524 ms (10×) |
-| DAG GNP sparse | 0.074 ms | 0.064 ms (0.9×) | 1.112 ms (15×) | 1.554 ms (21×) | 0.854 ms (12×) |
-| DAG GNP dense | 0.324 ms | 0.245 ms (0.8×) | 17.84 ms (55×) | 10.95 ms (34×) | 2.149 ms (6.6×) |
-| DAG GNP dense shfld. | 0.366 ms | 0.246 ms (0.7×) | 19.50 ms (53×) | 15.74 ms (43×) | 2.356 ms (6.4×) |
+| Path<br><sub>10k nodes, 10k edges</sub> | 0.063 ms | 0.066 ms (1.0×) | 0.436 ms (6.9×) | 0.406 ms (6.4×) | 0.536 ms (8.5×) |
+| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 0.070 ms | 0.052 ms (0.7×) | 0.679 ms (9.7×) | 0.729 ms (10×) | 0.420 ms (6.0×) |
+| Tree<br><sub>10k nodes, 10k edges</sub> | 0.055 ms | 0.044 ms (0.8×) | 0.698 ms (13×) | 0.669 ms (12×) | 0.600 ms (11×) |
+| Tree shfld. | 0.050 ms | 0.046 ms (0.9×) | 0.714 ms (14×) | 0.674 ms (13×) | 0.504 ms (10×) |
+| DAG GNP sparse | 0.078 ms | 0.064 ms (0.8×) | 1.152 ms (15×) | 1.316 ms (17×) | 0.829 ms (11×) |
+| DAG GNP dense | 0.326 ms | 0.239 ms (0.7×) | 16.46 ms (51×) | 9.801 ms (30×) | 1.985 ms (6.1×) |
+| DAG GNP dense shfld. | 0.382 ms | 0.243 ms (0.6×) | 17.71 ms (46×) | 10.05 ms (26×) | 2.258 ms (5.9×) |
 
 #### Throughput @ 10k nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) | JGraphT | Guava | WebGraph |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) | JGraphT | Guava | WebGraph |
 |---|---:|---:|---:|---:|---:|
-| Path<br><sub>10k nodes, 10k edges</sub> | 14 925 op/s | 14 925 op/s (100%) | 2 326 op/s (15.6%) | 2 427 op/s (16.3%) | 1 783 op/s (11.9%) |
-| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 14 286 op/s | 19 231 op/s (135%) | 1 484 op/s (10.4%) | 1 103 op/s (7.7%) | 2 273 op/s (15.9%) |
-| Tree<br><sub>10k nodes, 10k edges</sub> | 20 408 op/s | 27 027 op/s (132%) | 1 418 op/s (7.0%) | 1 284 op/s (6.3%) | 1 653 op/s (8.1%) |
-| Tree shfld. | 20 000 op/s | 21 277 op/s (106%) | 1 362 op/s (6.8%) | 1 433 op/s (7.2%) | 1 908 op/s (9.5%) |
-| DAG GNP sparse | 13 514 op/s | 15 625 op/s (116%) | 899.3 op/s (6.7%) | 643.5 op/s (4.8%) | 1 171 op/s (8.7%) |
-| DAG GNP dense | 3 086 op/s | 4 082 op/s (132%) | 56.06 op/s (1.8%) | 91.29 op/s (3.0%) | 465.3 op/s (15.1%) |
-| DAG GNP dense shfld. | 2 732 op/s | 4 065 op/s (149%) | 51.27 op/s (1.9%) | 63.54 op/s (2.3%) | 424.4 op/s (15.5%) |
+| Path<br><sub>10k nodes, 10k edges</sub> | 15 873 op/s | 15 152 op/s (95.5%) | 2 294 op/s (14.4%) | 2 463 op/s (15.5%) | 1 866 op/s (11.8%) |
+| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 14 286 op/s | 19 231 op/s (135%) | 1 473 op/s (10.3%) | 1 372 op/s (9.6%) | 2 381 op/s (16.7%) |
+| Tree<br><sub>10k nodes, 10k edges</sub> | 18 182 op/s | 22 727 op/s (125%) | 1 433 op/s (7.9%) | 1 495 op/s (8.2%) | 1 667 op/s (9.2%) |
+| Tree shfld. | 20 000 op/s | 21 739 op/s (109%) | 1 401 op/s (7.0%) | 1 484 op/s (7.4%) | 1 984 op/s (9.9%) |
+| DAG GNP sparse | 12 821 op/s | 15 625 op/s (122%) | 868.1 op/s (6.8%) | 759.9 op/s (5.9%) | 1 206 op/s (9.4%) |
+| DAG GNP dense | 3 067 op/s | 4 184 op/s (136%) | 60.74 op/s (2.0%) | 102.0 op/s (3.3%) | 503.8 op/s (16.4%) |
+| DAG GNP dense shfld. | 2 618 op/s | 4 115 op/s (157%) | 56.48 op/s (2.2%) | 99.45 op/s (3.8%) | 442.9 op/s (16.9%) |
 
-![1.6.1 TopOrder @ n = 10 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-6-1-toporder-n-10-000.svg)
+![1.8.1 TopOrder @ n = 10 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-8-1-toporder-n-10-000.svg)
 
 #### Times @ 100k nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) | JGraphT | Guava | WebGraph |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) | JGraphT | Guava | WebGraph |
 |---|---:|---:|---:|---:|---:|
-| Path<br><sub>100k nodes, 100k edges</sub> | 0.632 ms | 0.628 ms (1.0×) | 7.642 ms (12×) | 15.93 ms (25×) | 3.453 ms (5.5×) |
-| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 1.068 ms | 0.528 ms (0.5×) | 34.83 ms (33×) | 30.21 ms (28×) | 5.051 ms (4.7×) |
-| Tree<br><sub>100k nodes, 100k edges</sub> | 1.426 ms | 1.182 ms (0.8×) | 37.97 ms (27×) | 22.72 ms (16×) | 14.76 ms (10×) |
-| Tree shfld. | 1.479 ms | 1.255 ms (0.8×) | 33.53 ms (23×) | 25.75 ms (17×) | 10.15 ms (6.9×) |
-| DAG GNP sparse | 2.242 ms | 1.499 ms (0.7×) | 72.19 ms (32×) | 60.72 ms (27×) | 16.83 ms (7.5×) |
-| DAG GNP dense | 4.515 ms | 3.127 ms (0.7×) | 276.4 ms (61×) | 317.3 ms (70×) | 25.01 ms (5.5×) |
-| DAG GNP dense shfld. | 5.063 ms | 3.173 ms (0.6×) | 294.4 ms (58×) | 318.4 ms (63×) | 31.84 ms (6.3×) |
+| Path<br><sub>100k nodes, 100k edges</sub> | 0.631 ms | 0.631 ms (1.0×) | 7.961 ms (13×) | 11.70 ms (19×) | 3.041 ms (4.8×) |
+| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 1.080 ms | 0.520 ms (0.5×) | 25.93 ms (24×) | 25.97 ms (24×) | 4.956 ms (4.6×) |
+| Tree<br><sub>100k nodes, 100k edges</sub> | 1.175 ms | 1.128 ms (1.0×) | 26.52 ms (23×) | 19.22 ms (16×) | 14.43 ms (12×) |
+| Tree shfld. | 1.473 ms | 1.236 ms (0.8×) | 26.51 ms (18×) | 18.65 ms (13×) | 9.834 ms (6.7×) |
+| DAG GNP sparse | 2.269 ms | 1.442 ms (0.6×) | 54.43 ms (24×) | 44.66 ms (20×) | 17.21 ms (7.6×) |
+| DAG GNP dense | 4.475 ms | 3.041 ms (0.7×) | 234.8 ms (52×) | 305.7 ms (68×) | 24.48 ms (5.5×) |
+| DAG GNP dense shfld. | 5.321 ms | 3.130 ms (0.6×) | 243.6 ms (46×) | 300.5 ms (56×) | 31.28 ms (5.9×) |
 
 #### Throughput @ 100k nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) | JGraphT | Guava | WebGraph |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) | JGraphT | Guava | WebGraph |
 |---|---:|---:|---:|---:|---:|
-| Path<br><sub>100k nodes, 100k edges</sub> | 1 582 op/s | 1 592 op/s (101%) | 130.9 op/s (8.3%) | 62.79 op/s (4.0%) | 289.6 op/s (18.3%) |
-| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 936.3 op/s | 1 894 op/s (202%) | 28.71 op/s (3.1%) | 33.10 op/s (3.5%) | 198.0 op/s (21.1%) |
-| Tree<br><sub>100k nodes, 100k edges</sub> | 701.3 op/s | 846.0 op/s (121%) | 26.34 op/s (3.8%) | 44.01 op/s (6.3%) | 67.75 op/s (9.7%) |
-| Tree shfld. | 676.1 op/s | 796.8 op/s (118%) | 29.82 op/s (4.4%) | 38.84 op/s (5.7%) | 98.54 op/s (14.6%) |
-| DAG GNP sparse | 446.0 op/s | 667.1 op/s (150%) | 13.85 op/s (3.1%) | 16.47 op/s (3.7%) | 59.40 op/s (13.3%) |
-| DAG GNP dense | 221.5 op/s | 319.8 op/s (144%) | 3.618 op/s (1.6%) | 3.152 op/s (1.4%) | 39.98 op/s (18.1%) |
-| DAG GNP dense shfld. | 197.5 op/s | 315.2 op/s (160%) | 3.397 op/s (1.7%) | 3.141 op/s (1.6%) | 31.41 op/s (15.9%) |
+| Path<br><sub>100k nodes, 100k edges</sub> | 1 585 op/s | 1 585 op/s (100%) | 125.6 op/s (7.9%) | 85.51 op/s (5.4%) | 328.8 op/s (20.7%) |
+| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 925.9 op/s | 1 923 op/s (208%) | 38.56 op/s (4.2%) | 38.51 op/s (4.2%) | 201.8 op/s (21.8%) |
+| Tree<br><sub>100k nodes, 100k edges</sub> | 851.1 op/s | 886.5 op/s (104%) | 37.71 op/s (4.4%) | 52.02 op/s (6.1%) | 69.32 op/s (8.1%) |
+| Tree shfld. | 678.9 op/s | 809.1 op/s (119%) | 37.72 op/s (5.6%) | 53.62 op/s (7.9%) | 101.7 op/s (15.0%) |
+| DAG GNP sparse | 440.7 op/s | 693.5 op/s (157%) | 18.37 op/s (4.2%) | 22.39 op/s (5.1%) | 58.11 op/s (13.2%) |
+| DAG GNP dense | 223.5 op/s | 328.8 op/s (147%) | 4.259 op/s (1.9%) | 3.271 op/s (1.5%) | 40.84 op/s (18.3%) |
+| DAG GNP dense shfld. | 187.9 op/s | 319.5 op/s (170%) | 4.105 op/s (2.2%) | 3.328 op/s (1.8%) | 31.97 op/s (17.0%) |
 
-![1.6.2 TopOrder @ n = 100 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-6-2-toporder-n-100-000.svg)
+![1.8.2 TopOrder @ n = 100 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-8-2-toporder-n-100-000.svg)
 
 #### Times @ 1M nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
 |---|---:|---:|
-| DAG GNP sparse | 31.70 ms | 15.34 ms (0.5×) |
-| DAG GNP dense | 106.4 ms | 38.21 ms (0.4×) |
-| DAG GNP dense shfld. | 177.6 ms | 39.11 ms (0.2×) |
+| DAG GNP sparse | 33.89 ms | 14.76 ms (0.4×) |
+| DAG GNP dense | 104.2 ms | 38.09 ms (0.4×) |
+| DAG GNP dense shfld. | 178.7 ms | 38.93 ms (0.2×) |
 
 #### Throughput @ 1M nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
 |---|---:|---:|
-| DAG GNP sparse | 31.55 op/s | 65.18 op/s (207%) |
-| DAG GNP dense | 9.398 op/s | 26.17 op/s (278%) |
-| DAG GNP dense shfld. | 5.631 op/s | 25.57 op/s (454%) |
+| DAG GNP sparse | 29.51 op/s | 67.77 op/s (230%) |
+| DAG GNP dense | 9.597 op/s | 26.25 op/s (274%) |
+| DAG GNP dense shfld. | 5.596 op/s | 25.69 op/s (459%) |
 
-![1.6.3 TopOrder @ n = 1 000 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-6-3-toporder-n-1-000-000.svg)
+![1.8.3 TopOrder @ n = 1 000 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-8-3-toporder-n-1-000-000.svg)
 
 #### Times @ 10M nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
 |---|---:|---:|
-| DAG GNP sparse | 1241.1 ms | 163.7 ms (0.1×) |
-| DAG GNP dense | 2005.5 ms | 466.3 ms (0.2×) |
-| DAG GNP dense shfld. | 2927.1 ms | 418.1 ms (0.1×) |
+| DAG GNP sparse | 1133.7 ms | 154.0 ms (0.1×) |
+| DAG GNP dense | 1935.8 ms | 466.2 ms (0.2×) |
+| DAG GNP dense shfld. | 2829.4 ms | 429.6 ms (0.2×) |
 
 #### Throughput @ 10M nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
 |---|---:|---:|
-| DAG GNP sparse | 0.806 op/s | 6.109 op/s (758%) |
-| DAG GNP dense | 0.499 op/s | 2.145 op/s (430%) |
-| DAG GNP dense shfld. | 0.342 op/s | 2.392 op/s (700%) |
+| DAG GNP sparse | 0.882 op/s | 6.494 op/s (736%) |
+| DAG GNP dense | 0.517 op/s | 2.145 op/s (415%) |
+| DAG GNP dense shfld. | 0.353 op/s | 2.328 op/s (659%) |
 
-![1.6.4 TopOrder @ n = 10 000 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-6-4-toporder-n-10-000-000.svg)
+![1.8.4 TopOrder @ n = 10 000 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-8-4-toporder-n-10-000-000.svg)
 
 #### Times @ 100M nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
 |---|---:|---:|
-| DAG GNP sparse | 18079 ms | 1855.1 ms (0.1×) |
+| DAG GNP sparse | 16836 ms | 1845.1 ms (0.1×) |
 
 #### Throughput @ 100M nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
 |---|---:|---:|
-| DAG GNP sparse | 0.055 op/s | 0.539 op/s (975%) |
+| DAG GNP sparse | 0.059 op/s | 0.542 op/s (912%) |
 
-![1.6.5 TopOrder @ n = 100 000 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-6-5-toporder-n-100-000-000.svg)
+![1.8.5 TopOrder @ n = 100 000 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-8-5-toporder-n-100-000-000.svg)
 
-### 1.7 TopOrderAndLevels
+### 1.9 TopOrderAndLevels
 
 #### Times @ 10k nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) | Graphity 2.2.0<br>(bi-adjacent) | JGraphT | Guava | WebGraph |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) | Graphity 2.3.0<br>(bi-adjacent) | JGraphT | Guava | WebGraph |
 |---|---:|---:|---:|---:|---:|---:|
-| Path<br><sub>10k nodes, 10k edges</sub> | 0.039 ms | 0.039 ms (1.0×) | 0.041 ms (1.1×) | 0.221 ms (5.7×) | 0.363 ms (9.3×) | 0.409 ms (10×) |
-| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 0.057 ms | 0.040 ms (0.7×) | 0.055 ms (1.0×) | 0.363 ms (6.4×) | 0.504 ms (8.8×) | 0.638 ms (11×) |
-| Tree<br><sub>10k nodes, 10k edges</sub> | 0.035 ms | 0.031 ms (0.9×) | 0.029 ms (0.8×) | 0.210 ms (6.0×) | 0.546 ms (16×) | 0.653 ms (19×) |
-| Tree shfld. | 0.032 ms | 0.031 ms (1.0×) | 0.030 ms (0.9×) | 0.218 ms (6.8×) | 0.552 ms (17×) | 0.691 ms (22×) |
-| DAG GNP sparse | 0.061 ms | 0.054 ms (0.9×) | 0.045 ms (0.7×) | 0.384 ms (6.3×) | 1.151 ms (19×) | 1.071 ms (18×) |
-| DAG GNP dense | 0.364 ms | 0.334 ms (0.9×) | 0.249 ms (0.7×) | 4.566 ms (13×) | 8.607 ms (24×) | 3.764 ms (10×) |
-| DAG GNP dense shfld. | 0.404 ms | 0.328 ms (0.8×) | 0.295 ms (0.7×) | 5.709 ms (14×) | 13.28 ms (33×) | 4.180 ms (10×) |
+| Path<br><sub>10k nodes, 10k edges</sub> | 0.040 ms | 0.039 ms (1.0×) | 0.040 ms (1.0×) | 0.262 ms (6.5×) | 0.230 ms (5.8×) | 0.388 ms (9.7×) |
+| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 0.056 ms | 0.039 ms (0.7×) | 0.054 ms (1.0×) | 0.374 ms (6.7×) | 0.365 ms (6.5×) | 0.626 ms (11×) |
+| Tree<br><sub>10k nodes, 10k edges</sub> | 0.031 ms | 0.031 ms (1.0×) | 0.028 ms (0.9×) | 0.201 ms (6.5×) | 0.347 ms (11×) | 0.639 ms (21×) |
+| Tree shfld. | 0.031 ms | 0.031 ms (1.0×) | 0.029 ms (0.9×) | 0.206 ms (6.6×) | 0.343 ms (11×) | 0.671 ms (22×) |
+| DAG GNP sparse | 0.052 ms | 0.054 ms (1.0×) | 0.042 ms (0.8×) | 0.288 ms (5.5×) | 1.030 ms (20×) | 1.018 ms (20×) |
+| DAG GNP dense | 0.350 ms | 0.320 ms (0.9×) | 0.241 ms (0.7×) | 4.308 ms (12×) | 7.351 ms (21×) | 3.629 ms (10×) |
+| DAG GNP dense shfld. | 0.395 ms | 0.312 ms (0.8×) | 0.280 ms (0.7×) | 4.203 ms (11×) | 7.433 ms (19×) | 3.963 ms (10×) |
 
 #### Throughput @ 10k nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) | Graphity 2.2.0<br>(bi-adjacent) | JGraphT | Guava | WebGraph |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) | Graphity 2.3.0<br>(bi-adjacent) | JGraphT | Guava | WebGraph |
 |---|---:|---:|---:|---:|---:|---:|
-| Path<br><sub>10k nodes, 10k edges</sub> | 25 641 op/s | 25 641 op/s (100%) | 24 390 op/s (95.1%) | 4 525 op/s (17.6%) | 2 755 op/s (10.7%) | 2 445 op/s (9.5%) |
-| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 17 544 op/s | 25 000 op/s (142%) | 18 182 op/s (104%) | 2 755 op/s (15.7%) | 1 984 op/s (11.3%) | 1 567 op/s (8.9%) |
-| Tree<br><sub>10k nodes, 10k edges</sub> | 28 571 op/s | 32 258 op/s (113%) | 34 483 op/s (121%) | 4 762 op/s (16.7%) | 1 832 op/s (6.4%) | 1 531 op/s (5.4%) |
-| Tree shfld. | 31 250 op/s | 32 258 op/s (103%) | 33 333 op/s (107%) | 4 587 op/s (14.7%) | 1 812 op/s (5.8%) | 1 447 op/s (4.6%) |
-| DAG GNP sparse | 16 393 op/s | 18 519 op/s (113%) | 22 222 op/s (136%) | 2 604 op/s (15.9%) | 868.8 op/s (5.3%) | 933.7 op/s (5.7%) |
-| DAG GNP dense | 2 747 op/s | 2 994 op/s (109%) | 4 016 op/s (146%) | 219.0 op/s (8.0%) | 116.2 op/s (4.2%) | 265.7 op/s (9.7%) |
-| DAG GNP dense shfld. | 2 475 op/s | 3 049 op/s (123%) | 3 390 op/s (137%) | 175.2 op/s (7.1%) | 75.28 op/s (3.0%) | 239.2 op/s (9.7%) |
+| Path<br><sub>10k nodes, 10k edges</sub> | 25 000 op/s | 25 641 op/s (103%) | 25 000 op/s (100%) | 3 817 op/s (15.3%) | 4 348 op/s (17.4%) | 2 577 op/s (10.3%) |
+| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 17 857 op/s | 25 641 op/s (144%) | 18 519 op/s (104%) | 2 674 op/s (15.0%) | 2 740 op/s (15.3%) | 1 597 op/s (8.9%) |
+| Tree<br><sub>10k nodes, 10k edges</sub> | 32 258 op/s | 32 258 op/s (100%) | 35 714 op/s (111%) | 4 975 op/s (15.4%) | 2 882 op/s (8.9%) | 1 565 op/s (4.9%) |
+| Tree shfld. | 32 258 op/s | 32 258 op/s (100%) | 34 483 op/s (107%) | 4 854 op/s (15.0%) | 2 915 op/s (9.0%) | 1 490 op/s (4.6%) |
+| DAG GNP sparse | 19 231 op/s | 18 519 op/s (96.3%) | 23 810 op/s (124%) | 3 472 op/s (18.1%) | 970.9 op/s (5.0%) | 982.3 op/s (5.1%) |
+| DAG GNP dense | 2 857 op/s | 3 125 op/s (109%) | 4 149 op/s (145%) | 232.1 op/s (8.1%) | 136.0 op/s (4.8%) | 275.6 op/s (9.6%) |
+| DAG GNP dense shfld. | 2 532 op/s | 3 205 op/s (127%) | 3 571 op/s (141%) | 237.9 op/s (9.4%) | 134.5 op/s (5.3%) | 252.3 op/s (10.0%) |
 
-![1.7.1 TopOrderAndLevels @ n = 10 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-7-1-toporderandlevels-n-10-000.svg)
+![1.9.1 TopOrderAndLevels @ n = 10 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-9-1-toporderandlevels-n-10-000.svg)
 
 #### Times @ 100k nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) | Graphity 2.2.0<br>(bi-adjacent) | JGraphT | Guava | WebGraph |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) | Graphity 2.3.0<br>(bi-adjacent) | JGraphT | Guava | WebGraph |
 |---|---:|---:|---:|---:|---:|---:|
-| Path<br><sub>100k nodes, 100k edges</sub> | 0.462 ms | 0.571 ms (1.2×) | 0.360 ms (0.8×) | 4.695 ms (10×) | 5.601 ms (12×) | 3.763 ms (8.1×) |
-| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 1.424 ms | 0.565 ms (0.4×) | 1.335 ms (0.9×) | 25.18 ms (18×) | 18.03 ms (13×) | 7.208 ms (5.1×) |
-| Tree<br><sub>100k nodes, 100k edges</sub> | 0.947 ms | 0.845 ms (0.9×) | 0.852 ms (0.9×) | 11.93 ms (13×) | 12.06 ms (13×) | 7.956 ms (8.4×) |
-| Tree shfld. | 0.954 ms | 0.893 ms (0.9×) | 0.896 ms (0.9×) | 12.11 ms (13×) | 11.26 ms (12×) | 8.159 ms (8.6×) |
-| DAG GNP sparse | 2.261 ms | 1.985 ms (0.9×) | 1.981 ms (0.9×) | 23.32 ms (10×) | 38.09 ms (17×) | 14.35 ms (6.3×) |
-| DAG GNP dense | 5.364 ms | 4.696 ms (0.9×) | 4.360 ms (0.8×) | 64.37 ms (12×) | 232.5 ms (43×) | 47.48 ms (8.9×) |
-| DAG GNP dense shfld. | 5.866 ms | 4.690 ms (0.8×) | 4.509 ms (0.8×) | 78.56 ms (13×) | 217.3 ms (37×) | 58.47 ms (10.0×) |
+| Path<br><sub>100k nodes, 100k edges</sub> | 0.452 ms | 0.547 ms (1.2×) | 0.370 ms (0.8×) | 4.201 ms (9.3×) | 3.671 ms (8.1×) | 3.702 ms (8.2×) |
+| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 1.314 ms | 0.450 ms (0.3×) | 1.280 ms (1.0×) | 14.55 ms (11×) | 10.38 ms (7.9×) | 7.255 ms (5.5×) |
+| Tree<br><sub>100k nodes, 100k edges</sub> | 0.926 ms | 0.783 ms (0.8×) | 0.849 ms (0.9×) | 7.912 ms (8.5×) | 8.530 ms (9.2×) | 7.634 ms (8.2×) |
+| Tree shfld. | 0.951 ms | 0.835 ms (0.9×) | 0.917 ms (1.0×) | 7.294 ms (7.7×) | 8.774 ms (9.2×) | 7.867 ms (8.3×) |
+| DAG GNP sparse | 2.153 ms | 1.936 ms (0.9×) | 1.931 ms (0.9×) | 18.56 ms (8.6×) | 29.87 ms (14×) | 13.99 ms (6.5×) |
+| DAG GNP dense | 5.212 ms | 4.618 ms (0.9×) | 3.651 ms (0.7×) | 64.01 ms (12×) | 202.5 ms (39×) | 44.30 ms (8.5×) |
+| DAG GNP dense shfld. | 6.018 ms | 4.535 ms (0.8×) | 4.514 ms (0.8×) | 72.93 ms (12×) | 213.5 ms (35×) | 56.25 ms (9.3×) |
 
 #### Throughput @ 100k nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) | Graphity 2.2.0<br>(bi-adjacent) | JGraphT | Guava | WebGraph |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) | Graphity 2.3.0<br>(bi-adjacent) | JGraphT | Guava | WebGraph |
 |---|---:|---:|---:|---:|---:|---:|
-| Path<br><sub>100k nodes, 100k edges</sub> | 2 165 op/s | 1 751 op/s (80.9%) | 2 778 op/s (128%) | 213.0 op/s (9.8%) | 178.5 op/s (8.2%) | 265.7 op/s (12.3%) |
-| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 702.2 op/s | 1 770 op/s (252%) | 749.1 op/s (107%) | 39.72 op/s (5.7%) | 55.47 op/s (7.9%) | 138.7 op/s (19.8%) |
-| Tree<br><sub>100k nodes, 100k edges</sub> | 1 056 op/s | 1 183 op/s (112%) | 1 174 op/s (111%) | 83.80 op/s (7.9%) | 82.90 op/s (7.9%) | 125.7 op/s (11.9%) |
-| Tree shfld. | 1 048 op/s | 1 120 op/s (107%) | 1 116 op/s (106%) | 82.58 op/s (7.9%) | 88.82 op/s (8.5%) | 122.6 op/s (11.7%) |
-| DAG GNP sparse | 442.3 op/s | 503.8 op/s (114%) | 504.8 op/s (114%) | 42.88 op/s (9.7%) | 26.25 op/s (5.9%) | 69.71 op/s (15.8%) |
-| DAG GNP dense | 186.4 op/s | 212.9 op/s (114%) | 229.4 op/s (123%) | 15.53 op/s (8.3%) | 4.301 op/s (2.3%) | 21.06 op/s (11.3%) |
-| DAG GNP dense shfld. | 170.5 op/s | 213.2 op/s (125%) | 221.8 op/s (130%) | 12.73 op/s (7.5%) | 4.602 op/s (2.7%) | 17.10 op/s (10.0%) |
+| Path<br><sub>100k nodes, 100k edges</sub> | 2 212 op/s | 1 828 op/s (82.6%) | 2 703 op/s (122%) | 238.0 op/s (10.8%) | 272.4 op/s (12.3%) | 270.1 op/s (12.2%) |
+| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 761.0 op/s | 2 222 op/s (292%) | 781.2 op/s (103%) | 68.72 op/s (9.0%) | 96.32 op/s (12.7%) | 137.8 op/s (18.1%) |
+| Tree<br><sub>100k nodes, 100k edges</sub> | 1 080 op/s | 1 277 op/s (118%) | 1 178 op/s (109%) | 126.4 op/s (11.7%) | 117.2 op/s (10.9%) | 131.0 op/s (12.1%) |
+| Tree shfld. | 1 052 op/s | 1 198 op/s (114%) | 1 091 op/s (104%) | 137.1 op/s (13.0%) | 114.0 op/s (10.8%) | 127.1 op/s (12.1%) |
+| DAG GNP sparse | 464.5 op/s | 516.5 op/s (111%) | 517.9 op/s (111%) | 53.87 op/s (11.6%) | 33.48 op/s (7.2%) | 71.49 op/s (15.4%) |
+| DAG GNP dense | 191.9 op/s | 216.5 op/s (113%) | 273.9 op/s (143%) | 15.62 op/s (8.1%) | 4.938 op/s (2.6%) | 22.57 op/s (11.8%) |
+| DAG GNP dense shfld. | 166.2 op/s | 220.5 op/s (133%) | 221.5 op/s (133%) | 13.71 op/s (8.3%) | 4.684 op/s (2.8%) | 17.78 op/s (10.7%) |
 
-![1.7.2 TopOrderAndLevels @ n = 100 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-7-2-toporderandlevels-n-100-000.svg)
+![1.9.2 TopOrderAndLevels @ n = 100 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-9-2-toporderandlevels-n-100-000.svg)
 
 #### Times @ 1M nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
 |---|---:|---:|
-| DAG GNP sparse | 32.07 ms | 27.96 ms (0.9×) |
-| DAG GNP dense | 112.9 ms | 95.81 ms (0.8×) |
-| DAG GNP dense shfld. | 206.4 ms | 96.05 ms (0.5×) |
+| DAG GNP sparse | 31.72 ms | 28.43 ms (0.9×) |
+| DAG GNP dense | 112.5 ms | 93.99 ms (0.8×) |
+| DAG GNP dense shfld. | 199.4 ms | 92.20 ms (0.5×) |
 
 #### Throughput @ 1M nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
 |---|---:|---:|
-| DAG GNP sparse | 31.18 op/s | 35.76 op/s (115%) |
-| DAG GNP dense | 8.857 op/s | 10.44 op/s (118%) |
-| DAG GNP dense shfld. | 4.845 op/s | 10.41 op/s (215%) |
+| DAG GNP sparse | 31.53 op/s | 35.18 op/s (112%) |
+| DAG GNP dense | 8.889 op/s | 10.64 op/s (120%) |
+| DAG GNP dense shfld. | 5.015 op/s | 10.85 op/s (216%) |
 
-![1.7.3 TopOrderAndLevels @ n = 1 000 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-7-3-toporderandlevels-n-1-000-000.svg)
+![1.9.3 TopOrderAndLevels @ n = 1 000 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-9-3-toporderandlevels-n-1-000-000.svg)
 
 #### Times @ 10M nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
 |---|---:|---:|
-| DAG GNP sparse | 877.4 ms | 772.4 ms (0.9×) |
-| DAG GNP dense | 3289.1 ms | 3050.5 ms (0.9×) |
-| DAG GNP dense shfld. | 4671.3 ms | 2667.8 ms (0.6×) |
+| DAG GNP sparse | 847.7 ms | 752.4 ms (0.9×) |
+| DAG GNP dense | 3082.4 ms | 2699.6 ms (0.9×) |
+| DAG GNP dense shfld. | 4329.4 ms | 2707.5 ms (0.6×) |
 
 #### Throughput @ 10M nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
 |---|---:|---:|
-| DAG GNP sparse | 1.140 op/s | 1.295 op/s (114%) |
-| DAG GNP dense | 0.304 op/s | 0.328 op/s (108%) |
-| DAG GNP dense shfld. | 0.214 op/s | 0.375 op/s (175%) |
+| DAG GNP sparse | 1.180 op/s | 1.329 op/s (113%) |
+| DAG GNP dense | 0.324 op/s | 0.370 op/s (114%) |
+| DAG GNP dense shfld. | 0.231 op/s | 0.369 op/s (160%) |
 
-![1.7.4 TopOrderAndLevels @ n = 10 000 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-7-4-toporderandlevels-n-10-000-000.svg)
+![1.9.4 TopOrderAndLevels @ n = 10 000 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-9-4-toporderandlevels-n-10-000-000.svg)
 
 #### Times @ 100M nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
 |---|---:|---:|
-| DAG GNP sparse | 11575 ms | 9530.7 ms (0.8×) |
+| DAG GNP sparse | 11214 ms | 9499.8 ms (0.8×) |
 
 #### Throughput @ 100M nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
 |---|---:|---:|
-| DAG GNP sparse | 0.086 op/s | 0.105 op/s (121%) |
+| DAG GNP sparse | 0.089 op/s | 0.105 op/s (118%) |
 
-![1.7.5 TopOrderAndLevels @ n = 100 000 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-7-5-toporderandlevels-n-100-000-000.svg)
+![1.9.5 TopOrderAndLevels @ n = 100 000 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-9-5-toporderandlevels-n-100-000-000.svg)
 
-### 1.8 BackEdges
+### 1.10 BackEdges
 
 #### Times @ 10k nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) | JGraphT | Guava | WebGraph |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) | JGraphT | Guava | WebGraph |
 |---|---:|---:|---:|---:|---:|
-| Path<br><sub>10k nodes, 10k edges</sub> | 0.052 ms | 0.061 ms (1.2×) | 0.168 ms (3.2×) | 0.217 ms (4.2×) | 0.558 ms (11×) |
-| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 0.065 ms | 0.051 ms (0.8×) | 0.367 ms (5.6×) | 0.506 ms (7.8×) | 0.442 ms (6.8×) |
-| Tree<br><sub>10k nodes, 10k edges</sub> | 0.049 ms | 0.047 ms (1.0×) | 0.496 ms (10×) | 0.624 ms (13×) | 0.587 ms (12×) |
-| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 0.143 ms | 0.093 ms (0.7×) | 0.614 ms (4.3×) | 1.369 ms (9.6×) | 0.784 ms (5.5×) |
-| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 0.775 ms | 0.658 ms (0.8×) | 6.489 ms (8.4×) | 12.77 ms (16×) | 2.568 ms (3.3×) |
-| GNP dense shfld.<br><sub>10k nodes, 299.6k edges</sub> | 0.776 ms | 0.662 ms (0.9×) | 5.123 ms (6.6×) | 14.78 ms (19×) | 2.511 ms (3.2×) |
-| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 0.582 ms | 0.596 ms (1.0×) | 3.848 ms (6.6×) | 3.656 ms (6.3×) | 3.915 ms (6.7×) |
-| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 0.657 ms | 0.588 ms (0.9×) | 4.819 ms (7.3×) | 5.799 ms (8.8×) | 2.409 ms (3.7×) |
+| Path<br><sub>10k nodes, 10k edges</sub> | 0.059 ms | 0.059 ms (1.0×) | 0.157 ms (2.7×) | 0.212 ms (3.6×) | 0.538 ms (9.1×) |
+| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 0.065 ms | 0.051 ms (0.8×) | 0.357 ms (5.5×) | 0.368 ms (5.7×) | 0.423 ms (6.5×) |
+| Tree<br><sub>10k nodes, 10k edges</sub> | 0.048 ms | 0.041 ms (0.9×) | 0.439 ms (9.1×) | 0.669 ms (14×) | 0.585 ms (12×) |
+| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 0.165 ms | 0.085 ms (0.5×) | 0.641 ms (3.9×) | 1.139 ms (6.9×) | 0.775 ms (4.7×) |
+| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 0.781 ms | 0.656 ms (0.8×) | 4.477 ms (5.7×) | 12.04 ms (15×) | 2.629 ms (3.4×) |
+| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 0.583 ms | 0.589 ms (1.0×) | 3.378 ms (5.8×) | 2.229 ms (3.8×) | 3.964 ms (6.8×) |
+| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 0.642 ms | 0.582 ms (0.9×) | 4.182 ms (6.5×) | 3.747 ms (5.8×) | 2.436 ms (3.8×) |
 
 #### Throughput @ 10k nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) | JGraphT | Guava | WebGraph |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) | JGraphT | Guava | WebGraph |
 |---|---:|---:|---:|---:|---:|
-| Path<br><sub>10k nodes, 10k edges</sub> | 19 231 op/s | 16 393 op/s (85.2%) | 5 952 op/s (31.0%) | 4 608 op/s (24.0%) | 1 792 op/s (9.3%) |
-| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 15 385 op/s | 19 608 op/s (127%) | 2 725 op/s (17.7%) | 1 976 op/s (12.8%) | 2 262 op/s (14.7%) |
-| Tree<br><sub>10k nodes, 10k edges</sub> | 20 408 op/s | 21 277 op/s (104%) | 2 016 op/s (9.9%) | 1 603 op/s (7.9%) | 1 704 op/s (8.3%) |
-| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 6 993 op/s | 10 753 op/s (154%) | 1 629 op/s (23.3%) | 730.5 op/s (10.4%) | 1 276 op/s (18.2%) |
-| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 1 290 op/s | 1 520 op/s (118%) | 154.1 op/s (11.9%) | 78.30 op/s (6.1%) | 389.4 op/s (30.2%) |
-| GNP dense shfld.<br><sub>10k nodes, 299.6k edges</sub> | 1 289 op/s | 1 511 op/s (117%) | 195.2 op/s (15.1%) | 67.64 op/s (5.2%) | 398.2 op/s (30.9%) |
-| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 1 718 op/s | 1 678 op/s (97.7%) | 259.9 op/s (15.1%) | 273.5 op/s (15.9%) | 255.4 op/s (14.9%) |
-| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 1 522 op/s | 1 701 op/s (112%) | 207.5 op/s (13.6%) | 172.4 op/s (11.3%) | 415.1 op/s (27.3%) |
+| Path<br><sub>10k nodes, 10k edges</sub> | 16 949 op/s | 16 949 op/s (100%) | 6 369 op/s (37.6%) | 4 717 op/s (27.8%) | 1 859 op/s (11.0%) |
+| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 15 385 op/s | 19 608 op/s (127%) | 2 801 op/s (18.2%) | 2 717 op/s (17.7%) | 2 364 op/s (15.4%) |
+| Tree<br><sub>10k nodes, 10k edges</sub> | 20 833 op/s | 24 390 op/s (117%) | 2 278 op/s (10.9%) | 1 495 op/s (7.2%) | 1 709 op/s (8.2%) |
+| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 6 061 op/s | 11 765 op/s (194%) | 1 560 op/s (25.7%) | 878.0 op/s (14.5%) | 1 290 op/s (21.3%) |
+| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 1 280 op/s | 1 524 op/s (119%) | 223.4 op/s (17.4%) | 83.09 op/s (6.5%) | 380.4 op/s (29.7%) |
+| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 1 715 op/s | 1 698 op/s (99.0%) | 296.0 op/s (17.3%) | 448.6 op/s (26.2%) | 252.3 op/s (14.7%) |
+| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 1 558 op/s | 1 718 op/s (110%) | 239.1 op/s (15.4%) | 266.9 op/s (17.1%) | 410.5 op/s (26.4%) |
 
-![1.8.1 BackEdges @ n = 10 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-8-1-backedges-n-10-000.svg)
+![1.10.1 BackEdges @ n = 10 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-10-1-backedges-n-10-000.svg)
 
 #### Times @ 100k nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) | JGraphT | Guava | WebGraph |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) | JGraphT | Guava | WebGraph |
 |---|---:|---:|---:|---:|---:|
-| Path<br><sub>100k nodes, 100k edges</sub> | 0.568 ms | 0.569 ms (1.0×) | 5.870 ms (10×) | 9.034 ms (16×) | 3.710 ms (6.5×) |
-| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 0.994 ms | 0.506 ms (0.5×) | 25.61 ms (26×) | 20.62 ms (21×) | 5.590 ms (5.6×) |
-| Tree<br><sub>100k nodes, 100k edges</sub> | 1.295 ms | 1.035 ms (0.8×) | 32.46 ms (25×) | 23.01 ms (18×) | 14.83 ms (11×) |
-| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 3.124 ms | 1.895 ms (0.6×) | 46.38 ms (15×) | 44.02 ms (14×) | 11.49 ms (3.7×) |
-| GNP dense<br><sub>100k nodes, 3M edges</sub> | 13.51 ms | 7.279 ms (0.5×) | 131.2 ms (9.7×) | 266.9 ms (20×) | 51.57 ms (3.8×) |
-| GNP dense shfld.<br><sub>100k nodes, 3M edges</sub> | 13.88 ms | 7.242 ms (0.5×) | 128.4 ms (9.3×) | 215.3 ms (16×) | 49.13 ms (3.5×) |
-| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 6.179 ms | 6.220 ms (1.0×) | 84.33 ms (14×) | 78.64 ms (13×) | 48.91 ms (7.9×) |
-| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 12.63 ms | 6.482 ms (0.5×) | 132.4 ms (10×) | 90.29 ms (7.1×) | 40.70 ms (3.2×) |
+| Path<br><sub>100k nodes, 100k edges</sub> | 0.557 ms | 0.558 ms (1.0×) | 6.257 ms (11×) | 5.693 ms (10×) | 3.301 ms (5.9×) |
+| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 1.042 ms | 0.503 ms (0.5×) | 23.32 ms (22×) | 15.49 ms (15×) | 5.017 ms (4.8×) |
+| Tree<br><sub>100k nodes, 100k edges</sub> | 1.315 ms | 1.038 ms (0.8×) | 26.66 ms (20×) | 20.59 ms (16×) | 14.48 ms (11×) |
+| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 3.047 ms | 1.962 ms (0.6×) | 44.84 ms (15×) | 43.34 ms (14×) | 10.88 ms (3.6×) |
+| GNP dense<br><sub>100k nodes, 3M edges</sub> | 13.08 ms | 7.220 ms (0.6×) | 135.9 ms (10×) | 204.1 ms (16×) | 43.18 ms (3.3×) |
+| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 6.134 ms | 6.154 ms (1.0×) | 77.86 ms (13×) | 62.76 ms (10×) | 46.98 ms (7.7×) |
+| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 11.61 ms | 6.395 ms (0.6×) | 138.9 ms (12×) | 110.1 ms (9.5×) | 42.60 ms (3.7×) |
 
 #### Throughput @ 100k nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) | JGraphT | Guava | WebGraph |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) | JGraphT | Guava | WebGraph |
 |---|---:|---:|---:|---:|---:|
-| Path<br><sub>100k nodes, 100k edges</sub> | 1 761 op/s | 1 757 op/s (99.8%) | 170.4 op/s (9.7%) | 110.7 op/s (6.3%) | 269.5 op/s (15.3%) |
-| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 1 006 op/s | 1 976 op/s (196%) | 39.04 op/s (3.9%) | 48.50 op/s (4.8%) | 178.9 op/s (17.8%) |
-| Tree<br><sub>100k nodes, 100k edges</sub> | 772.2 op/s | 966.2 op/s (125%) | 30.81 op/s (4.0%) | 43.46 op/s (5.6%) | 67.42 op/s (8.7%) |
-| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 320.1 op/s | 527.7 op/s (165%) | 21.56 op/s (6.7%) | 22.72 op/s (7.1%) | 87.00 op/s (27.2%) |
-| GNP dense<br><sub>100k nodes, 3M edges</sub> | 74.05 op/s | 137.4 op/s (186%) | 7.622 op/s (10.3%) | 3.747 op/s (5.1%) | 19.39 op/s (26.2%) |
-| GNP dense shfld.<br><sub>100k nodes, 3M edges</sub> | 72.07 op/s | 138.1 op/s (192%) | 7.788 op/s (10.8%) | 4.645 op/s (6.4%) | 20.35 op/s (28.2%) |
-| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 161.8 op/s | 160.8 op/s (99.3%) | 11.86 op/s (7.3%) | 12.72 op/s (7.9%) | 20.45 op/s (12.6%) |
-| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 79.16 op/s | 154.3 op/s (195%) | 7.553 op/s (9.5%) | 11.08 op/s (14.0%) | 24.57 op/s (31.0%) |
+| Path<br><sub>100k nodes, 100k edges</sub> | 1 795 op/s | 1 792 op/s (99.8%) | 159.8 op/s (8.9%) | 175.7 op/s (9.8%) | 302.9 op/s (16.9%) |
+| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 959.7 op/s | 1 988 op/s (207%) | 42.88 op/s (4.5%) | 64.57 op/s (6.7%) | 199.3 op/s (20.8%) |
+| Tree<br><sub>100k nodes, 100k edges</sub> | 760.5 op/s | 963.4 op/s (127%) | 37.51 op/s (4.9%) | 48.57 op/s (6.4%) | 69.05 op/s (9.1%) |
+| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 328.2 op/s | 509.7 op/s (155%) | 22.30 op/s (6.8%) | 23.07 op/s (7.0%) | 91.88 op/s (28.0%) |
+| GNP dense<br><sub>100k nodes, 3M edges</sub> | 76.43 op/s | 138.5 op/s (181%) | 7.358 op/s (9.6%) | 4.900 op/s (6.4%) | 23.16 op/s (30.3%) |
+| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 163.0 op/s | 162.5 op/s (99.7%) | 12.84 op/s (7.9%) | 15.93 op/s (9.8%) | 21.29 op/s (13.1%) |
+| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 86.14 op/s | 156.4 op/s (182%) | 7.199 op/s (8.4%) | 9.083 op/s (10.5%) | 23.47 op/s (27.3%) |
 
-![1.8.2 BackEdges @ n = 100 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-8-2-backedges-n-100-000.svg)
+![1.10.2 BackEdges @ n = 100 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-10-2-backedges-n-100-000.svg)
 
 #### Times @ 1M nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
 |---|---:|---:|
-| GNP sparse<br><sub>1M nodes, 3M edges</sub> | 49.41 ms | 19.64 ms (0.4×) |
-| GNP dense<br><sub>1M nodes, 30M edges</sub> | 251.1 ms | 93.71 ms (0.4×) |
-| GNP dense shfld.<br><sub>1M nodes, 30M edges</sub> | 253.4 ms | 92.78 ms (0.4×) |
-| Chain of cliques<br><sub>1M nodes, 31.1M edges</sub> | 77.08 ms | 77.78 ms (1.0×) |
+| GNP sparse<br><sub>1M nodes, 3M edges</sub> | 53.11 ms | 21.00 ms (0.4×) |
+| GNP dense<br><sub>1M nodes, 30M edges</sub> | 247.6 ms | 89.72 ms (0.4×) |
+| Chain of cliques<br><sub>1M nodes, 31.1M edges</sub> | 74.96 ms | 76.19 ms (1.0×) |
 
 #### Throughput @ 1M nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
 |---|---:|---:|
-| GNP sparse<br><sub>1M nodes, 3M edges</sub> | 20.24 op/s | 50.91 op/s (252%) |
-| GNP dense<br><sub>1M nodes, 30M edges</sub> | 3.982 op/s | 10.67 op/s (268%) |
-| GNP dense shfld.<br><sub>1M nodes, 30M edges</sub> | 3.946 op/s | 10.78 op/s (273%) |
-| Chain of cliques<br><sub>1M nodes, 31.1M edges</sub> | 12.97 op/s | 12.86 op/s (99.1%) |
+| GNP sparse<br><sub>1M nodes, 3M edges</sub> | 18.83 op/s | 47.63 op/s (253%) |
+| GNP dense<br><sub>1M nodes, 30M edges</sub> | 4.039 op/s | 11.15 op/s (276%) |
+| Chain of cliques<br><sub>1M nodes, 31.1M edges</sub> | 13.34 op/s | 13.12 op/s (98.4%) |
 
-![1.8.3 BackEdges @ n = 1 000 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-8-3-backedges-n-1-000-000.svg)
+![1.10.3 BackEdges @ n = 1 000 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-10-3-backedges-n-1-000-000.svg)
 
 #### Times @ 10M nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
 |---|---:|---:|
-| GNP sparse<br><sub>10M nodes, 30M edges</sub> | 2052.4 ms | 244.8 ms (0.1×) |
-| GNP dense<br><sub>10M nodes, 299.6M edges</sub> | 3843.7 ms | 1022.2 ms (0.3×) |
-| GNP dense shfld.<br><sub>10M nodes, 299.6M edges</sub> | 3989.1 ms | 1135.8 ms (0.3×) |
-| Chain of cliques<br><sub>10M nodes, 310.8M edges</sub> | 838.2 ms | 802.5 ms (1.0×) |
+| GNP sparse<br><sub>10M nodes, 30M edges</sub> | 2025.5 ms | 246.6 ms (0.1×) |
+| GNP dense<br><sub>10M nodes, 299.6M edges</sub> | 3661.0 ms | 927.2 ms (0.3×) |
+| Chain of cliques<br><sub>10M nodes, 310.8M edges</sub> | 692.1 ms | 689.2 ms (1.0×) |
 
 #### Throughput @ 10M nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
 |---|---:|---:|
-| GNP sparse<br><sub>10M nodes, 30M edges</sub> | 0.487 op/s | 4.085 op/s (838%) |
-| GNP dense<br><sub>10M nodes, 299.6M edges</sub> | 0.260 op/s | 0.978 op/s (376%) |
-| GNP dense shfld.<br><sub>10M nodes, 299.6M edges</sub> | 0.251 op/s | 0.880 op/s (351%) |
-| Chain of cliques<br><sub>10M nodes, 310.8M edges</sub> | 1.193 op/s | 1.246 op/s (104%) |
+| GNP sparse<br><sub>10M nodes, 30M edges</sub> | 0.494 op/s | 4.055 op/s (821%) |
+| GNP dense<br><sub>10M nodes, 299.6M edges</sub> | 0.273 op/s | 1.079 op/s (395%) |
+| Chain of cliques<br><sub>10M nodes, 310.8M edges</sub> | 1.445 op/s | 1.451 op/s (100%) |
 
-![1.8.4 BackEdges @ n = 10 000 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-8-4-backedges-n-10-000-000.svg)
+![1.10.4 BackEdges @ n = 10 000 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-10-4-backedges-n-10-000-000.svg)
 
 #### Times @ 100M nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
 |---|---:|---:|
-| GNP sparse<br><sub>100M nodes, 300M edges</sub> | 28157 ms | 3364.5 ms (0.1×) |
+| GNP sparse<br><sub>100M nodes, 300M edges</sub> | 27738 ms | 3076.0 ms (0.1×) |
 
 #### Throughput @ 100M nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
 |---|---:|---:|
-| GNP sparse<br><sub>100M nodes, 300M edges</sub> | 0.036 op/s | 0.297 op/s (837%) |
+| GNP sparse<br><sub>100M nodes, 300M edges</sub> | 0.036 op/s | 0.325 op/s (902%) |
 
-![1.8.5 BackEdges @ n = 100 000 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-8-5-backedges-n-100-000-000.svg)
+![1.10.5 BackEdges @ n = 100 000 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-10-5-backedges-n-100-000-000.svg)
 
-### 1.9 EdgeTypes
+### 1.11 EdgeTypes
 
 #### Times @ 10k nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) | JGraphT | Guava | WebGraph |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) | JGraphT | Guava | WebGraph |
 |---|---:|---:|---:|---:|---:|
-| Path<br><sub>10k nodes, 10k edges</sub> | 0.064 ms | 0.065 ms (1.0×) | 0.202 ms (3.2×) | 0.391 ms (6.1×) | 0.611 ms (9.5×) |
-| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 0.077 ms | 0.062 ms (0.8×) | 0.367 ms (4.8×) | 0.562 ms (7.3×) | 0.490 ms (6.4×) |
-| Tree<br><sub>10k nodes, 10k edges</sub> | 0.053 ms | 0.047 ms (0.9×) | 0.498 ms (9.4×) | 0.700 ms (13×) | 0.650 ms (12×) |
-| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 0.182 ms | 0.090 ms (0.5×) | 0.707 ms (3.9×) | 1.446 ms (7.9×) | 0.883 ms (4.9×) |
-| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 0.533 ms | 0.369 ms (0.7×) | 6.936 ms (13×) | 16.58 ms (31×) | 3.212 ms (6.0×) |
-| GNP dense shfld.<br><sub>10k nodes, 299.6k edges</sub> | 0.528 ms | 0.382 ms (0.7×) | 7.719 ms (15×) | 16.52 ms (31×) | 3.149 ms (6.0×) |
-| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 0.296 ms | 0.303 ms (1.0×) | 5.107 ms (17×) | 4.767 ms (16×) | 4.784 ms (16×) |
-| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 0.402 ms | 0.300 ms (0.7×) | 6.272 ms (16×) | 6.516 ms (16×) | 3.051 ms (7.6×) |
+| Path<br><sub>10k nodes, 10k edges</sub> | 0.064 ms | 0.064 ms (1.0×) | 0.187 ms (2.9×) | 0.243 ms (3.8×) | 0.610 ms (9.5×) |
+| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 0.078 ms | 0.060 ms (0.8×) | 0.382 ms (4.9×) | 0.410 ms (5.3×) | 0.505 ms (6.5×) |
+| Tree<br><sub>10k nodes, 10k edges</sub> | 0.052 ms | 0.046 ms (0.9×) | 0.501 ms (9.6×) | 0.681 ms (13×) | 0.653 ms (13×) |
+| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 0.166 ms | 0.078 ms (0.5×) | 0.656 ms (4.0×) | 1.388 ms (8.4×) | 0.917 ms (5.5×) |
+| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 0.531 ms | 0.384 ms (0.7×) | 8.162 ms (15×) | 13.61 ms (26×) | 3.287 ms (6.2×) |
+| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 0.293 ms | 0.293 ms (1.0×) | 5.143 ms (18×) | 3.720 ms (13×) | 4.633 ms (16×) |
+| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 0.394 ms | 0.295 ms (0.7×) | 6.289 ms (16×) | 5.361 ms (14×) | 3.152 ms (8.0×) |
 
 #### Throughput @ 10k nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) | JGraphT | Guava | WebGraph |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) | JGraphT | Guava | WebGraph |
 |---|---:|---:|---:|---:|---:|
-| Path<br><sub>10k nodes, 10k edges</sub> | 15 625 op/s | 15 385 op/s (98.5%) | 4 950 op/s (31.7%) | 2 558 op/s (16.4%) | 1 637 op/s (10.5%) |
-| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 12 987 op/s | 16 129 op/s (124%) | 2 725 op/s (21.0%) | 1 779 op/s (13.7%) | 2 041 op/s (15.7%) |
-| Tree<br><sub>10k nodes, 10k edges</sub> | 18 868 op/s | 21 277 op/s (113%) | 2 008 op/s (10.6%) | 1 429 op/s (7.6%) | 1 538 op/s (8.2%) |
-| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 5 495 op/s | 11 111 op/s (202%) | 1 414 op/s (25.7%) | 691.6 op/s (12.6%) | 1 133 op/s (20.6%) |
-| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 1 876 op/s | 2 710 op/s (144%) | 144.2 op/s (7.7%) | 60.31 op/s (3.2%) | 311.3 op/s (16.6%) |
-| GNP dense shfld.<br><sub>10k nodes, 299.6k edges</sub> | 1 894 op/s | 2 618 op/s (138%) | 129.6 op/s (6.8%) | 60.55 op/s (3.2%) | 317.6 op/s (16.8%) |
-| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 3 378 op/s | 3 300 op/s (97.7%) | 195.8 op/s (5.8%) | 209.8 op/s (6.2%) | 209.0 op/s (6.2%) |
-| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 2 488 op/s | 3 333 op/s (134%) | 159.4 op/s (6.4%) | 153.5 op/s (6.2%) | 327.8 op/s (13.2%) |
+| Path<br><sub>10k nodes, 10k edges</sub> | 15 625 op/s | 15 625 op/s (100%) | 5 348 op/s (34.2%) | 4 115 op/s (26.3%) | 1 639 op/s (10.5%) |
+| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 12 821 op/s | 16 667 op/s (130%) | 2 618 op/s (20.4%) | 2 439 op/s (19.0%) | 1 980 op/s (15.4%) |
+| Tree<br><sub>10k nodes, 10k edges</sub> | 19 231 op/s | 21 739 op/s (113%) | 1 996 op/s (10.4%) | 1 468 op/s (7.6%) | 1 531 op/s (8.0%) |
+| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 6 024 op/s | 12 821 op/s (213%) | 1 524 op/s (25.3%) | 720.5 op/s (12.0%) | 1 091 op/s (18.1%) |
+| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 1 883 op/s | 2 604 op/s (138%) | 122.5 op/s (6.5%) | 73.50 op/s (3.9%) | 304.2 op/s (16.2%) |
+| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 3 413 op/s | 3 413 op/s (100%) | 194.4 op/s (5.7%) | 268.8 op/s (7.9%) | 215.8 op/s (6.3%) |
+| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 2 538 op/s | 3 390 op/s (134%) | 159.0 op/s (6.3%) | 186.5 op/s (7.3%) | 317.3 op/s (12.5%) |
 
-![1.9.1 EdgeTypes @ n = 10 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-9-1-edgetypes-n-10-000.svg)
+![1.11.1 EdgeTypes @ n = 10 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-11-1-edgetypes-n-10-000.svg)
 
 #### Times @ 100k nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) | JGraphT | Guava | WebGraph |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) | JGraphT | Guava | WebGraph |
 |---|---:|---:|---:|---:|---:|
-| Path<br><sub>100k nodes, 100k edges</sub> | 0.603 ms | 0.605 ms (1.0×) | 7.376 ms (12×) | 11.48 ms (19×) | 4.590 ms (7.6×) |
-| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 1.430 ms | 0.634 ms (0.4×) | 27.91 ms (20×) | 19.76 ms (14×) | 6.337 ms (4.4×) |
-| Tree<br><sub>100k nodes, 100k edges</sub> | 1.497 ms | 1.071 ms (0.7×) | 29.47 ms (20×) | 28.19 ms (19×) | 17.91 ms (12×) |
-| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 3.696 ms | 1.962 ms (0.5×) | 48.84 ms (13×) | 53.84 ms (15×) | 14.20 ms (3.8×) |
-| GNP dense<br><sub>100k nodes, 3M edges</sub> | 7.537 ms | 4.320 ms (0.6×) | 167.7 ms (22×) | 257.6 ms (34×) | 58.94 ms (7.8×) |
-| GNP dense shfld.<br><sub>100k nodes, 3M edges</sub> | 7.584 ms | 4.299 ms (0.6×) | 171.3 ms (23×) | 229.0 ms (30×) | 60.77 ms (8.0×) |
-| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 2.696 ms | 2.754 ms (1.0×) | 100.4 ms (37×) | 93.77 ms (35×) | 59.96 ms (22×) |
-| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 6.171 ms | 2.973 ms (0.5×) | 163.0 ms (26×) | 114.9 ms (19×) | 57.97 ms (9.4×) |
+| Path<br><sub>100k nodes, 100k edges</sub> | 0.595 ms | 0.604 ms (1.0×) | 9.131 ms (15×) | 8.504 ms (14×) | 4.627 ms (7.8×) |
+| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 1.386 ms | 0.623 ms (0.4×) | 20.39 ms (15×) | 17.50 ms (13×) | 6.072 ms (4.4×) |
+| Tree<br><sub>100k nodes, 100k edges</sub> | 1.439 ms | 1.044 ms (0.7×) | 32.24 ms (22×) | 21.79 ms (15×) | 17.55 ms (12×) |
+| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 3.580 ms | 1.830 ms (0.5×) | 46.91 ms (13×) | 48.17 ms (13×) | 13.27 ms (3.7×) |
+| GNP dense<br><sub>100k nodes, 3M edges</sub> | 7.214 ms | 4.159 ms (0.6×) | 158.3 ms (22×) | 218.7 ms (30×) | 54.56 ms (7.6×) |
+| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 2.701 ms | 2.642 ms (1.0×) | 88.85 ms (33×) | 74.75 ms (28×) | 58.03 ms (21×) |
+| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 5.809 ms | 2.965 ms (0.5×) | 164.0 ms (28×) | 127.1 ms (22×) | 54.12 ms (9.3×) |
 
 #### Throughput @ 100k nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) | JGraphT | Guava | WebGraph |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) | JGraphT | Guava | WebGraph |
 |---|---:|---:|---:|---:|---:|
-| Path<br><sub>100k nodes, 100k edges</sub> | 1 658 op/s | 1 653 op/s (99.7%) | 135.6 op/s (8.2%) | 87.11 op/s (5.3%) | 217.9 op/s (13.1%) |
-| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 699.3 op/s | 1 577 op/s (226%) | 35.83 op/s (5.1%) | 50.61 op/s (7.2%) | 157.8 op/s (22.6%) |
-| Tree<br><sub>100k nodes, 100k edges</sub> | 668.0 op/s | 933.7 op/s (140%) | 33.93 op/s (5.1%) | 35.47 op/s (5.3%) | 55.84 op/s (8.4%) |
-| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 270.6 op/s | 509.7 op/s (188%) | 20.48 op/s (7.6%) | 18.57 op/s (6.9%) | 70.41 op/s (26.0%) |
-| GNP dense<br><sub>100k nodes, 3M edges</sub> | 132.7 op/s | 231.5 op/s (174%) | 5.963 op/s (4.5%) | 3.882 op/s (2.9%) | 16.97 op/s (12.8%) |
-| GNP dense shfld.<br><sub>100k nodes, 3M edges</sub> | 131.9 op/s | 232.6 op/s (176%) | 5.838 op/s (4.4%) | 4.367 op/s (3.3%) | 16.46 op/s (12.5%) |
-| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 370.9 op/s | 363.1 op/s (97.9%) | 9.960 op/s (2.7%) | 10.66 op/s (2.9%) | 16.68 op/s (4.5%) |
-| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 162.0 op/s | 336.4 op/s (208%) | 6.135 op/s (3.8%) | 8.703 op/s (5.4%) | 17.25 op/s (10.6%) |
+| Path<br><sub>100k nodes, 100k edges</sub> | 1 681 op/s | 1 656 op/s (98.5%) | 109.5 op/s (6.5%) | 117.6 op/s (7.0%) | 216.1 op/s (12.9%) |
+| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 721.5 op/s | 1 605 op/s (222%) | 49.04 op/s (6.8%) | 57.15 op/s (7.9%) | 164.7 op/s (22.8%) |
+| Tree<br><sub>100k nodes, 100k edges</sub> | 694.9 op/s | 957.9 op/s (138%) | 31.01 op/s (4.5%) | 45.89 op/s (6.6%) | 56.97 op/s (8.2%) |
+| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 279.3 op/s | 546.4 op/s (196%) | 21.32 op/s (7.6%) | 20.76 op/s (7.4%) | 75.35 op/s (27.0%) |
+| GNP dense<br><sub>100k nodes, 3M edges</sub> | 138.6 op/s | 240.4 op/s (173%) | 6.317 op/s (4.6%) | 4.572 op/s (3.3%) | 18.33 op/s (13.2%) |
+| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 370.2 op/s | 378.5 op/s (102%) | 11.26 op/s (3.0%) | 13.38 op/s (3.6%) | 17.23 op/s (4.7%) |
+| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 172.1 op/s | 337.3 op/s (196%) | 6.098 op/s (3.5%) | 7.868 op/s (4.6%) | 18.48 op/s (10.7%) |
 
-![1.9.2 EdgeTypes @ n = 100 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-9-2-edgetypes-n-100-000.svg)
+![1.11.2 EdgeTypes @ n = 100 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-11-2-edgetypes-n-100-000.svg)
 
 #### Times @ 1M nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
 |---|---:|---:|
-| GNP sparse<br><sub>1M nodes, 3M edges</sub> | 69.55 ms | 22.69 ms (0.3×) |
-| GNP dense<br><sub>1M nodes, 30M edges</sub> | 252.1 ms | 60.84 ms (0.2×) |
-| GNP dense shfld.<br><sub>1M nodes, 30M edges</sub> | 252.0 ms | 60.77 ms (0.2×) |
-| Chain of cliques<br><sub>1M nodes, 31.1M edges</sub> | 26.76 ms | 26.80 ms (1.0×) |
+| GNP sparse<br><sub>1M nodes, 3M edges</sub> | 67.35 ms | 21.38 ms (0.3×) |
+| GNP dense<br><sub>1M nodes, 30M edges</sub> | 241.3 ms | 61.23 ms (0.3×) |
+| Chain of cliques<br><sub>1M nodes, 31.1M edges</sub> | 26.94 ms | 26.71 ms (1.0×) |
 
 #### Throughput @ 1M nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
 |---|---:|---:|
-| GNP sparse<br><sub>1M nodes, 3M edges</sub> | 14.38 op/s | 44.08 op/s (307%) |
-| GNP dense<br><sub>1M nodes, 30M edges</sub> | 3.967 op/s | 16.44 op/s (414%) |
-| GNP dense shfld.<br><sub>1M nodes, 30M edges</sub> | 3.968 op/s | 16.46 op/s (415%) |
-| Chain of cliques<br><sub>1M nodes, 31.1M edges</sub> | 37.37 op/s | 37.32 op/s (99.9%) |
+| GNP sparse<br><sub>1M nodes, 3M edges</sub> | 14.85 op/s | 46.77 op/s (315%) |
+| GNP dense<br><sub>1M nodes, 30M edges</sub> | 4.144 op/s | 16.33 op/s (394%) |
+| Chain of cliques<br><sub>1M nodes, 31.1M edges</sub> | 37.12 op/s | 37.44 op/s (101%) |
 
-![1.9.3 EdgeTypes @ n = 1 000 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-9-3-edgetypes-n-1-000-000.svg)
+![1.11.3 EdgeTypes @ n = 1 000 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-11-3-edgetypes-n-1-000-000.svg)
 
 #### Times @ 10M nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
 |---|---:|---:|
-| GNP sparse<br><sub>10M nodes, 30M edges</sub> | 2557.2 ms | 447.1 ms (0.2×) |
-| GNP dense<br><sub>10M nodes, 299.6M edges</sub> | 4861.4 ms | 1624.0 ms (0.3×) |
-| GNP dense shfld.<br><sub>10M nodes, 299.6M edges</sub> | 4853.4 ms | 1557.3 ms (0.3×) |
-| Chain of cliques<br><sub>10M nodes, 310.8M edges</sub> | 336.4 ms | 284.6 ms (0.8×) |
+| GNP sparse<br><sub>10M nodes, 30M edges</sub> | 2500.9 ms | 411.7 ms (0.2×) |
+| GNP dense<br><sub>10M nodes, 299.6M edges</sub> | 4606.3 ms | 1435.0 ms (0.3×) |
+| Chain of cliques<br><sub>10M nodes, 310.8M edges</sub> | 278.7 ms | 279.7 ms (1.0×) |
 
 #### Throughput @ 10M nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
 |---|---:|---:|
-| GNP sparse<br><sub>10M nodes, 30M edges</sub> | 0.391 op/s | 2.237 op/s (572%) |
-| GNP dense<br><sub>10M nodes, 299.6M edges</sub> | 0.206 op/s | 0.616 op/s (299%) |
-| GNP dense shfld.<br><sub>10M nodes, 299.6M edges</sub> | 0.206 op/s | 0.642 op/s (312%) |
-| Chain of cliques<br><sub>10M nodes, 310.8M edges</sub> | 2.973 op/s | 3.514 op/s (118%) |
+| GNP sparse<br><sub>10M nodes, 30M edges</sub> | 0.400 op/s | 2.429 op/s (607%) |
+| GNP dense<br><sub>10M nodes, 299.6M edges</sub> | 0.217 op/s | 0.697 op/s (321%) |
+| Chain of cliques<br><sub>10M nodes, 310.8M edges</sub> | 3.588 op/s | 3.575 op/s (99.6%) |
 
-![1.9.4 EdgeTypes @ n = 10 000 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-9-4-edgetypes-n-10-000-000.svg)
+![1.11.4 EdgeTypes @ n = 10 000 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-11-4-edgetypes-n-10-000-000.svg)
 
 #### Times @ 100M nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
 |---|---:|---:|
-| GNP sparse<br><sub>100M nodes, 300M edges</sub> | 32754 ms | 7210.5 ms (0.2×) |
+| GNP sparse<br><sub>100M nodes, 300M edges</sub> | 31640 ms | 6770.4 ms (0.2×) |
 
 #### Throughput @ 100M nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(reordered) |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(reordered) |
 |---|---:|---:|
-| GNP sparse<br><sub>100M nodes, 300M edges</sub> | 0.031 op/s | 0.139 op/s (454%) |
+| GNP sparse<br><sub>100M nodes, 300M edges</sub> | 0.032 op/s | 0.148 op/s (467%) |
 
-![1.9.5 EdgeTypes @ n = 100 000 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-9-5-edgetypes-n-100-000-000.svg)
+![1.11.5 EdgeTypes @ n = 100 000 000](fig/synthetic-ubuntu-ryzen-9950x-peers/1-11-5-edgetypes-n-100-000-000.svg)
 
-### 1.10 Reorder (DFS-preorder) cost
+### 1.12 Reorder (DFS-preorder) cost
 
 #### Times @ 10k nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
-| Path<br><sub>10k nodes, 10k edges</sub> | 0.110 ms |
-| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 0.130 ms |
-| Tree<br><sub>10k nodes, 10k edges</sub> | 0.090 ms |
-| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 0.385 ms |
-| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 0.818 ms |
-| GNP dense shfld.<br><sub>10k nodes, 299.6k edges</sub> | 0.817 ms |
-| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 0.533 ms |
-| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 0.618 ms |
+| Path<br><sub>10k nodes, 10k edges</sub> | 0.112 ms |
+| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 0.124 ms |
+| Tree<br><sub>10k nodes, 10k edges</sub> | 0.084 ms |
+| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 0.380 ms |
+| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 0.811 ms |
+| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 0.519 ms |
+| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 0.614 ms |
 
 #### Throughput @ 10k nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
-| Path<br><sub>10k nodes, 10k edges</sub> | 9 091 op/s |
-| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 7 692 op/s |
-| Tree<br><sub>10k nodes, 10k edges</sub> | 11 111 op/s |
-| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 2 597 op/s |
-| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 1 222 op/s |
-| GNP dense shfld.<br><sub>10k nodes, 299.6k edges</sub> | 1 224 op/s |
-| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 1 876 op/s |
-| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 1 618 op/s |
+| Path<br><sub>10k nodes, 10k edges</sub> | 8 929 op/s |
+| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 8 065 op/s |
+| Tree<br><sub>10k nodes, 10k edges</sub> | 11 905 op/s |
+| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 2 632 op/s |
+| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 1 233 op/s |
+| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 1 927 op/s |
+| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 1 629 op/s |
 
 #### Times @ 100k nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
-| Path<br><sub>100k nodes, 100k edges</sub> | 1.043 ms |
-| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 2.016 ms |
-| Tree<br><sub>100k nodes, 100k edges</sub> | 2.314 ms |
-| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 5.436 ms |
-| GNP dense<br><sub>100k nodes, 3M edges</sub> | 11.74 ms |
-| GNP dense shfld.<br><sub>100k nodes, 3M edges</sub> | 11.77 ms |
-| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 5.406 ms |
-| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 9.153 ms |
+| Path<br><sub>100k nodes, 100k edges</sub> | 1.099 ms |
+| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 2.113 ms |
+| Tree<br><sub>100k nodes, 100k edges</sub> | 2.463 ms |
+| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 5.407 ms |
+| GNP dense<br><sub>100k nodes, 3M edges</sub> | 11.16 ms |
+| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 5.367 ms |
+| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 9.224 ms |
 
 #### Throughput @ 100k nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
-| Path<br><sub>100k nodes, 100k edges</sub> | 958.8 op/s |
-| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 496.0 op/s |
-| Tree<br><sub>100k nodes, 100k edges</sub> | 432.2 op/s |
-| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 184.0 op/s |
-| GNP dense<br><sub>100k nodes, 3M edges</sub> | 85.17 op/s |
-| GNP dense shfld.<br><sub>100k nodes, 3M edges</sub> | 84.97 op/s |
-| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 185.0 op/s |
-| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 109.3 op/s |
+| Path<br><sub>100k nodes, 100k edges</sub> | 909.9 op/s |
+| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 473.3 op/s |
+| Tree<br><sub>100k nodes, 100k edges</sub> | 406.0 op/s |
+| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 184.9 op/s |
+| GNP dense<br><sub>100k nodes, 3M edges</sub> | 89.61 op/s |
+| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 186.3 op/s |
+| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 108.4 op/s |
 
 #### Times @ 1M nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
-| GNP sparse<br><sub>1M nodes, 3M edges</sub> | 84.36 ms |
-| GNP dense<br><sub>1M nodes, 30M edges</sub> | 336.7 ms |
-| GNP dense shfld.<br><sub>1M nodes, 30M edges</sub> | 336.1 ms |
-| Chain of cliques<br><sub>1M nodes, 31.1M edges</sub> | 53.13 ms |
+| GNP sparse<br><sub>1M nodes, 3M edges</sub> | 87.61 ms |
+| GNP dense<br><sub>1M nodes, 30M edges</sub> | 318.2 ms |
+| Chain of cliques<br><sub>1M nodes, 31.1M edges</sub> | 52.32 ms |
 
 #### Throughput @ 1M nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
-| GNP sparse<br><sub>1M nodes, 3M edges</sub> | 11.85 op/s |
-| GNP dense<br><sub>1M nodes, 30M edges</sub> | 2.970 op/s |
-| GNP dense shfld.<br><sub>1M nodes, 30M edges</sub> | 2.975 op/s |
-| Chain of cliques<br><sub>1M nodes, 31.1M edges</sub> | 18.82 op/s |
+| GNP sparse<br><sub>1M nodes, 3M edges</sub> | 11.41 op/s |
+| GNP dense<br><sub>1M nodes, 30M edges</sub> | 3.143 op/s |
+| Chain of cliques<br><sub>1M nodes, 31.1M edges</sub> | 19.11 op/s |
 
 #### Times @ 10M nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
-| GNP sparse<br><sub>10M nodes, 30M edges</sub> | 3401.7 ms |
-| GNP dense<br><sub>10M nodes, 299.6M edges</sub> | 7782.3 ms |
-| GNP dense shfld.<br><sub>10M nodes, 299.6M edges</sub> | 7838.8 ms |
-| Chain of cliques<br><sub>10M nodes, 310.8M edges</sub> | 622.8 ms |
+| GNP sparse<br><sub>10M nodes, 30M edges</sub> | 3194.6 ms |
+| GNP dense<br><sub>10M nodes, 299.6M edges</sub> | 7202.3 ms |
+| Chain of cliques<br><sub>10M nodes, 310.8M edges</sub> | 543.0 ms |
 
 #### Throughput @ 10M nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
-| GNP sparse<br><sub>10M nodes, 30M edges</sub> | 0.294 op/s |
-| GNP dense<br><sub>10M nodes, 299.6M edges</sub> | 0.128 op/s |
-| GNP dense shfld.<br><sub>10M nodes, 299.6M edges</sub> | 0.128 op/s |
-| Chain of cliques<br><sub>10M nodes, 310.8M edges</sub> | 1.606 op/s |
+| GNP sparse<br><sub>10M nodes, 30M edges</sub> | 0.313 op/s |
+| GNP dense<br><sub>10M nodes, 299.6M edges</sub> | 0.139 op/s |
+| Chain of cliques<br><sub>10M nodes, 310.8M edges</sub> | 1.842 op/s |
 
 #### Times @ 100M nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
-| GNP sparse<br><sub>100M nodes, 300M edges</sub> | 41896 ms |
+| GNP sparse<br><sub>100M nodes, 300M edges</sub> | 40225 ms |
 
 #### Throughput @ 100M nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
-| GNP sparse<br><sub>100M nodes, 300M edges</sub> | 0.024 op/s |
+| GNP sparse<br><sub>100M nodes, 300M edges</sub> | 0.025 op/s |
 
-### 1.11 BiAdjacency (in-adjacency) cost
+### 1.13 BiAdjacency (in-adjacency) cost
 
 #### Times @ 10k nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
-| Path<br><sub>10k nodes, 10k edges</sub> | 0.022 ms |
-| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 0.022 ms |
+| Path<br><sub>10k nodes, 10k edges</sub> | 0.015 ms |
+| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 0.023 ms |
 | Tree<br><sub>10k nodes, 10k edges</sub> | 0.023 ms |
-| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 0.058 ms |
-| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 0.548 ms |
-| GNP dense shfld.<br><sub>10k nodes, 299.6k edges</sub> | 0.547 ms |
+| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 0.057 ms |
+| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 0.544 ms |
 | Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 0.542 ms |
-| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 0.547 ms |
+| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 0.544 ms |
 
 #### Throughput @ 10k nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
-| Path<br><sub>10k nodes, 10k edges</sub> | 45 455 op/s |
-| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 45 455 op/s |
+| Path<br><sub>10k nodes, 10k edges</sub> | 66 667 op/s |
+| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 43 478 op/s |
 | Tree<br><sub>10k nodes, 10k edges</sub> | 43 478 op/s |
-| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 17 241 op/s |
-| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 1 825 op/s |
-| GNP dense shfld.<br><sub>10k nodes, 299.6k edges</sub> | 1 828 op/s |
+| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 17 544 op/s |
+| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 1 838 op/s |
 | Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 1 845 op/s |
-| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 1 828 op/s |
+| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 1 838 op/s |
 
 #### Times @ 100k nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
-| Path<br><sub>100k nodes, 100k edges</sub> | 0.204 ms |
+| Path<br><sub>100k nodes, 100k edges</sub> | 0.203 ms |
 | Path shfld.<br><sub>100k nodes, 100k edges</sub> | 0.236 ms |
-| Tree<br><sub>100k nodes, 100k edges</sub> | 0.613 ms |
-| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 1.423 ms |
-| GNP dense<br><sub>100k nodes, 3M edges</sub> | 7.932 ms |
-| GNP dense shfld.<br><sub>100k nodes, 3M edges</sub> | 7.744 ms |
-| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 5.555 ms |
-| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 7.824 ms |
+| Tree<br><sub>100k nodes, 100k edges</sub> | 0.606 ms |
+| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 1.408 ms |
+| GNP dense<br><sub>100k nodes, 3M edges</sub> | 7.385 ms |
+| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 5.548 ms |
+| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 7.574 ms |
 
 #### Throughput @ 100k nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
-| Path<br><sub>100k nodes, 100k edges</sub> | 4 902 op/s |
+| Path<br><sub>100k nodes, 100k edges</sub> | 4 926 op/s |
 | Path shfld.<br><sub>100k nodes, 100k edges</sub> | 4 237 op/s |
-| Tree<br><sub>100k nodes, 100k edges</sub> | 1 631 op/s |
-| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 702.7 op/s |
-| GNP dense<br><sub>100k nodes, 3M edges</sub> | 126.1 op/s |
-| GNP dense shfld.<br><sub>100k nodes, 3M edges</sub> | 129.1 op/s |
-| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 180.0 op/s |
-| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 127.8 op/s |
+| Tree<br><sub>100k nodes, 100k edges</sub> | 1 650 op/s |
+| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 710.2 op/s |
+| GNP dense<br><sub>100k nodes, 3M edges</sub> | 135.4 op/s |
+| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 180.2 op/s |
+| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 132.0 op/s |
 
-### 1.12 Symmetrize (WebGraph) cost
+### 1.14 Symmetrize (WebGraph) cost
 
 #### Times @ 10k nodes (ms/op, lower is better)
 
 | Shape | WebGraph |
 |---|---:|
-| Path<br><sub>10k nodes, 10k edges</sub> | 5.113 ms |
-| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 7.914 ms |
-| Tree<br><sub>10k nodes, 10k edges</sub> | 8.270 ms |
-| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 18.40 ms |
-| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 113.2 ms |
-| GNP dense shfld.<br><sub>10k nodes, 299.6k edges</sub> | 95.85 ms |
-| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 14.77 ms |
-| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 67.55 ms |
+| Path<br><sub>10k nodes, 10k edges</sub> | 5.437 ms |
+| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 8.017 ms |
+| Tree<br><sub>10k nodes, 10k edges</sub> | 8.057 ms |
+| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 18.51 ms |
+| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 111.5 ms |
+| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 14.95 ms |
+| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 58.27 ms |
 
 #### Throughput @ 10k nodes (op/s, higher is better)
 
 | Shape | WebGraph |
 |---|---:|
-| Path<br><sub>10k nodes, 10k edges</sub> | 195.6 op/s |
-| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 126.4 op/s |
-| Tree<br><sub>10k nodes, 10k edges</sub> | 120.9 op/s |
-| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 54.34 op/s |
-| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 8.834 op/s |
-| GNP dense shfld.<br><sub>10k nodes, 299.6k edges</sub> | 10.43 op/s |
-| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 67.71 op/s |
-| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 14.80 op/s |
+| Path<br><sub>10k nodes, 10k edges</sub> | 183.9 op/s |
+| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 124.7 op/s |
+| Tree<br><sub>10k nodes, 10k edges</sub> | 124.1 op/s |
+| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 54.04 op/s |
+| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 8.969 op/s |
+| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 66.88 op/s |
+| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 17.16 op/s |
 
 #### Times @ 100k nodes (ms/op, lower is better)
 
 | Shape | WebGraph |
 |---|---:|
-| Path<br><sub>100k nodes, 100k edges</sub> | 34.09 ms |
-| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 63.65 ms |
-| Tree<br><sub>100k nodes, 100k edges</sub> | 68.92 ms |
-| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 185.3 ms |
-| GNP dense<br><sub>100k nodes, 3M edges</sub> | 1131.1 ms |
-| GNP dense shfld.<br><sub>100k nodes, 3M edges</sub> | 1157.1 ms |
-| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 120.7 ms |
-| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 685.3 ms |
+| Path<br><sub>100k nodes, 100k edges</sub> | 38.47 ms |
+| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 62.81 ms |
+| Tree<br><sub>100k nodes, 100k edges</sub> | 69.78 ms |
+| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 183.9 ms |
+| GNP dense<br><sub>100k nodes, 3M edges</sub> | 1111.0 ms |
+| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 122.3 ms |
+| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 667.5 ms |
 
 #### Throughput @ 100k nodes (op/s, higher is better)
 
 | Shape | WebGraph |
 |---|---:|
-| Path<br><sub>100k nodes, 100k edges</sub> | 29.33 op/s |
-| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 15.71 op/s |
-| Tree<br><sub>100k nodes, 100k edges</sub> | 14.51 op/s |
-| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 5.397 op/s |
-| GNP dense<br><sub>100k nodes, 3M edges</sub> | 0.884 op/s |
-| GNP dense shfld.<br><sub>100k nodes, 3M edges</sub> | 0.864 op/s |
-| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 8.285 op/s |
-| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 1.459 op/s |
+| Path<br><sub>100k nodes, 100k edges</sub> | 26.00 op/s |
+| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 15.92 op/s |
+| Tree<br><sub>100k nodes, 100k edges</sub> | 14.33 op/s |
+| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 5.438 op/s |
+| GNP dense<br><sub>100k nodes, 3M edges</sub> | 0.900 op/s |
+| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 8.177 op/s |
+| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 1.498 op/s |
 
-### 1.13 Dominators
+### 1.15 Dominators
 
 #### Times @ 10k nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
-| Structured | 0.168 ms |
-| Irreducible | 0.178 ms |
-| Ladder | 0.155 ms |
-| Chain | 0.114 ms |
-| Fan behind chain | 0.144 ms |
-| Small methods | 0.201 ms |
+| Structured | 0.165 ms |
+| Irreducible | 0.164 ms |
+| Ladder | 0.159 ms |
+| Chain | 0.113 ms |
+| Fan behind chain | 0.143 ms |
+| Small methods | 0.184 ms |
 
 #### Throughput @ 10k nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
-| Structured | 5 952 op/s |
-| Irreducible | 5 618 op/s |
-| Ladder | 6 452 op/s |
-| Chain | 8 772 op/s |
-| Fan behind chain | 6 944 op/s |
-| Small methods | 4 975 op/s |
+| Structured | 6 061 op/s |
+| Irreducible | 6 098 op/s |
+| Ladder | 6 289 op/s |
+| Chain | 8 850 op/s |
+| Fan behind chain | 6 993 op/s |
+| Small methods | 5 435 op/s |
 
 #### Times @ 100k nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
-| Structured | 3.606 ms |
-| Irreducible | 3.848 ms |
-| Ladder | 1.528 ms |
-| Chain | 1.098 ms |
-| Fan behind chain | 1.469 ms |
-| Small methods | 2.946 ms |
+| Structured | 3.546 ms |
+| Irreducible | 3.771 ms |
+| Ladder | 1.465 ms |
+| Chain | 1.096 ms |
+| Fan behind chain | 1.459 ms |
+| Small methods | 2.900 ms |
 
 #### Throughput @ 100k nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
-| Structured | 277.3 op/s |
-| Irreducible | 259.9 op/s |
-| Ladder | 654.5 op/s |
-| Chain | 910.7 op/s |
-| Fan behind chain | 680.7 op/s |
-| Small methods | 339.4 op/s |
+| Structured | 282.0 op/s |
+| Irreducible | 265.2 op/s |
+| Ladder | 682.6 op/s |
+| Chain | 912.4 op/s |
+| Fan behind chain | 685.4 op/s |
+| Small methods | 344.8 op/s |
 
-### 1.14 Dominance frontiers
+### 1.16 Dominance frontiers
 
 #### Times @ 10k nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
 | Structured | 0.069 ms |
-| Irreducible | 0.083 ms |
-| Ladder | 45.91 ms |
-| Chain | 0.037 ms |
-| Fan behind chain | 105.8 ms |
+| Irreducible | 0.080 ms |
+| Ladder | 45.03 ms |
+| Chain | 0.036 ms |
+| Fan behind chain | 103.3 ms |
+| Small methods | 0.055 ms |
+
+#### Throughput @ 10k nodes (op/s, higher is better)
+
+| Shape | Graphity 2.3.0 |
+|---|---:|
+| Structured | 14 493 op/s |
+| Irreducible | 12 500 op/s |
+| Ladder | 22.21 op/s |
+| Chain | 27 778 op/s |
+| Fan behind chain | 9.681 op/s |
+| Small methods | 18 182 op/s |
+
+#### Times @ 100k nodes (ms/op, lower is better)
+
+| Shape | Graphity 2.3.0 |
+|---|---:|
+| Structured | 1.957 ms |
+| Irreducible | 2.310 ms |
+| Chain | 0.358 ms |
+| Small methods | 1.425 ms |
+
+#### Throughput @ 100k nodes (op/s, higher is better)
+
+| Shape | Graphity 2.3.0 |
+|---|---:|
+| Structured | 511.0 op/s |
+| Irreducible | 432.9 op/s |
+| Chain | 2 793 op/s |
+| Small methods | 701.8 op/s |
+
+### 1.17 Iterated dominance frontier (build + one query per variable)
+
+#### Times @ 10k nodes (ms/op, lower is better)
+
+| Shape | Graphity 2.3.0 |
+|---|---:|
+| Structured | 30.80 ms |
+| Irreducible | 41.67 ms |
+| Ladder | 35.74 ms |
+| Chain | 20.90 ms |
+| Fan behind chain | 33.78 ms |
+| Small methods | 0.435 ms |
+
+#### Throughput @ 10k nodes (op/s, higher is better)
+
+| Shape | Graphity 2.3.0 |
+|---|---:|
+| Structured | 32.47 op/s |
+| Irreducible | 24.00 op/s |
+| Ladder | 27.98 op/s |
+| Chain | 47.85 op/s |
+| Fan behind chain | 29.61 op/s |
+| Small methods | 2 299 op/s |
+
+#### Times @ 100k nodes (ms/op, lower is better)
+
+| Shape | Graphity 2.3.0 |
+|---|---:|
+| Structured | 433.1 ms |
+| Irreducible | 557.4 ms |
+| Ladder | 364.3 ms |
+| Chain | 228.3 ms |
+| Fan behind chain | 404.0 ms |
+| Small methods | 4.420 ms |
+
+#### Throughput @ 100k nodes (op/s, higher is better)
+
+| Shape | Graphity 2.3.0 |
+|---|---:|
+| Structured | 2.309 op/s |
+| Irreducible | 1.794 op/s |
+| Ladder | 2.745 op/s |
+| Chain | 4.380 op/s |
+| Fan behind chain | 2.475 op/s |
+| Small methods | 226.2 op/s |
+
+### 1.18 Loops
+
+#### Times @ 10k nodes (ms/op, lower is better)
+
+| Shape | Graphity 2.3.0 |
+|---|---:|
+| Structured | 0.395 ms |
+| Irreducible | 0.422 ms |
+| Ladder | 0.101 ms |
+| Chain | 0.102 ms |
+| Fan behind chain | 0.102 ms |
+| Small methods | 0.464 ms |
+
+#### Throughput @ 10k nodes (op/s, higher is better)
+
+| Shape | Graphity 2.3.0 |
+|---|---:|
+| Structured | 2 532 op/s |
+| Irreducible | 2 370 op/s |
+| Ladder | 9 901 op/s |
+| Chain | 9 804 op/s |
+| Fan behind chain | 9 804 op/s |
+| Small methods | 2 155 op/s |
+
+#### Times @ 100k nodes (ms/op, lower is better)
+
+| Shape | Graphity 2.3.0 |
+|---|---:|
+| Structured | 5.751 ms |
+| Irreducible | 7.272 ms |
+| Ladder | 1.020 ms |
+| Chain | 0.994 ms |
+| Fan behind chain | 0.997 ms |
+| Small methods | 4.844 ms |
+
+#### Throughput @ 100k nodes (op/s, higher is better)
+
+| Shape | Graphity 2.3.0 |
+|---|---:|
+| Structured | 173.9 op/s |
+| Irreducible | 137.5 op/s |
+| Ladder | 980.4 op/s |
+| Chain | 1 006 op/s |
+| Fan behind chain | 1 003 op/s |
+| Small methods | 206.4 op/s |
+
+### 1.19 Ancestry of the dominator tree
+
+#### Times @ 10k nodes (ms/op, lower is better)
+
+| Shape | Graphity 2.3.0 |
+|---|---:|
+| Structured | 0.065 ms |
+| Irreducible | 0.066 ms |
+| Ladder | 0.045 ms |
+| Chain | 0.056 ms |
+| Fan behind chain | 0.051 ms |
 | Small methods | 0.057 ms |
 
 #### Throughput @ 10k nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
-| Structured | 14 493 op/s |
-| Irreducible | 12 048 op/s |
-| Ladder | 21.78 op/s |
-| Chain | 27 027 op/s |
-| Fan behind chain | 9.452 op/s |
+| Structured | 15 385 op/s |
+| Irreducible | 15 152 op/s |
+| Ladder | 22 222 op/s |
+| Chain | 17 857 op/s |
+| Fan behind chain | 19 608 op/s |
 | Small methods | 17 544 op/s |
 
 #### Times @ 100k nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
-| Structured | 1.991 ms |
-| Irreducible | 2.347 ms |
-| Chain | 0.368 ms |
-| Small methods | 1.455 ms |
+| Structured | 1.792 ms |
+| Irreducible | 1.718 ms |
+| Ladder | 0.488 ms |
+| Chain | 0.553 ms |
+| Fan behind chain | 0.490 ms |
+| Small methods | 1.564 ms |
 
 #### Throughput @ 100k nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
-| Structured | 502.3 op/s |
-| Irreducible | 426.1 op/s |
-| Chain | 2 717 op/s |
-| Small methods | 687.3 op/s |
+| Structured | 558.0 op/s |
+| Irreducible | 582.1 op/s |
+| Ladder | 2 049 op/s |
+| Chain | 1 808 op/s |
+| Fan behind chain | 2 041 op/s |
+| Small methods | 639.4 op/s |
 
-### 1.15 Iterated dominance frontier (build + one query per variable)
+### 1.20 PreorderAncestry of the dominator tree
 
 #### Times @ 10k nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
-| Structured | 30.88 ms |
-| Irreducible | 42.61 ms |
-| Ladder | 36.01 ms |
-| Chain | 21.29 ms |
-| Fan behind chain | 33.67 ms |
-| Small methods | 0.432 ms |
-
-#### Throughput @ 10k nodes (op/s, higher is better)
-
-| Shape | Graphity 2.2.0 |
-|---|---:|
-| Structured | 32.38 op/s |
-| Irreducible | 23.47 op/s |
-| Ladder | 27.77 op/s |
-| Chain | 46.96 op/s |
-| Fan behind chain | 29.70 op/s |
-| Small methods | 2 315 op/s |
-
-#### Times @ 100k nodes (ms/op, lower is better)
-
-| Shape | Graphity 2.2.0 |
-|---|---:|
-| Structured | 438.1 ms |
-| Irreducible | 572.2 ms |
-| Ladder | 375.5 ms |
-| Chain | 231.5 ms |
-| Fan behind chain | 405.6 ms |
-| Small methods | 4.535 ms |
-
-#### Throughput @ 100k nodes (op/s, higher is better)
-
-| Shape | Graphity 2.2.0 |
-|---|---:|
-| Structured | 2.283 op/s |
-| Irreducible | 1.748 op/s |
-| Ladder | 2.663 op/s |
-| Chain | 4.320 op/s |
-| Fan behind chain | 2.465 op/s |
-| Small methods | 220.5 op/s |
-
-### 1.16 Loops
-
-#### Times @ 10k nodes (ms/op, lower is better)
-
-| Shape | Graphity 2.2.0 |
-|---|---:|
-| Structured | 0.400 ms |
-| Irreducible | 0.420 ms |
-| Ladder | 0.102 ms |
-| Chain | 0.103 ms |
-| Fan behind chain | 0.103 ms |
-| Small methods | 0.465 ms |
-
-#### Throughput @ 10k nodes (op/s, higher is better)
-
-| Shape | Graphity 2.2.0 |
-|---|---:|
-| Structured | 2 500 op/s |
-| Irreducible | 2 381 op/s |
-| Ladder | 9 804 op/s |
-| Chain | 9 709 op/s |
-| Fan behind chain | 9 709 op/s |
-| Small methods | 2 151 op/s |
-
-#### Times @ 100k nodes (ms/op, lower is better)
-
-| Shape | Graphity 2.2.0 |
-|---|---:|
-| Structured | 5.543 ms |
-| Irreducible | 7.337 ms |
-| Ladder | 1.035 ms |
-| Chain | 0.992 ms |
-| Fan behind chain | 1.005 ms |
-| Small methods | 4.997 ms |
-
-#### Throughput @ 100k nodes (op/s, higher is better)
-
-| Shape | Graphity 2.2.0 |
-|---|---:|
-| Structured | 180.4 op/s |
-| Irreducible | 136.3 op/s |
-| Ladder | 966.2 op/s |
-| Chain | 1 008 op/s |
-| Fan behind chain | 995.0 op/s |
-| Small methods | 200.1 op/s |
-
-### 1.17 Ancestry of the dominator tree
-
-#### Times @ 10k nodes (ms/op, lower is better)
-
-| Shape | Graphity 2.2.0 |
-|---|---:|
-| Structured | 0.065 ms |
-| Irreducible | 0.067 ms |
-| Ladder | 0.052 ms |
-| Chain | 0.056 ms |
-| Fan behind chain | 0.052 ms |
-| Small methods | 0.058 ms |
-
-#### Throughput @ 10k nodes (op/s, higher is better)
-
-| Shape | Graphity 2.2.0 |
-|---|---:|
-| Structured | 15 385 op/s |
-| Irreducible | 14 925 op/s |
-| Ladder | 19 231 op/s |
-| Chain | 17 857 op/s |
-| Fan behind chain | 19 231 op/s |
-| Small methods | 17 241 op/s |
-
-#### Times @ 100k nodes (ms/op, lower is better)
-
-| Shape | Graphity 2.2.0 |
-|---|---:|
-| Structured | 1.897 ms |
-| Irreducible | 1.727 ms |
-| Ladder | 0.504 ms |
-| Chain | 0.559 ms |
-| Fan behind chain | 0.543 ms |
-| Small methods | 1.591 ms |
-
-#### Throughput @ 100k nodes (op/s, higher is better)
-
-| Shape | Graphity 2.2.0 |
-|---|---:|
-| Structured | 527.1 op/s |
-| Irreducible | 579.0 op/s |
-| Ladder | 1 984 op/s |
-| Chain | 1 789 op/s |
-| Fan behind chain | 1 842 op/s |
-| Small methods | 628.5 op/s |
-
-### 1.18 PreorderAncestry of the dominator tree
-
-#### Times @ 10k nodes (ms/op, lower is better)
-
-| Shape | Graphity 2.2.0 |
-|---|---:|
-| Structured | 0.052 ms |
-| Irreducible | 0.052 ms |
-| Ladder | 0.045 ms |
+| Structured | 0.051 ms |
+| Irreducible | 0.051 ms |
+| Ladder | 0.044 ms |
 | Chain | 0.046 ms |
-| Fan behind chain | 0.044 ms |
-| Small methods | 0.050 ms |
+| Fan behind chain | 0.045 ms |
+| Small methods | 0.048 ms |
 
 #### Throughput @ 10k nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
-| Structured | 19 231 op/s |
-| Irreducible | 19 231 op/s |
-| Ladder | 22 222 op/s |
+| Structured | 19 608 op/s |
+| Irreducible | 19 608 op/s |
+| Ladder | 22 727 op/s |
 | Chain | 21 739 op/s |
-| Fan behind chain | 22 727 op/s |
-| Small methods | 20 000 op/s |
+| Fan behind chain | 22 222 op/s |
+| Small methods | 20 833 op/s |
 
 #### Times @ 100k nodes (ms/op, lower is better)
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
-| Structured | 1.072 ms |
-| Irreducible | 1.051 ms |
-| Ladder | 0.378 ms |
-| Chain | 0.426 ms |
-| Fan behind chain | 0.376 ms |
-| Small methods | 0.868 ms |
+| Structured | 1.094 ms |
+| Irreducible | 1.055 ms |
+| Ladder | 0.346 ms |
+| Chain | 0.411 ms |
+| Fan behind chain | 0.401 ms |
+| Small methods | 0.846 ms |
 
 #### Throughput @ 100k nodes (op/s, higher is better)
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
-| Structured | 932.8 op/s |
-| Irreducible | 951.5 op/s |
-| Ladder | 2 646 op/s |
-| Chain | 2 347 op/s |
-| Fan behind chain | 2 660 op/s |
-| Small methods | 1 152 op/s |
+| Structured | 914.1 op/s |
+| Irreducible | 947.9 op/s |
+| Ladder | 2 890 op/s |
+| Chain | 2 433 op/s |
+| Fan behind chain | 2 494 op/s |
+| Small methods | 1 182 op/s |
 
 ## 2 Memory Footprint
 
-Retained heap in bytes for a fully built graph. Lower is better. Baseline (= 100%): **Graphity 2.2.0**, or the newest version present in a table it is missing from. Two charts per section: *Graphity & WebGraph* (same league) and *All libraries*.
+Retained heap in bytes for a fully built graph. Lower is better. Baseline (= 100%): **Graphity 2.3.0**, or the newest version present in a table it is missing from. Two charts per section: *Graphity & WebGraph* (same league) and *All libraries*.
 
 ### 2.1 Total Graph Size
 
 **Memory footprint in bytes (lower is better)**
 
-| Shape | Graphity 2.2.0 | JGraphT | Guava | WebGraph |
+| Shape | Graphity 2.3.0 | JGraphT | Guava | WebGraph |
 |---|---:|---:|---:|---:|
-| Path<br><sub>10k nodes, 10k edges</sub> | 80.1 kB | 4.0 MB (5037%) | 2.7 MB (3375%) | 18.8 kB (23.5%) |
-| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 80.1 kB | 4.0 MB (5037%) | 2.7 MB (3375%) | 37.8 kB (47.3%) |
+| Path<br><sub>10k nodes, 10k edges</sub> | 80.1 kB | 4.0 MB (5037%) | 2.7 MB (3375%) | 18.8 kB (23.4%) |
+| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 80.1 kB | 4.0 MB (5037%) | 2.7 MB (3375%) | 37.8 kB (47.2%) |
 | Tree<br><sub>10k nodes, 10k edges</sub> | 80.1 kB | 4.0 MB (5043%) | 2.7 MB (3378%) | 31.9 kB (39.8%) |
 | GNP sparse<br><sub>10k nodes, 30k edges</sub> | 160 kB | 8.6 MB (5343%) | 4.8 MB (2984%) | 78.8 kB (49.2%) |
 | GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 1.2 MB | 68.6 MB (5544%) | 33.4 MB (2700%) | 475 kB (38.4%) |
-| GNP dense shfld.<br><sub>10k nodes, 299.6k edges</sub> | 1.2 MB | 68.6 MB (5543%) | 33.4 MB (2700%) | 475 kB (38.4%) |
 | Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 1.3 MB | 71.3 MB (5558%) | 22.7 MB (1769%) | 50.6 kB (3.9%) |
 | Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 1.3 MB | 71.3 MB (5559%) | 22.7 MB (1769%) | 482 kB (37.6%) |
 | Path<br><sub>100k nodes, 100k edges</sub> | 800 kB | 41.5 MB (5192%) | 27.4 MB (3430%) | 181 kB (22.6%) |
@@ -1491,7 +1531,6 @@ Retained heap in bytes for a fully built graph. Lower is better. Baseline (= 100
 | Tree<br><sub>100k nodes, 100k edges</sub> | 800 kB | 41.7 MB (5208%) | 27.5 MB (3443%) | 372 kB (46.4%) |
 | GNP sparse<br><sub>100k nodes, 300k edges</sub> | 1.6 MB | 85.0 MB (5310%) | 48.3 MB (3016%) | 952 kB (59.5%) |
 | GNP dense<br><sub>100k nodes, 3M edges</sub> | 12.4 MB | 680 MB (5488%) | 337 MB (2716%) | 6.4 MB (51.7%) |
-| GNP dense shfld.<br><sub>100k nodes, 3M edges</sub> | 12.4 MB | 680 MB (5488%) | 337 MB (2716%) | 6.4 MB (51.7%) |
 | Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 12.8 MB | 706 MB (5506%) | 228 MB (1777%) | 499 kB (3.9%) |
 | Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 12.8 MB | 706 MB (5506%) | 228 MB (1777%) | 6.6 MB (51.6%) |
 | GNP sparse<br><sub>1M nodes, 3M edges</sub> | 16.0 MB | — | — | — |
@@ -1510,14 +1549,13 @@ Retained heap in bytes for a fully built graph. Lower is better. Baseline (= 100
 
 **Memory footprint in bytes (lower is better)**
 
-| Shape | Graphity 2.2.0 | JGraphT | Guava | WebGraph |
+| Shape | Graphity 2.3.0 | JGraphT | Guava | WebGraph |
 |---|---:|---:|---:|---:|
 | Path<br><sub>10k nodes, 10k edges</sub> | 4 B | 201.65 B (5041%) | 135.10 B (3378%) | 0.94 B (23.5%) |
 | Path shfld.<br><sub>10k nodes, 10k edges</sub> | 4 B | 201.65 B (5041%) | 135.10 B (3378%) | 1.89 B (47.2%) |
 | Tree<br><sub>10k nodes, 10k edges</sub> | 4 B | 201.90 B (5048%) | 135.24 B (3381%) | 1.60 B (40.0%) |
 | GNP sparse<br><sub>10k nodes, 30k edges</sub> | 4 B | 213.79 B (5345%) | 119.42 B (2986%) | 1.97 B (49.2%) |
 | GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 4 B | 221.75 B (5544%) | 108.02 B (2700%) | 1.54 B (38.5%) |
-| GNP dense shfld.<br><sub>10k nodes, 299.6k edges</sub> | 4 B | 221.75 B (5544%) | 108.01 B (2700%) | 1.53 B (38.2%) |
 | Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 4 B | 222.34 B (5558%) | 70.78 B (1770%) | 0.16 B (4.0%) |
 | Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 4 B | 222.36 B (5559%) | 70.78 B (1770%) | 1.50 B (37.5%) |
 | Path<br><sub>100k nodes, 100k edges</sub> | 4 B | 207.71 B (5193%) | 137.23 B (3431%) | 0.90 B (22.5%) |
@@ -1525,7 +1563,6 @@ Retained heap in bytes for a fully built graph. Lower is better. Baseline (= 100
 | Tree<br><sub>100k nodes, 100k edges</sub> | 4 B | 208.34 B (5208%) | 137.73 B (3443%) | 1.86 B (46.5%) |
 | GNP sparse<br><sub>100k nodes, 300k edges</sub> | 4 B | 212.40 B (5310%) | 120.65 B (3016%) | 2.38 B (59.5%) |
 | GNP dense<br><sub>100k nodes, 3M edges</sub> | 4 B | 219.51 B (5488%) | 108.63 B (2716%) | 2.07 B (51.7%) |
-| GNP dense shfld.<br><sub>100k nodes, 3M edges</sub> | 4 B | 219.52 B (5488%) | 108.63 B (2716%) | 2.07 B (51.7%) |
 | Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 4 B | 220.25 B (5506%) | 71.08 B (1777%) | 0.16 B (4.0%) |
 | Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 4 B | 220.25 B (5506%) | 71.08 B (1777%) | 2.06 B (51.5%) |
 | GNP sparse<br><sub>1M nodes, 3M edges</sub> | 4 B | — | — | — |
@@ -1542,35 +1579,33 @@ Retained heap in bytes for a fully built graph. Lower is better. Baseline (= 100
 
 ## 3 Allocations
 
-Bytes allocated per algorithm invocation (JMH `-prof gc`). Lower is better. Baseline (= 100%): **Graphity 2.2.0**, or the newest version present in a table it is missing from.
+Bytes allocated per algorithm invocation (JMH `-prof gc`). Lower is better. Baseline (= 100%): **Graphity 2.3.0**, or the newest version present in a table it is missing from.
 
 ### 3.1 Build
 
 **Allocations @ 10k nodes in bytes (lower is better)**
 
-| Shape | Graphity 2.2.0 | JGraphT | Guava | WebGraph |
+| Shape | Graphity 2.3.0 | JGraphT | Guava | WebGraph |
 |---|---:|---:|---:|---:|
-| Path<br><sub>10k nodes, 10k edges</sub> | 458 kB | 5.3 MB (1163%) | 2.8 MB (604%) | 4.3 MB (948%) |
-| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 458 kB | 5.2 MB (1133%) | 2.8 MB (604%) | 4.4 MB (954%) |
-| Tree<br><sub>10k nodes, 10k edges</sub> | 458 kB | 5.3 MB (1161%) | 2.8 MB (609%) | 4.1 MB (887%) |
-| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 960 kB | 13.1 MB (1360%) | 5.1 MB (536%) | 4.4 MB (463%) |
-| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 9.9 MB | 111 MB (1116%) | 37.3 MB (376%) | 9.7 MB (98.2%) |
-| GNP dense shfld.<br><sub>10k nodes, 299.6k edges</sub> | 9.9 MB | 111 MB (1116%) | 37.3 MB (376%) | 9.7 MB (98.1%) |
+| Path<br><sub>10k nodes, 10k edges</sub> | 458 kB | 5.3 MB (1163%) | 2.8 MB (604%) | 4.3 MB (949%) |
+| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 458 kB | 5.2 MB (1133%) | 2.8 MB (604%) | 4.4 MB (955%) |
+| Tree<br><sub>10k nodes, 10k edges</sub> | 458 kB | 5.3 MB (1161%) | 2.8 MB (609%) | 4.1 MB (888%) |
+| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 960 kB | 13.1 MB (1360%) | 5.1 MB (536%) | 4.5 MB (464%) |
+| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 9.9 MB | 111 MB (1116%) | 37.3 MB (376%) | 9.8 MB (98.5%) |
 | Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 10.0 MB | 116 MB (1159%) | 29.3 MB (294%) | 8.9 MB (89.7%) |
-| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 10.0 MB | 116 MB (1159%) | 29.3 MB (294%) | 9.4 MB (94.1%) |
+| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 10.0 MB | 116 MB (1159%) | 29.3 MB (294%) | 9.4 MB (94.5%) |
 
 ![3.1.1 · Build @ n = 10 000](fig/synthetic-ubuntu-ryzen-9950x-peers/3-1-1-build-n-10-000.svg)
 
 **Allocations @ 100k nodes in bytes (lower is better)**
 
-| Shape | Graphity 2.2.0 | JGraphT | Guava | WebGraph |
+| Shape | Graphity 2.3.0 | JGraphT | Guava | WebGraph |
 |---|---:|---:|---:|---:|
-| Path<br><sub>100k nodes, 100k edges</sub> | 3.8 MB | 54.4 MB (1447%) | 28.5 MB (757%) | 14.2 MB (378%) |
-| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 3.8 MB | 54.3 MB (1443%) | 28.5 MB (757%) | 14.5 MB (385%) |
-| Tree<br><sub>100k nodes, 100k edges</sub> | 3.8 MB | 55.6 MB (1479%) | 28.8 MB (766%) | 11.4 MB (302%) |
-| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 10.6 MB | 129 MB (1215%) | 52.3 MB (492%) | 15.3 MB (144%) |
-| GNP dense<br><sub>100k nodes, 3M edges</sub> | 111 MB | 1094 MB (983%) | 376 MB (338%) | 69.8 MB (62.7%) |
-| GNP dense shfld.<br><sub>100k nodes, 3M edges</sub> | 111 MB | 1094 MB (983%) | 376 MB (338%) | 69.8 MB (62.7%) |
+| Path<br><sub>100k nodes, 100k edges</sub> | 3.8 MB | 54.4 MB (1447%) | 28.5 MB (757%) | 14.3 MB (379%) |
+| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 3.8 MB | 54.3 MB (1443%) | 28.5 MB (757%) | 14.5 MB (386%) |
+| Tree<br><sub>100k nodes, 100k edges</sub> | 3.8 MB | 55.7 MB (1479%) | 28.8 MB (766%) | 11.4 MB (303%) |
+| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 10.6 MB | 129 MB (1215%) | 52.3 MB (492%) | 15.4 MB (145%) |
+| GNP dense<br><sub>100k nodes, 3M edges</sub> | 111 MB | 1094 MB (983%) | 376 MB (338%) | 69.9 MB (62.8%) |
 | Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 112 MB | 1139 MB (1020%) | 294 MB (264%) | 60.2 MB (53.9%) |
 | Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 112 MB | 1139 MB (1020%) | 294 MB (264%) | 66.4 MB (59.5%) |
 
@@ -1580,31 +1615,29 @@ Bytes allocated per algorithm invocation (JMH `-prof gc`). Lower is better. Base
 
 **Allocations @ 10k nodes in bytes (lower is better)**
 
-| Shape | Graphity 2.2.0 | JGraphT | Guava | WebGraph |
+| Shape | Graphity 2.3.0 | JGraphT | Guava | WebGraph |
 |---|---:|---:|---:|---:|
-| Path<br><sub>10k nodes, 10k edges</sub> | 534 kB | 5.2 MB (975%) | 4.0 MB (758%) | 1.4 MB (269%) |
-| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 534 kB | 5.2 MB (966%) | 4.0 MB (747%) | 1.3 MB (247%) |
-| Tree<br><sub>10k nodes, 10k edges</sub> | 288 kB | 5.0 MB (1746%) | 3.7 MB (1299%) | 908 kB (315%) |
-| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 371 kB | 3.2 MB (854%) | 4.0 MB (1091%) | 1.3 MB (346%) |
-| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 498 kB | 6.3 MB (1276%) | 5.2 MB (1044%) | 1.5 MB (295%) |
-| GNP dense shfld.<br><sub>10k nodes, 299.6k edges</sub> | 497 kB | 6.3 MB (1277%) | 5.2 MB (1044%) | 1.5 MB (294%) |
-| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 495 kB | 4.8 MB (964%) | 8.5 MB (1720%) | 6.1 MB (1237%) |
+| Path<br><sub>10k nodes, 10k edges</sub> | 534 kB | 5.2 MB (975%) | 2.6 MB (488%) | 1.4 MB (269%) |
+| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 534 kB | 5.2 MB (966%) | 2.6 MB (478%) | 1.3 MB (247%) |
+| Tree<br><sub>10k nodes, 10k edges</sub> | 288 kB | 5.0 MB (1746%) | 2.3 MB (799%) | 908 kB (315%) |
+| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 371 kB | 3.2 MB (854%) | 2.6 MB (703%) | 1.3 MB (346%) |
+| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 498 kB | 6.4 MB (1276%) | 4.6 MB (916%) | 1.5 MB (295%) |
+| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 496 kB | 4.8 MB (964%) | 7.1 MB (1429%) | 6.1 MB (1237%) |
 | Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 364 kB | 6.0 MB (1634%) | 7.2 MB (1982%) | 1.3 MB (348%) |
 
 ![3.2.1 · SCC @ n = 10 000](fig/synthetic-ubuntu-ryzen-9950x-peers/3-2-1-scc-n-10-000.svg)
 
 **Allocations @ 100k nodes in bytes (lower is better)**
 
-| Shape | Graphity 2.2.0 | JGraphT | Guava | WebGraph |
+| Shape | Graphity 2.3.0 | JGraphT | Guava | WebGraph |
 |---|---:|---:|---:|---:|
 | Path<br><sub>100k nodes, 100k edges</sub> | 4.9 MB | 51.6 MB (1056%) | 28.9 MB (591%) | 13.3 MB (272%) |
-| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 4.9 MB | 51.7 MB (1058%) | 41.8 MB (855%) | 13.5 MB (275%) |
+| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 4.9 MB | 51.7 MB (1058%) | 27.4 MB (561%) | 13.5 MB (275%) |
 | Tree<br><sub>100k nodes, 100k edges</sub> | 2.8 MB | 50.3 MB (1792%) | 25.5 MB (907%) | 8.8 MB (314%) |
-| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 3.5 MB | 32.1 MB (916%) | 42.9 MB (1222%) | 12.3 MB (351%) |
-| GNP dense<br><sub>100k nodes, 3M edges</sub> | 4.5 MB | 71.7 MB (1588%) | 46.2 MB (1023%) | 13.5 MB (298%) |
-| GNP dense shfld.<br><sub>100k nodes, 3M edges</sub> | 4.5 MB | 71.7 MB (1588%) | 53.7 MB (1189%) | 13.5 MB (298%) |
-| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 4.5 MB | 48.7 MB (1081%) | 76.8 MB (1706%) | 60.3 MB (1339%) |
-| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 3.5 MB | 61.4 MB (1777%) | 89.7 MB (2598%) | 12.3 MB (356%) |
+| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 3.5 MB | 32.2 MB (916%) | 28.5 MB (812%) | 12.3 MB (351%) |
+| GNP dense<br><sub>100k nodes, 3M edges</sub> | 4.5 MB | 70.1 MB (1552%) | 45.2 MB (1002%) | 13.5 MB (298%) |
+| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 4.5 MB | 48.5 MB (1078%) | 76.8 MB (1706%) | 60.3 MB (1339%) |
+| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 3.5 MB | 61.4 MB (1777%) | 75.3 MB (2181%) | 12.3 MB (356%) |
 
 ![3.2.2 · SCC @ n = 100 000](fig/synthetic-ubuntu-ryzen-9950x-peers/3-2-2-scc-n-100-000.svg)
 
@@ -1612,31 +1645,29 @@ Bytes allocated per algorithm invocation (JMH `-prof gc`). Lower is better. Base
 
 **Allocations @ 10k nodes in bytes (lower is better)**
 
-| Shape | Graphity 2.2.0 | JGraphT | Guava | WebGraph |
+| Shape | Graphity 2.3.0 | JGraphT | Guava | WebGraph |
 |---|---:|---:|---:|---:|
-| Path<br><sub>10k nodes, 10k edges</sub> | 200 kB | 3.0 MB (1516%) | 3.0 MB (1516%) | 2.0 MB (989%) |
-| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 200 kB | 2.3 MB (1156%) | 3.0 MB (1516%) | 1.9 MB (929%) |
-| Tree<br><sub>10k nodes, 10k edges</sub> | 200 kB | 3.1 MB (1545%) | 3.0 MB (1516%) | 1.2 MB (611%) |
-| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 200 kB | 3.1 MB (1551%) | 3.5 MB (1754%) | 1.2 MB (600%) |
+| Path<br><sub>10k nodes, 10k edges</sub> | 200 kB | 3.0 MB (1516%) | 2.4 MB (1196%) | 2.0 MB (989%) |
+| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 200 kB | 2.3 MB (1156%) | 2.4 MB (1196%) | 1.9 MB (929%) |
+| Tree<br><sub>10k nodes, 10k edges</sub> | 200 kB | 3.1 MB (1545%) | 2.4 MB (1196%) | 1.2 MB (611%) |
+| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 200 kB | 3.1 MB (1551%) | 2.9 MB (1435%) | 1.2 MB (600%) |
 | GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 200 kB | 10.3 MB (5169%) | 9.3 MB (4668%) | 1.3 MB (650%) |
-| GNP dense shfld.<br><sub>10k nodes, 299.6k edges</sub> | 200 kB | 10.3 MB (5169%) | 9.3 MB (4668%) | 1.3 MB (641%) |
-| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 200 kB | 9.4 MB (4720%) | 9.6 MB (4803%) | 6.1 MB (3071%) |
-| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 200 kB | 9.4 MB (4720%) | 9.6 MB (4803%) | 1.3 MB (642%) |
+| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 200 kB | 9.4 MB (4720%) | 9.6 MB (4802%) | 6.1 MB (3070%) |
+| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 200 kB | 9.8 MB (4919%) | 9.6 MB (4802%) | 1.3 MB (642%) |
 
 ![3.3.1 · WCC @ n = 10 000](fig/synthetic-ubuntu-ryzen-9950x-peers/3-3-1-wcc-n-10-000.svg)
 
 **Allocations @ 100k nodes in bytes (lower is better)**
 
-| Shape | Graphity 2.2.0 | JGraphT | Guava | WebGraph |
+| Shape | Graphity 2.3.0 | JGraphT | Guava | WebGraph |
 |---|---:|---:|---:|---:|
-| Path<br><sub>100k nodes, 100k edges</sub> | 2.0 MB | 32.7 MB (1635%) | 26.3 MB (1315%) | 19.3 MB (964%) |
+| Path<br><sub>100k nodes, 100k edges</sub> | 2.0 MB | 32.7 MB (1635%) | 26.3 MB (1315%) | 19.3 MB (965%) |
 | Path shfld.<br><sub>100k nodes, 100k edges</sub> | 2.0 MB | 32.7 MB (1635%) | 26.3 MB (1315%) | 16.5 MB (824%) |
 | Tree<br><sub>100k nodes, 100k edges</sub> | 2.0 MB | 33.2 MB (1661%) | 26.3 MB (1315%) | 11.1 MB (557%) |
-| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 2.0 MB | 37.5 MB (1875%) | 37.5 MB (1873%) | 11.0 MB (552%) |
-| GNP dense<br><sub>100k nodes, 3M edges</sub> | 2.0 MB | 106 MB (5304%) | 95.9 MB (4794%) | 11.7 MB (587%) |
-| GNP dense shfld.<br><sub>100k nodes, 3M edges</sub> | 2.0 MB | 106 MB (5304%) | 95.9 MB (4794%) | 11.8 MB (589%) |
-| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 2.0 MB | 101 MB (5037%) | 98.4 MB (4918%) | 61.4 MB (3071%) |
-| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 2.0 MB | 96.7 MB (4837%) | 98.4 MB (4918%) | 12.5 MB (623%) |
+| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 2.0 MB | 37.5 MB (1875%) | 31.1 MB (1554%) | 11.0 MB (552%) |
+| GNP dense<br><sub>100k nodes, 3M edges</sub> | 2.0 MB | 106 MB (5303%) | 95.9 MB (4793%) | 11.7 MB (587%) |
+| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 2.0 MB | 101 MB (5036%) | 98.4 MB (4917%) | 61.4 MB (3070%) |
+| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 2.0 MB | 96.8 MB (4836%) | 98.4 MB (4917%) | 12.5 MB (623%) |
 
 ![3.3.2 · WCC @ n = 100 000](fig/synthetic-ubuntu-ryzen-9950x-peers/3-3-2-wcc-n-100-000.svg)
 
@@ -1644,27 +1675,25 @@ Bytes allocated per algorithm invocation (JMH `-prof gc`). Lower is better. Base
 
 **Allocations @ 10k nodes in bytes (lower is better)**
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
 | Path<br><sub>10k nodes, 10k edges</sub> | 200 kB |
 | Path shfld.<br><sub>10k nodes, 10k edges</sub> | 200 kB |
 | Tree<br><sub>10k nodes, 10k edges</sub> | 200 kB |
 | GNP sparse<br><sub>10k nodes, 30k edges</sub> | 200 kB |
 | GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 200 kB |
-| GNP dense shfld.<br><sub>10k nodes, 299.6k edges</sub> | 200 kB |
 | Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 200 kB |
 | Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 200 kB |
 
 **Allocations @ 100k nodes in bytes (lower is better)**
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
 | Path<br><sub>100k nodes, 100k edges</sub> | 2.0 MB |
 | Path shfld.<br><sub>100k nodes, 100k edges</sub> | 2.0 MB |
 | Tree<br><sub>100k nodes, 100k edges</sub> | 2.0 MB |
 | GNP sparse<br><sub>100k nodes, 300k edges</sub> | 2.0 MB |
 | GNP dense<br><sub>100k nodes, 3M edges</sub> | 2.0 MB |
-| GNP dense shfld.<br><sub>100k nodes, 3M edges</sub> | 2.0 MB |
 | Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 2.0 MB |
 | Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 2.0 MB |
 
@@ -1672,58 +1701,58 @@ Bytes allocated per algorithm invocation (JMH `-prof gc`). Lower is better. Base
 
 **Allocations @ 1k nodes in bytes (lower is better)**
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
 | Path<br><sub>1k nodes, 1k edges</sub> | 23.2 kB |
-| GNP dense<br><sub>1k nodes, 30k edges</sub> | 96 B |
-| Chain of cliques<br><sub>1k nodes, 31.1k edges</sub> | 760 B |
+| GNP dense<br><sub>1k nodes, 30k edges</sub> | 97 B |
+| Chain of cliques<br><sub>1k nodes, 31.1k edges</sub> | 761 B |
 | DAG GNP sparse<br><sub>1k nodes</sub> | 66.4 kB |
 
 **Allocations @ 10k nodes in bytes (lower is better)**
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
 | Path<br><sub>10k nodes, 10k edges</sub> | 250 kB |
-| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 97 B |
+| GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 103 B |
 | Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 7.2 kB |
 | DAG GNP sparse<br><sub>10k nodes</sub> | 541 kB |
 
 **Allocations @ 100k nodes in bytes (lower is better)**
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
 | Path<br><sub>100k nodes, 100k edges</sub> | 2.1 MB |
-| GNP dense<br><sub>100k nodes, 3M edges</sub> | 107 B |
-| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 75.7 kB |
+| GNP dense<br><sub>100k nodes, 3M edges</sub> | 205 B |
+| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 75.8 kB |
 | DAG GNP sparse<br><sub>100k nodes</sub> | 5.9 MB |
 
 ### 3.6 TopOrder
 
 **Allocations @ 10k nodes in bytes (lower is better)**
 
-| Shape | Graphity 2.2.0 | JGraphT | Guava | WebGraph |
+| Shape | Graphity 2.3.0 | JGraphT | Guava | WebGraph |
 |---|---:|---:|---:|---:|
 | Path<br><sub>10k nodes, 10k edges</sub> | 297 kB | 1.3 MB (422%) | 943 kB (318%) | 1.5 MB (494%) |
-| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 297 kB | 1.3 MB (422%) | 2.4 MB (803%) | 1.0 MB (345%) |
-| Tree<br><sub>10k nodes, 10k edges</sub> | 50.8 kB | 1.3 MB (2507%) | 2.3 MB (4430%) | 885 kB (1742%) |
-| Tree shfld.<br><sub>10k nodes</sub> | 50.8 kB | 1.3 MB (2507%) | 2.3 MB (4430%) | 845 kB (1663%) |
-| DAG GNP sparse<br><sub>10k nodes</sub> | 50.8 kB | 1.3 MB (2507%) | 2.3 MB (4430%) | 984 kB (1936%) |
-| DAG GNP dense<br><sub>10k nodes</sub> | 50.8 kB | 1.3 MB (2468%) | 812 kB (1597%) | 1.1 MB (2162%) |
-| DAG GNP dense shfld.<br><sub>10k nodes</sub> | 50.8 kB | 1.3 MB (2468%) | 2.3 MB (4430%) | 1.1 MB (2119%) |
+| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 297 kB | 1.3 MB (422%) | 1.1 MB (372%) | 1.0 MB (345%) |
+| Tree<br><sub>10k nodes, 10k edges</sub> | 50.8 kB | 1.3 MB (2507%) | 812 kB (1597%) | 885 kB (1742%) |
+| Tree shfld.<br><sub>10k nodes</sub> | 50.8 kB | 1.3 MB (2507%) | 812 kB (1597%) | 845 kB (1663%) |
+| DAG GNP sparse<br><sub>10k nodes</sub> | 50.8 kB | 1.3 MB (2506%) | 930 kB (1830%) | 984 kB (1936%) |
+| DAG GNP dense<br><sub>10k nodes</sub> | 50.8 kB | 1.3 MB (2469%) | 812 kB (1597%) | 1.1 MB (2161%) |
+| DAG GNP dense shfld.<br><sub>10k nodes</sub> | 50.9 kB | 1.3 MB (2469%) | 812 kB (1597%) | 1.1 MB (2118%) |
 
 ![3.6.1 · TopOrder @ n = 10 000](fig/synthetic-ubuntu-ryzen-9950x-peers/3-6-1-toporder-n-10-000.svg)
 
 **Allocations @ 100k nodes in bytes (lower is better)**
 
-| Shape | Graphity 2.2.0 | JGraphT | Guava | WebGraph |
+| Shape | Graphity 2.3.0 | JGraphT | Guava | WebGraph |
 |---|---:|---:|---:|---:|
-| Path<br><sub>100k nodes, 100k edges</sub> | 2.5 MB | 13.3 MB (529%) | 24.3 MB (968%) | 10.5 MB (417%) |
+| Path<br><sub>100k nodes, 100k edges</sub> | 2.5 MB | 13.3 MB (529%) | 9.9 MB (396%) | 10.5 MB (417%) |
 | Path shfld.<br><sub>100k nodes, 100k edges</sub> | 2.5 MB | 13.3 MB (529%) | 8.9 MB (354%) | 10.0 MB (400%) |
-| Tree<br><sub>100k nodes, 100k edges</sub> | 433 kB | 13.5 MB (3108%) | 7.8 MB (1811%) | 8.5 MB (1953%) |
-| Tree shfld.<br><sub>100k nodes</sub> | 433 kB | 13.5 MB (3108%) | 22.2 MB (5134%) | 8.4 MB (1945%) |
-| DAG GNP sparse<br><sub>100k nodes</sub> | 433 kB | 13.6 MB (3128%) | 12.6 MB (2904%) | 9.5 MB (2203%) |
-| DAG GNP dense<br><sub>100k nodes</sub> | 433 kB | 13.3 MB (3074%) | 7.9 MB (1812%) | 10.3 MB (2375%) |
-| DAG GNP dense shfld.<br><sub>100k nodes</sub> | 433 kB | 13.3 MB (3074%) | 7.9 MB (1812%) | 10.2 MB (2361%) |
+| Tree<br><sub>100k nodes, 100k edges</sub> | 433 kB | 13.5 MB (3108%) | 7.9 MB (1811%) | 8.5 MB (1953%) |
+| Tree shfld.<br><sub>100k nodes</sub> | 433 kB | 13.5 MB (3108%) | 7.9 MB (1811%) | 8.4 MB (1944%) |
+| DAG GNP sparse<br><sub>100k nodes</sub> | 433 kB | 13.6 MB (3128%) | 9.6 MB (2210%) | 9.5 MB (2203%) |
+| DAG GNP dense<br><sub>100k nodes</sub> | 434 kB | 13.3 MB (3073%) | 7.9 MB (1812%) | 10.3 MB (2374%) |
+| DAG GNP dense shfld.<br><sub>100k nodes</sub> | 434 kB | 13.3 MB (3073%) | 7.9 MB (1811%) | 10.2 MB (2360%) |
 
 ![3.6.2 · TopOrder @ n = 100 000](fig/synthetic-ubuntu-ryzen-9950x-peers/3-6-2-toporder-n-100-000.svg)
 
@@ -1731,26 +1760,26 @@ Bytes allocated per algorithm invocation (JMH `-prof gc`). Lower is better. Base
 
 **Allocations @ 10k nodes in bytes (lower is better)**
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(bi-adjacent) | JGraphT | Guava | WebGraph |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(bi-adjacent) | JGraphT | Guava | WebGraph |
 |---|---:|---:|---:|---:|---:|
-| Path<br><sub>10k nodes, 10k edges</sub> | 160 kB | 160 kB (100%) | 476 kB (297%) | 1.9 MB (1196%) | 1.7 MB (1088%) |
-| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 160 kB | 160 kB (100%) | 476 kB (297%) | 1.9 MB (1196%) | 1.7 MB (1070%) |
-| Tree<br><sub>10k nodes, 10k edges</sub> | 160 kB | 160 kB (100%) | 476 kB (297%) | 1.9 MB (1196%) | 1.3 MB (828%) |
-| Tree shfld.<br><sub>10k nodes</sub> | 160 kB | 160 kB (100%) | 476 kB (297%) | 1.9 MB (1196%) | 1.3 MB (796%) |
-| DAG GNP sparse<br><sub>10k nodes</sub> | 160 kB | 160 kB (100%) | 476 kB (297%) | 476 kB (297%) | 1.6 MB (1016%) |
-| DAG GNP dense<br><sub>10k nodes</sub> | 160 kB | 160 kB (100.0%) | 476 kB (297%) | 1.9 MB (1196%) | 1.8 MB (1126%) |
-| DAG GNP dense shfld.<br><sub>10k nodes</sub> | 160 kB | 160 kB (100.0%) | 476 kB (297%) | 1.9 MB (1196%) | 1.8 MB (1140%) |
+| Path<br><sub>10k nodes, 10k edges</sub> | 160 kB | 160 kB (100%) | 476 kB (297%) | 476 kB (297%) | 1.7 MB (1088%) |
+| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 160 kB | 160 kB (100%) | 476 kB (297%) | 476 kB (297%) | 1.7 MB (1070%) |
+| Tree<br><sub>10k nodes, 10k edges</sub> | 160 kB | 160 kB (100%) | 476 kB (297%) | 476 kB (297%) | 1.3 MB (829%) |
+| Tree shfld.<br><sub>10k nodes</sub> | 160 kB | 160 kB (100%) | 476 kB (297%) | 476 kB (297%) | 1.3 MB (796%) |
+| DAG GNP sparse<br><sub>10k nodes</sub> | 160 kB | 160 kB (100.0%) | 476 kB (297%) | 476 kB (297%) | 1.6 MB (1016%) |
+| DAG GNP dense<br><sub>10k nodes</sub> | 160 kB | 160 kB (100.0%) | 476 kB (297%) | 477 kB (297%) | 1.8 MB (1126%) |
+| DAG GNP dense shfld.<br><sub>10k nodes</sub> | 160 kB | 160 kB (100.0%) | 476 kB (297%) | 477 kB (297%) | 1.8 MB (1140%) |
 
 ![3.7.1 · TopOrderAndLevels @ n = 10 000](fig/synthetic-ubuntu-ryzen-9950x-peers/3-7-1-toporderandlevels-n-10-000.svg)
 
 **Allocations @ 100k nodes in bytes (lower is better)**
 
-| Shape | Graphity 2.2.0 | Graphity 2.2.0<br>(bi-adjacent) | JGraphT | Guava | WebGraph |
+| Shape | Graphity 2.3.0 | Graphity 2.3.0<br>(bi-adjacent) | JGraphT | Guava | WebGraph |
 |---|---:|---:|---:|---:|---:|
-| Path<br><sub>100k nodes, 100k edges</sub> | 1.6 MB | 1.6 MB (100%) | 4.8 MB (300%) | 4.8 MB (300%) | 16.9 MB (1054%) |
-| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 1.6 MB | 1.6 MB (100%) | 4.8 MB (300%) | 19.2 MB (1200%) | 16.8 MB (1052%) |
-| Tree<br><sub>100k nodes, 100k edges</sub> | 1.6 MB | 1.6 MB (100.0%) | 4.8 MB (300%) | 19.2 MB (1200%) | 12.5 MB (780%) |
-| Tree shfld.<br><sub>100k nodes</sub> | 1.6 MB | 1.6 MB (100.0%) | 4.8 MB (300%) | 19.2 MB (1200%) | 12.4 MB (777%) |
+| Path<br><sub>100k nodes, 100k edges</sub> | 1.6 MB | 1.6 MB (100.0%) | 4.8 MB (300%) | 4.8 MB (300%) | 16.9 MB (1054%) |
+| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 1.6 MB | 1.6 MB (100.0%) | 4.8 MB (300%) | 4.8 MB (300%) | 16.8 MB (1052%) |
+| Tree<br><sub>100k nodes, 100k edges</sub> | 1.6 MB | 1.6 MB (100.0%) | 4.8 MB (300%) | 4.8 MB (300%) | 12.5 MB (780%) |
+| Tree shfld.<br><sub>100k nodes</sub> | 1.6 MB | 1.6 MB (100.0%) | 4.8 MB (300%) | 4.8 MB (300%) | 12.4 MB (777%) |
 | DAG GNP sparse<br><sub>100k nodes</sub> | 1.6 MB | 1.6 MB (100.0%) | 4.8 MB (300%) | 4.8 MB (300%) | 15.5 MB (967%) |
 | DAG GNP dense<br><sub>100k nodes</sub> | 1.6 MB | 1.6 MB (100.0%) | 4.8 MB (300%) | 4.8 MB (300%) | 17.1 MB (1070%) |
 | DAG GNP dense shfld.<br><sub>100k nodes</sub> | 1.6 MB | 1.6 MB (100.0%) | 4.8 MB (300%) | 4.8 MB (300%) | 17.1 MB (1069%) |
@@ -1761,30 +1790,28 @@ Bytes allocated per algorithm invocation (JMH `-prof gc`). Lower is better. Base
 
 **Allocations @ 10k nodes in bytes (lower is better)**
 
-| Shape | Graphity 2.2.0 | JGraphT | Guava | WebGraph |
+| Shape | Graphity 2.3.0 | JGraphT | Guava | WebGraph |
 |---|---:|---:|---:|---:|
-| Path<br><sub>10k nodes, 10k edges</sub> | 257 kB | 161 kB (62.6%) | 161 kB (62.7%) | 1.4 MB (555%) |
-| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 257 kB | 161 kB (62.6%) | 1.6 MB (624%) | 985 kB (384%) |
-| Tree<br><sub>10k nodes, 10k edges</sub> | 10.9 kB | 161 kB (1476%) | 1.6 MB (14712%) | 845 kB (7768%) |
-| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 351 kB | 386 kB (110%) | 1.8 MB (520%) | 1.2 MB (336%) |
+| Path<br><sub>10k nodes, 10k edges</sub> | 257 kB | 161 kB (62.6%) | 161 kB (62.6%) | 1.4 MB (555%) |
+| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 257 kB | 161 kB (62.6%) | 161 kB (62.6%) | 985 kB (384%) |
+| Tree<br><sub>10k nodes, 10k edges</sub> | 10.9 kB | 161 kB (1476%) | 161 kB (1476%) | 845 kB (7766%) |
+| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 351 kB | 386 kB (110%) | 386 kB (110%) | 1.2 MB (336%) |
 | GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 4.1 MB | 4.0 MB (97.7%) | 4.8 MB (117%) | 4.9 MB (120%) |
-| GNP dense shfld.<br><sub>10k nodes, 299.6k edges</sub> | 4.1 MB | 4.0 MB (97.7%) | 5.4 MB (133%) | 4.8 MB (118%) |
-| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 4.1 MB | 4.0 MB (97.7%) | 5.4 MB (133%) | 9.7 MB (236%) |
-| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 4.0 MB | 4.0 MB (101%) | 5.4 MB (137%) | 4.9 MB (124%) |
+| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 4.1 MB | 4.0 MB (97.7%) | 4.0 MB (97.7%) | 9.7 MB (236%) |
+| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 4.0 MB | 4.0 MB (101%) | 4.0 MB (101%) | 4.9 MB (124%) |
 
 ![3.8.1 · BackEdges @ n = 10 000](fig/synthetic-ubuntu-ryzen-9950x-peers/3-8-1-backedges-n-10-000.svg)
 
 **Allocations @ 100k nodes in bytes (lower is better)**
 
-| Shape | Graphity 2.2.0 | JGraphT | Guava | WebGraph |
+| Shape | Graphity 2.3.0 | JGraphT | Guava | WebGraph |
 |---|---:|---:|---:|---:|
-| Path<br><sub>100k nodes, 100k edges</sub> | 2.1 MB | 1.6 MB (76.8%) | 16.0 MB (758%) | 10.1 MB (477%) |
-| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 2.1 MB | 1.6 MB (76.8%) | 16.0 MB (758%) | 9.6 MB (456%) |
-| Tree<br><sub>100k nodes, 100k edges</sub> | 33.4 kB | 1.6 MB (4861%) | 1.6 MB (4861%) | 8.1 MB (24141%) |
+| Path<br><sub>100k nodes, 100k edges</sub> | 2.1 MB | 1.6 MB (76.8%) | 1.6 MB (76.8%) | 10.1 MB (477%) |
+| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 2.1 MB | 1.6 MB (76.8%) | 3.2 MB (152%) | 9.6 MB (456%) |
+| Tree<br><sub>100k nodes, 100k edges</sub> | 33.5 kB | 1.6 MB (4854%) | 1.6 MB (4853%) | 8.1 MB (24086%) |
 | GNP sparse<br><sub>100k nodes, 300k edges</sub> | 3.6 MB | 4.2 MB (115%) | 4.2 MB (115%) | 12.1 MB (332%) |
-| GNP dense<br><sub>100k nodes, 3M edges</sub> | 45.9 MB | 45.4 MB (98.9%) | 53.9 MB (117%) | 53.6 MB (117%) |
-| GNP dense shfld.<br><sub>100k nodes, 3M edges</sub> | 45.9 MB | 45.4 MB (98.9%) | 53.9 MB (118%) | 53.6 MB (117%) |
-| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 45.9 MB | 45.4 MB (98.9%) | 59.8 MB (130%) | 101 MB (219%) |
+| GNP dense<br><sub>100k nodes, 3M edges</sub> | 45.9 MB | 45.4 MB (98.9%) | 53.4 MB (116%) | 53.6 MB (117%) |
+| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 45.9 MB | 45.4 MB (98.9%) | 45.4 MB (98.9%) | 101 MB (219%) |
 | Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 44.8 MB | 45.4 MB (101%) | 45.4 MB (101%) | 53.5 MB (119%) |
 
 ![3.8.2 · BackEdges @ n = 100 000](fig/synthetic-ubuntu-ryzen-9950x-peers/3-8-2-backedges-n-100-000.svg)
@@ -1793,31 +1820,29 @@ Bytes allocated per algorithm invocation (JMH `-prof gc`). Lower is better. Base
 
 **Allocations @ 10k nodes in bytes (lower is better)**
 
-| Shape | Graphity 2.2.0 | JGraphT | Guava | WebGraph |
+| Shape | Graphity 2.3.0 | JGraphT | Guava | WebGraph |
 |---|---:|---:|---:|---:|
 | Path<br><sub>10k nodes, 10k edges</sub> | 307 kB | 581 kB (190%) | 581 kB (190%) | 1.8 MB (602%) |
-| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 307 kB | 581 kB (190%) | 2.0 MB (659%) | 1.4 MB (458%) |
-| Tree<br><sub>10k nodes, 10k edges</sub> | 60.8 kB | 581 kB (956%) | 583 kB (958%) | 1.3 MB (2081%) |
-| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 196 kB | 1.1 MB (540%) | 2.5 MB (1276%) | 1.8 MB (945%) |
+| Path shfld.<br><sub>10k nodes, 10k edges</sub> | 307 kB | 581 kB (190%) | 581 kB (190%) | 1.4 MB (458%) |
+| Tree<br><sub>10k nodes, 10k edges</sub> | 60.8 kB | 581 kB (955%) | 581 kB (956%) | 1.3 MB (2081%) |
+| GNP sparse<br><sub>10k nodes, 30k edges</sub> | 196 kB | 1.1 MB (540%) | 1.5 MB (756%) | 1.8 MB (945%) |
 | GNP dense<br><sub>10k nodes, 299.6k edges</sub> | 596 kB | 9.9 MB (1665%) | 10.7 MB (1799%) | 10.8 MB (1818%) |
-| GNP dense shfld.<br><sub>10k nodes, 299.6k edges</sub> | 596 kB | 9.9 MB (1665%) | 11.4 MB (1906%) | 10.8 MB (1806%) |
-| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 607 kB | 9.9 MB (1634%) | 11.4 MB (1871%) | 15.6 MB (2565%) |
-| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 476 kB | 9.9 MB (2084%) | 11.4 MB (2386%) | 10.8 MB (2275%) |
+| Chain of cliques<br><sub>10k nodes, 310.8k edges</sub> | 608 kB | 9.9 MB (1634%) | 9.9 MB (1634%) | 15.6 MB (2565%) |
+| Chain of cliques shfld.<br><sub>10k nodes, 310.8k edges</sub> | 476 kB | 9.9 MB (2084%) | 9.9 MB (2084%) | 10.8 MB (2275%) |
 
 ![3.9.1 · EdgeTypes @ n = 10 000](fig/synthetic-ubuntu-ryzen-9950x-peers/3-9-1-edgetypes-n-10-000.svg)
 
 **Allocations @ 100k nodes in bytes (lower is better)**
 
-| Shape | Graphity 2.2.0 | JGraphT | Guava | WebGraph |
+| Shape | Graphity 2.3.0 | JGraphT | Guava | WebGraph |
 |---|---:|---:|---:|---:|
-| Path<br><sub>100k nodes, 100k edges</sub> | 2.6 MB | 4.9 MB (188%) | 19.3 MB (738%) | 13.4 MB (511%) |
-| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 2.6 MB | 4.9 MB (188%) | 19.3 MB (738%) | 12.9 MB (495%) |
+| Path<br><sub>100k nodes, 100k edges</sub> | 2.6 MB | 4.9 MB (188%) | 4.9 MB (188%) | 13.4 MB (511%) |
+| Path shfld.<br><sub>100k nodes, 100k edges</sub> | 2.6 MB | 4.9 MB (188%) | 4.9 MB (188%) | 12.9 MB (495%) |
 | Tree<br><sub>100k nodes, 100k edges</sub> | 533 kB | 4.9 MB (920%) | 4.9 MB (920%) | 11.3 MB (2127%) |
-| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 1.8 MB | 11.7 MB (665%) | 26.1 MB (1481%) | 19.6 MB (1112%) |
-| GNP dense<br><sub>100k nodes, 3M edges</sub> | 5.5 MB | 113 MB (2046%) | 121 MB (2191%) | 121 MB (2194%) |
-| GNP dense shfld.<br><sub>100k nodes, 3M edges</sub> | 5.5 MB | 113 MB (2046%) | 121 MB (2191%) | 121 MB (2195%) |
-| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 5.6 MB | 113 MB (2008%) | 127 MB (2264%) | 168 MB (2990%) |
-| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 4.6 MB | 113 MB (2469%) | 117 MB (2556%) | 121 MB (2646%) |
+| GNP sparse<br><sub>100k nodes, 300k edges</sub> | 1.8 MB | 11.8 MB (666%) | 16.0 MB (903%) | 19.6 MB (1111%) |
+| GNP dense<br><sub>100k nodes, 3M edges</sub> | 5.5 MB | 113 MB (2045%) | 121 MB (2191%) | 121 MB (2194%) |
+| Chain of cliques<br><sub>100k nodes, 3.1M edges</sub> | 5.6 MB | 113 MB (2008%) | 113 MB (2008%) | 168 MB (2990%) |
+| Chain of cliques shfld.<br><sub>100k nodes, 3.1M edges</sub> | 4.6 MB | 113 MB (2469%) | 113 MB (2469%) | 121 MB (2645%) |
 
 ![3.9.2 · EdgeTypes @ n = 100 000](fig/synthetic-ubuntu-ryzen-9950x-peers/3-9-2-edgetypes-n-100-000.svg)
 
@@ -1825,7 +1850,7 @@ Bytes allocated per algorithm invocation (JMH `-prof gc`). Lower is better. Base
 
 **Allocations @ 10k nodes in bytes (lower is better)**
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
 | Structured<br><sub>10k nodes</sub> | 371 kB |
 | Irreducible<br><sub>10k nodes</sub> | 371 kB |
@@ -1836,9 +1861,9 @@ Bytes allocated per algorithm invocation (JMH `-prof gc`). Lower is better. Base
 
 **Allocations @ 100k nodes in bytes (lower is better)**
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
-| Structured<br><sub>100k nodes</sub> | 3.6 MB |
+| Structured<br><sub>100k nodes</sub> | 3.7 MB |
 | Irreducible<br><sub>100k nodes</sub> | 3.7 MB |
 | Ladder<br><sub>100k nodes</sub> | 4.7 MB |
 | Chain<br><sub>100k nodes</sub> | 5.5 MB |
@@ -1849,7 +1874,7 @@ Bytes allocated per algorithm invocation (JMH `-prof gc`). Lower is better. Base
 
 **Allocations @ 10k nodes in bytes (lower is better)**
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
 | Structured<br><sub>10k nodes</sub> | 134 kB |
 | Irreducible<br><sub>10k nodes</sub> | 144 kB |
@@ -1860,7 +1885,7 @@ Bytes allocated per algorithm invocation (JMH `-prof gc`). Lower is better. Base
 
 **Allocations @ 100k nodes in bytes (lower is better)**
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
 | Structured<br><sub>100k nodes</sub> | 1.3 MB |
 | Irreducible<br><sub>100k nodes</sub> | 1.4 MB |
@@ -1871,7 +1896,7 @@ Bytes allocated per algorithm invocation (JMH `-prof gc`). Lower is better. Base
 
 **Allocations @ 10k nodes in bytes (lower is better)**
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
 | Structured<br><sub>10k nodes</sub> | 25.4 MB |
 | Irreducible<br><sub>10k nodes</sub> | 28.9 MB |
@@ -1882,7 +1907,7 @@ Bytes allocated per algorithm invocation (JMH `-prof gc`). Lower is better. Base
 
 **Allocations @ 100k nodes in bytes (lower is better)**
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
 | Structured<br><sub>100k nodes</sub> | 370 MB |
 | Irreducible<br><sub>100k nodes</sub> | 451 MB |
@@ -1895,7 +1920,7 @@ Bytes allocated per algorithm invocation (JMH `-prof gc`). Lower is better. Base
 
 **Allocations @ 10k nodes in bytes (lower is better)**
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
 | Structured<br><sub>10k nodes</sub> | 772 kB |
 | Irreducible<br><sub>10k nodes</sub> | 812 kB |
@@ -1906,7 +1931,7 @@ Bytes allocated per algorithm invocation (JMH `-prof gc`). Lower is better. Base
 
 **Allocations @ 100k nodes in bytes (lower is better)**
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
 | Structured<br><sub>100k nodes</sub> | 7.5 MB |
 | Irreducible<br><sub>100k nodes</sub> | 13.5 MB |
@@ -1919,7 +1944,7 @@ Bytes allocated per algorithm invocation (JMH `-prof gc`). Lower is better. Base
 
 **Allocations @ 10k nodes in bytes (lower is better)**
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
 | Structured<br><sub>10k nodes</sub> | 280 kB |
 | Irreducible<br><sub>10k nodes</sub> | 280 kB |
@@ -1930,7 +1955,7 @@ Bytes allocated per algorithm invocation (JMH `-prof gc`). Lower is better. Base
 
 **Allocations @ 100k nodes in bytes (lower is better)**
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
 | Structured<br><sub>100k nodes</sub> | 2.8 MB |
 | Irreducible<br><sub>100k nodes</sub> | 2.8 MB |
@@ -1943,7 +1968,7 @@ Bytes allocated per algorithm invocation (JMH `-prof gc`). Lower is better. Base
 
 **Allocations @ 10k nodes in bytes (lower is better)**
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
 | Structured<br><sub>10k nodes</sub> | 200 kB |
 | Irreducible<br><sub>10k nodes</sub> | 200 kB |
@@ -1954,7 +1979,7 @@ Bytes allocated per algorithm invocation (JMH `-prof gc`). Lower is better. Base
 
 **Allocations @ 100k nodes in bytes (lower is better)**
 
-| Shape | Graphity 2.2.0 |
+| Shape | Graphity 2.3.0 |
 |---|---:|
 | Structured<br><sub>100k nodes</sub> | 2.0 MB |
 | Irreducible<br><sub>100k nodes</sub> | 2.0 MB |

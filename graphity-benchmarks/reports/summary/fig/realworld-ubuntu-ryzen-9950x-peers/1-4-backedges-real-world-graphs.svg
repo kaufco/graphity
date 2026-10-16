@@ -2,9 +2,9 @@
 <style>text{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;font-size:11px;fill:#334155}.axis{stroke:#94a3b8;stroke-width:1;fill:none}.grid{stroke:#e2e8f0;stroke-width:1}.ylabel{fill:#64748b;font-size:10px}.tick{fill:#64748b;font-size:10px}.xlabel{font-size:10px}</style>
 <rect x="0" y="0" width="612" height="436" fill="#ffffff"/>
 <rect x="56" y="5" width="12" height="12" rx="2" fill="#2563eb"/>
-<text x="72" y="14" class="tick">Graphity 2.2.0</text>
+<text x="72" y="14" class="tick">Graphity 2.3.0</text>
 <rect x="56" y="21" width="12" height="12" rx="2" fill="#0d9488"/>
-<text x="72" y="30" class="tick">Graphity 2.2.0 (reordered)</text>
+<text x="72" y="30" class="tick">Graphity 2.3.0 (reordered)</text>
 <rect x="56" y="37" width="12" height="12" rx="2" fill="#16a34a"/>
 <text x="72" y="46" class="tick">JGraphT</text>
 <rect x="56" y="53" width="12" height="12" rx="2" fill="#ca8a04"/>
@@ -29,36 +29,36 @@
 <text class="tick" x="48" y="123.0" text-anchor="end">350%</text>
 <line class="axis" x1="56" y1="120" x2="56" y2="340"/>
 <line class="axis" x1="56" y1="340" x2="588" y2="340"/>
-<text class="ylabel" x="16" y="230.0" text-anchor="middle" transform="rotate(-90 16 230.0)">% of Graphity 2.2.0</text>
+<text class="ylabel" x="16" y="230.0" text-anchor="middle" transform="rotate(-90 16 230.0)">% of Graphity 2.3.0</text>
 <text class="xlabel" x="102.0" y="352.0" text-anchor="end" transform="rotate(-40 102.0 352.0)">web-Google</text>
-<rect x="56.0" y="277.1" width="16" height="62.9" fill="#2563eb" rx="1"><title>Graphity 2.2.0 · web-Google: 100%</title></rect>
-<rect x="75.0" y="229.3" width="16" height="110.7" fill="#0d9488" rx="1"><title>Graphity 2.2.0 (reordered) · web-Google: 176%</title></rect>
-<rect x="94.0" y="336.6" width="16" height="3.4" fill="#16a34a" rx="1"><title>JGraphT · web-Google: 5.5%</title></rect>
-<rect x="113.0" y="337.6" width="16" height="2.4" fill="#ca8a04" rx="1"><title>Guava · web-Google: 3.8%</title></rect>
-<rect x="132.0" y="336.3" width="16" height="3.7" fill="#9333ea" rx="1"><title>WebGraph · web-Google: 5.9%</title></rect>
+<rect x="56.0" y="277.1" width="16" height="62.9" fill="#2563eb" rx="1"><title>Graphity 2.3.0 · web-Google: 100%</title></rect>
+<rect x="75.0" y="222.5" width="16" height="117.5" fill="#0d9488" rx="1"><title>Graphity 2.3.0 (reordered) · web-Google: 187%</title></rect>
+<rect x="94.0" y="336.4" width="16" height="3.6" fill="#16a34a" rx="1"><title>JGraphT · web-Google: 5.7%</title></rect>
+<rect x="113.0" y="336.6" width="16" height="3.4" fill="#ca8a04" rx="1"><title>Guava · web-Google: 5.4%</title></rect>
+<rect x="132.0" y="336.0" width="16" height="4.0" fill="#9333ea" rx="1"><title>WebGraph · web-Google: 6.3%</title></rect>
 <text class="xlabel" x="212.0" y="352.0" text-anchor="end" transform="rotate(-40 212.0 352.0)">wiki-Talk</text>
-<rect x="166.0" y="277.1" width="16" height="62.9" fill="#2563eb" rx="1"><title>Graphity 2.2.0 · wiki-Talk: 100%</title></rect>
-<rect x="185.0" y="237.7" width="16" height="102.3" fill="#0d9488" rx="1"><title>Graphity 2.2.0 (reordered) · wiki-Talk: 163%</title></rect>
-<rect x="204.0" y="338.5" width="16" height="1.5" fill="#16a34a" rx="1"><title>JGraphT · wiki-Talk: 1.7%</title></rect>
-<rect x="223.0" y="337.6" width="16" height="2.4" fill="#ca8a04" rx="1"><title>Guava · wiki-Talk: 3.8%</title></rect>
-<rect x="242.0" y="338.5" width="16" height="1.5" fill="#9333ea" rx="1"><title>WebGraph · wiki-Talk: 1.5%</title></rect>
+<rect x="166.0" y="277.1" width="16" height="62.9" fill="#2563eb" rx="1"><title>Graphity 2.3.0 · wiki-Talk: 100%</title></rect>
+<rect x="185.0" y="230.1" width="16" height="109.9" fill="#0d9488" rx="1"><title>Graphity 2.3.0 (reordered) · wiki-Talk: 175%</title></rect>
+<rect x="204.0" y="338.5" width="16" height="1.5" fill="#16a34a" rx="1"><title>JGraphT · wiki-Talk: 2.0%</title></rect>
+<rect x="223.0" y="337.1" width="16" height="2.9" fill="#ca8a04" rx="1"><title>Guava · wiki-Talk: 4.6%</title></rect>
+<rect x="242.0" y="338.5" width="16" height="1.5" fill="#9333ea" rx="1"><title>WebGraph · wiki-Talk: 1.7%</title></rect>
 <text class="xlabel" x="322.0" y="352.0" text-anchor="end" transform="rotate(-40 322.0 352.0)">soc-LiveJournal1</text>
-<rect x="276.0" y="277.1" width="16" height="62.9" fill="#2563eb" rx="1"><title>Graphity 2.2.0 · soc-LiveJournal1: 100%</title></rect>
-<rect x="295.0" y="149.0" width="16" height="191.0" fill="#0d9488" rx="1"><title>Graphity 2.2.0 (reordered) · soc-LiveJournal1: 304%</title></rect>
-<rect x="314.0" y="334.6" width="16" height="5.4" fill="#16a34a" rx="1"><title>JGraphT · soc-LiveJournal1: 8.5%</title></rect>
-<rect x="333.0" y="335.2" width="16" height="4.8" fill="#ca8a04" rx="1"><title>Guava · soc-LiveJournal1: 7.6%</title></rect>
-<rect x="352.0" y="336.1" width="16" height="3.9" fill="#9333ea" rx="1"><title>WebGraph · soc-LiveJournal1: 6.1%</title></rect>
+<rect x="276.0" y="277.1" width="16" height="62.9" fill="#2563eb" rx="1"><title>Graphity 2.3.0 · soc-LiveJournal1: 100%</title></rect>
+<rect x="295.0" y="153.2" width="16" height="186.8" fill="#0d9488" rx="1"><title>Graphity 2.3.0 (reordered) · soc-LiveJournal1: 297%</title></rect>
+<rect x="314.0" y="334.5" width="16" height="5.5" fill="#16a34a" rx="1"><title>JGraphT · soc-LiveJournal1: 8.8%</title></rect>
+<rect x="333.0" y="335.3" width="16" height="4.7" fill="#ca8a04" rx="1"><title>Guava · soc-LiveJournal1: 7.5%</title></rect>
+<rect x="352.0" y="334.9" width="16" height="5.1" fill="#9333ea" rx="1"><title>WebGraph · soc-LiveJournal1: 8.1%</title></rect>
 <text class="xlabel" x="432.0" y="352.0" text-anchor="end" transform="rotate(-40 432.0 352.0)">cit-Patents</text>
-<rect x="386.0" y="277.1" width="16" height="62.9" fill="#2563eb" rx="1"><title>Graphity 2.2.0 · cit-Patents: 100%</title></rect>
-<rect x="405.0" y="280.4" width="16" height="59.6" fill="#0d9488" rx="1"><title>Graphity 2.2.0 (reordered) · cit-Patents: 95%</title></rect>
-<rect x="424.0" y="338.5" width="16" height="1.5" fill="#16a34a" rx="1"><title>JGraphT · cit-Patents: 0.27%</title></rect>
-<rect x="443.0" y="338.5" width="16" height="1.5" fill="#ca8a04" rx="1"><title>Guava · cit-Patents: 0.25%</title></rect>
-<rect x="462.0" y="338.5" width="16" height="1.5" fill="#9333ea" rx="1"><title>WebGraph · cit-Patents: 0.26%</title></rect>
+<rect x="386.0" y="277.1" width="16" height="62.9" fill="#2563eb" rx="1"><title>Graphity 2.3.0 · cit-Patents: 100%</title></rect>
+<rect x="405.0" y="273.0" width="16" height="67.0" fill="#0d9488" rx="1"><title>Graphity 2.3.0 (reordered) · cit-Patents: 107%</title></rect>
+<rect x="424.0" y="338.5" width="16" height="1.5" fill="#16a34a" rx="1"><title>JGraphT · cit-Patents: 0.17%</title></rect>
+<rect x="443.0" y="338.5" width="16" height="1.5" fill="#ca8a04" rx="1"><title>Guava · cit-Patents: 0.29%</title></rect>
+<rect x="462.0" y="338.5" width="16" height="1.5" fill="#9333ea" rx="1"><title>WebGraph · cit-Patents: 0.28%</title></rect>
 <text class="xlabel" x="542.0" y="352.0" text-anchor="end" transform="rotate(-40 542.0 352.0)">cit-HepPh</text>
-<rect x="496.0" y="277.1" width="16" height="62.9" fill="#2563eb" rx="1"><title>Graphity 2.2.0 · cit-HepPh: 100%</title></rect>
-<rect x="515.0" y="264.5" width="16" height="75.5" fill="#0d9488" rx="1"><title>Graphity 2.2.0 (reordered) · cit-HepPh: 120%</title></rect>
-<rect x="534.0" y="335.2" width="16" height="4.8" fill="#16a34a" rx="1"><title>JGraphT · cit-HepPh: 7.6%</title></rect>
-<rect x="553.0" y="337.6" width="16" height="2.4" fill="#ca8a04" rx="1"><title>Guava · cit-HepPh: 3.8%</title></rect>
-<rect x="572.0" y="335.6" width="16" height="4.4" fill="#9333ea" rx="1"><title>WebGraph · cit-HepPh: 7.0%</title></rect>
+<rect x="496.0" y="277.1" width="16" height="62.9" fill="#2563eb" rx="1"><title>Graphity 2.3.0 · cit-HepPh: 100%</title></rect>
+<rect x="515.0" y="265.0" width="16" height="75.0" fill="#0d9488" rx="1"><title>Graphity 2.3.0 (reordered) · cit-HepPh: 119%</title></rect>
+<rect x="534.0" y="337.2" width="16" height="2.8" fill="#16a34a" rx="1"><title>JGraphT · cit-HepPh: 4.5%</title></rect>
+<rect x="553.0" y="337.7" width="16" height="2.3" fill="#ca8a04" rx="1"><title>Guava · cit-HepPh: 3.7%</title></rect>
+<rect x="572.0" y="335.4" width="16" height="4.6" fill="#9333ea" rx="1"><title>WebGraph · cit-HepPh: 7.3%</title></rect>
 <line x1="56" y1="277.1" x2="588" y2="277.1" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4 3"/>
 </svg>

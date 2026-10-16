@@ -1,71 +1,85 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="707" height="452" viewBox="0 0 707 452" role="img">
+<svg xmlns="http://www.w3.org/2000/svg" width="897" height="484" viewBox="0 0 897 484" role="img">
 <style>text{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;font-size:11px;fill:#334155}.axis{stroke:#94a3b8;stroke-width:1;fill:none}.grid{stroke:#e2e8f0;stroke-width:1}.ylabel{fill:#64748b;font-size:10px}.tick{fill:#64748b;font-size:10px}.xlabel{font-size:10px}</style>
-<rect x="0" y="0" width="707" height="452" fill="#ffffff"/>
+<rect x="0" y="0" width="897" height="484" fill="#ffffff"/>
 <rect x="56" y="5" width="12" height="12" rx="2" fill="#2563eb"/>
 <text x="72" y="14" class="tick">Graphity 2.0.0</text>
 <rect x="56" y="21" width="12" height="12" rx="2" fill="#dc2626"/>
 <text x="72" y="30" class="tick">Graphity 2.1.0</text>
 <rect x="56" y="37" width="12" height="12" rx="2" fill="#0891b2"/>
 <text x="72" y="46" class="tick">Graphity 2.2.0</text>
-<rect x="56" y="53" width="12" height="12" rx="2" fill="#0d9488"/>
-<text x="72" y="62" class="tick">Graphity 2.0.0 (reordered)</text>
-<rect x="56" y="69" width="12" height="12" rx="2" fill="#db2777"/>
-<text x="72" y="78" class="tick">Graphity 2.1.0 (reordered)</text>
-<rect x="56" y="85" width="12" height="12" rx="2" fill="#65a30d"/>
-<text x="72" y="94" class="tick">Graphity 2.2.0 (reordered)</text>
-<line class="grid" x1="56" y1="356.0" x2="683" y2="356.0"/>
-<text class="tick" x="48" y="359.0" text-anchor="end">0%</text>
-<line class="grid" x1="56" y1="324.6" x2="683" y2="324.6"/>
-<text class="tick" x="48" y="327.6" text-anchor="end">50%</text>
-<line class="grid" x1="56" y1="293.1" x2="683" y2="293.1"/>
-<text class="tick" x="48" y="296.1" text-anchor="end">100%</text>
-<line class="grid" x1="56" y1="261.7" x2="683" y2="261.7"/>
-<text class="tick" x="48" y="264.7" text-anchor="end">150%</text>
-<line class="grid" x1="56" y1="230.3" x2="683" y2="230.3"/>
-<text class="tick" x="48" y="233.3" text-anchor="end">200%</text>
-<line class="grid" x1="56" y1="198.9" x2="683" y2="198.9"/>
-<text class="tick" x="48" y="201.9" text-anchor="end">250%</text>
-<line class="grid" x1="56" y1="167.4" x2="683" y2="167.4"/>
-<text class="tick" x="48" y="170.4" text-anchor="end">300%</text>
-<line class="grid" x1="56" y1="136.0" x2="683" y2="136.0"/>
-<text class="tick" x="48" y="139.0" text-anchor="end">350%</text>
-<line class="axis" x1="56" y1="136" x2="56" y2="356"/>
-<line class="axis" x1="56" y1="356" x2="683" y2="356"/>
-<text class="ylabel" x="16" y="246.0" text-anchor="middle" transform="rotate(-90 16 246.0)">% of Graphity 2.2.0</text>
-<text class="xlabel" x="111.5" y="368.0" text-anchor="end" transform="rotate(-40 111.5 368.0)">cit-Patents</text>
-<rect x="56.0" y="295.5" width="16" height="60.5" fill="#2563eb" rx="1"><title>Graphity 2.0.0 · cit-Patents: 96%</title></rect>
-<rect x="75.0" y="292.1" width="16" height="63.9" fill="#dc2626" rx="1"><title>Graphity 2.1.0 · cit-Patents: 102%</title></rect>
-<rect x="94.0" y="293.1" width="16" height="62.9" fill="#0891b2" rx="1"><title>Graphity 2.2.0 · cit-Patents: 100%</title></rect>
-<rect x="113.0" y="296.2" width="16" height="59.8" fill="#0d9488" rx="1"><title>Graphity 2.0.0 (reordered) · cit-Patents: 95%</title></rect>
-<rect x="132.0" y="292.3" width="16" height="63.7" fill="#db2777" rx="1"><title>Graphity 2.1.0 (reordered) · cit-Patents: 101%</title></rect>
-<rect x="151.0" y="296.4" width="16" height="59.6" fill="#65a30d" rx="1"><title>Graphity 2.2.0 (reordered) · cit-Patents: 95%</title></rect>
-<text class="xlabel" x="240.5" y="368.0" text-anchor="end" transform="rotate(-40 240.5 368.0)">cit-HepPh</text>
-<rect x="185.0" y="294.1" width="16" height="61.9" fill="#2563eb" rx="1"><title>Graphity 2.0.0 · cit-HepPh: 98%</title></rect>
-<rect x="204.0" y="293.2" width="16" height="62.8" fill="#dc2626" rx="1"><title>Graphity 2.1.0 · cit-HepPh: 100%</title></rect>
-<rect x="223.0" y="293.1" width="16" height="62.9" fill="#0891b2" rx="1"><title>Graphity 2.2.0 · cit-HepPh: 100%</title></rect>
-<rect x="242.0" y="282.7" width="16" height="73.3" fill="#0d9488" rx="1"><title>Graphity 2.0.0 (reordered) · cit-HepPh: 117%</title></rect>
-<rect x="261.0" y="280.6" width="16" height="75.4" fill="#db2777" rx="1"><title>Graphity 2.1.0 (reordered) · cit-HepPh: 120%</title></rect>
-<rect x="280.0" y="280.5" width="16" height="75.5" fill="#65a30d" rx="1"><title>Graphity 2.2.0 (reordered) · cit-HepPh: 120%</title></rect>
-<text class="xlabel" x="369.5" y="368.0" text-anchor="end" transform="rotate(-40 369.5 368.0)">web-Google</text>
-<rect x="314.0" y="291.9" width="16" height="64.1" fill="#2563eb" rx="1"><title>Graphity 2.0.0 · web-Google: 102%</title></rect>
-<rect x="333.0" y="291.7" width="16" height="64.3" fill="#dc2626" rx="1"><title>Graphity 2.1.0 · web-Google: 102%</title></rect>
-<rect x="352.0" y="293.1" width="16" height="62.9" fill="#0891b2" rx="1"><title>Graphity 2.2.0 · web-Google: 100%</title></rect>
-<rect x="371.0" y="247.7" width="16" height="108.3" fill="#0d9488" rx="1"><title>Graphity 2.0.0 (reordered) · web-Google: 172%</title></rect>
-<rect x="390.0" y="246.0" width="16" height="110.0" fill="#db2777" rx="1"><title>Graphity 2.1.0 (reordered) · web-Google: 175%</title></rect>
-<rect x="409.0" y="245.3" width="16" height="110.7" fill="#65a30d" rx="1"><title>Graphity 2.2.0 (reordered) · web-Google: 176%</title></rect>
-<text class="xlabel" x="498.5" y="368.0" text-anchor="end" transform="rotate(-40 498.5 368.0)">wiki-Talk</text>
-<rect x="443.0" y="298.0" width="16" height="58.0" fill="#2563eb" rx="1"><title>Graphity 2.0.0 · wiki-Talk: 92%</title></rect>
-<rect x="462.0" y="296.6" width="16" height="59.4" fill="#dc2626" rx="1"><title>Graphity 2.1.0 · wiki-Talk: 94%</title></rect>
-<rect x="481.0" y="293.1" width="16" height="62.9" fill="#0891b2" rx="1"><title>Graphity 2.2.0 · wiki-Talk: 100%</title></rect>
-<rect x="500.0" y="264.8" width="16" height="91.2" fill="#0d9488" rx="1"><title>Graphity 2.0.0 (reordered) · wiki-Talk: 145%</title></rect>
-<rect x="519.0" y="254.2" width="16" height="101.8" fill="#db2777" rx="1"><title>Graphity 2.1.0 (reordered) · wiki-Talk: 162%</title></rect>
-<rect x="538.0" y="253.7" width="16" height="102.3" fill="#65a30d" rx="1"><title>Graphity 2.2.0 (reordered) · wiki-Talk: 163%</title></rect>
-<text class="xlabel" x="627.5" y="368.0" text-anchor="end" transform="rotate(-40 627.5 368.0)">soc-LiveJournal1</text>
-<rect x="572.0" y="294.1" width="16" height="61.9" fill="#2563eb" rx="1"><title>Graphity 2.0.0 · soc-LiveJournal1: 98%</title></rect>
-<rect x="591.0" y="291.9" width="16" height="64.1" fill="#dc2626" rx="1"><title>Graphity 2.1.0 · soc-LiveJournal1: 102%</title></rect>
-<rect x="610.0" y="293.1" width="16" height="62.9" fill="#0891b2" rx="1"><title>Graphity 2.2.0 · soc-LiveJournal1: 100%</title></rect>
-<rect x="629.0" y="164.3" width="16" height="191.7" fill="#0d9488" rx="1"><title>Graphity 2.0.0 (reordered) · soc-LiveJournal1: 305%</title></rect>
-<rect x="648.0" y="164.7" width="16" height="191.3" fill="#db2777" rx="1"><title>Graphity 2.1.0 (reordered) · soc-LiveJournal1: 304%</title></rect>
-<rect x="667.0" y="165.0" width="16" height="191.0" fill="#65a30d" rx="1"><title>Graphity 2.2.0 (reordered) · soc-LiveJournal1: 304%</title></rect>
-<line x1="56" y1="293.1" x2="683" y2="293.1" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4 3"/>
+<rect x="56" y="53" width="12" height="12" rx="2" fill="#ea580c"/>
+<text x="72" y="62" class="tick">Graphity 2.3.0</text>
+<rect x="56" y="69" width="12" height="12" rx="2" fill="#0d9488"/>
+<text x="72" y="78" class="tick">Graphity 2.0.0 (reordered)</text>
+<rect x="56" y="85" width="12" height="12" rx="2" fill="#db2777"/>
+<text x="72" y="94" class="tick">Graphity 2.1.0 (reordered)</text>
+<rect x="56" y="101" width="12" height="12" rx="2" fill="#65a30d"/>
+<text x="72" y="110" class="tick">Graphity 2.2.0 (reordered)</text>
+<rect x="56" y="117" width="12" height="12" rx="2" fill="#7c3aed"/>
+<text x="72" y="126" class="tick">Graphity 2.3.0 (reordered)</text>
+<line class="grid" x1="56" y1="388.0" x2="873" y2="388.0"/>
+<text class="tick" x="48" y="391.0" text-anchor="end">0%</text>
+<line class="grid" x1="56" y1="356.6" x2="873" y2="356.6"/>
+<text class="tick" x="48" y="359.6" text-anchor="end">50%</text>
+<line class="grid" x1="56" y1="325.1" x2="873" y2="325.1"/>
+<text class="tick" x="48" y="328.1" text-anchor="end">100%</text>
+<line class="grid" x1="56" y1="293.7" x2="873" y2="293.7"/>
+<text class="tick" x="48" y="296.7" text-anchor="end">150%</text>
+<line class="grid" x1="56" y1="262.3" x2="873" y2="262.3"/>
+<text class="tick" x="48" y="265.3" text-anchor="end">200%</text>
+<line class="grid" x1="56" y1="230.9" x2="873" y2="230.9"/>
+<text class="tick" x="48" y="233.9" text-anchor="end">250%</text>
+<line class="grid" x1="56" y1="199.4" x2="873" y2="199.4"/>
+<text class="tick" x="48" y="202.4" text-anchor="end">300%</text>
+<line class="grid" x1="56" y1="168.0" x2="873" y2="168.0"/>
+<text class="tick" x="48" y="171.0" text-anchor="end">350%</text>
+<line class="axis" x1="56" y1="168" x2="56" y2="388"/>
+<line class="axis" x1="56" y1="388" x2="873" y2="388"/>
+<text class="ylabel" x="16" y="278.0" text-anchor="middle" transform="rotate(-90 16 278.0)">% of Graphity 2.3.0</text>
+<text class="xlabel" x="130.5" y="400.0" text-anchor="end" transform="rotate(-40 130.5 400.0)">cit-Patents</text>
+<rect x="56.0" y="321.5" width="16" height="66.5" fill="#2563eb" rx="1"><title>Graphity 2.0.0 · cit-Patents: 106%</title></rect>
+<rect x="75.0" y="317.7" width="16" height="70.3" fill="#dc2626" rx="1"><title>Graphity 2.1.0 · cit-Patents: 112%</title></rect>
+<rect x="94.0" y="318.9" width="16" height="69.1" fill="#0891b2" rx="1"><title>Graphity 2.2.0 · cit-Patents: 110%</title></rect>
+<rect x="113.0" y="325.1" width="16" height="62.9" fill="#ea580c" rx="1"><title>Graphity 2.3.0 · cit-Patents: 100%</title></rect>
+<rect x="132.0" y="322.2" width="16" height="65.8" fill="#0d9488" rx="1"><title>Graphity 2.0.0 (reordered) · cit-Patents: 105%</title></rect>
+<rect x="151.0" y="317.9" width="16" height="70.1" fill="#db2777" rx="1"><title>Graphity 2.1.0 (reordered) · cit-Patents: 111%</title></rect>
+<rect x="170.0" y="322.5" width="16" height="65.5" fill="#65a30d" rx="1"><title>Graphity 2.2.0 (reordered) · cit-Patents: 104%</title></rect>
+<rect x="189.0" y="321.0" width="16" height="67.0" fill="#7c3aed" rx="1"><title>Graphity 2.3.0 (reordered) · cit-Patents: 107%</title></rect>
+<text class="xlabel" x="297.5" y="400.0" text-anchor="end" transform="rotate(-40 297.5 400.0)">cit-HepPh</text>
+<rect x="223.0" y="324.7" width="16" height="63.3" fill="#2563eb" rx="1"><title>Graphity 2.0.0 · cit-HepPh: 101%</title></rect>
+<rect x="242.0" y="323.8" width="16" height="64.2" fill="#dc2626" rx="1"><title>Graphity 2.1.0 · cit-HepPh: 102%</title></rect>
+<rect x="261.0" y="323.7" width="16" height="64.3" fill="#0891b2" rx="1"><title>Graphity 2.2.0 · cit-HepPh: 102%</title></rect>
+<rect x="280.0" y="325.1" width="16" height="62.9" fill="#ea580c" rx="1"><title>Graphity 2.3.0 · cit-HepPh: 100%</title></rect>
+<rect x="299.0" y="312.9" width="16" height="75.1" fill="#0d9488" rx="1"><title>Graphity 2.0.0 (reordered) · cit-HepPh: 119%</title></rect>
+<rect x="318.0" y="310.8" width="16" height="77.2" fill="#db2777" rx="1"><title>Graphity 2.1.0 (reordered) · cit-HepPh: 123%</title></rect>
+<rect x="337.0" y="310.7" width="16" height="77.3" fill="#65a30d" rx="1"><title>Graphity 2.2.0 (reordered) · cit-HepPh: 123%</title></rect>
+<rect x="356.0" y="313.0" width="16" height="75.0" fill="#7c3aed" rx="1"><title>Graphity 2.3.0 (reordered) · cit-HepPh: 119%</title></rect>
+<text class="xlabel" x="464.5" y="400.0" text-anchor="end" transform="rotate(-40 464.5 400.0)">web-Google</text>
+<rect x="390.0" y="320.2" width="16" height="67.8" fill="#2563eb" rx="1"><title>Graphity 2.0.0 · web-Google: 108%</title></rect>
+<rect x="409.0" y="320.0" width="16" height="68.0" fill="#dc2626" rx="1"><title>Graphity 2.1.0 · web-Google: 108%</title></rect>
+<rect x="428.0" y="321.5" width="16" height="66.5" fill="#0891b2" rx="1"><title>Graphity 2.2.0 · web-Google: 106%</title></rect>
+<rect x="447.0" y="325.1" width="16" height="62.9" fill="#ea580c" rx="1"><title>Graphity 2.3.0 · web-Google: 100%</title></rect>
+<rect x="466.0" y="273.5" width="16" height="114.5" fill="#0d9488" rx="1"><title>Graphity 2.0.0 (reordered) · web-Google: 182%</title></rect>
+<rect x="485.0" y="271.7" width="16" height="116.3" fill="#db2777" rx="1"><title>Graphity 2.1.0 (reordered) · web-Google: 185%</title></rect>
+<rect x="504.0" y="270.9" width="16" height="117.1" fill="#65a30d" rx="1"><title>Graphity 2.2.0 (reordered) · web-Google: 186%</title></rect>
+<rect x="523.0" y="270.5" width="16" height="117.5" fill="#7c3aed" rx="1"><title>Graphity 2.3.0 (reordered) · web-Google: 187%</title></rect>
+<text class="xlabel" x="631.5" y="400.0" text-anchor="end" transform="rotate(-40 631.5 400.0)">wiki-Talk</text>
+<rect x="557.0" y="321.4" width="16" height="66.6" fill="#2563eb" rx="1"><title>Graphity 2.0.0 · wiki-Talk: 106%</title></rect>
+<rect x="576.0" y="319.8" width="16" height="68.2" fill="#dc2626" rx="1"><title>Graphity 2.1.0 · wiki-Talk: 109%</title></rect>
+<rect x="595.0" y="315.7" width="16" height="72.3" fill="#0891b2" rx="1"><title>Graphity 2.2.0 · wiki-Talk: 115%</title></rect>
+<rect x="614.0" y="325.1" width="16" height="62.9" fill="#ea580c" rx="1"><title>Graphity 2.3.0 · wiki-Talk: 100%</title></rect>
+<rect x="633.0" y="283.1" width="16" height="104.9" fill="#0d9488" rx="1"><title>Graphity 2.0.0 (reordered) · wiki-Talk: 167%</title></rect>
+<rect x="652.0" y="270.9" width="16" height="117.1" fill="#db2777" rx="1"><title>Graphity 2.1.0 (reordered) · wiki-Talk: 186%</title></rect>
+<rect x="671.0" y="270.4" width="16" height="117.6" fill="#65a30d" rx="1"><title>Graphity 2.2.0 (reordered) · wiki-Talk: 187%</title></rect>
+<rect x="690.0" y="278.1" width="16" height="109.9" fill="#7c3aed" rx="1"><title>Graphity 2.3.0 (reordered) · wiki-Talk: 175%</title></rect>
+<text class="xlabel" x="798.5" y="400.0" text-anchor="end" transform="rotate(-40 798.5 400.0)">soc-LiveJournal1</text>
+<rect x="724.0" y="327.2" width="16" height="60.8" fill="#2563eb" rx="1"><title>Graphity 2.0.0 · soc-LiveJournal1: 97%</title></rect>
+<rect x="743.0" y="325.1" width="16" height="62.9" fill="#dc2626" rx="1"><title>Graphity 2.1.0 · soc-LiveJournal1: 100%</title></rect>
+<rect x="762.0" y="326.3" width="16" height="61.7" fill="#0891b2" rx="1"><title>Graphity 2.2.0 · soc-LiveJournal1: 98%</title></rect>
+<rect x="781.0" y="325.1" width="16" height="62.9" fill="#ea580c" rx="1"><title>Graphity 2.3.0 · soc-LiveJournal1: 100%</title></rect>
+<rect x="800.0" y="199.8" width="16" height="188.2" fill="#0d9488" rx="1"><title>Graphity 2.0.0 (reordered) · soc-LiveJournal1: 299%</title></rect>
+<rect x="819.0" y="200.2" width="16" height="187.8" fill="#db2777" rx="1"><title>Graphity 2.1.0 (reordered) · soc-LiveJournal1: 299%</title></rect>
+<rect x="838.0" y="200.5" width="16" height="187.5" fill="#65a30d" rx="1"><title>Graphity 2.2.0 (reordered) · soc-LiveJournal1: 298%</title></rect>
+<rect x="857.0" y="201.2" width="16" height="186.8" fill="#7c3aed" rx="1"><title>Graphity 2.3.0 (reordered) · soc-LiveJournal1: 297%</title></rect>
+<line x1="56" y1="325.1" x2="873" y2="325.1" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4 3"/>
 </svg>

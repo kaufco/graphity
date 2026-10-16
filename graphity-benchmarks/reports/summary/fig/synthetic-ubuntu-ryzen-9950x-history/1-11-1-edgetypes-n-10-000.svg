@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1550" height="500" viewBox="0 0 1550 500" role="img">
+<style>text{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;font-size:11px;fill:#334155}.axis{stroke:#94a3b8;stroke-width:1;fill:none}.grid{stroke:#e2e8f0;stroke-width:1}.ylabel{fill:#64748b;font-size:10px}.tick{fill:#64748b;font-size:10px}.xlabel{font-size:10px}</style>
+<rect x="0" y="0" width="1550" height="500" fill="#ffffff"/>
+<rect x="56" y="5" width="12" height="12" rx="2" fill="#2563eb"/>
+<text x="72" y="14" class="tick">Graphity 1.0</text>
+<rect x="56" y="21" width="12" height="12" rx="2" fill="#dc2626"/>
+<text x="72" y="30" class="tick">Graphity 2.0.0</text>
+<rect x="56" y="37" width="12" height="12" rx="2" fill="#0891b2"/>
+<text x="72" y="46" class="tick">Graphity 2.1.0</text>
+<rect x="56" y="53" width="12" height="12" rx="2" fill="#ea580c"/>
+<text x="72" y="62" class="tick">Graphity 2.2.0</text>
+<rect x="56" y="69" width="12" height="12" rx="2" fill="#4f46e5"/>
+<text x="72" y="78" class="tick">Graphity 2.3.0</text>
+<rect x="56" y="85" width="12" height="12" rx="2" fill="#0d9488"/>
+<text x="72" y="94" class="tick">Graphity 2.0.0 (reordered)</text>
+<rect x="56" y="101" width="12" height="12" rx="2" fill="#db2777"/>
+<text x="72" y="110" class="tick">Graphity 2.1.0 (reordered)</text>
+<rect x="56" y="117" width="12" height="12" rx="2" fill="#65a30d"/>
+<text x="72" y="126" class="tick">Graphity 2.2.0 (reordered)</text>
+<rect x="56" y="133" width="12" height="12" rx="2" fill="#7c3aed"/>
+<text x="72" y="142" class="tick">Graphity 2.3.0 (reordered)</text>
+<line class="grid" x1="56" y1="404.0" x2="1526" y2="404.0"/>
+<text class="tick" x="48" y="407.0" text-anchor="end">0%</text>
+<line class="grid" x1="56" y1="360.0" x2="1526" y2="360.0"/>
+<text class="tick" x="48" y="363.0" text-anchor="end">50%</text>
+<line class="grid" x1="56" y1="316.0" x2="1526" y2="316.0"/>
+<text class="tick" x="48" y="319.0" text-anchor="end">100%</text>
+<line class="grid" x1="56" y1="272.0" x2="1526" y2="272.0"/>
+<text class="tick" x="48" y="275.0" text-anchor="end">150%</text>
+<line class="grid" x1="56" y1="228.0" x2="1526" y2="228.0"/>
+<text class="tick" x="48" y="231.0" text-anchor="end">200%</text>
+<line class="grid" x1="56" y1="184.0" x2="1526" y2="184.0"/>
+<text class="tick" x="48" y="187.0" text-anchor="end">250%</text>
+<line class="axis" x1="56" y1="184" x2="56" y2="404"/>
+<line class="axis" x1="56" y1="404" x2="1526" y2="404"/>
+<text class="ylabel" x="16" y="294.0" text-anchor="middle" transform="rotate(-90 16 294.0)">% of Graphity 2.3.0</text>
+<text class="xlabel" x="140.0" y="416.0" text-anchor="end" transform="rotate(-40 140.0 416.0)">Path</text>
+<rect x="56.0" y="293.6" width="16" height="110.4" fill="#2563eb" rx="1"><title>Graphity 1.0 · Path: 125%</title></rect>
+<rect x="75.0" y="316.0" width="16" height="88.0" fill="#dc2626" rx="1"><title>Graphity 2.0.0 · Path: 100%</title></rect>
+<rect x="94.0" y="314.6" width="16" height="89.4" fill="#0891b2" rx="1"><title>Graphity 2.1.0 · Path: 102%</title></rect>
+<rect x="113.0" y="316.0" width="16" height="88.0" fill="#ea580c" rx="1"><title>Graphity 2.2.0 · Path: 100%</title></rect>
+<rect x="132.0" y="316.0" width="16" height="88.0" fill="#4f46e5" rx="1"><title>Graphity 2.3.0 · Path: 100%</title></rect>
+<rect x="151.0" y="316.0" width="16" height="88.0" fill="#0d9488" rx="1"><title>Graphity 2.0.0 (reordered) · Path: 100%</title></rect>
+<rect x="170.0" y="316.0" width="16" height="88.0" fill="#db2777" rx="1"><title>Graphity 2.1.0 (reordered) · Path: 100%</title></rect>
+<rect x="189.0" y="317.4" width="16" height="86.6" fill="#65a30d" rx="1"><title>Graphity 2.2.0 (reordered) · Path: 98%</title></rect>
+<rect x="208.0" y="316.0" width="16" height="88.0" fill="#7c3aed" rx="1"><title>Graphity 2.3.0 (reordered) · Path: 100%</title></rect>
+<text class="xlabel" x="326.0" y="416.0" text-anchor="end" transform="rotate(-40 326.0 416.0)">Path shfld.</text>
+<rect x="242.0" y="300.0" width="16" height="104.0" fill="#2563eb" rx="1"><title>Graphity 1.0 · Path shfld.: 118%</title></rect>
+<rect x="261.0" y="314.9" width="16" height="89.1" fill="#dc2626" rx="1"><title>Graphity 2.0.0 · Path shfld.: 101%</title></rect>
+<rect x="280.0" y="314.9" width="16" height="89.1" fill="#0891b2" rx="1"><title>Graphity 2.1.0 · Path shfld.: 101%</title></rect>
+<rect x="299.0" y="314.9" width="16" height="89.1" fill="#ea580c" rx="1"><title>Graphity 2.2.0 · Path shfld.: 101%</title></rect>
+<rect x="318.0" y="316.0" width="16" height="88.0" fill="#4f46e5" rx="1"><title>Graphity 2.3.0 · Path shfld.: 100%</title></rect>
+<rect x="337.0" y="287.7" width="16" height="116.3" fill="#0d9488" rx="1"><title>Graphity 2.0.0 (reordered) · Path shfld.: 132%</title></rect>
+<rect x="356.0" y="289.6" width="16" height="114.4" fill="#db2777" rx="1"><title>Graphity 2.1.0 (reordered) · Path shfld.: 130%</title></rect>
+<rect x="375.0" y="293.3" width="16" height="110.7" fill="#65a30d" rx="1"><title>Graphity 2.2.0 (reordered) · Path shfld.: 126%</title></rect>
+<rect x="394.0" y="289.6" width="16" height="114.4" fill="#7c3aed" rx="1"><title>Graphity 2.3.0 (reordered) · Path shfld.: 130%</title></rect>
+<text class="xlabel" x="512.0" y="416.0" text-anchor="end" transform="rotate(-40 512.0 416.0)">Tree</text>
+<rect x="428.0" y="380.7" width="16" height="23.3" fill="#2563eb" rx="1"><title>Graphity 1.0 · Tree: 27%</title></rect>
+<rect x="447.0" y="317.7" width="16" height="86.3" fill="#dc2626" rx="1"><title>Graphity 2.0.0 · Tree: 98%</title></rect>
+<rect x="466.0" y="317.7" width="16" height="86.3" fill="#0891b2" rx="1"><title>Graphity 2.1.0 · Tree: 98%</title></rect>
+<rect x="485.0" y="317.7" width="16" height="86.3" fill="#ea580c" rx="1"><title>Graphity 2.2.0 · Tree: 98%</title></rect>
+<rect x="504.0" y="316.0" width="16" height="88.0" fill="#4f46e5" rx="1"><title>Graphity 2.3.0 · Tree: 100%</title></rect>
+<rect x="523.0" y="304.5" width="16" height="99.5" fill="#0d9488" rx="1"><title>Graphity 2.0.0 (reordered) · Tree: 113%</title></rect>
+<rect x="542.0" y="304.5" width="16" height="99.5" fill="#db2777" rx="1"><title>Graphity 2.1.0 (reordered) · Tree: 113%</title></rect>
+<rect x="561.0" y="306.6" width="16" height="97.4" fill="#65a30d" rx="1"><title>Graphity 2.2.0 (reordered) · Tree: 111%</title></rect>
+<rect x="580.0" y="304.5" width="16" height="99.5" fill="#7c3aed" rx="1"><title>Graphity 2.3.0 (reordered) · Tree: 113%</title></rect>
+<text class="xlabel" x="698.0" y="416.0" text-anchor="end" transform="rotate(-40 698.0 416.0)">GNP sparse</text>
+<rect x="614.0" y="338.2" width="16" height="65.8" fill="#2563eb" rx="1"><title>Graphity 1.0 · GNP sparse: 75%</title></rect>
+<rect x="633.0" y="324.2" width="16" height="79.8" fill="#dc2626" rx="1"><title>Graphity 2.0.0 · GNP sparse: 91%</title></rect>
+<rect x="652.0" y="325.5" width="16" height="78.5" fill="#0891b2" rx="1"><title>Graphity 2.1.0 · GNP sparse: 89%</title></rect>
+<rect x="671.0" y="323.7" width="16" height="80.3" fill="#ea580c" rx="1"><title>Graphity 2.2.0 · GNP sparse: 91%</title></rect>
+<rect x="690.0" y="316.0" width="16" height="88.0" fill="#4f46e5" rx="1"><title>Graphity 2.3.0 · GNP sparse: 100%</title></rect>
+<rect x="709.0" y="246.9" width="16" height="157.1" fill="#0d9488" rx="1"><title>Graphity 2.0.0 (reordered) · GNP sparse: 178%</title></rect>
+<rect x="728.0" y="248.6" width="16" height="155.4" fill="#db2777" rx="1"><title>Graphity 2.1.0 (reordered) · GNP sparse: 177%</title></rect>
+<rect x="747.0" y="241.7" width="16" height="162.3" fill="#65a30d" rx="1"><title>Graphity 2.2.0 (reordered) · GNP sparse: 184%</title></rect>
+<rect x="766.0" y="216.7" width="16" height="187.3" fill="#7c3aed" rx="1"><title>Graphity 2.3.0 (reordered) · GNP sparse: 213%</title></rect>
+<text class="xlabel" x="884.0" y="416.0" text-anchor="end" transform="rotate(-40 884.0 416.0)">GNP dense</text>
+<rect x="800.0" y="332.4" width="16" height="71.6" fill="#2563eb" rx="1"><title>Graphity 1.0 · GNP dense: 81%</title></rect>
+<rect x="819.0" y="312.6" width="16" height="91.4" fill="#dc2626" rx="1"><title>Graphity 2.0.0 · GNP dense: 104%</title></rect>
+<rect x="838.0" y="315.8" width="16" height="88.2" fill="#0891b2" rx="1"><title>Graphity 2.1.0 · GNP dense: 100%</title></rect>
+<rect x="857.0" y="316.3" width="16" height="87.7" fill="#ea580c" rx="1"><title>Graphity 2.2.0 · GNP dense: 100%</title></rect>
+<rect x="876.0" y="316.0" width="16" height="88.0" fill="#4f46e5" rx="1"><title>Graphity 2.3.0 · GNP dense: 100%</title></rect>
+<rect x="895.0" y="278.7" width="16" height="125.3" fill="#0d9488" rx="1"><title>Graphity 2.0.0 (reordered) · GNP dense: 142%</title></rect>
+<rect x="914.0" y="280.1" width="16" height="123.9" fill="#db2777" rx="1"><title>Graphity 2.1.0 (reordered) · GNP dense: 141%</title></rect>
+<rect x="933.0" y="277.4" width="16" height="126.6" fill="#65a30d" rx="1"><title>Graphity 2.2.0 (reordered) · GNP dense: 144%</title></rect>
+<rect x="952.0" y="282.3" width="16" height="121.7" fill="#7c3aed" rx="1"><title>Graphity 2.3.0 (reordered) · GNP dense: 138%</title></rect>
+<text class="xlabel" x="1070.0" y="416.0" text-anchor="end" transform="rotate(-40 1070.0 416.0)">GNP dense shfld.</text>
+<text class="xlabel" x="1256.0" y="416.0" text-anchor="end" transform="rotate(-40 1256.0 416.0)">Chain of cliques</text>
+<rect x="1172.0" y="335.2" width="16" height="68.8" fill="#2563eb" rx="1"><title>Graphity 1.0 · Chain of cliques: 78%</title></rect>
+<rect x="1191.0" y="312.6" width="16" height="91.4" fill="#dc2626" rx="1"><title>Graphity 2.0.0 · Chain of cliques: 104%</title></rect>
+<rect x="1210.0" y="316.9" width="16" height="87.1" fill="#0891b2" rx="1"><title>Graphity 2.1.0 · Chain of cliques: 99%</title></rect>
+<rect x="1229.0" y="316.9" width="16" height="87.1" fill="#ea580c" rx="1"><title>Graphity 2.2.0 · Chain of cliques: 99%</title></rect>
+<rect x="1248.0" y="316.0" width="16" height="88.0" fill="#4f46e5" rx="1"><title>Graphity 2.3.0 · Chain of cliques: 100%</title></rect>
+<rect x="1267.0" y="313.5" width="16" height="90.5" fill="#0d9488" rx="1"><title>Graphity 2.0.0 (reordered) · Chain of cliques: 103%</title></rect>
+<rect x="1286.0" y="317.2" width="16" height="86.8" fill="#db2777" rx="1"><title>Graphity 2.1.0 (reordered) · Chain of cliques: 99%</title></rect>
+<rect x="1305.0" y="318.9" width="16" height="85.1" fill="#65a30d" rx="1"><title>Graphity 2.2.0 (reordered) · Chain of cliques: 97%</title></rect>
+<rect x="1324.0" y="316.0" width="16" height="88.0" fill="#7c3aed" rx="1"><title>Graphity 2.3.0 (reordered) · Chain of cliques: 100%</title></rect>
+<text class="xlabel" x="1442.0" y="416.0" text-anchor="end" transform="rotate(-40 1442.0 416.0)">Chain of cliques shfld.</text>
+<rect x="1358.0" y="334.5" width="16" height="69.5" fill="#2563eb" rx="1"><title>Graphity 1.0 · Chain of cliques shfld.: 79%</title></rect>
+<rect x="1377.0" y="313.5" width="16" height="90.5" fill="#dc2626" rx="1"><title>Graphity 2.0.0 · Chain of cliques shfld.: 103%</title></rect>
+<rect x="1396.0" y="316.0" width="16" height="88.0" fill="#0891b2" rx="1"><title>Graphity 2.1.0 · Chain of cliques shfld.: 100%</title></rect>
+<rect x="1415.0" y="317.8" width="16" height="86.2" fill="#ea580c" rx="1"><title>Graphity 2.2.0 · Chain of cliques shfld.: 98%</title></rect>
+<rect x="1434.0" y="316.0" width="16" height="88.0" fill="#4f46e5" rx="1"><title>Graphity 2.3.0 · Chain of cliques shfld.: 100%</title></rect>
+<rect x="1453.0" y="278.4" width="16" height="125.6" fill="#0d9488" rx="1"><title>Graphity 2.0.0 (reordered) · Chain of cliques shfld.: 143%</title></rect>
+<rect x="1472.0" y="287.3" width="16" height="116.7" fill="#db2777" rx="1"><title>Graphity 2.1.0 (reordered) · Chain of cliques shfld.: 133%</title></rect>
+<rect x="1491.0" y="288.4" width="16" height="115.6" fill="#65a30d" rx="1"><title>Graphity 2.2.0 (reordered) · Chain of cliques shfld.: 131%</title></rect>
+<rect x="1510.0" y="286.5" width="16" height="117.5" fill="#7c3aed" rx="1"><title>Graphity 2.3.0 (reordered) · Chain of cliques shfld.: 134%</title></rect>
+<line x1="56" y1="316.0" x2="1526" y2="316.0" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4 3"/>
+</svg>

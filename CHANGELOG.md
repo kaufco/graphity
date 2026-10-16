@@ -1,4 +1,4 @@
-## [2.3.0] — unreleased
+## [2.3.0] — 2026-10-16
 
 Adds contraction by a partition of your choosing, per-node and per-edge data along mappings
 and partitions, edge lookup after `build()`, and BFS distances and reachability.

@@ -2,9 +2,9 @@
 <style>text{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;font-size:11px;fill:#334155}.axis{stroke:#94a3b8;stroke-width:1;fill:none}.grid{stroke:#e2e8f0;stroke-width:1}.ylabel{fill:#64748b;font-size:10px}.tick{fill:#64748b;font-size:10px}.xlabel{font-size:10px}</style>
 <rect x="0" y="0" width="200" height="436" fill="#ffffff"/>
 <rect x="56" y="5" width="12" height="12" rx="2" fill="#2563eb"/>
-<text x="72" y="14" class="tick">Graphity 2.2.0</text>
+<text x="72" y="14" class="tick">Graphity 2.3.0</text>
 <rect x="56" y="21" width="12" height="12" rx="2" fill="#be123c"/>
-<text x="72" y="30" class="tick">Graphity 2.2.0 (bi-adjacent)</text>
+<text x="72" y="30" class="tick">Graphity 2.3.0 (bi-adjacent)</text>
 <rect x="56" y="37" width="12" height="12" rx="2" fill="#16a34a"/>
 <text x="72" y="46" class="tick">JGraphT</text>
 <rect x="56" y="53" width="12" height="12" rx="2" fill="#ca8a04"/>
@@ -25,12 +25,12 @@
 <text class="tick" x="48" y="123.0" text-anchor="end">125%</text>
 <line class="axis" x1="56" y1="120" x2="56" y2="340"/>
 <line class="axis" x1="56" y1="340" x2="176" y2="340"/>
-<text class="ylabel" x="16" y="230.0" text-anchor="middle" transform="rotate(-90 16 230.0)">% of Graphity 2.2.0</text>
+<text class="ylabel" x="16" y="230.0" text-anchor="middle" transform="rotate(-90 16 230.0)">% of Graphity 2.3.0</text>
 <text class="xlabel" x="102.0" y="352.0" text-anchor="end" transform="rotate(-40 102.0 352.0)">cit-Patents</text>
-<rect x="56.0" y="164.0" width="16" height="176.0" fill="#2563eb" rx="1"><title>Graphity 2.2.0 · cit-Patents: 100%</title></rect>
-<rect x="75.0" y="160.3" width="16" height="179.7" fill="#be123c" rx="1"><title>Graphity 2.2.0 (bi-adjacent) · cit-Patents: 102%</title></rect>
-<rect x="94.0" y="314.8" width="16" height="25.2" fill="#16a34a" rx="1"><title>JGraphT · cit-Patents: 14%</title></rect>
-<rect x="113.0" y="325.6" width="16" height="14.4" fill="#ca8a04" rx="1"><title>Guava · cit-Patents: 8.2%</title></rect>
-<rect x="132.0" y="301.1" width="16" height="38.9" fill="#9333ea" rx="1"><title>WebGraph · cit-Patents: 22%</title></rect>
+<rect x="56.0" y="164.0" width="16" height="176.0" fill="#2563eb" rx="1"><title>Graphity 2.3.0 · cit-Patents: 100%</title></rect>
+<rect x="75.0" y="159.4" width="16" height="180.6" fill="#be123c" rx="1"><title>Graphity 2.3.0 (bi-adjacent) · cit-Patents: 103%</title></rect>
+<rect x="94.0" y="309.5" width="16" height="30.5" fill="#16a34a" rx="1"><title>JGraphT · cit-Patents: 17%</title></rect>
+<rect x="113.0" y="320.1" width="16" height="19.9" fill="#ca8a04" rx="1"><title>Guava · cit-Patents: 11%</title></rect>
+<rect x="132.0" y="298.1" width="16" height="41.9" fill="#9333ea" rx="1"><title>WebGraph · cit-Patents: 24%</title></rect>
 <line x1="56" y1="164.0" x2="176" y2="164.0" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4 3"/>
 </svg>

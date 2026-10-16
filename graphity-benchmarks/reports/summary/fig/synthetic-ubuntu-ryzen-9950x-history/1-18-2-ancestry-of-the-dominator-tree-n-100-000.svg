@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="380" height="388" viewBox="0 0 380 388" role="img">
+<style>text{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;font-size:11px;fill:#334155}.axis{stroke:#94a3b8;stroke-width:1;fill:none}.grid{stroke:#e2e8f0;stroke-width:1}.ylabel{fill:#64748b;font-size:10px}.tick{fill:#64748b;font-size:10px}.xlabel{font-size:10px}</style>
+<rect x="0" y="0" width="380" height="388" fill="#ffffff"/>
+<rect x="56" y="5" width="12" height="12" rx="2" fill="#2563eb"/>
+<text x="72" y="14" class="tick">Graphity 2.2.0</text>
+<rect x="56" y="21" width="12" height="12" rx="2" fill="#dc2626"/>
+<text x="72" y="30" class="tick">Graphity 2.3.0</text>
+<line class="grid" x1="56" y1="292.0" x2="356" y2="292.0"/>
+<text class="tick" x="48" y="295.0" text-anchor="end">0%</text>
+<line class="grid" x1="56" y1="242.0" x2="356" y2="242.0"/>
+<text class="tick" x="48" y="245.0" text-anchor="end">25%</text>
+<line class="grid" x1="56" y1="192.0" x2="356" y2="192.0"/>
+<text class="tick" x="48" y="195.0" text-anchor="end">50%</text>
+<line class="grid" x1="56" y1="142.0" x2="356" y2="142.0"/>
+<text class="tick" x="48" y="145.0" text-anchor="end">75%</text>
+<line class="grid" x1="56" y1="92.0" x2="356" y2="92.0"/>
+<text class="tick" x="48" y="95.0" text-anchor="end">100%</text>
+<line class="grid" x1="56" y1="72.0" x2="356" y2="72.0"/>
+<text class="tick" x="48" y="75.0" text-anchor="end">110%</text>
+<line class="axis" x1="56" y1="72" x2="56" y2="292"/>
+<line class="axis" x1="56" y1="292" x2="356" y2="292"/>
+<text class="ylabel" x="16" y="182.0" text-anchor="middle" transform="rotate(-90 16 182.0)">% of Graphity 2.3.0</text>
+<text class="xlabel" x="73.5" y="304.0" text-anchor="end" transform="rotate(-40 73.5 304.0)">Structured</text>
+<rect x="56.0" y="103.1" width="16" height="188.9" fill="#2563eb" rx="1"><title>Graphity 2.2.0 · Structured: 94%</title></rect>
+<rect x="75.0" y="92.0" width="16" height="200.0" fill="#dc2626" rx="1"><title>Graphity 2.3.0 · Structured: 100%</title></rect>
+<text class="xlabel" x="126.5" y="304.0" text-anchor="end" transform="rotate(-40 126.5 304.0)">Irreducible</text>
+<rect x="109.0" y="93.0" width="16" height="199.0" fill="#2563eb" rx="1"><title>Graphity 2.2.0 · Irreducible: 99%</title></rect>
+<rect x="128.0" y="92.0" width="16" height="200.0" fill="#dc2626" rx="1"><title>Graphity 2.3.0 · Irreducible: 100%</title></rect>
+<text class="xlabel" x="179.5" y="304.0" text-anchor="end" transform="rotate(-40 179.5 304.0)">Ladder</text>
+<rect x="162.0" y="98.3" width="16" height="193.7" fill="#2563eb" rx="1"><title>Graphity 2.2.0 · Ladder: 97%</title></rect>
+<rect x="181.0" y="92.0" width="16" height="200.0" fill="#dc2626" rx="1"><title>Graphity 2.3.0 · Ladder: 100%</title></rect>
+<text class="xlabel" x="232.5" y="304.0" text-anchor="end" transform="rotate(-40 232.5 304.0)">Chain</text>
+<rect x="215.0" y="94.1" width="16" height="197.9" fill="#2563eb" rx="1"><title>Graphity 2.2.0 · Chain: 99%</title></rect>
+<rect x="234.0" y="92.0" width="16" height="200.0" fill="#dc2626" rx="1"><title>Graphity 2.3.0 · Chain: 100%</title></rect>
+<text class="xlabel" x="285.5" y="304.0" text-anchor="end" transform="rotate(-40 285.5 304.0)">Fan behind chain</text>
+<rect x="268.0" y="111.5" width="16" height="180.5" fill="#2563eb" rx="1"><title>Graphity 2.2.0 · Fan behind chain: 90%</title></rect>
+<rect x="287.0" y="92.0" width="16" height="200.0" fill="#dc2626" rx="1"><title>Graphity 2.3.0 · Fan behind chain: 100%</title></rect>
+<text class="xlabel" x="338.5" y="304.0" text-anchor="end" transform="rotate(-40 338.5 304.0)">Small methods</text>
+<rect x="321.0" y="95.4" width="16" height="196.6" fill="#2563eb" rx="1"><title>Graphity 2.2.0 · Small methods: 98%</title></rect>
+<rect x="340.0" y="92.0" width="16" height="200.0" fill="#dc2626" rx="1"><title>Graphity 2.3.0 · Small methods: 100%</title></rect>
+<line x1="56" y1="92.0" x2="356" y2="92.0" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4 3"/>
+</svg>

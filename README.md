@@ -169,14 +169,14 @@ Measured on an AMD Ryzen 9 9950X with OpenJDK 25. The parenthesised factor is re
 
 | Shape            | Graphity | JGraphT         | Guava           | WebGraph        |
 |------------------|---------:|----------------:|----------------:|----------------:|
-| Tree             | 2.153 ms | 49.38 ms (23×)  | 41.68 ms (19×)  | 5.713 ms (2.7×) |
-| GNP sparse       | 4.617 ms | 119.9 ms (26×)  | 115.9 ms (25×)  | 10.53 ms (2.3×) |
-| GNP dense        | 8.010 ms | 503.0 ms (63×)  | 584.2 ms (73×)  | 37.19 ms (4.6×) |
-| Chain of cliques | 2.509 ms | 177.4 ms (71×)  | 116.1 ms (46×)  | 37.72 ms (15×)  |
+| Tree             | 2.159 ms | 41.51 ms (19×)  | 38.09 ms (18×)  | 5.712 ms (2.6×) |
+| GNP sparse       | 4.400 ms | 109.6 ms (25×)  | 87.01 ms (20×)  | 10.30 ms (2.3×) |
+| GNP dense        | 7.751 ms | 446.5 ms (58×)  | 333.1 ms (43×)  | 36.12 ms (4.7×) |
+| Chain of cliques | 2.614 ms | 166.0 ms (64×)  | 108.0 ms (41×)  | 37.02 ms (14×)  |
 
 #### Throughput @ 100k nodes (higher is better)
 
-![SCC at n = 100k](graphity-benchmarks/reports/summary/fig/synthetic-ubuntu-ryzen-9950x-peers/1-2-2-scc-n-100-000.svg)
+![SCC at n = 100k](graphity-benchmarks/reports/summary/fig/synthetic-ubuntu-ryzen-9950x-peers/1-4-2-scc-n-100-000.svg)
 
 ### SCC on real-world graphs (SNAP datasets)
 
@@ -184,9 +184,9 @@ Measured on an AMD Ryzen 9 9950X with OpenJDK 25. The parenthesised factor is re
 
 | Dataset                                  | Graphity | JGraphT          | Guava            | WebGraph        |
 |------------------------------------------|---------:|-----------------:|-----------------:|----------------:|
-| web-Google (875k nodes, 5.1M edges)      | 44.45 ms | 1325.0 ms (30×)  | 807.0 ms (18×)   | 239.3 ms (5.4×) |
-| wiki-Talk (2.4M nodes, 5M edges)         | 62.68 ms | 1572.4 ms (25×)  | 1591.0 ms (25×)  | 153.0 ms (2.4×) |
-| soc-LiveJournal1 (4.8M nodes, 69M edges) | 1063.4 ms | 24532 ms (23×) | 17416 ms (16×) | 3949.5 ms (3.7×) |
+| web-Google (875k nodes, 5.1M edges)      | 45.19 ms | 1266.8 ms (28×)  | 799.0 ms (18×)   | 234.3 ms (5.2×) |
+| wiki-Talk (2.4M nodes, 5M edges)         | 61.57 ms | 1391.8 ms (23×)  | 1466.2 ms (24×)  | 153.2 ms (2.5×) |
+| soc-LiveJournal1 (4.8M nodes, 69M edges) | 993.9 ms | 22122 ms (22×)  | 16631 ms (17×)   | 3864.4 ms (3.9×) |
 
 #### Throughput (higher is better)
 
