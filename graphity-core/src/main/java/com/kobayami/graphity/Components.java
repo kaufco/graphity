@@ -57,6 +57,8 @@ public final class Components {
    *
    * @param graph the graph to analyze
    * @return the SCCs as an {@link Sccs} instance
+   * @throws IllegalArgumentException if {@code graph.nodeCount() >= 2^30 - 2}, or if a
+   *     depth-first path is longer than 2^30 - 5 nodes, the most frames an array can hold
    */
   public static Sccs sccsOf(Graph graph) {
     var tarjan = new TarjanTraverser(graph);
@@ -171,15 +173,15 @@ public final class Components {
    * In-adjacency is required and is obtained via {@link Graph#biAdjacentGraph()} unless the
    * argument already provides it.
    * <p>
-   * <strong>Time:</strong> O(nodeCount + edgeCount + bridgeCount x log bridgeCount), the last
-   * term for ordering the bridges; bridgeCount is at most nodeCount - 1.<br>
+   * <strong>Time:</strong> O(nodeCount + edgeCount); the bridges, at most nodeCount - 1, are
+   * ordered by counting.<br>
    * <strong>Memory:</strong> O(nodeCount + edgeCount) for the result; during computation
    * 29 x nodeCount bytes for the traversal state, up to 8 x nodeCount bytes for the collected
-   * bridges before they are ordered, 4 x edgeCount bytes for the edge index translation and up
-   * to 4 x edgeCount bytes for the edge stack, which grows on demand and never exceeds
-   * edgeCount entries, plus 4 x (nodeCount + edgeCount) bytes for the in-adjacency unless the
-   * graph is a {@link BiAdjacentGraph} - several times the size of the graph itself, and worth
-   * checking against the available heap on very large graphs.
+   * bridges and as much again plus 4 x nodeCount bytes while they are ordered, 4 x edgeCount
+   * bytes for the edge index translation and up to 4 x edgeCount bytes for the edge stack, which
+   * grows on demand and never exceeds edgeCount entries, plus 4 x (nodeCount + edgeCount) bytes
+   * for the in-adjacency unless the graph is a {@link BiAdjacentGraph} - several times the size
+   * of the graph itself, and worth checking against the available heap on very large graphs.
    *
    * @param graph the graph to analyze
    * @return bridges, articulation points and blocks as a {@link Biconnectivity} instance
@@ -216,27 +218,26 @@ public final class Components {
    * so deep graphs cannot overflow the JVM call stack), identifying all strongly connected
    * components. SCC IDs are assigned in reverse topological order of the component DAG.
    * <p>
-   * The per-node state - index, lowlink, visited and on-stack - is packed into a single
-   * {@code long[]} (array-of-structs): index in bits 0-30, lowlink in bits 31-61, visited in
-   * bit 62, on-stack (SCC-stack membership) in bit 63. index and lowlink are both node IDs, so
-   * 31 bits each suffice. Every node touch is then one cache line instead of two int arrays plus
-   * two bit-sets; the shift/mask ALU work is free next to the cache miss it avoids.
+   * The per-node state - index, lowlink, visited and on-stack - lives in two interleaved
+   * {@code int} lanes per node: {@code index | visited << 31} and {@code lowlink | onStack << 31}.
+   * index and lowlink are both node IDs, so 31 bits each suffice. Every node touch is then one
+   * cache line instead of two int arrays plus two bit-sets, and the layout stays within 32-bit
+   * arithmetic, which a port to a language without 64-bit integer operators can mirror. Two lanes
+   * per node cap the node count below 2^30 - 2.
    * <p>
-   * Two stacks drive the traversal: {@code frames} for the DFS descent (each entry packs a node
-   * ID and its resume cursor), and {@code sccStack} holding nodes not yet assigned to a
+   * Two stacks drive the traversal: {@code frames} for the DFS descent (each entry a node ID and
+   * its resume position), and {@code sccStack} holding nodes not yet assigned to a
    * completed SCC - a node may be finished in DFS but still on {@code sccStack} until its SCC
    * root finishes.
    */
   private static final class TarjanTraverser {
 
-    private static final long INDEX_MASK = (1L << 31) - 1;    // bits 0-30
-    private static final int LOWLINK_SHIFT = 31;              // lowlink occupies bits 31-61
-    private static final long LOWLINK_FIELD = INDEX_MASK << LOWLINK_SHIFT;
-    private static final long VISITED = 1L << 62;
-    private static final long ON_STACK = 1L << 63;
+    private static final int VALUE = Integer.MAX_VALUE;   // bits 0-30 of a lane
+    // bit 31: visited in lane 0, on-stack in lane 1
+    private static final int FLAG = Integer.MIN_VALUE;
 
     private final Graph graph;
-    private final long[] node;   // packed index | lowlink | visited | onStack per node
+    private final int[] node;   // per node: index | visited << 31, lowlink | onStack << 31
     private final int[] sccStack;
     private int nextIndex;
     private int sccTop;
@@ -250,7 +251,11 @@ public final class Components {
     TarjanTraverser(Graph graph) {
       this.graph = graph;
       int n = graph.nodeCount();
-      this.node = new long[n];
+      if (n > DfsPreorder.MAX_NODE_COUNT) {
+        throw new IllegalArgumentException("Tarjan's algorithm keeps two ints per node and so"
+            + " requires nodeCount < 2^30 - 2, but was " + n);
+      }
+      this.node = new int[2 * n];
       this.sccStack = new int[n];
       this.nodeToScc = new int[n];
       this.sccNodes = new int[n];
@@ -261,62 +266,61 @@ public final class Components {
       int n = graph.nodeCount();
       int[] out = graph.outAdjacencyStart;
       int[] adj = graph.outAdjacency;
-      long[] node = this.node;
+      int[] node = this.node;
 
       // DFS frames grow on demand: depth is data-dependent and usually far below n, so
-      // pre-sizing to n would needlessly zero a huge array for shallow graphs. Each frame
-      // packs (node << 32 | resume cursor) into one long: node and cursor share a cache
-      // line, and the array grows with one allocation per resize instead of two.
-      long[] frames = new long[Math.max(16, Math.min(n, 1024))];
+      // pre-sizing to n would needlessly zero a huge array for shallow graphs. Each frame is
+      // two interleaved ints, the node and its resume position in the adjacency
+      // array, sharing a cache line.
+      int[] frames = DfsFrames.initial(n);
 
       for (int root = 0; root < n; root++) {
-        if ((node[root] & VISITED) != 0) {
+        if ((node[2 * root] & FLAG) != 0) {
           continue;
         }
         preorder(root);
-        frames[0] = ((long) root << 32) | (out[root] & 0xFFFFFFFFL);
+        frames[0] = root;
+        frames[1] = out[root];
         int top = 0;
 
         outer:
         while (top >= 0) {
-          long frame = frames[top];
-          int u = (int) (frame >>> 32);
+          int u = frames[2 * top];
           int end = out[u + 1];
           // Tight neighbor scan: i and end stay in registers; the frame list is
           // touched only when we actually descend, not once per edge.
-          int i = (int) frame;
+          int i = frames[2 * top + 1];
           while (i < end) {
             int v = adj[i++];
-            long nv = node[v];               // one load yields all of v's packed state
-            if ((nv & VISITED) == 0) {
-              frames[top] = (frame & 0xFFFFFFFF00000000L) | (i & 0xFFFFFFFFL);  // resume here after v's subtree finishes
+            if ((node[2 * v] & FLAG) == 0) {
+              frames[2 * top + 1] = i;  // resume here after v's subtree finishes
               preorder(v);
-              if (++top == frames.length) {
-                frames = Arrays.copyOf(frames, top << 1);
+              if (++top == frames.length >> 1) {
+                frames = DfsFrames.grow(frames, n);
               }
-              frames[top] = ((long) v << 32) | (out[v] & 0xFFFFFFFFL);
+              frames[2 * top] = v;
+              frames[2 * top + 1] = out[v];
               continue outer;
-            } else if ((nv & ON_STACK) != 0) {
+            } else if ((node[2 * v + 1] & FLAG) != 0) {   // same cache line as v's lane 0
               // lowlink[u] = min(lowlink[u], index[v])
-              int idxV = (int) (nv & INDEX_MASK);
-              long nu = node[u];
-              if (idxV < (int) ((nu >>> LOWLINK_SHIFT) & INDEX_MASK)) {
-                node[u] = (nu & ~LOWLINK_FIELD) | ((long) idxV << LOWLINK_SHIFT);
+              int idxV = node[2 * v] & VALUE;
+              int lowLane = node[2 * u + 1];
+              if (idxV < (lowLane & VALUE)) {
+                node[2 * u + 1] = (lowLane & FLAG) | idxV;
               }
             }
           }
 
           // Postorder: u is finished. Close its SCC if it is a root, then propagate its
           // lowlink to the parent (the node beneath it on the DFS stack).
-          long nu = node[u];
-          int lowU = (int) ((nu >>> LOWLINK_SHIFT) & INDEX_MASK);
-          if (lowU == (int) (nu & INDEX_MASK)) {
+          int lowU = node[2 * u + 1] & VALUE;
+          if (lowU == (node[2 * u] & VALUE)) {
             int start = sccNodesPos;
             sccStart[sccCount] = start;
             int w;
             do {
               w = sccStack[--sccTop];
-              node[w] &= ~ON_STACK;
+              node[2 * w + 1] &= VALUE;
               nodeToScc[w] = sccCount;
               sccNodes[sccNodesPos++] = w;
             } while (w != u);
@@ -324,10 +328,10 @@ public final class Components {
             sccCount++;
           }
           if (--top >= 0) {
-            int parent = (int) (frames[top] >>> 32);
-            long np = node[parent];
-            if (lowU < (int) ((np >>> LOWLINK_SHIFT) & INDEX_MASK)) {
-              node[parent] = (np & ~LOWLINK_FIELD) | ((long) lowU << LOWLINK_SHIFT);
+            int parent = frames[2 * top];
+            int lowLane = node[2 * parent + 1];
+            if (lowU < (lowLane & VALUE)) {
+              node[2 * parent + 1] = (lowLane & FLAG) | lowU;
             }
           }
         }
@@ -335,8 +339,9 @@ public final class Components {
     }
 
     private void preorder(int v) {
-      long idx = nextIndex++;
-      node[v] = idx | (idx << LOWLINK_SHIFT) | VISITED | ON_STACK;
+      int idx = nextIndex++;
+      node[2 * v] = idx | FLAG;
+      node[2 * v + 1] = idx | FLAG;
       sccStack[sccTop++] = v;
     }
 

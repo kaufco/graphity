@@ -1,8 +1,6 @@
 package com.kobayami.graphity;
 
 import it.unimi.dsi.fastutil.ints.IntArrayList;
-import it.unimi.dsi.fastutil.ints.IntLists;
-import it.unimi.dsi.fastutil.longs.LongArrayList;
 import java.util.Arrays;
 
 /**
@@ -153,7 +151,8 @@ public final class Biconnectivity {
     private int edgeTop;
 
     private final boolean[] isArticulation;
-    private final LongArrayList bridgeKeys = new LongArrayList();
+    /** Bridges as (lower node, higher node) pairs, interleaved. */
+    private final IntArrayList bridgePairs = new IntArrayList();
 
     /** Edge index → block ID, {@code -1} for a self-loop. */
     private final int[] blockOfEdge;
@@ -232,7 +231,8 @@ public final class Biconnectivity {
               if (parent != root) isArticulation[parent] = true;
             }
             if (low[u] > disc[parent]) {
-              bridgeKeys.add(bridgeKey(parent, u));
+              bridgePairs.add(Math.min(parent, u));
+              bridgePairs.add(Math.max(parent, u));
             }
           }
         }
@@ -323,25 +323,9 @@ public final class Biconnectivity {
       }
     }
 
-    private static long bridgeKey(int a, int b) {
-      int source = Math.min(a, b);
-      int target = Math.max(a, b);
-      return ((long) source << 32) | target;
-    }
-
     Edges bridges() {
-      if (bridgeKeys.isEmpty()) return Edges.empty();
-      long[] keys = bridgeKeys.elements();
-      int count = bridgeKeys.size();
-      // Both node IDs are non-negative, so the packed key sorts by source, then target.
-      Arrays.sort(keys, 0, count);
-      var sources = new IntArrayList(count);
-      var targets = new IntArrayList(count);
-      for (int i = 0; i < count; i++) {
-        sources.add((int) (keys[i] >>> 32));
-        targets.add((int) keys[i]);
-      }
-      return new Edges(IntLists.unmodifiable(sources), IntLists.unmodifiable(targets));
+      return Edges.sortedPairs(bridgePairs.elements(), bridgePairs.size() >> 1,
+          graph.nodeCount(), false);
     }
 
     SortedIntView articulationPoints() {

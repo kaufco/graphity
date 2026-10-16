@@ -2,7 +2,6 @@ package com.kobayami.graphity;
 
 import it.unimi.dsi.fastutil.ints.IntList;
 
-import java.util.Arrays;
 import java.util.Objects;
 
 /**
@@ -87,14 +86,13 @@ public abstract class IterativeDfsTraverser {
   private final int[] state;
 
   /**
-   * Explicit DFS stack, replacing the call stack; grows on demand. Each frame packs
-   * {@code (node << 32 | resume cursor)} into one {@code long}: the node ID at depth
-   * {@code d} and the next adjacency index to scan for it share a cache line, and the
-   * backing array grows with one allocation per resize instead of two. A raw array rather
-   * than a list, so that the traversal loop keeps array reference and stack pointer in
-   * registers; the field only carries the capacity across {@code run} calls.
+   * Explicit DFS stack, replacing the call stack; grows on demand. Each frame is two
+   * interleaved ints: the node ID at depth {@code d} and its resume position in the
+   * adjacency array, sharing a cache line. A raw array rather than a list, so that the
+   * traversal loop keeps array reference and stack pointer in registers; the field only
+   * carries the capacity across {@code run} calls.
    */
-  private long[] frames;
+  private int[] frames;
 
   /**
    * Creates a traverser for the given graph.
@@ -105,7 +103,7 @@ public abstract class IterativeDfsTraverser {
     this.graph = graph;
     int n = graph.nodeCount();
     this.state = new int[(n >> 4) + 1];
-    this.frames = new long[Math.max(16, Math.min(n, 1024))];
+    this.frames = DfsFrames.initial(n);
   }
 
   /**
@@ -158,6 +156,9 @@ public abstract class IterativeDfsTraverser {
    * May be called multiple times, and freely combined with other {@code run} methods.
    * <p>
    * <strong>Time:</strong> O(nodeCount + edgeCount).
+   *
+   * @throws IllegalArgumentException if a depth-first path is longer than 2^30 - 5 nodes, the most
+   *     frames an array can hold
    */
   public final void run() {
     int n = graph.nodeCount();
@@ -178,6 +179,8 @@ public abstract class IterativeDfsTraverser {
    *
    * @param startNode the start node
    * @throws IndexOutOfBoundsException if {@code startNode} is out of range
+   * @throws IllegalArgumentException if a depth-first path is longer than 2^30 - 5 nodes, the most
+   *     frames an array can hold
    */
   public final void run(int startNode) {
     Objects.checkIndex(startNode, graph.nodeCount());
@@ -196,6 +199,8 @@ public abstract class IterativeDfsTraverser {
    * <strong>Time:</strong> O(reachable nodes + reachable edges).
    *
    * @param startNodes the start nodes, visited in list order
+   * @throws IllegalArgumentException if a depth-first path is longer than 2^30 - 5 nodes, the most
+   *     frames an array can hold
    */
   public final void runFromNodes(IntList startNodes) {
     for (int i = 0; i < startNodes.size(); i++) {
@@ -215,7 +220,7 @@ public abstract class IterativeDfsTraverser {
     int[] out = graph.outAdjacencyStart;
     int[] adj = graph.outAdjacency;
     int[] state = this.state;
-    long[] frames = this.frames;
+    int[] frames = this.frames;
 
     int rShift = (root & 0xF) << 1;
     state[root >> 4] |= (VISITED | ON_STACK) << rShift;
@@ -225,27 +230,28 @@ public abstract class IterativeDfsTraverser {
       leaveNode(root);
       return;
     }
-    frames[0] = ((long) root << 32) | (out[root] & 0xFFFFFFFFL);
+    frames[0] = root;
+    frames[1] = out[root];
     int top = 0;
 
     outer:
     while (top >= 0) {
-      long frame = frames[top];
-      int u = (int) (frame >>> 32);
+      int u = frames[2 * top];
       int end = out[u + 1];
-      int i = (int) frame;
+      int i = frames[2 * top + 1];
       while (i < end) {
         int v = adj[i++];
         int shift = (v & 0xF) << 1;
         if (((state[v >> 4] >>> shift) & VISITED) == 0) {  // tree edge
           state[v >> 4] |= (VISITED | ON_STACK) << shift;
           if (enterNode(v)) {
-            frames[top] = (frame & 0xFFFFFFFF00000000L) | (i & 0xFFFFFFFFL);  // save u's resume point before descending
-            if (++top == frames.length) {
-              frames = Arrays.copyOf(frames, top << 1);
+            frames[2 * top + 1] = i;  // save u's resume point before descending
+            if (++top == frames.length >> 1) {
+              frames = DfsFrames.grow(frames, graph.nodeCount());
               this.frames = frames;  // keep the grown capacity for later run calls
             }
-            frames[top] = ((long) v << 32) | (out[v] & 0xFFFFFFFFL);
+            frames[2 * top] = v;
+            frames[2 * top + 1] = out[v];
             continue outer;
           }
           // Pruned: no descent, immediate postorder. u's scan continues with the

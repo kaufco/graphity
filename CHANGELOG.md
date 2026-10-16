@@ -1,3 +1,21 @@
+# Changelog
+
+All notable changes to Graphity are documented in this file.
+
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+Graphity adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+---
+
+## [2.4.0] — unreleased
+
+### Changed
+
+- Performance
+  - [Issue #27](../../issues/27) - Replace the 64-bit packed DFS state with interleaved int32 lanes
+
+---
+
 ## [2.3.0] — 2026-10-16
 
 Adds contraction by a partition of your choosing, per-node and per-edge data along mappings

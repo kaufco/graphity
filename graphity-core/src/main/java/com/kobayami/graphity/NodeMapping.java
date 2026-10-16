@@ -302,6 +302,8 @@ public final class NodeMapping extends IndexMapping {
    * @param graph the graph to reindex
    * @return permutation mapping from new IDs to old IDs (DFS preorder)
    * @see Graphs#remapped(Graph, NodeMapping)
+   * @throws IllegalArgumentException if a depth-first path is longer than 2^30 - 5 nodes, the most
+   *     frames an array can hold
    */
   public static NodeMapping reindex(Graph graph) {
     int n = graph.nodeCount();
@@ -343,24 +345,24 @@ public final class NodeMapping extends IndexMapping {
       int[] out = graph.outAdjacencyStart;
       int[] adj = graph.outAdjacency;
       long[] visited = this.visited;
-      // Each frame packs (node << 32 | resume cursor) into one long: node and cursor share a
-      // cache line, and the array grows on demand (one allocation per resize instead of two).
-      long[] frames = new long[Math.max(16, Math.min(n, 1024))];
+      // Each frame is two interleaved ints, the node and its resume position in the
+      // adjacency array: both share a cache line, and the array grows on demand.
+      int[] frames = DfsFrames.initial(n);
 
       for (int root = nextClearBit(visited, 0); root < n; root = nextClearBit(visited, root + 1)) {
         visited[root >>> 6] |= 1L << root;
         order[pos++] = root;
-        frames[0] = ((long) root << 32) | (out[root] & 0xFFFFFFFFL);
+        frames[0] = root;
+        frames[1] = out[root];
         int top = 0;
 
         outer:
         while (top >= 0) {
-          long frame = frames[top];
-          int u = (int) (frame >>> 32);
+          int u = frames[2 * top];
           int end = out[u + 1];
           // Tight neighbor scan: i and end stay in registers; the frame list is
           // touched only when we actually descend, not once per edge.
-          int i = (int) frame;
+          int i = frames[2 * top + 1];
           while (i < end) {
             int v = adj[i++];
             int w = v >>> 6;
@@ -369,11 +371,12 @@ public final class NodeMapping extends IndexMapping {
             if ((bits & mask) == 0) {
               visited[w] = bits | mask;
               order[pos++] = v;
-              frames[top] = (frame & 0xFFFFFFFF00000000L) | (i & 0xFFFFFFFFL);
-              if (++top == frames.length) {
-                frames = Arrays.copyOf(frames, top << 1);
+              frames[2 * top + 1] = i;
+              if (++top == frames.length >> 1) {
+                frames = DfsFrames.grow(frames, n);
               }
-              frames[top] = ((long) v << 32) | (out[v] & 0xFFFFFFFFL);
+              frames[2 * top] = v;
+              frames[2 * top + 1] = out[v];
               continue outer;
             }
           }

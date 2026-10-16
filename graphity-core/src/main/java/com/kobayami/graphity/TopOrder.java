@@ -4,8 +4,6 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.ints.IntLists;
 
-import java.util.Arrays;
-
 /**
  * Topological sort of a directed acyclic graph (DAG).
  * <p>
@@ -36,7 +34,8 @@ public final class TopOrder {
    *
    * @param graph the graph to sort (must be a DAG)
    * @return an unmodifiable list of node IDs in topological order
-   * @throws IllegalArgumentException if the graph contains a cycle
+   * @throws IllegalArgumentException if the graph contains a cycle, or if a depth-first path is
+   *     longer than 2^30 - 5 nodes, the most frames an array can hold
    */
   public static IntList of(Graph graph) {
     var traverser = new TopOrderTraverser(graph);
@@ -80,9 +79,9 @@ public final class TopOrder {
       int[] adj = graph.outAdjacency;
       int[] state = this.state;
       int[] order = this.order;
-      // Each frame packs (node << 32 | resume cursor) into one long: node and cursor share a
-      // cache line, and the array grows on demand (one allocation per resize instead of two).
-      long[] frames = new long[Math.max(16, Math.min(n, 1024))];
+      // Each frame is two interleaved ints, the node and its resume position in the
+      // adjacency array: both share a cache line, and the array grows on demand.
+      int[] frames = DfsFrames.initial(n);
 
       for (int root = 0; root < n; root++) {
         int rShift = (root & 0xF) << 1;
@@ -90,17 +89,17 @@ public final class TopOrder {
           continue;
         }
         state[root >> 4] |= (VISITED | ON_STACK) << rShift;
-        frames[0] = ((long) root << 32) | (out[root] & 0xFFFFFFFFL);
+        frames[0] = root;
+        frames[1] = out[root];
         int top = 0;
 
         outer:
         while (top >= 0) {
-          long frame = frames[top];
-          int u = (int) (frame >>> 32);
+          int u = frames[2 * top];
           int end = out[u + 1];
           // Tight neighbor scan: i and end stay in registers; the frame list is
           // touched only when we actually descend, not once per edge.
-          int i = (int) frame;
+          int i = frames[2 * top + 1];
           while (i < end) {
             int v = adj[i++];
             int shift = (v & 0xF) << 1;
@@ -110,12 +109,13 @@ public final class TopOrder {
               return;
             }
             if ((flags & VISITED) == 0) {
-              frames[top] = (frame & 0xFFFFFFFF00000000L) | (i & 0xFFFFFFFFL);
+              frames[2 * top + 1] = i;
               state[v >> 4] |= (VISITED | ON_STACK) << shift;
-              if (++top == frames.length) {
-                frames = Arrays.copyOf(frames, top << 1);
+              if (++top == frames.length >> 1) {
+                frames = DfsFrames.grow(frames, n);
               }
-              frames[top] = ((long) v << 32) | (out[v] & 0xFFFFFFFFL);
+              frames[2 * top] = v;
+              frames[2 * top + 1] = out[v];
               continue outer;
             }
           }
