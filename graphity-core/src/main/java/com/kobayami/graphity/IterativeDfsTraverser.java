@@ -15,9 +15,9 @@ import java.util.Objects;
  * <p>
  * This covers the large majority of user traversals: pre/postorder processing, subtree pruning,
  * reachability, DFS ordering, cycle detection via {@link #isOnStack(int)}, and depth tracking.
- * It cannot express edge-centric algorithms (e.g. Tarjan SCC) that must inspect edges to
- * already-visited nodes; for those, use the ready-made {@link Components}, {@link EdgeTypes},
- * {@link BackEdges}, or the recursive {@link DfsTraverser} with manual edge iteration.
+ * It cannot express edge-centric algorithms that must inspect edges to already-visited nodes;
+ * for those, use {@link IterativeDfsEdgeTraverser}, which reports every edge with the state of
+ * its target, or the ready-made {@link Components}, {@link EdgeTypes} and {@link BackEdges}.
  *
  * <h2>Example: parenthesized DFS trace</h2>
  * <pre>{@code
@@ -66,6 +66,7 @@ import java.util.Objects;
  *
  * @see Graph
  * @see DfsTraverser
+ * @see IterativeDfsEdgeTraverser
  */
 public abstract class IterativeDfsTraverser {
 

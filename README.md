@@ -236,7 +236,7 @@ Graphity ships the following algorithms out of the box. All of them return typed
 | Quotient graph by a partition of your choosing                  | `NodePartition.of(graph, groupOf, groupCount).condense()` |
 | Subgraph extraction and node remapping                          | `Graphs.remapped(...)`        |
 
-For custom traversals, subclass `IterativeDfsTraverser` (or `BiAdjacentDfsTraverser` for combined in/out access) — it keeps its DFS stack on the heap, so it handles arbitrarily deep graphs without any `-Xss` tuning. Override `enterNode(int)` for preorder and `leaveNode(int)` for postorder; return `false` from `enterNode` to prune a subtree. For edge-centric algorithms that must inspect back edges directly (e.g. a custom variant of Tarjan), use the recursive `DfsTraverser` instead. Multiple `run()` calls accumulate visited state, so two-phase walks compose without external bookkeeping.
+For custom traversals, subclass `IterativeDfsTraverser` (or `BiAdjacentDfsTraverser` for combined in/out access) — it keeps its DFS stack on the heap, so it handles arbitrarily deep graphs without any `-Xss` tuning. Override `enterNode(int)` for preorder and `leaveNode(int)` for postorder; return `false` from `enterNode` to prune a subtree. For edge-centric algorithms that must look at every edge, such as finding a cycle, subclass `IterativeDfsEdgeTraverser`: its `visitEdge` hook reports each edge with the state of its target (unvisited, on the current path, finished) and returns whether to descend, skip the edge or stop. Multiple `run()` calls accumulate visited state, so two-phase walks compose without external bookkeeping.
 
 ## Limitations
 
