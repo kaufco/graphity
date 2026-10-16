@@ -68,7 +68,8 @@ import java.util.Objects;
  * Already-visited nodes are never revisited - the visited set is cumulative across calls. A target
  * skipped while unvisited stays unvisited; a later edge or {@code run} call may still reach it.
  * {@link #leaveNode(int)} is invoked exactly once for every visited node, including nodes whose
- * subtree was pruned by {@link #enterNode(int)}, unless the traversal is stopped before.
+ * subtree was pruned by {@link #enterNode(int)}, unless the traversal is stopped before
+ * ({@link EdgeAction#STOP} or {@link #stop()}).
  * <p>
  * <strong>Memory:</strong> O(nodeCount) - visited/on-stack state is packed 2 bits per node into a
  * single {@code int[]}; the explicit stack grows on demand up to the longest DFS path.
@@ -134,6 +135,9 @@ public abstract class IterativeDfsEdgeTraverser {
    */
   private int[] frames;
 
+  /** Set by {@link #stop()}; cleared when a {@code run} call starts. */
+  private boolean stopRequested;
+
   /**
    * Creates a traverser for the given graph.
    *
@@ -161,8 +165,8 @@ public abstract class IterativeDfsEdgeTraverser {
   /**
    * Postorder hook, called once per visited node, after all its out-edges have been reported
    * (or right after {@link #enterNode(int)} if that pruned the subtree). Not called for the nodes
-   * on the current path when the traversal is stopped with {@link EdgeAction#STOP}. Default:
-   * no-op.
+   * on the current path when the traversal is stopped with {@link EdgeAction#STOP} or
+   * {@link #stop()}. Default: no-op.
    *
    * @param node node ID in {@code 0..nodeCount()-1}
    */
@@ -214,6 +218,22 @@ public abstract class IterativeDfsEdgeTraverser {
   }
 
   /**
+   * Stops the traversal in progress: the current {@code run} call returns as soon as the hook
+   * that calls this method returns, without calling any further hook - like returning
+   * {@link EdgeAction#STOP} from {@link #visitEdge}, but callable from every hook. Called from
+   * {@link #enterNode(int)}, it leaves the entered node visited, so it counts as finished
+   * afterwards like the rest of the path; a target that {@code STOP} declines stays unvisited.
+   * <p>
+   * Outside a {@code run} call it has no effect. To cancel from another thread, let a hook check a
+   * flag of your own and call this method.
+   * <p>
+   * <strong>Time:</strong> O(1); the traversal checks for it once per hook call.
+   */
+  protected final void stop() {
+    stopRequested = true;
+  }
+
+  /**
    * Runs a full DFS forest over all nodes. Forest roots are picked sequentially (0, 1, 2, …),
    * skipping already-visited nodes (including nodes visited by previous {@code run} calls).
    * <p>
@@ -225,6 +245,7 @@ public abstract class IterativeDfsEdgeTraverser {
    *     frames an array can hold
    */
   public final void run() {
+    stopRequested = false;
     int n = graph.nodeCount();
     for (int root = 0; root < n; root++) {
       if (!dfsIfUnvisited(root)) {
@@ -248,13 +269,15 @@ public abstract class IterativeDfsEdgeTraverser {
    */
   public final void run(int startNode) {
     Objects.checkIndex(startNode, graph.nodeCount());
+    stopRequested = false;
     dfsIfUnvisited(startNode);
   }
 
   /**
    * Runs DFS starting from the given nodes, in list order. Only visits nodes reachable from
    * the specified start set that have not been visited yet. Already-visited start nodes are
-   * skipped; {@link EdgeAction#STOP} ends the whole call, not just the current start node.
+   * skipped; {@link EdgeAction#STOP} and {@link #stop()} end the whole call, not just the current
+   * start node.
    * <p>
    * May be called multiple times, and freely combined with other {@code run} methods.
    * <p>
@@ -265,6 +288,7 @@ public abstract class IterativeDfsEdgeTraverser {
    *     frames an array can hold
    */
   public final void runFromNodes(IntList startNodes) {
+    stopRequested = false;
     for (int i = 0; i < startNodes.size(); i++) {
       if (!dfsIfUnvisited(startNodes.getInt(i))) {
         return;
@@ -295,10 +319,15 @@ public abstract class IterativeDfsEdgeTraverser {
 
     int rShift = (root & 0xF) << 1;
     state[root >> 4] |= (VISITED | ON_STACK) << rShift;
-    if (!enterNode(root)) {
+    boolean descend = enterNode(root);
+    if (stopRequested) {
+      state[root >> 4] &= ~(ON_STACK << rShift);
+      return false;
+    }
+    if (!descend) {
       state[root >> 4] &= ~(ON_STACK << rShift);
       leaveNode(root);
-      return true;
+      return !stopRequested;
     }
     frames[0] = root;
     frames[1] = out[root];
@@ -314,13 +343,23 @@ public abstract class IterativeDfsEdgeTraverser {
         int v = adj[c];
         int shift = (v & 0xF) << 1;
         int flags = (state[v >> 4] >>> shift) & (VISITED | ON_STACK);
-        switch (visitEdge(u, v, c, TARGET_STATES[flags])) {
+        EdgeAction action = visitEdge(u, v, c, TARGET_STATES[flags]);
+        if (stopRequested) {
+          action = EdgeAction.STOP;
+        }
+        switch (action) {
           case DESCEND:
             if (flags != 0) {
               break;
             }
             state[v >> 4] |= (VISITED | ON_STACK) << shift;
-            if (enterNode(v)) {
+            descend = enterNode(v);
+            if (stopRequested) {
+              state[v >> 4] &= ~(ON_STACK << shift);
+              leaveStack(frames, top);
+              return false;
+            }
+            if (descend) {
               frames[2 * top + 1] = i;
               if (++top == frames.length >> 1) {
                 frames = DfsFrames.grow(frames, graph.nodeCount());
@@ -332,21 +371,34 @@ public abstract class IterativeDfsEdgeTraverser {
             }
             state[v >> 4] &= ~(ON_STACK << shift);
             leaveNode(v);
+            if (stopRequested) {
+              leaveStack(frames, top);
+              return false;
+            }
             break;
           case SKIP:
             break;
           case STOP:
-            for (int d = 0; d <= top; d++) {
-              int w = frames[2 * d];
-              state[w >> 4] &= ~(ON_STACK << ((w & 0xF) << 1));
-            }
+            leaveStack(frames, top);
             return false;
         }
       }
       state[u >> 4] &= ~(ON_STACK << ((u & 0xF) << 1));
       leaveNode(u);
       top--;
+      if (stopRequested) {
+        leaveStack(frames, top);
+        return false;
+      }
     }
     return true;
+  }
+
+  /** Clears the on-stack flag of every node in {@code frames[0..top]}, once per stop. */
+  private void leaveStack(int[] frames, int top) {
+    for (int d = 0; d <= top; d++) {
+      int w = frames[2 * d];
+      state[w >> 4] &= ~(ON_STACK << ((w & 0xF) << 1));
+    }
   }
 }

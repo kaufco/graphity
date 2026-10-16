@@ -271,4 +271,130 @@ class IterativeDfsTraverserTest {
     assertThat(counter.entered).isEqualTo(deep);
     assertThat(counter.left).isEqualTo(deep);
   }
+
+  // ---- stop() ----
+
+  /** Records pre- and postorder and stops when entering or leaving the given node. */
+  private static class StoppingDfs extends IterativeDfsTraverser {
+    final IntArrayList enter = new IntArrayList();
+    final IntArrayList leave = new IntArrayList();
+    int stopOnEnter = -1;
+    int stopOnLeave = -1;
+    boolean prune;
+    int pruneNode = -1;
+
+    StoppingDfs(Graph graph) {
+      super(graph);
+    }
+
+    @Override protected boolean enterNode(int node) {
+      enter.add(node);
+      if (node == stopOnEnter) {
+        stop();
+      }
+      return !prune && node != pruneNode;
+    }
+
+    @Override protected void leaveNode(int node) {
+      leave.add(node);
+      if (node == stopOnLeave) {
+        stop();
+      }
+    }
+
+    void stopNow() {
+      stop();
+    }
+  }
+
+  @Test
+  void stopInEnterNodeEndsTheRunWithoutLeavingThePath() {
+    var t = new StoppingDfs(TestGraphs.path(5));
+    t.stopOnEnter = 2;
+    t.run();
+    assertThat(t.enter.toIntArray()).containsExactly(0, 1, 2);
+    assertThat(t.leave.isEmpty()).isTrue();
+    for (int v = 0; v < 5; v++) {
+      assertThat(t.isOnStack(v)).as("node %d on stack", v).isFalse();
+    }
+    assertThat(t.isVisited(2)).isTrue();
+    assertThat(t.isVisited(3)).isFalse();
+
+    t.stopOnEnter = -1;
+    t.run();
+    assertThat(t.enter.toIntArray()).containsExactly(0, 1, 2, 3, 4);
+    assertThat(t.leave.toIntArray()).containsExactly(4, 3);
+  }
+
+  @Test
+  void stopInLeaveNodeEndsTheRun() {
+    // Binary tree: 0 -> 1, 2; 1 -> 3, 4; 2 -> 5, 6.
+    var t = new StoppingDfs(TestGraphs.of(7, 0, 1, 0, 2, 1, 3, 1, 4, 2, 5, 2, 6));
+    t.stopOnLeave = 3;
+    t.run();
+    assertThat(t.enter.toIntArray()).containsExactly(0, 1, 3);
+    assertThat(t.leave.toIntArray()).containsExactly(3);
+    assertThat(t.isOnStack(0)).isFalse();
+    assertThat(t.isOnStack(1)).isFalse();
+  }
+
+  @Test
+  void stopOnAPrunedNodeSkipsItsLeaveNode() {
+    var t = new StoppingDfs(TestGraphs.isolated(3));
+    t.prune = true;
+    t.stopOnEnter = 1;
+    t.run();
+    assertThat(t.enter.toIntArray()).containsExactly(0, 1);
+    assertThat(t.leave.toIntArray()).containsExactly(0);
+  }
+
+  @Test
+  void stopEndsTheWholeRunFromNodesCall() {
+    var t = new StoppingDfs(TestGraphs.isolated(4));
+    t.stopOnLeave = 3;
+    t.runFromNodes(IntList.of(3, 1, 2));
+    assertThat(t.enter.toIntArray()).containsExactly(3);
+  }
+
+  @Test
+  void stopOutsideARunHasNoEffect() {
+    var t = new StoppingDfs(TestGraphs.path(3));
+    t.stopNow();
+    t.run(0);
+    assertThat(t.enter.toIntArray()).containsExactly(0, 1, 2);
+  }
+
+  @Test
+  void stopInLeaveNodeOfAPrunedRootEndsTheRun() {
+    var t = new StoppingDfs(TestGraphs.isolated(3));
+    t.prune = true;
+    t.stopOnLeave = 0;
+    t.run();
+    assertThat(t.enter.toIntArray()).containsExactly(0);
+    assertThat(t.leave.toIntArray()).containsExactly(0);
+  }
+
+  @Test
+  void stopInLeaveNodeOfAPrunedChildEndsTheRun() {
+    // 0 -> 1, 0 -> 2: node 1 is pruned and stops the run when it is left.
+    var t = new StoppingDfs(TestGraphs.of(3, 0, 1, 0, 2));
+    t.pruneNode = 1;
+    t.stopOnLeave = 1;
+    t.run();
+    assertThat(t.enter.toIntArray()).containsExactly(0, 1);
+    assertThat(t.leave.toIntArray()).containsExactly(1);
+    assertThat(t.isOnStack(0)).isFalse();
+    assertThat(t.isVisited(2)).isFalse();
+  }
+
+  @Test
+  void runFromNodesClearsAnEarlierStop() {
+    var t = new StoppingDfs(TestGraphs.isolated(3));
+    t.stopOnEnter = 0;
+    t.runFromNodes(IntList.of(0, 1));
+    assertThat(t.enter.toIntArray()).containsExactly(0);
+    t.stopOnEnter = -1;
+    t.runFromNodes(IntList.of(1, 2));
+    assertThat(t.enter.toIntArray()).containsExactly(0, 1, 2);
+  }
 }

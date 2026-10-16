@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.kobayami.graphity.testutils.RecordingBiAdjacentFrontierTraverser;
 import com.kobayami.graphity.testutils.TestGraphs;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import org.junit.jupiter.api.Test;
 
 class BiAdjacentFrontierTraverserTest {
@@ -110,5 +111,21 @@ class BiAdjacentFrontierTraverserTest {
     var g = TestGraphs.path(3).biAdjacentGraph();
     var t = new RecordingBiAdjacentFrontierTraverser(g);
     assertThat(t.biAdjacentGraph).isSameAs(t.graph);
+  }
+
+  @Test
+  void stopEndsRunFromRoots() {
+    // Two roots (0 and 3), each reaching one sink; stop at the first root.
+    var g = TestGraphs.of(4, 0, 1, 1, 2, 3, 2).biAdjacentGraph();
+    var visits = new IntArrayList();
+    var t = new BiAdjacentFrontierTraverser(g) {
+      @Override protected void visitNode(int node) {
+        visits.add(node);
+        enqueueChildren(node);
+        stop();
+      }
+    };
+    t.runFromRoots();
+    assertThat(visits.toIntArray()).containsExactly(0);
   }
 }

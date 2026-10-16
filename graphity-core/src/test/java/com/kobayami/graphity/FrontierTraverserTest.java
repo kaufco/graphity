@@ -242,4 +242,90 @@ class FrontierTraverserTest {
     boolean callEnqueue(int node) { return enqueue(node); }
     @Override protected void visitNode(int node) {}
   }
+
+  // ---- stop() ----
+
+  /** Records visits and completed levels; stops when visiting a node or completing a level. */
+  private static class StoppingFrontier extends FrontierTraverser {
+    final IntArrayList visits = new IntArrayList();
+    final IntArrayList levels = new IntArrayList();
+    int stopOnVisit = -1;
+    int stopOnLevel = -1;
+
+    StoppingFrontier(Graph graph) {
+      super(graph);
+    }
+
+    @Override protected void visitNode(int node) {
+      visits.add(node);
+      enqueueChildren(node);
+      if (node == stopOnVisit) {
+        stop();
+      }
+    }
+
+    @Override protected void onLevelComplete(int level) {
+      levels.add(level);
+      if (level == stopOnLevel) {
+        stop();
+      }
+    }
+  }
+
+  @Test
+  void stopInVisitNodeDropsTheRestOfTheFrontier() {
+    // 0 -> 1, 0 -> 2, 1 -> 3; stop while visiting 1: 2 and 3 are enqueued but dropped.
+    var t = new StoppingFrontier(TestGraphs.of(5, 0, 1, 0, 2, 1, 3));
+    t.stopOnVisit = 1;
+    t.run();
+    assertThat(t.visits.toIntArray()).containsExactly(0, 1);
+    assertThat(t.levels.toIntArray()).containsExactly(0);
+    assertThat(t.isVisited(2)).as("enqueued before the stop").isTrue();
+    assertThat(t.isVisited(4)).isFalse();
+
+    t.stopOnVisit = -1;
+    t.run();
+    assertThat(t.visits.toIntArray()).containsExactly(0, 1, 4);
+  }
+
+  @Test
+  void stopInOnLevelCompleteEndsTheRun() {
+    // Binary tree: 0 -> 1, 2; 1 -> 3, 4; 2 -> 5, 6.
+    var t = new StoppingFrontier(TestGraphs.of(7, 0, 1, 0, 2, 1, 3, 1, 4, 2, 5, 2, 6));
+    t.stopOnLevel = 1;
+    t.run(0);
+    assertThat(t.visits.toIntArray()).containsExactly(0, 1, 2);
+    assertThat(t.levels.toIntArray()).containsExactly(0, 1);
+  }
+
+  @Test
+  void stopEndsTheWholeRunOverAllRoots() {
+    var t = new StoppingFrontier(TestGraphs.isolated(3));
+    t.stopOnLevel = 0;
+    t.run();
+    assertThat(t.visits.toIntArray()).containsExactly(0);
+    t.stopOnLevel = -1;
+    t.run();
+    assertThat(t.visits.toIntArray()).containsExactly(0, 1, 2);
+  }
+
+  @Test
+  void runOfOneNodeClearsAnEarlierStop() {
+    var t = new StoppingFrontier(TestGraphs.of(3, 1, 2));
+    t.stopOnVisit = 0;
+    t.run(0);
+    t.stopOnVisit = -1;
+    t.run(1);
+    assertThat(t.visits.toIntArray()).containsExactly(0, 1, 2);
+  }
+
+  @Test
+  void runFromNodesClearsAnEarlierStop() {
+    var t = new StoppingFrontier(TestGraphs.of(3, 1, 2));
+    t.stopOnVisit = 0;
+    t.run(0);
+    t.stopOnVisit = -1;
+    t.runFromNodes(IntList.of(1));
+    assertThat(t.visits.toIntArray()).containsExactly(0, 1, 2);
+  }
 }

@@ -295,4 +295,118 @@ class IterativeDfsEdgeTraverserTest {
     assertThat(counter.edges).isEqualTo(deep - 1);
     assertThat(counter.left).isEqualTo(deep);
   }
+
+  // ---- stop() ----
+
+  @Test
+  void stopFromEveryHookEndsTheRun() {
+    // Path 0 -> 1 -> 2 -> 3; stop in enterNode(1), visitEdge(1 -> 2) or leaveNode(3).
+    for (int hook = 0; hook < 3; hook++) {
+      int stopIn = hook;
+      var t = new Recorder(TestGraphs.path(4)) {
+        @Override protected boolean enterNode(int node) {
+          super.enterNode(node);
+          if (stopIn == 0 && node == 1) {
+            stop();
+          }
+          return true;
+        }
+        @Override protected void leaveNode(int node) {
+          super.leaveNode(node);
+          if (stopIn == 2 && node == 3) {
+            stop();
+          }
+        }
+        @Override EdgeAction action(int source, int target, int edgeIndex, TargetState state) {
+          if (stopIn == 1 && source == 1) {
+            stop();
+          }
+          return super.action(source, target, edgeIndex, state);
+        }
+      };
+      t.run();
+      int[][] expectedEnter = {{0, 1}, {0, 1}, {0, 1, 2, 3}};
+      int[][] expectedLeave = {{}, {}, {3}};
+      int[][] expectedEdges = {{0}, {0, 1}, {0, 1, 2}};
+      assertThat(t.edges.toIntArray()).as("hook %d", hook).containsExactly(expectedEdges[hook]);
+      assertThat(t.preOrder.toIntArray()).as("hook %d", hook).containsExactly(expectedEnter[hook]);
+      assertThat(t.postOrder.toIntArray()).as("hook %d", hook).containsExactly(expectedLeave[hook]);
+      for (int v = 0; v < 4; v++) {
+        assertThat(t.isOnStack(v)).as("hook %d, node %d on stack", hook, v).isFalse();
+      }
+    }
+  }
+
+  /** Records like {@link Recorder} and stops in the hook and at the node it is told to. */
+  private static class StoppingRecorder extends Recorder {
+    int stopOnEnter = -1;
+    int stopOnLeave = -1;
+    int pruneNode = -1;
+
+    StoppingRecorder(Graph graph) {
+      super(graph);
+    }
+
+    @Override protected boolean enterNode(int node) {
+      super.enterNode(node);
+      if (node == stopOnEnter) stop();
+      return node != pruneNode;
+    }
+
+    @Override protected void leaveNode(int node) {
+      super.leaveNode(node);
+      if (node == stopOnLeave) stop();
+    }
+  }
+
+  @Test
+  void stopInEnterNodeOfTheRootReportsNothingElse() {
+    var t = new StoppingRecorder(TestGraphs.path(3));
+    t.stopOnEnter = 0;
+    t.run();
+    assertThat(t.preOrder.toIntArray()).containsExactly(0);
+    assertThat(t.postOrder.isEmpty()).isTrue();
+    assertThat(t.edges.isEmpty()).isTrue();
+    assertThat(t.isOnStack(0)).isFalse();
+  }
+
+  @Test
+  void stopInLeaveNodeOfAPrunedRootEndsTheRun() {
+    var t = new StoppingRecorder(TestGraphs.isolated(3));
+    t.pruneNode = 0;
+    t.stopOnLeave = 0;
+    t.run();
+    assertThat(t.preOrder.toIntArray()).containsExactly(0);
+    assertThat(t.postOrder.toIntArray()).containsExactly(0);
+  }
+
+  @Test
+  void stopInLeaveNodeOfAPrunedChildEndsTheRun() {
+    // 0 -> 1, 0 -> 2: node 1 is pruned and stops the run when it is left.
+    var t = new StoppingRecorder(TestGraphs.of(3, 0, 1, 0, 2));
+    t.pruneNode = 1;
+    t.stopOnLeave = 1;
+    t.run();
+    assertThat(t.preOrder.toIntArray()).containsExactly(0, 1);
+    assertThat(t.postOrder.toIntArray()).containsExactly(1);
+    assertThat(t.edges.toIntArray()).containsExactly(0);
+    assertThat(t.isOnStack(0)).isFalse();
+  }
+
+  @Test
+  void everyRunVariantClearsAnEarlierStop() {
+    // 1 -> 2: after a stop at node 0, each variant must still descend from 1 to 2.
+    for (int variant = 0; variant < 3; variant++) {
+      var t = new StoppingRecorder(TestGraphs.of(3, 1, 2));
+      t.stopOnEnter = 0;
+      t.run(0);
+      t.stopOnEnter = -1;
+      switch (variant) {
+        case 0 -> t.run(1);
+        case 1 -> t.runFromNodes(IntList.of(1));
+        default -> t.run();
+      }
+      assertThat(t.preOrder.toIntArray()).as("variant %d", variant).containsExactly(0, 1, 2);
+    }
+  }
 }

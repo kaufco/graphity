@@ -13,6 +13,7 @@ Graphity adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - API
   - [Issue #29](../../issues/29) - Add `IterativeDfsEdgeTraverser` - edge-centric depth-first search without a stack limit
+  - [Issue #30](../../issues/30) - Let a traversal stop early
 
 ### Changed
 

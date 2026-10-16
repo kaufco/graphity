@@ -99,6 +99,9 @@ public abstract class FrontierTraverser {
   private int cursor;
   private int level;
 
+  /** Set by {@link #stop()}; cleared when a {@code run} call starts. */
+  private boolean stopRequested;
+
   /**
    * Creates a traverser for the given graph.
    *
@@ -197,6 +200,24 @@ public abstract class FrontierTraverser {
   }
 
   /**
+   * Stops the traversal in progress: the current {@code run} call returns as soon as the hook
+   * that calls this method returns, without calling any further hook. Nodes already enqueued but
+   * not yet visited stay marked as visited and are dropped from the frontier, so no later
+   * {@code run} call visits them. The visited state is kept, so a later {@code run} call skips
+   * everything visited or enqueued so far.
+   * <p>
+   * Callable from {@link #visitNode(int)} and {@link #onLevelComplete(int)}; outside a
+   * {@code run} call it has no effect. To cancel from another thread, let a hook check a flag of
+   * your own and call this method.
+   * <p>
+   * <strong>Time:</strong> O(1); the traversal checks for it after every hook call - once per
+   * visited node and once per completed level.
+   */
+  protected final void stop() {
+    stopRequested = true;
+  }
+
+  /**
    * Runs a full frontier traversal over all nodes.
    * Unreachable nodes are picked sequentially (0, 1, 2, …) as new tree roots,
    * skipping already-visited nodes (including nodes visited by previous {@code run} calls
@@ -208,11 +229,14 @@ public abstract class FrontierTraverser {
    * <strong>Time:</strong> O(nodeCount + edgeCount).
    */
   public final void run() {
+    stopRequested = false;
     int n = graph.nodeCount();
     int root = visited.nextClearBit(0);
     while (root < n) {
       enqueue(root);
-      processFrontier();
+      if (!processFrontier()) {
+        return;
+      }
       root = visited.nextClearBit(root + 1);
     }
   }
@@ -230,6 +254,7 @@ public abstract class FrontierTraverser {
    */
   public final void run(int startNode) {
     Objects.checkIndex(startNode, graph.nodeCount());
+    stopRequested = false;
     if (enqueue(startNode)) {
       processFrontier();
     }
@@ -249,6 +274,7 @@ public abstract class FrontierTraverser {
    * @param startNodes the start nodes
    */
   public final void runFromNodes(IntList startNodes) {
+    stopRequested = false;
     for (int i = 0; i < startNodes.size(); i++) {
       enqueue(startNodes.getInt(i));
     }
@@ -258,23 +284,34 @@ public abstract class FrontierTraverser {
   /**
    * Processes all nodes in the frontier. Tracks level boundaries and fires
    * {@link #onLevelComplete(int)} after each level.
+   *
+   * @return {@code false} if the traversal was stopped
    */
-  private void processFrontier() {
+  private boolean processFrontier() {
     level = 0;
     int levelStart = cursor;
     int levelEnd = frontier.size();
     while (cursor < frontier.size()) {
       if (cursor == levelEnd) {
         onLevelComplete(level);
+        if (stopRequested) {
+          cursor = frontier.size();
+          return false;
+        }
         level++;
         levelStart = cursor;
         levelEnd = frontier.size();
       }
       visitNode(frontier.getInt(cursor++));
+      if (stopRequested) {
+        cursor = frontier.size();
+        return false;
+      }
     }
     if (cursor > levelStart) {
       onLevelComplete(level);
     }
+    return !stopRequested;
   }
 
 }
