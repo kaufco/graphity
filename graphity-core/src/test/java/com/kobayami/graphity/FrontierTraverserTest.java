@@ -91,6 +91,18 @@ class FrontierTraverserTest {
   }
 
   @Test
+  void everyEntryPointSkipsVisitedNodes() {
+    // 0 -> 1, plus isolated 2 and 3; duplicates and repeated starts must not revisit.
+    var t = new RecordingFrontierTraverser(TestGraphs.of(4, 0, 1));
+    t.run(0);
+    t.run(1);
+    t.runFromNodes(IntList.of(0, 2, 2));
+    t.run();
+    assertThat(t.visitOrder.toIntArray()).containsExactly(0, 1, 2, 3);
+    assertThat(t.completedLevels.toIntArray()).containsExactly(0, 1, 0, 0);
+  }
+
+  @Test
   void runFromEmptyNodeListIsNoOp() {
     var t = new RecordingFrontierTraverser(TestGraphs.path(3));
     t.runFromNodes(new IntArrayList());

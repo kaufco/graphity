@@ -131,7 +131,7 @@ public abstract class DfsTraverser {
 
   /**
    * Visits a single node if not already visited. Marks it as visited and calls
-   * {@link #visitNode(int)}.
+   * {@link #visitNode(int)}. Every {@code run} method starts its trees through here.
    * <p>
    * Intended for manual edge iteration in algorithms that need to inspect all edges
    * (e.g., Tarjan SCC). For standard DFS descent, prefer {@link #visitChildren(int)}.
@@ -174,8 +174,7 @@ public abstract class DfsTraverser {
     int n = graph.nodeCount();
     int root = visited.nextClearBit(0);
     while (root < n) {
-      visited.set(root);
-      visitNode(root);
+      visit(root);
       root = visited.nextClearBit(root + 1);
     }
   }
@@ -193,9 +192,7 @@ public abstract class DfsTraverser {
    */
   public final void run(int startNode) {
     Objects.checkIndex(startNode, graph.nodeCount());
-    if (visited.get(startNode)) return;
-    visited.set(startNode);
-    visitNode(startNode);
+    visit(startNode);
   }
 
   /**
@@ -211,11 +208,7 @@ public abstract class DfsTraverser {
    */
   public final void runFromNodes(IntList startNodes) {
     for (int i = 0; i < startNodes.size(); i++) {
-      int node = startNodes.getInt(i);
-      if (!visited.get(node)) {
-        visited.set(node);
-        visitNode(node);
-      }
+      visit(startNodes.getInt(i));
     }
   }
 

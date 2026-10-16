@@ -95,6 +95,17 @@ class IterativeDfsTraverserTest {
   }
 
   @Test
+  void everyEntryPointSkipsVisitedNodes() {
+    // 0 -> 1, plus isolated 2 and 3; duplicates and repeated starts must not revisit.
+    var t = new RecordingIterativeDfsTraverser(TestGraphs.of(4, 0, 1));
+    t.run(0);
+    t.run(1);
+    t.runFromNodes(IntList.of(0, 2, 2));
+    t.run();
+    assertThat(t.preOrder.toIntArray()).containsExactly(0, 1, 2, 3);
+  }
+
+  @Test
   void runFromEmptyNodeListIsNoOp() {
     var t = new RecordingIterativeDfsTraverser(TestGraphs.path(3));
     t.runFromNodes(new IntArrayList());

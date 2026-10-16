@@ -40,8 +40,7 @@ public abstract class BiAdjacentDfsTraverser extends DfsTraverser {
     int node = visited.nextClearBit(0);
     while (node < n) {
       if (biAdjacentGraph.isRootNode(node)) {
-        visited.set(node);
-        visitNode(node);
+        visit(node);
       }
       node = visited.nextClearBit(node + 1);
     }

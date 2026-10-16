@@ -146,7 +146,8 @@ public abstract class FrontierTraverser {
 
   /**
    * Enqueues a single node into the frontier if not already visited.
-   * The node is marked as visited and appended to the frontier for later processing.
+   * The node is marked as visited and appended to the frontier for later processing. Every
+   * {@code run} method seeds the frontier through here.
    * <p>
    * <strong>Time:</strong> O(1).
    *
@@ -210,7 +211,8 @@ public abstract class FrontierTraverser {
     int n = graph.nodeCount();
     int root = visited.nextClearBit(0);
     while (root < n) {
-      seedAndProcess(root);
+      enqueue(root);
+      processFrontier();
       root = visited.nextClearBit(root + 1);
     }
   }
@@ -228,8 +230,9 @@ public abstract class FrontierTraverser {
    */
   public final void run(int startNode) {
     Objects.checkIndex(startNode, graph.nodeCount());
-    if (visited.get(startNode)) return;
-    seedAndProcess(startNode);
+    if (enqueue(startNode)) {
+      processFrontier();
+    }
   }
 
   /**
@@ -247,21 +250,8 @@ public abstract class FrontierTraverser {
    */
   public final void runFromNodes(IntList startNodes) {
     for (int i = 0; i < startNodes.size(); i++) {
-      int node = startNodes.getInt(i);
-      if (!visited.get(node)) {
-        visited.set(node);
-        frontier.add(node);
-      }
+      enqueue(startNodes.getInt(i));
     }
-    processFrontier();
-  }
-
-  /**
-   * Seeds the frontier with a single root and processes until empty.
-   */
-  private void seedAndProcess(int root) {
-    visited.set(root);
-    frontier.add(root);
     processFrontier();
   }
 

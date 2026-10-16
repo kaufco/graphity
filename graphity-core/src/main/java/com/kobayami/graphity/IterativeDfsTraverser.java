@@ -163,9 +163,7 @@ public abstract class IterativeDfsTraverser {
   public final void run() {
     int n = graph.nodeCount();
     for (int root = 0; root < n; root++) {
-      if (!isVisited(root)) {
-        dfsFrom(root);
-      }
+      dfsIfUnvisited(root);
     }
   }
 
@@ -184,9 +182,7 @@ public abstract class IterativeDfsTraverser {
    */
   public final void run(int startNode) {
     Objects.checkIndex(startNode, graph.nodeCount());
-    if (!isVisited(startNode)) {
-      dfsFrom(startNode);
-    }
+    dfsIfUnvisited(startNode);
   }
 
   /**
@@ -204,10 +200,14 @@ public abstract class IterativeDfsTraverser {
    */
   public final void runFromNodes(IntList startNodes) {
     for (int i = 0; i < startNodes.size(); i++) {
-      int node = startNodes.getInt(i);
-      if (!isVisited(node)) {
-        dfsFrom(node);
-      }
+      dfsIfUnvisited(startNodes.getInt(i));
+    }
+  }
+
+  /** The single entry of every {@code run} method: the visited check lives here only. */
+  private void dfsIfUnvisited(int root) {
+    if (!isVisited(root)) {
+      dfsFrom(root);
     }
   }
 
