@@ -598,7 +598,7 @@ class GraphsTest {
   @Test
   void transposedEdgeMappingInverseEqualsTransposedEdgeIndex() {
     var g = TestGraphs.of(4, 0, 1, 0, 2, 1, 3, 2, 3, 0, 0);
-    var inverse = Graphs.transposedEdgeMapping(g).inverse();
+    var inverse = Graphs.transposedEdgeMapping(g).inverted();
     var biAdjacent = BiAdjacentGraph.of(g);
     for (int p = 0; p < g.edgeCount(); p++) {
       assertThat(inverse.get(p)).isEqualTo(biAdjacent.transposedEdgeIndex(p));

@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
  * exercised through NodeMappingTest.
  * <p>
  * This class therefore tests only what is EdgeMapping-specific: the covariant return
- * types of {@link EdgeMapping#inverse()} and {@link EdgeMapping#compose(EdgeMapping)}.
+ * types of {@link EdgeMapping#inverted()} and {@link EdgeMapping#compose(EdgeMapping)}.
  * Integration with {@link Graphs#edgeMapping(Graph, Graph, NodeMapping)} is covered
  * in GraphsTest.
  */
@@ -21,11 +21,24 @@ class EdgeMappingTest {
   @Test
   void inverseReturnsEdgeMapping() {
     var em = new EdgeMapping(new int[] {2, 0, 1}, 3, false);
-    var inv = em.inverse();
+    var inv = em.inverted();
     assertThatObject(inv).isInstanceOf(EdgeMapping.class);
     assertThat(inv.get(0)).isEqualTo(1);
     assertThat(inv.get(1)).isEqualTo(2);
     assertThat(inv.get(2)).isZero();
+  }
+
+  @Test
+  @SuppressWarnings("removal") // the deprecated name until it is removed in 3.0
+  void deprecatedInverseMatchesInverted() {
+    var em = new EdgeMapping(new int[] {2, -1, 0}, 2, true);
+    assertThatObject(em.inverse()).isInstanceOf(EdgeMapping.class);
+    var deprecated = em.inverse();
+    var current = em.inverted();
+    assertThat(deprecated.size()).isEqualTo(current.size());
+    for (int i = -1; i <= 3; i++) {
+      assertThat(deprecated.get(i)).as("index %d", i).isEqualTo(current.get(i));
+    }
   }
 
   @Test
@@ -43,7 +56,7 @@ class EdgeMappingTest {
   void inverseOfMappingWithHolesIsPartial() {
     // Source 1 has no target (-1). Inverse has length max(0,2)+1 = 3 with only two valid entries.
     var em = new EdgeMapping(new int[] {2, -1, 0}, 2, true);
-    var inv = em.inverse();
+    var inv = em.inverted();
     assertThat(inv.isPartial()).isTrue();
   }
 

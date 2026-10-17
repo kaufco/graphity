@@ -12,7 +12,7 @@ import java.util.function.LongBinaryOperator;
  * <p>
  * Maps source indices to target indices. A target value of {@code -1} indicates that
  * the source index has no mapping (partial mapping). Inversion is defined only on the
- * invertible subclasses ({@link NodeMapping#inverse()}, {@link EdgeMapping#inverse()}),
+ * invertible subclasses ({@link NodeMapping#inverted()}, {@link EdgeMapping#inverted()}),
  * not on partitions, which are many-to-one.
  * <p>
  * {@link NodeMapping} and {@link EdgeMapping} specialize this base with one-to-one,

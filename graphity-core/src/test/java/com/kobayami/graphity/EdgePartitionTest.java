@@ -10,7 +10,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 /**
  * EdgePartition's CSR/get/size/inverse logic is structurally identical to NodePartition.
  * Here we focus on EdgePartition-specific aspects: partial mapping (intra-group edges
- * map to -1), edgeCount()/edgesOf() delegation, and inverse() throwing.
+ * map to -1), edgeCount()/edgesOf() delegation, and inverted() throwing.
  * Integration with Graphs.edgePartition(...) is covered in GraphsTest.
  */
 class EdgePartitionTest {

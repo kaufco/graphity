@@ -11,7 +11,7 @@ package com.kobayami.graphity;
  * edge 0 is the first out-edge of node 0, edge 1 the second, etc.
  * <p>
  * Instances are created via {@link Graphs#edgeMapping(Graph, Graph, NodeMapping)}.
- * Use {@link #inverse()} to obtain the reverse direction,
+ * Use {@link #inverted()} to obtain the reverse direction,
  * {@link #compose(EdgeMapping)} to chain multiple mappings, and {@link #gather(int[])} to carry
  * per-edge data along.
  *
@@ -49,10 +49,26 @@ public final class EdgeMapping extends IndexMapping {
    * @return the inverse edge mapping
    * @throws IllegalArgumentException if multiple source indices map to the same target
    */
-  public EdgeMapping inverse() {
+  public EdgeMapping inverted() {
     int[] inv = computeInverse(mapping);
     int valid = countValid(inv);
     return new EdgeMapping(inv, valid, valid < inv.length);
+  }
+
+  /**
+   * Creates the inverse mapping (target → source). Identical to {@link #inverted()}.
+   * <p>
+   * <strong>Time:</strong> as for {@link #inverted()}.<br>
+   * <strong>Memory:</strong> as for {@link #inverted()}.
+   *
+   * @return the inverse edge mapping
+   * @throws IllegalArgumentException if multiple source indices map to the same target
+   * @deprecated Reads like a constant-time view, as {@code inverse()} is in other libraries,
+   *     but computes a new mapping on every call. Use {@link #inverted()}. Removed in 3.0.
+   */
+  @Deprecated(since = "2.4.0", forRemoval = true)
+  public EdgeMapping inverse() {
+    return inverted();
   }
 
   /**

@@ -105,7 +105,7 @@ double[] weights = new double[graph.edgeCount()];
 | `Dominators.of(cfg, entry)` | `Dominators` | `immediateDominatorOf()`, `Graphs.dominatorTree()`, `Graphs.dominanceFrontiers()`, `Ancestry.of(dominators)` |
 | `Loops.of(cfg, entry)`     | `Loops`         | `innermostLoopOf()`, `nodesOf(loop)`, `entriesOf(loop)`, `isReducible()` |
 | `BfsDistances.of(graph, source)` | `BfsDistances` | `distanceOf()`, `pathTo(node)`, `maxDistance()` |
-| `NodeMapping.of(...)`      | `NodeMapping`   | `inverse()`, `compose(other)`, `gather(values)` |
+| `NodeMapping.of(...)`      | `NodeMapping`   | `inverted()`, `compose(other)`, `gather(values)` |
 
 These types compose. `sccs.condense()` returns a `Graph` plus a `NodeMapping` from original nodes to SCC IDs that you can run further algorithms on; `nodeMapping.compose(other)` chains transformations and applies the result to your own metadata arrays in one step.
 

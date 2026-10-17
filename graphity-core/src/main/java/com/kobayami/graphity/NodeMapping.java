@@ -21,7 +21,7 @@ import java.util.BitSet;
  *   <li>{@link #reindex(Graph)} - DFS-preorder reindexing for cache-friendly layouts</li>
  *   <li>{@link #of(int[])} - general-purpose, caller defines direction</li>
  * </ul>
- * Call {@link #inverse()} to obtain the reverse direction.
+ * Call {@link #inverted()} to obtain the reverse direction.
  * Use {@link Graphs#remapped(Graph, NodeMapping)} to apply a mapping to a graph.
  * Use {@link #compose(NodeMapping)} to chain multiple mappings, and {@link #gather(int[])} to
  * carry per-node data along.
@@ -190,10 +190,26 @@ public final class NodeMapping extends IndexMapping {
    * @throws IllegalArgumentException if multiple source IDs map to the same target
    *         (the mapping is not injective and cannot be inverted)
    */
-  public NodeMapping inverse() {
+  public NodeMapping inverted() {
     int[] inv = computeInverse(mapping);
     int valid = countValid(inv);
     return new NodeMapping(inv, valid, valid < inv.length);
+  }
+
+  /**
+   * Creates the inverse mapping (target → source). Identical to {@link #inverted()}.
+   * <p>
+   * <strong>Time:</strong> as for {@link #inverted()}.<br>
+   * <strong>Memory:</strong> as for {@link #inverted()}.
+   *
+   * @return the inverse mapping
+   * @throws IllegalArgumentException if multiple source IDs map to the same target
+   * @deprecated Reads like a constant-time view, as {@code inverse()} is in other libraries,
+   *     but computes a new mapping on every call. Use {@link #inverted()}. Removed in 3.0.
+   */
+  @Deprecated(since = "2.4.0", forRemoval = true)
+  public NodeMapping inverse() {
+    return inverted();
   }
 
   /**

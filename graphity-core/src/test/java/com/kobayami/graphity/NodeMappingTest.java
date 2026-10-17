@@ -185,7 +185,7 @@ class NodeMappingTest {
   @Test
   void inverseOfFullPermutationIsInjective() {
     var nm = NodeMapping.of(new int[] {2, 0, 1});
-    var inv = nm.inverse();
+    var inv = nm.inverted();
     assertThat(inv.get(0)).isEqualTo(1);
     assertThat(inv.get(1)).isEqualTo(2);
     assertThat(inv.get(2)).isZero();
@@ -196,7 +196,7 @@ class NodeMappingTest {
   @Test
   void inverseOfPartialMappingIsPartial() {
     var nm = NodeMapping.of(new int[] {5, -1, 3});
-    var inv = nm.inverse();
+    var inv = nm.inverted();
     assertThat(inv.size()).isEqualTo(2);
     assertThat(inv.isPartial()).isTrue();
     assertThat(inv.get(3)).isEqualTo(2);
@@ -208,7 +208,7 @@ class NodeMappingTest {
   @Test
   void inverseOfNonInjectiveThrows() {
     var nm = NodeMapping.of(new int[] {1, 1, 2});
-    assertThatThrownBy(nm::inverse)
+    assertThatThrownBy(nm::inverted)
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("target 1");
   }
@@ -216,24 +216,36 @@ class NodeMappingTest {
   @Test
   void inverseOfEmptyIsEmpty() {
     var nm = NodeMapping.of(new int[0]);
-    var inv = nm.inverse();
+    var inv = nm.inverted();
     assertThat(inv.size()).isZero();
   }
 
   @Test
   void inverseOfAllMinusOneIsEmpty() {
     var nm = NodeMapping.of(new int[] {-1, -1, -1});
-    var inv = nm.inverse();
+    var inv = nm.inverted();
     assertThat(inv.size()).isZero();
   }
 
   @Test
   void inverseRoundTripRestoresOriginal() {
     var nm = NodeMapping.of(new int[] {2, 0, 1});
-    var roundtrip = nm.inverse().inverse();
+    var roundtrip = nm.inverted().inverted();
     assertThat(roundtrip.get(0)).isEqualTo(2);
     assertThat(roundtrip.get(1)).isZero();
     assertThat(roundtrip.get(2)).isEqualTo(1);
+  }
+
+  @Test
+  @SuppressWarnings("removal") // the deprecated name until it is removed in 3.0
+  void deprecatedInverseMatchesInverted() {
+    var nm = NodeMapping.of(new int[] {2, -1, 0});
+    var deprecated = nm.inverse();
+    var current = nm.inverted();
+    assertThat(deprecated.size()).isEqualTo(current.size());
+    for (int i = -1; i <= 3; i++) {
+      assertThat(deprecated.get(i)).as("index %d", i).isEqualTo(current.get(i));
+    }
   }
 
   @Test

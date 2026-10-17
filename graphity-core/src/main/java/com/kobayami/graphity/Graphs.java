@@ -98,7 +98,7 @@ public final class Graphs {
 
     // Compute inverse (old → new) for edge-target translation.
     int[] fwd = newToOld.mapping;
-    int[] bwd = newToOld.inverse().mapping;
+    int[] bwd = newToOld.inverted().mapping;
 
     var origAdj = graph.outAdjacency;
     var origStart = graph.outAdjacencyStart;
