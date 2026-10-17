@@ -16,6 +16,7 @@ Graphity adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - [Issue #30](../../issues/30) - Let a traversal stop early
 - Algorithms
   - [Issue #31](../../issues/31) - Add strong bridges and strong articulation points
+  - [Issue #32](../../issues/32) - Add `Graphs.isStronglyConnected`
 
 ### Changed
 

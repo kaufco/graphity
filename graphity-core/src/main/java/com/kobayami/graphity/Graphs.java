@@ -15,7 +15,7 @@ import java.util.Objects;
  * A predicate whose name does not say otherwise reads the graph as directed; the ones prefixed
  * {@code undirected} read it as {@link Components#ccsOf(Graph)} does. {@code isBipartite} and
  * {@code isWeaklyConnected} carry no prefix because neither property has a directed reading that
- * could be meant instead.
+ * could be meant instead; {@code isStronglyConnected} is directed by definition.
  *
  * <pre>{@code
  * // Shape checks, directed reading
@@ -23,6 +23,7 @@ import java.util.Objects;
  * Graphs.isForest(graph);           // DAG with all inDegrees <= 1?
  * Graphs.isTree(graph);             // forest with exactly one root?
  * Graphs.isPath(graph);             // tree with all outDegrees <= 1?
+ * Graphs.isStronglyConnected(graph); // every node reaches every other?
  *
  * // Shape checks, undirected reading
  * Graphs.isBipartite(graph);        // nodes split into two classes?
@@ -442,7 +443,7 @@ public final class Graphs {
    * This is the whole-graph question behind {@link Components#wccsOf(Graph)}, which it would
    * otherwise be answered from, and it needs neither that partition nor a full pass - the check
    * stops once the nodes are known to form one component. For the directed reading see
-   * {@link Sccs#isStronglyConnected()}. An empty graph and a single node are weakly connected
+   * {@link #isStronglyConnected(Graph)}. An empty graph and a single node are weakly connected
    * (vacuously). Self-loops are irrelevant here, as they connect nothing.
    * <p>
    * <strong>Time:</strong> O(nodeCount x α(nodeCount) + edgeCount), effectively
@@ -452,7 +453,7 @@ public final class Graphs {
    * @param graph the graph to check
    * @return {@code true} if the graph consists of at most one weakly connected component
    * @see Components#wccsOf(Graph)
-   * @see Sccs#isStronglyConnected()
+   * @see #isStronglyConnected(Graph)
    */
   public static boolean isWeaklyConnected(Graph graph) {
     int n = graph.nodeCount();
@@ -476,6 +477,84 @@ public final class Graphs {
       }
     }
     return false;
+  }
+
+  /**
+   * Returns whether the given graph is strongly connected: every node reaches every other,
+   * following edge directions.
+   * <p>
+   * This is the whole-graph question behind {@link Components#sccsOf(Graph)}, answered without
+   * building the partition: one depth-first search from node 0 in the manner of Tarjan's
+   * algorithm, which stops as soon as a node below the root closes a component of its own - the
+   * graph then has a second component. Until that moment no component has been removed from
+   * Tarjan's stack, so the stack is exactly the set of visited nodes and needs no storage of its
+   * own. On a result already computed, {@link Sccs#isStronglyConnected()} answers in O(1). An
+   * empty graph and a single node are strongly connected (vacuously). Iterative; deep graphs do
+   * not overflow the call stack.
+   * <p>
+   * <strong>Time:</strong> O(nodeCount + edgeCount), with early termination.<br>
+   * <strong>Memory:</strong> 8 x nodeCount bytes, plus a frame stack that grows with the search
+   * depth, up to another 8 x nodeCount bytes; nothing afterwards.
+   *
+   * @param graph the graph to check
+   * @return {@code true} if the graph consists of at most one strongly connected component
+   * @throws IllegalArgumentException if the depth-first search is deeper than 2^30 - 5 nodes, the
+   *     most frames an array can hold
+   * @see Components#sccsOf(Graph)
+   * @see Sccs#isStronglyConnected()
+   * @see #isWeaklyConnected(Graph)
+   */
+  public static boolean isStronglyConnected(Graph graph) {
+    int n = graph.nodeCount();
+    if (n <= 1) {
+      return true;
+    }
+    int[] out = graph.outAdjacencyStart;
+    int[] adj = graph.outAdjacency;
+    var index = new int[n];   // discovery time from 1; 0 = unvisited
+    var low = new int[n];
+    int[] frames = DfsFrames.initial(n);
+    int time = 1;
+    index[0] = 1;
+    low[0] = 1;
+    frames[0] = 0;
+    frames[1] = out[0];
+    int top = 0;
+
+    outer:
+    while (true) {
+      int u = frames[2 * top];
+      int end = out[u + 1];
+      int i = frames[2 * top + 1];
+      while (i < end) {
+        int v = adj[i++];
+        if (index[v] == 0) {
+          frames[2 * top + 1] = i;
+          index[v] = ++time;
+          low[v] = time;
+          if (++top == frames.length >> 1) {
+            frames = DfsFrames.grow(frames, n);
+          }
+          frames[2 * top] = v;
+          frames[2 * top + 1] = out[v];
+          continue outer;
+        }
+        if (index[v] < low[u]) {
+          low[u] = index[v];
+        }
+      }
+      if (top == 0) {
+        return time == n;
+      }
+      if (low[u] == index[u]) {
+        return false;
+      }
+      int parent = frames[2 * (top - 1)];
+      if (low[u] < low[parent]) {
+        low[parent] = low[u];
+      }
+      top--;
+    }
   }
 
   /**

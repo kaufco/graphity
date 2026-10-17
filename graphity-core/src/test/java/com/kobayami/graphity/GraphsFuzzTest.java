@@ -178,6 +178,36 @@ class GraphsFuzzTest {
   }
 
   @Test
+  void isStronglyConnectedAgreesWithSccs() {
+    int connected = 0;
+    int notConnected = 0;
+    for (int i = 0; i < ITERATIONS; i++) {
+      var labeled = RandomGraphs.anyGraph(BASE_SEED + i);
+      var g = labeled.graph();
+      boolean ours = Graphs.isStronglyConnected(g);
+      assertThat(ours)
+          .as("isStronglyConnected mismatch vs sccsOf for %s", labeled.describe())
+          .isEqualTo(Components.sccsOf(g).isStronglyConnected());
+      var symmetric = RandomGraphs.symmetrized(g);
+      assertThat(Graphs.isStronglyConnected(symmetric))
+          .as("symmetrized %s: strongly connected exactly if weakly", labeled.describe())
+          .isEqualTo(Graphs.isWeaklyConnected(g));
+      if (ours) connected++;
+      else notConnected++;
+    }
+    assertThat(notConnected).as("no graph with several components was generated").isPositive();
+    var random = new java.util.Random(BASE_SEED);
+    for (int i = 0; i < ITERATIONS; i++) {
+      var g = RandomGraphs.gnp(2 + random.nextInt(10), 0.3 + random.nextDouble() * 0.5,
+          random.nextLong());
+      boolean ours = Graphs.isStronglyConnected(g);
+      assertThat(ours).as("dense gnp %d", i).isEqualTo(Components.sccsOf(g).isStronglyConnected());
+      if (ours) connected++;
+    }
+    assertThat(connected).as("no strongly connected graph was generated").isPositive();
+  }
+
+  @Test
   void isWeaklyConnectedAgreesWithJgrapht() {
     for (int i = 0; i < ITERATIONS; i++) {
       var labeled = RandomGraphs.anyUndirectedShape(BASE_SEED + i);

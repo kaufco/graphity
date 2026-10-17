@@ -232,7 +232,7 @@ Graphity ships the following algorithms out of the box. All of them return typed
 | Iterated dominance frontiers, phi placement (Sreedhar-Gao)      | `IteratedDominanceFrontier.of(dominators)` |
 | Loop nesting forest, irreducible loops included (Havlak)        | `Loops.of(biAdjacentGraph, entries)` |
 | Post-dominators, control dependence                             | `Dominators.of(cfg.transposed(), exits)`, `Graphs.dominanceFrontiers(postDominators).transposed()` |
-| Shape predicates (`isDag`, `isForest`, `isTree`, `isPath`)      | `Graphs.isDag(graph)`         |
+| Shape predicates (`isDag`, `isForest`, `isTree`, `isPath`, `isStronglyConnected`) | `Graphs.isDag(graph)` |
 | Shape predicates, undirected interpretation (`isBipartite`, `isUndirectedTree`, `isUndirectedForest`, `isWeaklyConnected`) | `Graphs.isBipartite(graph)` |
 | Condensation DAG                                                | `sccs.condense()`             |
 | Quotient graph by a partition of your choosing                  | `NodePartition.of(graph, groupOf, groupCount).condense()` |

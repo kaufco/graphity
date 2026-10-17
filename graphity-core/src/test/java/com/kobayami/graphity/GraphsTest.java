@@ -360,6 +360,34 @@ class GraphsTest {
   }
 
   @Test
+  void isStronglyConnectedTrueForEmptyGraphAndSingleNode() {
+    assertThat(Graphs.isStronglyConnected(TestGraphs.empty())).isTrue();
+    assertThat(Graphs.isStronglyConnected(TestGraphs.isolated(1))).isTrue();
+  }
+
+  @Test
+  void isStronglyConnectedOnCyclesAndPaths() {
+    assertThat(Graphs.isStronglyConnected(TestGraphs.cycle(5))).isTrue();
+    assertThat(Graphs.isStronglyConnected(TestGraphs.clique(4))).isTrue();
+    assertThat(Graphs.isStronglyConnected(TestGraphs.path(5))).isFalse();
+    assertThat(Graphs.isStronglyConnected(TestGraphs.isolated(2))).isFalse();
+  }
+
+  @Test
+  void isStronglyConnectedFalseWhenNodeZeroReachesAllButNotBack() {
+    // 0 <-> 1 and 1 -> 2: node 2 is reached, but closes a component of its own.
+    assertThat(Graphs.isStronglyConnected(TestGraphs.of(3, 0, 1, 1, 0, 1, 2))).isFalse();
+    // 1 -> 0 only: node 0 reaches nothing.
+    assertThat(Graphs.isStronglyConnected(TestGraphs.of(2, 1, 0))).isFalse();
+  }
+
+  @Test
+  void isStronglyConnectedOnDeepCycle() {
+    assertThat(Graphs.isStronglyConnected(TestGraphs.cycle(1_000_000))).isTrue();
+    assertThat(Graphs.isStronglyConnected(TestGraphs.path(1_000_000))).isFalse();
+  }
+
+  @Test
   void isWeaklyConnectedTrueForEmptyGraph() {
     assertThat(Graphs.isWeaklyConnected(TestGraphs.empty())).isTrue();
   }
