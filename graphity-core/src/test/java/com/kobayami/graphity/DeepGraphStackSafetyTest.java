@@ -100,6 +100,17 @@ class DeepGraphStackSafetyTest {
   }
 
   @Test
+  void deepStrongConnectivityDoesNotOverflowStack() {
+    // One cycle of DEEP nodes: both dominator searches descend DEEP levels, and every edge and
+    // node is critical.
+    Graph cycle = TestGraphs.cycle(DEEP);
+
+    StrongConnectivity strong = Components.strongConnectivityOf(cycle.biAdjacentGraph());
+    assertThat(strong.strongBridges().count()).isEqualTo(DEEP);
+    assertThat(strong.strongArticulationPoints().size()).isEqualTo(DEEP);
+  }
+
+  @Test
   void deepCycleDoesNotOverflowStack() {
     // One giant SCC: DFS descends DEEP levels, then a single back-edge closes the cycle.
     // Stresses the deep sccStack pop (Tarjan) and the deep onStack unwind.

@@ -132,7 +132,7 @@ public final class Dominators {
     Objects.requireNonNull(entries, "entries");
     int n = graph.nodeCount();
     var dfs = DfsPreorder.of(graph, entries, "Dominators");
-    int[] idom = lengauerTarjan(dfs, graph.inAdjacencyStart, graph.inAdjacency);
+    int[] idom = lengauerTarjan(dfs, graph.inAdjacencyStart, graph.inAdjacency, false);
 
     // Back to node IDs; the virtual root becomes -1.
     int[] order = dfs.order;
@@ -148,12 +148,39 @@ public final class Dominators {
   }
 
   /**
+   * Immediate dominators of each block's induced subgraph, as node IDs, {@code -1} for the entry
+   * of a block. A block is the set of nodes the search numbers from one entry. No entry may be
+   * reached by the search from an earlier one, and every node must be reached. One node of every
+   * strongly connected component, sink components first, satisfies this: each search stays inside
+   * its component, so the blocks are the components and the edges between them are ignored.
+   *
+   * @param analysis name of the calling analysis, for the exception message
+   * @throws IllegalArgumentException if {@code graph.nodeCount() >= 2^30 - 2}
+   */
+  static int[] withinBlocks(BiAdjacentGraph graph, IntList entries, String analysis) {
+    var dfs = DfsPreorder.of(graph, entries, analysis);
+    int[] idom = lengauerTarjan(dfs, graph.inAdjacencyStart, graph.inAdjacency, true);
+    int[] order = dfs.order;
+    var immediateDominator = new int[graph.nodeCount()];
+    Arrays.fill(immediateDominator, -1);
+    for (int v = 1; v <= dfs.reachedCount; v++) {
+      if (idom[v] != 0) immediateDominator[order[v]] = order[idom[v]];
+    }
+    return immediateDominator;
+  }
+
+  /**
    * Immediate dominators by preorder number, {@code 0} for the virtual root. {@code inStart} and
    * {@code in} are the in-adjacency over node IDs, translated per edge into preorder numbers
    * (0 = unreachable). Kept apart from the caller so that the JIT compiles the hot loop on its
    * own.
+   * <p>
+   * With {@code withinBlocks}, predecessors outside the block of the node are ignored, as
+   * described at {@link #withinBlocks}. A block is a contiguous range of preorder numbers that
+   * starts at its entry, and every predecessor in another block comes from a later one.
    */
-  private static int[] lengauerTarjan(DfsPreorder dfs, int[] inStart, int[] in) {
+  private static int[] lengauerTarjan(
+      DfsPreorder dfs, int[] inStart, int[] in, boolean withinBlocks) {
     int size = dfs.reachedCount + 1;
     int[] parent = dfs.parent;
     int[] order = dfs.order;
@@ -176,14 +203,25 @@ public final class Dominators {
     //    predecessors, then link the node to its search parent and settle every node whose
     //    semidominator is that parent, whose subtree is now complete. A settled node gets its
     //    immediate dominator, or a node with the same one, resolved in step 2.
+    int blockEnd = size - 1;
     for (int v = size - 1; v >= 1; v--) {
       int best = v;
       int node = order[v];
-      for (int i = inStart[node], end = inStart[node + 1]; i < end; i++) {
-        int u = number[in[i]];
-        if (u == 0) continue;
-        int candidate = u < v ? u : semi[eval(lanes, semi, u)];
-        if (candidate < best) best = candidate;
+      if (withinBlocks) {
+        for (int i = inStart[node], end = inStart[node + 1]; i < end; i++) {
+          int u = number[in[i]];
+          if (u > blockEnd) continue;
+          int candidate = u < v ? u : semi[eval(lanes, semi, u)];
+          if (candidate < best) best = candidate;
+        }
+        if (dfs.isEntry(v)) blockEnd = v - 1;
+      } else {
+        for (int i = inStart[node], end = inStart[node + 1]; i < end; i++) {
+          int u = number[in[i]];
+          if (u == 0) continue;
+          int candidate = u < v ? u : semi[eval(lanes, semi, u)];
+          if (candidate < best) best = candidate;
+        }
       }
       int s = dfs.isEntry(v) ? 0 : best;
       semi[v] = s;

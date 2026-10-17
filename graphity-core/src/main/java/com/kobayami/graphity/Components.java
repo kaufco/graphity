@@ -5,7 +5,7 @@ import java.util.Arrays;
 /**
  * Factory for computing connected components of a {@link Graph}.
  * <p>
- * Provides four entry points for different component types:
+ * Provides five entry points for different component types:
  * <ul>
  *   <li>{@link #sccsOf(Graph)} - Strongly Connected Components (Tarjan's algorithm)</li>
  *   <li>{@link #wccsOf(Graph)} - Weakly Connected Components (Union-Find)</li>
@@ -13,6 +13,8 @@ import java.util.Arrays;
  *       (identical to {@code wccsOf})</li>
  *   <li>{@link #biconnectivityOf(Graph)} - bridges, articulation points and biconnected
  *       components, also for undirected interpretation</li>
+ *   <li>{@link #strongConnectivityOf(BiAdjacentGraph)} - strong bridges and strong articulation
+ *       points, the directed counterpart</li>
  * </ul>
  *
  * <pre>{@code
@@ -189,6 +191,34 @@ public final class Components {
    */
   public static Biconnectivity biconnectivityOf(Graph graph) {
     return Biconnectivity.of(graph);
+  }
+
+  /**
+   * Computes the strong bridges and strong articulation points of the given graph: the edges
+   * and nodes whose removal increases the number of strongly connected components.
+   * <p>
+   * Edges are read as directed, as in {@link #sccsOf(Graph)}. Both results lie inside strongly
+   * connected components with more than one node; on a DAG both are empty.
+   * <p>
+   * The computation works on the dominators of each component and of its transpose, following
+   * Italiano, Laura and Santaroni, and so reads the predecessors of every node: it takes a
+   * {@link BiAdjacentGraph}, whose transpose is a constant-time view. A caller holding a plain
+   * {@link Graph} builds the in-adjacency once with {@link Graph#biAdjacentGraph()}. Iterative;
+   * deep graphs do not overflow the call stack.
+   * <p>
+   * <strong>Time:</strong> O((nodeCount + edgeCount) x log nodeCount) in the worst case, from the
+   * dominators; the strong bridges are ordered by counting.<br>
+   * <strong>Memory:</strong> O(nodeCount) for the result; up to about 70 x nodeCount bytes
+   * additional during computation.
+   *
+   * @param graph the graph to analyze
+   * @return strong bridges and strong articulation points as a {@link StrongConnectivity}
+   * @throws IllegalArgumentException if {@code graph.nodeCount() >= 2^30 - 2}, or if a
+   *     depth-first path is longer than 2^30 - 5 nodes, the most frames an array can hold
+   * @see StrongConnectivity
+   */
+  public static StrongConnectivity strongConnectivityOf(BiAdjacentGraph graph) {
+    return StrongConnectivity.of(graph);
   }
 
   private static int find(int[] parent, int x) {

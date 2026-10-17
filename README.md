@@ -97,6 +97,7 @@ double[] weights = new double[graph.edgeCount()];
 | `Components.sccsOf(graph)` | `Sccs`          | `containsCycle()`, `condense()`, `nodesOf()` |
 | `Components.wccsOf(graph)` | `NodePartition` | `nodesOf()`, `condense()`                    |
 | `Components.biconnectivityOf(graph)` | `Biconnectivity` | `bridges()`, `articulationPoints()`, `blocks()` |
+| `Components.strongConnectivityOf(biAdjacentGraph)` | `StrongConnectivity` | `strongBridges()`, `strongArticulationPoints()` |
 | `EdgeTypes.of(graph)`      | `EdgeTypes`     | `typeOf(edgeIndex)`, `edgesOfType(TREE)`     |
 | `BackEdges.of(graph)`      | `Edges`         | `sourceNodes()`, `targetNodes()`             |
 | `Ancestry.of(forest)`      | `Ancestry`      | `lowestCommonAncestorOf(a, b)`, `depthOf()`  |
@@ -217,6 +218,7 @@ Graphity ships the following algorithms out of the box. All of them return typed
 | Weakly connected components                                     | `Components.wccsOf(graph)`    |
 | Connected components (undirected interpretation)                | `Components.ccsOf(graph)`     |
 | Bridges, articulation points, biconnected components            | `Components.biconnectivityOf(graph)` |
+| Strong bridges, strong articulation points (directed)           | `Components.strongConnectivityOf(biAdjacentGraph)` |
 | Breadth-first distances and shortest paths, one or several sources | `BfsDistances.of(graph, sources)` |
 | Reachable nodes, sorted (input for subgraph extraction)         | `Graphs.reachableFrom(graph, sources)` |
 | Topological order (DFS reverse postorder)                       | `TopOrder.of(graph)`          |
