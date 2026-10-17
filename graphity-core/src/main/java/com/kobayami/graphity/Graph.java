@@ -12,7 +12,7 @@ import java.util.Objects;
  * must be kept externally (e.g. in parallel arrays indexed by node/edge ID).
  * <p>
  * Use {@code Graph} for algorithms that only need out-edges.
- * For in-edge access, obtain a {@link BiAdjacentGraph} via {@link #biAdjacentGraph()}.
+ * For in-edge access, obtain a {@link BiAdjacentGraph} via {@link BiAdjacentGraph#of(Graph)}.
  * <p>
  * <strong>Memory:</strong> 4 x (nodeCount + edgeCount) bytes.
  *
@@ -263,8 +263,20 @@ public sealed class Graph permits BiAdjacentGraph {
    * <strong>Memory:</strong> +4 x (nodeCount + edgeCount) bytes, or none if already bi-adjacent.
    *
    * @return a bi-adjacent graph with constant-time in- and out-node access
+   * @deprecated Reads like an accessor but builds the in-adjacency on every call on a plain
+   *     {@code Graph}. Use {@link BiAdjacentGraph#of(Graph)}, which behaves identically and shows
+   *     the cost at the call site. Removed in 3.0.
    */
+  @Deprecated(since = "2.4.0", forRemoval = true)
   public BiAdjacentGraph biAdjacentGraph() {
+    return BiAdjacentGraph.of(this);
+  }
+
+  /**
+   * Builds the in-adjacency of this graph; the body of {@link BiAdjacentGraph#of(Graph)} for a
+   * graph that is not yet bi-adjacent.
+   */
+  final BiAdjacentGraph withInAdjacency() {
     var totalNodes = nodeCount();
     var totalEdges = edgeCount();
     var inAdjacencyStart = new int[totalNodes + 1];
@@ -330,7 +342,7 @@ public sealed class Graph permits BiAdjacentGraph {
    * @see BiAdjacentGraph#transposedEdgeIndex(int)
    */
   public Graph transposed() {
-    return biAdjacentGraph().transposed();
+    return BiAdjacentGraph.of(this).transposed();
   }
 
   /**

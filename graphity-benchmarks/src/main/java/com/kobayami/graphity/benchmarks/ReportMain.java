@@ -87,7 +87,7 @@ public final class ReportMain {
    * Fixed algorithm order for the performance / allocation sub-chapters. The three structure
    * costs come last, as the closing subsections of chapter 1: {@code Reorder} for
    * {@code NodeMapping.reindex} plus {@code Graphs.remapped}, {@code BiAdjacency} for
-   * {@code Graph.biAdjacentGraph}, {@code Symmetrize} for WebGraph's symmetric closure. Each is
+   * {@code BiAdjacentGraph.of}, {@code Symmetrize} for WebGraph's symmetric closure. Each is
    * an up-front price paid once for the variant column it belongs to.
    */
   private static final List<String> ALGO_ORDER = List.of(

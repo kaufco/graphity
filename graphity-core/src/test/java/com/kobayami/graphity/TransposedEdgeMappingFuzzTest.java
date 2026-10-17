@@ -49,7 +49,7 @@ class TransposedEdgeMappingFuzzTest {
     for (long seed = 0; seed < ITERATIONS; seed++) {
       var labeled = RandomGraphs.anyGraph(seed);
       var g = labeled.graph();
-      var biAdjacent = g.biAdjacentGraph();
+      var biAdjacent = BiAdjacentGraph.of(g);
       var mapping = Graphs.transposedEdgeMapping(g);
 
       for (int p = 0; p < g.edgeCount(); p++) {
@@ -65,7 +65,7 @@ class TransposedEdgeMappingFuzzTest {
   void translatingTwiceReturnsTheOriginalIndex() {
     for (long seed = 0; seed < ITERATIONS; seed++) {
       var labeled = RandomGraphs.anyGraph(seed);
-      var biAdjacent = labeled.graph().biAdjacentGraph();
+      var biAdjacent = BiAdjacentGraph.of(labeled.graph());
       var transposed = biAdjacent.transposed();
 
       for (int p = 0; p < biAdjacent.edgeCount(); p++) {
@@ -82,7 +82,7 @@ class TransposedEdgeMappingFuzzTest {
       var labeled = RandomGraphs.anyGraph(seed);
       var g = labeled.graph();
       var fromUniAdjacent = Graphs.transposedEdgeMapping(g);
-      var fromBiAdjacent = Graphs.transposedEdgeMapping(g.biAdjacentGraph());
+      var fromBiAdjacent = Graphs.transposedEdgeMapping(BiAdjacentGraph.of(g));
 
       for (int q = 0; q < g.edgeCount(); q++) {
         assertThat(fromBiAdjacent.get(q))

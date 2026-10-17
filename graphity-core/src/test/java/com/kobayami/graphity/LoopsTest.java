@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 class LoopsTest {
 
   private static BiAdjacentGraph bi(int n, int... edges) {
-    return TestGraphs.of(n, edges).biAdjacentGraph();
+    return BiAdjacentGraph.of(TestGraphs.of(n, edges));
   }
 
   @Test
@@ -116,7 +116,7 @@ class LoopsTest {
   @Test
   void emptyEntryListAndEmptyGraph() {
     assertThat(Loops.of(bi(2, 0, 1, 1, 0), IntList.of()).loopCount()).isZero();
-    assertThat(Loops.of(TestGraphs.empty().biAdjacentGraph(), IntList.of()).loopCount()).isZero();
+    assertThat(Loops.of(BiAdjacentGraph.of(TestGraphs.empty()), IntList.of()).loopCount()).isZero();
   }
 
   @Test

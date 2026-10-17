@@ -40,7 +40,7 @@ public class DominatorWorstCaseBenchmark {
 
   @Setup(Level.Trial)
   public void setup() {
-    graph = ControlFlowShape.FAN_BEHIND_CHAIN.generate(nodeCount, 0).biAdjacentGraph();
+    graph = BiAdjacentGraph.of(ControlFlowShape.FAN_BEHIND_CHAIN.generate(nodeCount, 0));
   }
 
   @Benchmark

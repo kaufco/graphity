@@ -34,7 +34,7 @@ public class BiAdjacentGraphFixture {
 
   @Setup(Level.Trial)
   public void setupGraph() {
-    graph = BenchmarkGraphs.fromInput(shape, nodeCount, inputMode, datasetPath, /*requireDag=*/ false)
-        .biAdjacentGraph();
+    graph = BiAdjacentGraph.of(
+        BenchmarkGraphs.fromInput(shape, nodeCount, inputMode, datasetPath, /*requireDag=*/ false));
   }
 }

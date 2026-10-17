@@ -1,6 +1,7 @@
 package com.kobayami.graphity.benchmarks.controlflow;
 
 import com.kobayami.graphity.BackEdges;
+import com.kobayami.graphity.BiAdjacentGraph;
 import com.kobayami.graphity.ControlFlowAlternatives;
 import com.kobayami.graphity.Dominators;
 import com.kobayami.graphity.Edges;
@@ -55,7 +56,7 @@ public class FrontierLayoutBenchmark {
   @Setup(Level.Trial)
   public void setup() {
     graph = shape.generate(nodeCount, 42);
-    dominators = Dominators.of(graph.biAdjacentGraph(), 0);
+    dominators = Dominators.of(BiAdjacentGraph.of(graph), 0);
     var rnd = new Random(7);
     int n = graph.nodeCount();
     definitions = new IntList[VARIABLES];

@@ -12,7 +12,7 @@ class BiAdjacentFrontierTraverserTest {
   @Test
   void runFromRootsVisitsDagInBfsOrder() {
     // DAG with single root 0: 0 -> 1, 2; 1 -> 3; 2 -> 3.
-    var g = TestGraphs.of(4, 0, 1, 0, 2, 1, 3, 2, 3).biAdjacentGraph();
+    var g = BiAdjacentGraph.of(TestGraphs.of(4, 0, 1, 0, 2, 1, 3, 2, 3));
     var t = new RecordingBiAdjacentFrontierTraverser(g);
     t.runFromRoots();
     assertThat(t.visitOrder.toIntArray()).containsExactly(0, 1, 2, 3);
@@ -22,7 +22,7 @@ class BiAdjacentFrontierTraverserTest {
   @Test
   void runFromRootsPutsAllRootsAtLevelZero() {
     // Two roots (0 and 3), each reaching one sink.
-    var g = TestGraphs.of(4, 0, 1, 1, 2, 3, 2).biAdjacentGraph();
+    var g = BiAdjacentGraph.of(TestGraphs.of(4, 0, 1, 1, 2, 3, 2));
     var t = new RecordingBiAdjacentFrontierTraverser(g);
     t.runFromRoots();
     assertThat(t.visitOrder.toIntArray()).containsExactly(0, 3, 1, 2);
@@ -31,7 +31,7 @@ class BiAdjacentFrontierTraverserTest {
 
   @Test
   void runFromRootsOnIsolatedGraphStartsAllAtLevelZero() {
-    var g = TestGraphs.isolated(3).biAdjacentGraph();
+    var g = BiAdjacentGraph.of(TestGraphs.isolated(3));
     var t = new RecordingBiAdjacentFrontierTraverser(g);
     t.runFromRoots();
     assertThat(t.visitOrder.toIntArray()).containsExactly(0, 1, 2);
@@ -40,7 +40,7 @@ class BiAdjacentFrontierTraverserTest {
 
   @Test
   void runFromRootsOnPureCycleVisitsNothing() {
-    var g = TestGraphs.cycle(4).biAdjacentGraph();
+    var g = BiAdjacentGraph.of(TestGraphs.cycle(4));
     var t = new RecordingBiAdjacentFrontierTraverser(g);
     t.runFromRoots();
     assertThat(t.visitOrder.isEmpty()).isTrue();
@@ -50,7 +50,7 @@ class BiAdjacentFrontierTraverserTest {
   @Test
   void runFromRootsVisitsCycleReachableFromExternalRoot() {
     // 0 -> 1; cycle among {1, 2, 3}.
-    var g = TestGraphs.of(4, 0, 1, 1, 2, 2, 3, 3, 1).biAdjacentGraph();
+    var g = BiAdjacentGraph.of(TestGraphs.of(4, 0, 1, 1, 2, 2, 3, 3, 1));
     var t = new RecordingBiAdjacentFrontierTraverser(g);
     t.runFromRoots();
     assertThat(t.visitOrder.toIntArray()).containsExactly(0, 1, 2, 3);
@@ -59,7 +59,7 @@ class BiAdjacentFrontierTraverserTest {
 
   @Test
   void runFromRootsOnEmptyGraphIsNoOp() {
-    var g = TestGraphs.empty().biAdjacentGraph();
+    var g = BiAdjacentGraph.of(TestGraphs.empty());
     var t = new RecordingBiAdjacentFrontierTraverser(g);
     t.runFromRoots();
     assertThat(t.visitOrder.isEmpty()).isTrue();
@@ -69,7 +69,7 @@ class BiAdjacentFrontierTraverserTest {
   @Test
   void runFromRootsSkipsAlreadyVisitedRoots() {
     // Two roots 0 and 2: 0 -> 1, 2 -> 3.
-    var g = TestGraphs.of(4, 0, 1, 2, 3).biAdjacentGraph();
+    var g = BiAdjacentGraph.of(TestGraphs.of(4, 0, 1, 2, 3));
     var t = new RecordingBiAdjacentFrontierTraverser(g);
     t.run(0);
     t.runFromRoots();
@@ -79,9 +79,9 @@ class BiAdjacentFrontierTraverserTest {
   @Test
   void runFromRootsCombinedWithRunCoversAllNodes() {
     // DAG 0->1->2 plus pure cycle {3,4,5}.
-    var g = TestGraphs.of(6,
+    var g = BiAdjacentGraph.of(TestGraphs.of(6,
         0, 1, 1, 2,
-        3, 4, 4, 5, 5, 3).biAdjacentGraph();
+        3, 4, 4, 5, 5, 3));
     var t = new RecordingBiAdjacentFrontierTraverser(g);
     t.runFromRoots();
     assertThat(t.visitOrder.toIntArray()).containsExactly(0, 1, 2);
@@ -91,7 +91,7 @@ class BiAdjacentFrontierTraverserTest {
 
   @Test
   void runFromRootsMultipleCallsDoNotRevisit() {
-    var g = TestGraphs.path(3).biAdjacentGraph();
+    var g = BiAdjacentGraph.of(TestGraphs.path(3));
     var t = new RecordingBiAdjacentFrontierTraverser(g);
     t.runFromRoots();
     t.runFromRoots();
@@ -100,7 +100,7 @@ class BiAdjacentFrontierTraverserTest {
 
   @Test
   void runFromRootsFiresLevelCompleteForRootLevel() {
-    var g = TestGraphs.isolated(3).biAdjacentGraph();
+    var g = BiAdjacentGraph.of(TestGraphs.isolated(3));
     var t = new RecordingBiAdjacentFrontierTraverser(g);
     t.runFromRoots();
     assertThat(t.completedLevels.toIntArray()).containsExactly(0);
@@ -108,7 +108,7 @@ class BiAdjacentFrontierTraverserTest {
 
   @Test
   void biAdjacentGraphFieldIsSameInstanceAsGraph() {
-    var g = TestGraphs.path(3).biAdjacentGraph();
+    var g = BiAdjacentGraph.of(TestGraphs.path(3));
     var t = new RecordingBiAdjacentFrontierTraverser(g);
     assertThat(t.biAdjacentGraph).isSameAs(t.graph);
   }
@@ -116,7 +116,7 @@ class BiAdjacentFrontierTraverserTest {
   @Test
   void stopEndsRunFromRoots() {
     // Two roots (0 and 3), each reaching one sink; stop at the first root.
-    var g = TestGraphs.of(4, 0, 1, 1, 2, 3, 2).biAdjacentGraph();
+    var g = BiAdjacentGraph.of(TestGraphs.of(4, 0, 1, 1, 2, 3, 2));
     var visits = new IntArrayList();
     var t = new BiAdjacentFrontierTraverser(g) {
       @Override protected void visitNode(int node) {

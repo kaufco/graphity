@@ -176,7 +176,7 @@ class GraphTest {
     assertThat(g.edgeIndexOf(0, 0)).isEqualTo(-1);
     assertThat(g.edgeIndexOf(0, 999)).isEqualTo(-1);
     assertThat(g.edgeIndexOf(0, -1)).isEqualTo(-1);
-    assertThat(g.biAdjacentGraph().edgeIndexOf(2, 0)).isEqualTo(3);
+    assertThat(BiAdjacentGraph.of(g).edgeIndexOf(2, 0)).isEqualTo(3);
   }
 
   @ParameterizedTest
@@ -224,7 +224,7 @@ class GraphTest {
   void biAdjacentGraphComputesCorrectInEdges() {
     // Diamond 0->1, 0->2, 1->3, 2->3. In-edges: 1<-{0}, 2<-{0}, 3<-{1,2}.
     var g = TestGraphs.of(4, 0, 1, 0, 2, 1, 3, 2, 3);
-    var bi = g.biAdjacentGraph();
+    var bi = BiAdjacentGraph.of(g);
     assertThat(bi.inNodes(0).toIntArray()).isEmpty();
     assertThat(bi.inNodes(1).toIntArray()).containsExactly(0);
     assertThat(bi.inNodes(2).toIntArray()).containsExactly(0);
@@ -234,7 +234,7 @@ class GraphTest {
   @Test
   void biAdjacentGraphPreservesOutAdjacency() {
     var g = TestGraphs.of(4, 0, 1, 0, 2, 1, 3, 2, 3);
-    var bi = g.biAdjacentGraph();
+    var bi = BiAdjacentGraph.of(g);
     for (int i = 0; i < g.nodeCount(); i++) {
       assertThat(bi.outNodes(i).toIntArray()).containsExactly(g.outNodes(i).toIntArray());
     }
@@ -242,7 +242,7 @@ class GraphTest {
 
   @Test
   void biAdjacentGraphOnEmptyGraphIsEmpty() {
-    var bi = TestGraphs.empty().biAdjacentGraph();
+    var bi = BiAdjacentGraph.of(TestGraphs.empty());
     assertThat(bi.nodeCount()).isZero();
     assertThat(bi.edgeCount()).isZero();
   }
@@ -251,7 +251,7 @@ class GraphTest {
   void biAdjacentGraphInAdjacencyIsSorted() {
     // Node 3 receives edges from 0, 2, 1 — must end up sorted as [0, 1, 2].
     var g = TestGraphs.of(4, 0, 3, 1, 3, 2, 3);
-    assertThat(g.biAdjacentGraph().inNodes(3).toIntArray()).containsExactly(0, 1, 2);
+    assertThat(BiAdjacentGraph.of(g).inNodes(3).toIntArray()).containsExactly(0, 1, 2);
   }
 
   @Test
@@ -303,9 +303,21 @@ class GraphTest {
   }
 
   @Test
+  @SuppressWarnings("removal") // the deprecated accessor until it is removed in 3.0
+  void deprecatedBiAdjacentGraphMatchesOf() {
+    var g = TestGraphs.of(4, 0, 1, 0, 2, 1, 3, 2, 3);
+    var viaAccessor = g.biAdjacentGraph();
+    var viaFactory = BiAdjacentGraph.of(g);
+    assertThat(viaAccessor).isNotSameAs(viaFactory).isEqualTo(viaFactory);
+    for (int v = 0; v < 4; v++) {
+      assertThat(viaAccessor.inNodes(v).toIntArray()).containsExactly(viaFactory.inNodes(v).toIntArray());
+    }
+  }
+
+  @Test
   void equalsIgnoresBiVsUniAdjacentType() {
     var uni = TestGraphs.of(3, 0, 1, 1, 2);
-    var bi = uni.biAdjacentGraph();
+    var bi = BiAdjacentGraph.of(uni);
     assertThat(uni).isEqualTo(bi);
     assertThat(bi).isEqualTo(uni);
     assertThat(uni.hashCode()).isEqualTo(bi.hashCode());

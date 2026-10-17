@@ -41,7 +41,7 @@ class IteratedDominanceFrontierFuzzTest {
       int n = graph.nodeCount();
       var oracle = new NaiveDominators(graph, entries);
       var frontiers = oracle.frontiers();
-      var idf = IteratedDominanceFrontier.of(Dominators.of(graph.biAdjacentGraph(), entries));
+      var idf = IteratedDominanceFrontier.of(Dominators.of(BiAdjacentGraph.of(graph), entries));
 
       var rnd = new Random(seed * 13 + 7);
       for (int q = 0; q < QUERIES_PER_GRAPH; q++) {

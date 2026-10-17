@@ -13,7 +13,7 @@ import org.jgrapht.graph.DefaultEdge;
 import org.junit.jupiter.api.Test;
 
 /**
- * Cross-validates {@link Components#biconnectivityOf(Graph)} against JGraphT's
+ * Cross-validates {@link Components#biconnectivityOf(BiAdjacentGraph)} against JGraphT's
  * {@code BiconnectivityInspector} on the same graph read as undirected, and against invariants
  * that hold independently of any implementation.
  * <p>
@@ -23,6 +23,10 @@ import org.junit.jupiter.api.Test;
  * untested.
  */
 class BiconnectivityFuzzTest {
+
+  private static Biconnectivity biconnectivityOf(Graph graph) {
+    return Components.biconnectivityOf(BiAdjacentGraph.of(graph));
+  }
 
   private static final int ITERATIONS = 100;
 
@@ -35,7 +39,7 @@ class BiconnectivityFuzzTest {
       for (DefaultEdge edge : inspector.getBridges()) {
         expected.add(pairKey(jgrapht.getEdgeSource(edge), jgrapht.getEdgeTarget(edge)));
       }
-      var actual = bridgeKeys(Components.biconnectivityOf(graph));
+      var actual = bridgeKeys(biconnectivityOf(graph));
       assertThat(actual).as("bridges for %s", description).isEqualTo(expected);
     });
   }
@@ -46,7 +50,7 @@ class BiconnectivityFuzzTest {
       var inspector = new BiconnectivityInspector<>(JGraphtAdapter.toUndirectedJgrapht(graph));
       var expected = new TreeSet<Integer>(inspector.getCutpoints());
       var actual = new TreeSet<Integer>();
-      var points = Components.biconnectivityOf(graph).articulationPoints();
+      var points = biconnectivityOf(graph).articulationPoints();
       for (int i = 0; i < points.size(); i++) actual.add(points.getInt(i));
       assertThat(actual).as("articulation points for %s", description).isEqualTo(expected);
     });
@@ -67,7 +71,7 @@ class BiconnectivityFuzzTest {
         if (!edges.isEmpty()) expected.add(edges);
       }
 
-      var blocks = Components.biconnectivityOf(graph).blocks();
+      var blocks = biconnectivityOf(graph).blocks();
       Set<Set<Long>> actual = new HashSet<>();
       for (int block = 0; block < blocks.groupCount(); block++) {
         Set<Long> edges = new HashSet<>();
@@ -85,7 +89,7 @@ class BiconnectivityFuzzTest {
   @Test
   void blocksCoverEveryNonSelfLoopEdgeExactlyOnce() {
     forEachGraph((description, graph) -> {
-      var blocks = Components.biconnectivityOf(graph).blocks();
+      var blocks = biconnectivityOf(graph).blocks();
       int selfLoops = 0;
       for (int edgeIndex = 0; edgeIndex < graph.edgeCount(); edgeIndex++) {
         boolean selfLoop = graph.edgeSource(edgeIndex) == graph.edgeTarget(edgeIndex);
@@ -118,9 +122,9 @@ class BiconnectivityFuzzTest {
   @Test
   void reciprocalPairsShareABlockAndBridgesStandAlone() {
     forEachGraph((description, graph) -> {
-      var biconnectivity = Components.biconnectivityOf(graph);
+      var biconnectivity = biconnectivityOf(graph);
       var blocks = biconnectivity.blocks();
-      var biAdjacent = graph.biAdjacentGraph();
+      var biAdjacent = BiAdjacentGraph.of(graph);
 
       for (int edgeIndex = 0; edgeIndex < graph.edgeCount(); edgeIndex++) {
         int source = graph.edgeSource(edgeIndex);
@@ -151,10 +155,11 @@ class BiconnectivityFuzzTest {
   }
 
   @Test
+  @SuppressWarnings("removal") // the deprecated Graph form against the BiAdjacentGraph form
   void resultIsIdenticalForBiAdjacentInput() {
     forEachGraph((description, graph) -> {
       var fromUniAdjacent = Components.biconnectivityOf(graph);
-      var fromBiAdjacent = Components.biconnectivityOf(graph.biAdjacentGraph());
+      var fromBiAdjacent = Components.biconnectivityOf(BiAdjacentGraph.of(graph));
       assertThat(bridgeKeys(fromBiAdjacent))
           .as("bridges for %s", description)
           .isEqualTo(bridgeKeys(fromUniAdjacent));
@@ -177,7 +182,7 @@ class BiconnectivityFuzzTest {
   void theCorpusExercisesAllThreeResults() {
     int[] totals = new int[3];
     forEachGraph((description, graph) -> {
-      var biconnectivity = Components.biconnectivityOf(graph);
+      var biconnectivity = biconnectivityOf(graph);
       totals[0] += biconnectivity.bridges().count();
       totals[1] += biconnectivity.articulationPoints().size();
       var blocks = biconnectivity.blocks();

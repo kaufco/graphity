@@ -1007,7 +1007,7 @@ public final class Graphs {
       }
     }
 
-    // Same counting sort as Graph.biAdjacentGraph(), with the edge index as payload instead
+    // Same counting sort as BiAdjacentGraph.of, with the edge index as payload instead
     // of the source node. Ascending node scan makes slot q of the transpose and entry q of
     // the mapping describe the same edge.
     int[] mapping = new int[m];

@@ -21,7 +21,8 @@
  * <ul>
  *   <li>{@link com.kobayami.graphity.Graph} - read-only graph with out-adjacency only.</li>
  *   <li>{@link com.kobayami.graphity.BiAdjacentGraph} - adds in-adjacency for constant-time
- *       predecessor access; obtained via {@link com.kobayami.graphity.Graph#biAdjacentGraph()}.</li>
+ *       predecessor access; obtained via
+ *       {@link com.kobayami.graphity.BiAdjacentGraph#of(com.kobayami.graphity.Graph)}.</li>
  *   <li>{@link com.kobayami.graphity.GraphBuilder} - mutable, add-only builder that produces
  *       immutable {@code Graph} instances.</li>
  *   <li>{@link com.kobayami.graphity.SortedIntView} - the zero-copy, sorted view type returned

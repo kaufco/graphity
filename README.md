@@ -68,7 +68,7 @@ sccs.containsCycle(0);                 // does this SCC contain a cycle?
 var condensed = sccs.condense();       // condensation DAG
 
 // In-adjacency access (opt-in)
-var bi = graph.biAdjacentGraph();
+var bi = BiAdjacentGraph.of(graph);    // builds the in-adjacency once
 bi.inDegree(3);                        // number of incoming edges at node 3
 bi.inNodes(3);                         // sorted view of predecessors
 
@@ -88,7 +88,7 @@ double[] weights = new double[graph.edgeCount()];
 
 **Direction is an interpretation, not a type.** Edges are stored as directed pairs, but nothing commits a graph to one reading. Where the distinction matters, both variants are available — `Components.sccsOf` reads the graph as directed, `Components.ccsOf` as undirected. An AST that is a tree for one analysis and a dependency graph for the next needs no conversion and no second copy. Reading a graph as undirected collapses `a → b` and `b → a` into one edge and ignores self-loops, so a graph that stores its undirected edges symmetrically behaves exactly like one that stores a single direction per edge.
 
-**`BiAdjacentGraph` for O(1) bidirectional access.** Opt-in via `graph.biAdjacentGraph()`. Doubles the storage to 8 B per (node + edge) and gives constant-time access in both directions — useful for Kahn's topological order, which then reads in-degrees in O(nodeCount) instead of scanning every edge, and for anything that walks predecessors, such as bidirectional BFS or ancestry queries. Connectivity is not among them: `Components.wccsOf` and `ccsOf` are Union-Find over the out-edges and need no in-adjacency. The control-flow analyses, which do walk predecessors, take a `BiAdjacentGraph` as input: the in-adjacency is built once, where the caller sees the cost, and shared by every analysis that needs it.
+**`BiAdjacentGraph` for O(1) bidirectional access.** Opt-in via `BiAdjacentGraph.of(graph)`. Doubles the storage to 8 B per (node + edge) and gives constant-time access in both directions — useful for Kahn's topological order, which then reads in-degrees in O(nodeCount) instead of scanning every edge, and for anything that walks predecessors, such as bidirectional BFS or ancestry queries. Connectivity is not among them: `Components.wccsOf` and `ccsOf` are Union-Find over the out-edges and need no in-adjacency. The control-flow analyses, which do walk predecessors, take a `BiAdjacentGraph` as input: the in-adjacency is built once, where the caller sees the cost, and shared by every analysis that needs it.
 
 **Algorithm results as first-class typed values.** Where other libraries hand you `Set<Set<V>>` or `Map<V, Integer>` and let you figure out the rest, Graphity returns a domain object with useful follow-ups:
 
@@ -96,7 +96,7 @@ double[] weights = new double[graph.edgeCount()];
 |----------------------------|-----------------|----------------------------------------------|
 | `Components.sccsOf(graph)` | `Sccs`          | `containsCycle()`, `condense()`, `nodesOf()` |
 | `Components.wccsOf(graph)` | `NodePartition` | `nodesOf()`, `condense()`                    |
-| `Components.biconnectivityOf(graph)` | `Biconnectivity` | `bridges()`, `articulationPoints()`, `blocks()` |
+| `Components.biconnectivityOf(biAdjacentGraph)` | `Biconnectivity` | `bridges()`, `articulationPoints()`, `blocks()` |
 | `Components.strongConnectivityOf(biAdjacentGraph)` | `StrongConnectivity` | `strongBridges()`, `strongArticulationPoints()` |
 | `EdgeTypes.of(graph)`      | `EdgeTypes`     | `typeOf(edgeIndex)`, `edgesOfType(TREE)`     |
 | `BackEdges.of(graph)`      | `Edges`         | `sourceNodes()`, `targetNodes()`             |
@@ -217,7 +217,7 @@ Graphity ships the following algorithms out of the box. All of them return typed
 | Strongly connected components (Tarjan)                          | `Components.sccsOf(graph)`    |
 | Weakly connected components                                     | `Components.wccsOf(graph)`    |
 | Connected components (undirected interpretation)                | `Components.ccsOf(graph)`     |
-| Bridges, articulation points, biconnected components            | `Components.biconnectivityOf(graph)` |
+| Bridges, articulation points, biconnected components            | `Components.biconnectivityOf(biAdjacentGraph)` |
 | Strong bridges, strong articulation points (directed)           | `Components.strongConnectivityOf(biAdjacentGraph)` |
 | Breadth-first distances and shortest paths, one or several sources | `BfsDistances.of(graph, sources)` |
 | Reachable nodes, sorted (input for subgraph extraction)         | `Graphs.reachableFrom(graph, sources)` |

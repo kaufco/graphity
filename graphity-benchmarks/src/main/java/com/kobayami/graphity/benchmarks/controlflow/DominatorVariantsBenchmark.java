@@ -53,7 +53,7 @@ public class DominatorVariantsBenchmark {
   @Setup(Level.Trial)
   public void setup() {
     graph = shape.generate(nodeCount, 42);
-    biGraph = graph.biAdjacentGraph();
+    biGraph = BiAdjacentGraph.of(graph);
     int n = graph.nodeCount();
     int[] expected = immediateDominators(Dominators.of(biGraph, entries), n);
     check("preorder lists", expected,

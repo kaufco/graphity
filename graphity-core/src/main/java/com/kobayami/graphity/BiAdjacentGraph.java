@@ -9,7 +9,7 @@ import java.util.Objects;
  * <p>
  * Extends {@link Graph} with in-adjacency lists in the same flat-array layout,
  * each node's in-nodes sorted ascending.
- * Obtain via {@link Graph#biAdjacentGraph()}; convert back via {@link #uniAdjacentGraph()}.
+ * Obtain via {@link #of(Graph)}; convert back via {@link #uniAdjacentGraph()}.
  * <p>
  * <strong>Memory:</strong> 8 x (nodeCount + edgeCount) bytes (2x {@link Graph}).
  *
@@ -33,6 +33,23 @@ public final class BiAdjacentGraph extends Graph {
     super(outAdjacencyStart, outAdjacency);
     this.inAdjacencyStart = inAdjacencyStart;
     this.inAdjacency = inAdjacency;
+  }
+
+  /**
+   * Returns the given graph with in-adjacency added, for constant-time access to the
+   * predecessors of every node. The result shares the out-adjacency data; only the in-adjacency
+   * is newly computed, and it is not cached - hold on to the result to use it more than once.
+   * <p>
+   * If {@code graph} already is a {@code BiAdjacentGraph}, returns it unchanged in O(1).
+   * <p>
+   * <strong>Time:</strong> O(nodeCount + edgeCount), or O(1) if already bi-adjacent.<br>
+   * <strong>Memory:</strong> +4 x (nodeCount + edgeCount) bytes, or none if already bi-adjacent.
+   *
+   * @param graph the graph to add the in-adjacency to
+   * @return a bi-adjacent graph with the same nodes and edges
+   */
+  public static BiAdjacentGraph of(Graph graph) {
+    return graph instanceof BiAdjacentGraph biAdjacent ? biAdjacent : graph.withInAdjacency();
   }
 
   /**
@@ -103,7 +120,12 @@ public final class BiAdjacentGraph extends Graph {
    * Already bi-adjacent - returns {@code this}.
    * <p>
    * <strong>Time:</strong> O(1).
+   *
+   * @deprecated Use {@link #of(Graph)}, which returns a {@code BiAdjacentGraph} unchanged.
+   *     Removed in 3.0.
    */
+  @Deprecated(since = "2.4.0", forRemoval = true)
+  @SuppressWarnings("removal") // overrides the deprecated method it replaces in kind
   @Override
   public final BiAdjacentGraph biAdjacentGraph() {
     return this;

@@ -49,7 +49,7 @@ class LoopsFuzzTest {
       }
       int n = graph.nodeCount();
       var oracle = new NaiveLoops(graph, entries);
-      var loops = Loops.of(graph.biAdjacentGraph(), entries);
+      var loops = Loops.of(BiAdjacentGraph.of(graph), entries);
 
       int expectedCount = 0;
       boolean expectedReducible = true;
@@ -127,7 +127,7 @@ class LoopsFuzzTest {
       }
       int n = graph.nodeCount();
       var dominance = new NaiveDominators(graph, entries);
-      var loops = Loops.of(graph.biAdjacentGraph(), entries);
+      var loops = Loops.of(BiAdjacentGraph.of(graph), entries);
 
       var forwardOnly = new GraphBuilder();
       forwardOnly.addNodes(n);

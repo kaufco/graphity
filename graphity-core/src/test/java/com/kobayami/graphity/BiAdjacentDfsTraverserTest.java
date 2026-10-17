@@ -11,7 +11,7 @@ class BiAdjacentDfsTraverserTest {
   @Test
   void runFromRootsVisitsEntireDag() {
     // DAG with single root 0: 0 -> 1, 2; 1 -> 3; 2 -> 3.
-    var g = TestGraphs.of(4, 0, 1, 0, 2, 1, 3, 2, 3).biAdjacentGraph();
+    var g = BiAdjacentGraph.of(TestGraphs.of(4, 0, 1, 0, 2, 1, 3, 2, 3));
     var t = new RecordingBiAdjacentDfsTraverser(g);
     t.runFromRoots();
     assertThat(t.preOrder.toIntArray()).containsExactly(0, 1, 3, 2);
@@ -21,7 +21,7 @@ class BiAdjacentDfsTraverserTest {
   @Test
   void runFromRootsStartsAtEachRoot() {
     // Two roots (0 and 3), each reaching one sink: 0 -> 1 -> 2, 3 -> 2.
-    var g = TestGraphs.of(4, 0, 1, 1, 2, 3, 2).biAdjacentGraph();
+    var g = BiAdjacentGraph.of(TestGraphs.of(4, 0, 1, 1, 2, 3, 2));
     var t = new RecordingBiAdjacentDfsTraverser(g);
     t.runFromRoots();
     assertThat(t.preOrder.toIntArray()).containsExactly(0, 1, 2, 3);
@@ -30,7 +30,7 @@ class BiAdjacentDfsTraverserTest {
   @Test
   void runFromRootsVisitsRootsInAscendingOrder() {
     // Three isolated nodes as roots.
-    var g = TestGraphs.isolated(3).biAdjacentGraph();
+    var g = BiAdjacentGraph.of(TestGraphs.isolated(3));
     var t = new RecordingBiAdjacentDfsTraverser(g);
     t.runFromRoots();
     assertThat(t.preOrder.toIntArray()).containsExactly(0, 1, 2);
@@ -39,7 +39,7 @@ class BiAdjacentDfsTraverserTest {
   @Test
   void runFromRootsSkipsNodesInCycleWithoutExternalEntry() {
     // Pure cycle: no root. runFromRoots visits nothing.
-    var g = TestGraphs.cycle(4).biAdjacentGraph();
+    var g = BiAdjacentGraph.of(TestGraphs.cycle(4));
     var t = new RecordingBiAdjacentDfsTraverser(g);
     t.runFromRoots();
     assertThat(t.preOrder.isEmpty()).isTrue();
@@ -48,7 +48,7 @@ class BiAdjacentDfsTraverserTest {
   @Test
   void runFromRootsVisitsCycleReachableFromExternalRoot() {
     // Root 0 -> 1 -> 2 -> 3 -> 1 (cycle via 1, 2, 3; 0 is root).
-    var g = TestGraphs.of(4, 0, 1, 1, 2, 2, 3, 3, 1).biAdjacentGraph();
+    var g = BiAdjacentGraph.of(TestGraphs.of(4, 0, 1, 1, 2, 2, 3, 3, 1));
     var t = new RecordingBiAdjacentDfsTraverser(g);
     t.runFromRoots();
     assertThat(t.preOrder.toIntArray()).containsExactly(0, 1, 2, 3);
@@ -56,7 +56,7 @@ class BiAdjacentDfsTraverserTest {
 
   @Test
   void runFromRootsOnEmptyGraphIsNoOp() {
-    var g = TestGraphs.empty().biAdjacentGraph();
+    var g = BiAdjacentGraph.of(TestGraphs.empty());
     var t = new RecordingBiAdjacentDfsTraverser(g);
     t.runFromRoots();
     assertThat(t.preOrder.isEmpty()).isTrue();
@@ -65,7 +65,7 @@ class BiAdjacentDfsTraverserTest {
   @Test
   void runFromRootsSkipsAlreadyVisitedRoots() {
     // Two separate roots 0 and 2: 0 -> 1, 2 -> 3.
-    var g = TestGraphs.of(4, 0, 1, 2, 3).biAdjacentGraph();
+    var g = BiAdjacentGraph.of(TestGraphs.of(4, 0, 1, 2, 3));
     var t = new RecordingBiAdjacentDfsTraverser(g);
     t.run(0);
     t.runFromRoots();
@@ -76,9 +76,9 @@ class BiAdjacentDfsTraverserTest {
   @Test
   void runFromRootsCombinedWithRunCoversAllNodes() {
     // DAG reachable from roots plus a pure cycle {3, 4, 5}.
-    var g = TestGraphs.of(6,
+    var g = BiAdjacentGraph.of(TestGraphs.of(6,
         0, 1, 1, 2,
-        3, 4, 4, 5, 5, 3).biAdjacentGraph();
+        3, 4, 4, 5, 5, 3));
     var t = new RecordingBiAdjacentDfsTraverser(g);
     t.runFromRoots();
     // Only {0, 1, 2} reachable from roots.
@@ -90,7 +90,7 @@ class BiAdjacentDfsTraverserTest {
 
   @Test
   void runFromRootsMultipleCallsDoNotRevisit() {
-    var g = TestGraphs.path(3).biAdjacentGraph();
+    var g = BiAdjacentGraph.of(TestGraphs.path(3));
     var t = new RecordingBiAdjacentDfsTraverser(g);
     t.runFromRoots();
     t.runFromRoots();
@@ -99,7 +99,7 @@ class BiAdjacentDfsTraverserTest {
 
   @Test
   void biAdjacentGraphFieldIsSameInstanceAsGraph() {
-    var g = TestGraphs.path(3).biAdjacentGraph();
+    var g = BiAdjacentGraph.of(TestGraphs.path(3));
     var t = new RecordingBiAdjacentDfsTraverser(g);
     assertThat(t.biAdjacentGraph).isSameAs(t.graph);
   }

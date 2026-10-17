@@ -11,7 +11,7 @@ import java.util.Arrays;
  *   <li>{@link #wccsOf(Graph)} - Weakly Connected Components (Union-Find)</li>
  *   <li>{@link #ccsOf(Graph)} - Connected Components for undirected interpretation
  *       (identical to {@code wccsOf})</li>
- *   <li>{@link #biconnectivityOf(Graph)} - bridges, articulation points and biconnected
+ *   <li>{@link #biconnectivityOf(BiAdjacentGraph)} - bridges, articulation points and biconnected
  *       components, also for undirected interpretation</li>
  *   <li>{@link #strongConnectivityOf(BiAdjacentGraph)} - strong bridges and strong articulation
  *       points, the directed counterpart</li>
@@ -21,7 +21,7 @@ import java.util.Arrays;
  * var sccs = Components.sccsOf(graph);   // directed: SCCs via Tarjan
  * var wccs = Components.wccsOf(graph);   // directed: WCCs via Union-Find
  * var ccs  = Components.ccsOf(graph);    // undirected interpretation: same as wccsOf
- * var bcc  = Components.biconnectivityOf(graph);  // undirected: bridges, cut vertices, blocks
+ * var bcc  = Components.biconnectivityOf(BiAdjacentGraph.of(graph));  // undirected: bridges, cut vertices, blocks
  * }</pre>
  *
  * <h2>Directed vs. undirected interpretation</h2>
@@ -172,8 +172,9 @@ public final class Components {
    * The edges {@code a → b} and {@code b → a} count as one undirected edge, so a graph that
    * stores undirected edges in both directions still has bridges. Self-loops are ignored.
    * <p>
-   * In-adjacency is required and is obtained via {@link Graph#biAdjacentGraph()} unless the
-   * argument already provides it.
+   * The pass reads the predecessors of every node and so takes a {@link BiAdjacentGraph}. A
+   * caller holding a plain {@link Graph} builds the in-adjacency once with
+   * {@link BiAdjacentGraph#of(Graph)}, at a cost visible at the call site.
    * <p>
    * <strong>Time:</strong> O(nodeCount + edgeCount); the bridges, at most nodeCount - 1, are
    * ordered by counting.<br>
@@ -181,16 +182,36 @@ public final class Components {
    * 29 x nodeCount bytes for the traversal state, up to 8 x nodeCount bytes for the collected
    * bridges and as much again plus 4 x nodeCount bytes while they are ordered, 4 x edgeCount
    * bytes for the edge index translation and up to 4 x edgeCount bytes for the edge stack, which
-   * grows on demand and never exceeds edgeCount entries, plus 4 x (nodeCount + edgeCount) bytes
-   * for the in-adjacency unless the graph is a {@link BiAdjacentGraph} - several times the size
-   * of the graph itself, and worth checking against the available heap on very large graphs.
+   * grows on demand and never exceeds edgeCount entries - several times the size of the graph
+   * itself, and worth checking against the available heap on very large graphs.
    *
    * @param graph the graph to analyze
    * @return bridges, articulation points and blocks as a {@link Biconnectivity} instance
    * @see Biconnectivity
    */
-  public static Biconnectivity biconnectivityOf(Graph graph) {
+  public static Biconnectivity biconnectivityOf(BiAdjacentGraph graph) {
     return Biconnectivity.of(graph);
+  }
+
+  /**
+   * Computes bridges, articulation points and biconnected components of the given graph,
+   * building its in-adjacency first unless the graph already is a {@link BiAdjacentGraph}.
+   * Results are identical to {@link #biconnectivityOf(BiAdjacentGraph)}.
+   * <p>
+   * <strong>Time:</strong> as for {@link #biconnectivityOf(BiAdjacentGraph)}.<br>
+   * <strong>Memory:</strong> as for {@link #biconnectivityOf(BiAdjacentGraph)}, plus
+   * 4 x (nodeCount + edgeCount) bytes for the in-adjacency unless the graph is a
+   * {@code BiAdjacentGraph}.
+   *
+   * @param graph the graph to analyze
+   * @return bridges, articulation points and blocks as a {@link Biconnectivity} instance
+   * @deprecated Builds the in-adjacency on every call, hidden behind the call. Pass
+   *     {@code BiAdjacentGraph.of(graph)} to {@link #biconnectivityOf(BiAdjacentGraph)} instead;
+   *     a {@code BiAdjacentGraph} argument already resolves to that overload. Removed in 3.0.
+   */
+  @Deprecated(since = "2.4.0", forRemoval = true)
+  public static Biconnectivity biconnectivityOf(Graph graph) {
+    return Biconnectivity.of(BiAdjacentGraph.of(graph));
   }
 
   /**
@@ -203,7 +224,7 @@ public final class Components {
    * The computation works on the dominators of each component and of its transpose, following
    * Italiano, Laura and Santaroni, and so reads the predecessors of every node: it takes a
    * {@link BiAdjacentGraph}, whose transpose is a constant-time view. A caller holding a plain
-   * {@link Graph} builds the in-adjacency once with {@link Graph#biAdjacentGraph()}. Iterative;
+   * {@link Graph} builds the in-adjacency once with {@link BiAdjacentGraph#of(Graph)}. Iterative;
    * deep graphs do not overflow the call stack.
    * <p>
    * <strong>Time:</strong> O((nodeCount + edgeCount) x log nodeCount) in the worst case, from the

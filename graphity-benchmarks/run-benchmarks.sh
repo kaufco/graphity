@@ -123,7 +123,7 @@ DAG_FIXTURE_SHAPES = {
 }
 # "graphity-reordered" and "graphity-biadjacent" are pseudo-libraries: the same Graphity
 # algorithm run on a transformed graph — a DFS-preorder reordered one (NodeMapping.reindex +
-# Graphs.remapped) or a bi-adjacent one (Graph.biAdjacentGraph). Each shows up as a separate
+# Graphs.remapped) or a bi-adjacent one (BiAdjacentGraph.of). Each shows up as a separate
 # "Graphity (…)" column in the report. Alongside them sit the algorithms that measure the
 # one-time cost of those structures: "reorder" and "biadjacency" for Graphity, "symmetrize" for
 # WebGraph, whose ConnectedComponents needs a symmetric graph a BVGraph cannot provide.

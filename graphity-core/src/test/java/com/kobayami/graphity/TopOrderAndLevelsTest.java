@@ -118,7 +118,7 @@ class TopOrderAndLevelsTest {
   void ofUsesBiAdjacentFastPathConsistently() {
     // Same graph computed via Graph and via BiAdjacentGraph — must produce identical results.
     var g = TestGraphs.of(5, 0, 1, 0, 2, 1, 3, 2, 3, 3, 4);
-    var bi = g.biAdjacentGraph();
+    var bi = BiAdjacentGraph.of(g);
     var tolUni = TopOrderAndLevels.of(g);
     var tolBi = TopOrderAndLevels.of(bi);
     assertThat(tolUni.order().toIntArray()).containsExactly(tolBi.order().toIntArray());

@@ -56,7 +56,7 @@ class DeepGraphStackSafetyTest {
   void deepDominatorsDoNotOverflowStack() {
     // A chain makes both the search and the dominator tree DEEP levels deep, and path
     // compression walks the full depth.
-    BiAdjacentGraph path = TestGraphs.path(DEEP).biAdjacentGraph();
+    BiAdjacentGraph path = BiAdjacentGraph.of(TestGraphs.path(DEEP));
 
     Dominators dominators = Dominators.of(path, 0);
     assertThat(dominators.immediateDominatorOf(DEEP - 1)).isEqualTo(DEEP - 2);
@@ -69,7 +69,7 @@ class DeepGraphStackSafetyTest {
     builder.addNodes(DEEP);
     for (int i = 0; i + 1 < DEEP; i++) builder.addEdge(i, i + 1);
     for (int i = 0; i < DEEP; i += 1000) builder.addEdge(DEEP - 1, i);
-    Dominators looped = Dominators.of(builder.build().biAdjacentGraph(), 0);
+    Dominators looped = Dominators.of(BiAdjacentGraph.of(builder.build()), 0);
     assertThat(looped.immediateDominatorOf(DEEP - 1)).isEqualTo(DEEP - 2);
   }
 
@@ -81,7 +81,7 @@ class DeepGraphStackSafetyTest {
     builder.addNodes(DEEP);
     for (int i = 0; i + 1 < DEEP; i++) builder.addEdge(i, i + 1);
     for (int i = 0; i < DEEP / 2; i++) builder.addEdge(DEEP - 1 - i, i);
-    Loops loops = Loops.of(builder.build().biAdjacentGraph(), 0);
+    Loops loops = Loops.of(BiAdjacentGraph.of(builder.build()), 0);
     assertThat(loops.loopCount()).isEqualTo(DEEP / 2);
     assertThat(loops.loopDepthOf(DEEP / 2)).isEqualTo(DEEP / 2);
     assertThat(loops.isReducible()).isTrue();
@@ -93,7 +93,7 @@ class DeepGraphStackSafetyTest {
     // before the first block closes.
     Graph path = TestGraphs.path(DEEP);
 
-    Biconnectivity biconnectivity = Components.biconnectivityOf(path);
+    Biconnectivity biconnectivity = Components.biconnectivityOf(BiAdjacentGraph.of(path));
     assertThat(biconnectivity.bridges().count()).isEqualTo(DEEP - 1);
     assertThat(biconnectivity.articulationPoints().size()).isEqualTo(DEEP - 2);
     assertThat(biconnectivity.blocks().groupCount()).isEqualTo(DEEP - 1);
@@ -105,7 +105,7 @@ class DeepGraphStackSafetyTest {
     // node is critical.
     Graph cycle = TestGraphs.cycle(DEEP);
 
-    StrongConnectivity strong = Components.strongConnectivityOf(cycle.biAdjacentGraph());
+    StrongConnectivity strong = Components.strongConnectivityOf(BiAdjacentGraph.of(cycle));
     assertThat(strong.strongBridges().count()).isEqualTo(DEEP);
     assertThat(strong.strongArticulationPoints().size()).isEqualTo(DEEP);
   }

@@ -13,7 +13,7 @@ class BiAdjacentGraphTest {
 
   /** Standard test fixture: diamond 0->1, 0->2, 1->3, 2->3. */
   private static BiAdjacentGraph diamond() {
-    return TestGraphs.of(4, 0, 1, 0, 2, 1, 3, 2, 3).biAdjacentGraph();
+    return BiAdjacentGraph.of(TestGraphs.of(4, 0, 1, 0, 2, 1, 3, 2, 3));
   }
 
   @Test
@@ -44,7 +44,7 @@ class BiAdjacentGraphTest {
   @Test
   void degreeCountsSelfLoopTwice() {
     // Self-loop: 0->0. Contributes to in-degree and out-degree independently.
-    var g = TestGraphs.of(1, 0, 0).biAdjacentGraph();
+    var g = BiAdjacentGraph.of(TestGraphs.of(1, 0, 0));
     assertThat(g.inDegree(0)).isEqualTo(1);
     assertThat(g.outDegree(0)).isEqualTo(1);
     assertThat(g.degree(0)).isEqualTo(2);
@@ -84,7 +84,14 @@ class BiAdjacentGraphTest {
   }
 
   @Test
-  void biAdjacentGraphReturnsSelf() {
+  void ofReturnsABiAdjacentGraphUnchanged() {
+    var g = diamond();
+    assertThatObject(BiAdjacentGraph.of(g)).isSameAs(g);
+  }
+
+  @Test
+  @SuppressWarnings("removal") // the deprecated accessor until it is removed in 3.0
+  void deprecatedBiAdjacentGraphReturnsSelf() {
     var g = diamond();
     assertThatObject(g.biAdjacentGraph()).isSameAs(g);
   }
@@ -143,7 +150,7 @@ class BiAdjacentGraphTest {
   @Test
   void transposedEdgeIndexRelabelsEdges() {
     // 0->2 is edge 0, 1->0 is edge 1. In the transpose 0->1 comes first, so the two swap.
-    var g = TestGraphs.of(3, 1, 0, 0, 2).biAdjacentGraph();
+    var g = BiAdjacentGraph.of(TestGraphs.of(3, 1, 0, 0, 2));
     assertThat(g.transposedEdgeIndex(0)).isEqualTo(1);
     assertThat(g.transposedEdgeIndex(1)).isZero();
   }
@@ -151,7 +158,7 @@ class BiAdjacentGraphTest {
   @Test
   void transposedEdgeIndexHandlesSelfLoop() {
     // Node 1 has a self-loop (edge 1) next to 1->2 (edge 2); 0->1 is edge 0.
-    var g = TestGraphs.of(3, 0, 1, 1, 1, 1, 2).biAdjacentGraph();
+    var g = BiAdjacentGraph.of(TestGraphs.of(3, 0, 1, 1, 1, 1, 2));
     int loop = g.transposedEdgeIndex(1);
     var t = g.transposed();
     assertThat(t.edgeSource(loop)).isEqualTo(1);
@@ -178,14 +185,14 @@ class BiAdjacentGraphTest {
   @Test
   void neighborsDeduplicatesOverlapBetweenInAndOut() {
     // Bidirectional edge 0<->1: appears in both in-list and out-list of each.
-    var g = TestGraphs.of(2, 0, 1, 1, 0).biAdjacentGraph();
+    var g = BiAdjacentGraph.of(TestGraphs.of(2, 0, 1, 1, 0));
     assertThat(g.neighbors(0).toIntArray()).containsExactly(1);
     assertThat(g.neighbors(1).toIntArray()).containsExactly(0);
   }
 
   @Test
   void neighborsIncludesSelfOnSelfLoop() {
-    var g = TestGraphs.of(2, 0, 0, 0, 1).biAdjacentGraph();
+    var g = BiAdjacentGraph.of(TestGraphs.of(2, 0, 0, 0, 1));
     assertThat(g.neighbors(0).toIntArray()).containsExactly(0, 1);
   }
 
@@ -218,7 +225,7 @@ class BiAdjacentGraphTest {
 
   @Test
   void isRootNodeFalseOnSelfLoop() {
-    var g = TestGraphs.of(1, 0, 0).biAdjacentGraph();
+    var g = BiAdjacentGraph.of(TestGraphs.of(1, 0, 0));
     assertThat(g.isRootNode(0)).isFalse();
   }
 
@@ -230,18 +237,18 @@ class BiAdjacentGraphTest {
 
   @Test
   void rootNodesOnIsolatedGraphReturnsAllNodes() {
-    var g = TestGraphs.isolated(3).biAdjacentGraph();
+    var g = BiAdjacentGraph.of(TestGraphs.isolated(3));
     assertThat(g.rootNodes().toIntArray()).containsExactly(0, 1, 2);
   }
 
   @Test
   void rootNodesOnCycleIsEmpty() {
-    var g = TestGraphs.cycle(4).biAdjacentGraph();
+    var g = BiAdjacentGraph.of(TestGraphs.cycle(4));
     assertThat(g.rootNodes().isEmpty()).isTrue();
   }
 
   @Test
   void rootNodesOnEmptyGraphIsEmpty() {
-    assertThat(TestGraphs.empty().biAdjacentGraph().rootNodes().isEmpty()).isTrue();
+    assertThat(BiAdjacentGraph.of(TestGraphs.empty()).rootNodes().isEmpty()).isTrue();
   }
 }

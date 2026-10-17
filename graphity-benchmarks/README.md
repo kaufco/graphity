@@ -237,10 +237,10 @@ Reordering is a no-op on already ID-local shapes (`PATH`, `TREE`, `CHAIN_OF_CLIQ
 
 ## In-adjacency (`graphity-biadjacent` and `biadjacency`)
 
-`graph.biAdjacentGraph()` adds incoming adjacency to a graph that stores outgoing edges only, doubling its footprint. One algorithm in the suite reads it: `TopOrderAndLevels.of` takes in-degrees straight from the in-adjacency offsets in O(nodeCount), where a uni-adjacent graph leaves it scanning every edge in O(nodeCount + edgeCount). The suite measures both halves of that trade, in the same shape as reordering:
+`BiAdjacentGraph.of(graph)` adds incoming adjacency to a graph that stores outgoing edges only, doubling its footprint. One algorithm in the suite reads it: `TopOrderAndLevels.of` takes in-degrees straight from the in-adjacency offsets in O(nodeCount), where a uni-adjacent graph leaves it scanning every edge in O(nodeCount + edgeCount). The suite measures both halves of that trade, in the same shape as reordering:
 
 - **`graphity-biadjacent`** is a *pseudo-library*: the identical `TopOrderAndLevels.of` call on a bi-adjacent graph, shown as a **`Graphity (bi-adjacent)`** column beside `Graphity`. The conversion happens in trial setup and is not part of the measured time.
-- **`biadjacency`** is a `graphity`-only algorithm timing `graph.biAdjacentGraph()` itself, in its own subsection next to the `reorder` cost. Building the in-adjacency is O(nodeCount + edgeCount) — the same order the algorithm saves — so the column and the cost together answer the only interesting question: after how many runs the structure pays for itself.
+- **`biadjacency`** is a `graphity`-only algorithm timing `BiAdjacentGraph.of(graph)` itself, in its own subsection next to the `reorder` cost. Building the in-adjacency is O(nodeCount + edgeCount) — the same order the algorithm saves — so the column and the cost together answer the only interesting question: after how many runs the structure pays for itself.
 
 The peer side of the same trade is **`symmetrize`**, a `webgraph`-only algorithm. WebGraph's `ConnectedComponents` requires a symmetric graph, which a `BVGraph` storing out-adjacency cannot provide, so the `wcc` column for WebGraph runs on a symmetric closure built once per trial with `Transform.symmetrizeOffline` and re-stored as a `BVGraph`. `symmetrize` prices that closure. Graphity needs nothing of the sort for components: `Components.wccsOf` is Union-Find over the out-edges.
 

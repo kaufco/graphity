@@ -17,7 +17,7 @@ class DominatorsTest {
   }
 
   private static BiAdjacentGraph bi(int n, int... edges) {
-    return TestGraphs.of(n, edges).biAdjacentGraph();
+    return BiAdjacentGraph.of(TestGraphs.of(n, edges));
   }
 
   @Test
@@ -105,7 +105,7 @@ class DominatorsTest {
 
   @Test
   void emptyGraph() {
-    var d = Dominators.of(TestGraphs.empty().biAdjacentGraph(), IntList.of());
+    var d = Dominators.of(BiAdjacentGraph.of(TestGraphs.empty()), IntList.of());
     assertThat(Graphs.dominatorTree(d).nodeCount()).isZero();
     assertThat(Graphs.dominanceFrontiers(d).nodeCount()).isZero();
   }
@@ -157,7 +157,7 @@ class DominatorsTest {
   void ladderFrontierGrowsQuadratically() {
     int rungs = 50;
     var df = Graphs.dominanceFrontiers(
-        Dominators.of(ControlFlowGraphs.ladder(rungs).biAdjacentGraph(), 0));
+        Dominators.of(BiAdjacentGraph.of(ControlFlowGraphs.ladder(rungs)), 0));
     // b_i (= rungs + i) is in the frontier of every a_j with 1 <= j <= i, plus the exit.
     assertThat(df.edgeCount()).isGreaterThan(rungs * (rungs - 1) / 2);
   }
@@ -198,7 +198,7 @@ class DominatorsTest {
 
   @Test
   void fanBehindAChainIsDominatedByTheEntry() {
-    var graph = ControlFlowGraphs.fanBehindChain(1000, 1000).biAdjacentGraph();
+    var graph = BiAdjacentGraph.of(ControlFlowGraphs.fanBehindChain(1000, 1000));
     var d = Dominators.of(graph, 0);
     for (int fan = 1001; fan <= 2000; fan++) {
       assertThat(d.immediateDominatorOf(fan)).isZero();

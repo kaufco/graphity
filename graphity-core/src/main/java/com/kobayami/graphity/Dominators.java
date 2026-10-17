@@ -20,7 +20,7 @@ import java.util.Objects;
  * hand the same graph to {@link Loops} and the other analyses that need it:
  *
  * <pre>{@code
- * BiAdjacentGraph cfg = graph.biAdjacentGraph();   // +4 x (nodeCount + edgeCount) bytes
+ * BiAdjacentGraph cfg = BiAdjacentGraph.of(graph);   // +4 x (nodeCount + edgeCount) bytes
  * }</pre>
  *
  * The type is deliberately lean. It holds the immediate dominators, a reachability bit set and

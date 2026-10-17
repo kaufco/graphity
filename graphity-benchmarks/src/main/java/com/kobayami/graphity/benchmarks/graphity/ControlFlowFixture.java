@@ -40,7 +40,7 @@ public class ControlFlowFixture {
   public void setup() {
     Graph[] generated = shape.generateAll(nodeCount, 42);
     graphs = new BiAdjacentGraph[generated.length];
-    for (int g = 0; g < generated.length; g++) graphs[g] = generated[g].biAdjacentGraph();
+    for (int g = 0; g < generated.length; g++) graphs[g] = BiAdjacentGraph.of(generated[g]);
     dominators = new Dominators[graphs.length];
     dominatorAncestries = new Ancestry[graphs.length];
     definitions = new IntList[graphs.length][];

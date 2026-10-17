@@ -599,7 +599,7 @@ class GraphsTest {
   void transposedEdgeMappingInverseEqualsTransposedEdgeIndex() {
     var g = TestGraphs.of(4, 0, 1, 0, 2, 1, 3, 2, 3, 0, 0);
     var inverse = Graphs.transposedEdgeMapping(g).inverse();
-    var biAdjacent = g.biAdjacentGraph();
+    var biAdjacent = BiAdjacentGraph.of(g);
     for (int p = 0; p < g.edgeCount(); p++) {
       assertThat(inverse.get(p)).isEqualTo(biAdjacent.transposedEdgeIndex(p));
     }
@@ -609,7 +609,7 @@ class GraphsTest {
   void transposedEdgeMappingAgreesOnUniAndBiAdjacentInput() {
     var g = TestGraphs.of(4, 0, 1, 0, 2, 1, 3, 2, 3);
     var fromUniAdjacent = Graphs.transposedEdgeMapping(g);
-    var fromBiAdjacent = Graphs.transposedEdgeMapping(g.biAdjacentGraph());
+    var fromBiAdjacent = Graphs.transposedEdgeMapping(BiAdjacentGraph.of(g));
     for (int q = 0; q < g.edgeCount(); q++) {
       assertThat(fromBiAdjacent.get(q)).isEqualTo(fromUniAdjacent.get(q));
     }

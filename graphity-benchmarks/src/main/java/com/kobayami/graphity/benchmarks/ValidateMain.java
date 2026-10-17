@@ -2,6 +2,7 @@ package com.kobayami.graphity.benchmarks;
 
 import com.google.common.graph.Graph;
 import com.kobayami.graphity.BackEdges;
+import com.kobayami.graphity.BiAdjacentGraph;
 import com.kobayami.graphity.Components;
 import com.kobayami.graphity.EdgeType;
 import com.kobayami.graphity.EdgeTypes;
@@ -362,7 +363,7 @@ public final class ValidateMain {
           // The bi-adjacent branch reads in-degrees from the in-adjacency offsets instead of
           // scanning all edges. It is a second code path and its own report column, so it is
           // checked rather than assumed.
-          TopOrderAndLevels bi = TopOrderAndLevels.of(template.biAdjacentGraph());
+          TopOrderAndLevels bi = TopOrderAndLevels.of(BiAdjacentGraph.of(template));
           recordLevels(levelsByLib, lib + "/bi-adjacent", template, bi.order().toIntArray(), bi.levels().toIntArray());
         }
         case "jgrapht" -> {

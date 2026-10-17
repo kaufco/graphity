@@ -1,6 +1,7 @@
 package com.kobayami.graphity.benchmarks.controlflow;
 
 import com.kobayami.graphity.BackEdges;
+import com.kobayami.graphity.BiAdjacentGraph;
 import com.kobayami.graphity.ControlFlowAlternatives;
 import com.kobayami.graphity.Dominators;
 import com.kobayami.graphity.Edges;
@@ -22,7 +23,7 @@ import org.openjdk.jmh.annotations.Warmup;
 
 /**
  * Dominators starting from a plain {@code Graph}: either the predecessors rebuilt as lists in
- * preorder, or {@code biAdjacentGraph()} built inside the measurement and handed to
+ * preorder, or {@code BiAdjacentGraph.of(graph)} built inside the measurement and handed to
  * {@code Dominators.of} - what a caller holding a plain graph pays, since the analysis takes a
  * {@code BiAdjacentGraph}. Both allocate 4 x (nodeCount + edgeCount) bytes for the predecessors;
  * the question is which access pattern is cheaper overall. {@code backEdges} is the control
@@ -51,7 +52,7 @@ public class PredecessorSourceBenchmark {
     int n = graph.nodeCount();
     DominatorVariantsBenchmark.check("preorder lists",
         DominatorVariantsBenchmark.immediateDominators(
-            Dominators.of(graph.biAdjacentGraph(), entries), n),
+            Dominators.of(BiAdjacentGraph.of(graph), entries), n),
         ControlFlowAlternatives.lengauerTarjanPreorderLists(graph, entries));
   }
 
@@ -62,7 +63,7 @@ public class PredecessorSourceBenchmark {
 
   @Benchmark
   public Dominators viaBiAdjacentGraph() {
-    return Dominators.of(graph.biAdjacentGraph(), entries);
+    return Dominators.of(BiAdjacentGraph.of(graph), entries);
   }
 
   @Benchmark

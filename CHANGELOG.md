@@ -15,6 +15,7 @@ Graphity adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - [Issue #29](../../issues/29) - Add `IterativeDfsEdgeTraverser` - edge-centric depth-first search without a stack limit
   - [Issue #30](../../issues/30) - Let a traversal stop early
   - [Issue #33](../../issues/33) - Add `sccOf` and `sccCount` to `Sccs`
+  - [Issue #34](../../issues/34) - Add `BiAdjacentGraph.of` and a `BiAdjacentGraph` overload of `biconnectivityOf`
 - Algorithms
   - [Issue #31](../../issues/31) - Add strong bridges and strong articulation points
   - [Issue #32](../../issues/32) - Add `Graphs.isStronglyConnected`
@@ -25,6 +26,14 @@ Graphity adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - [Issue #27](../../issues/27) - Replace the 64-bit packed DFS state with interleaved int32 lanes
 - Internals
   - [Issue #28](../../issues/28) - Route every traversal entry point through one visited check
+
+### Deprecated
+
+All still work, identically, and are marked `forRemoval`: 3.0 removes them.
+
+- API
+  - [Issue #34](../../issues/34) - Deprecate `Graph.biAdjacentGraph()` — use `BiAdjacentGraph.of(graph)`;
+    deprecate `Components.biconnectivityOf(Graph)` — pass a `BiAdjacentGraph`
 
 ---
 

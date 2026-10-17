@@ -43,7 +43,7 @@ class DominatorsFuzzTest {
     for (long seed = 0; seed < ITERATIONS; seed++) {
       var c = caseFor(seed);
       var oracle = new NaiveDominators(c.graph(), c.entries());
-      var dominators = Dominators.of(c.graph().biAdjacentGraph(), c.entries());
+      var dominators = Dominators.of(BiAdjacentGraph.of(c.graph()), c.entries());
       for (int node = 0; node < c.graph().nodeCount(); node++) {
         int expected = oracle.immediateDominatorOf(node);
         if (expected >= 0 && expected != 0) nontrivial++;
@@ -66,7 +66,7 @@ class DominatorsFuzzTest {
       var c = caseFor(seed);
       int n = c.graph().nodeCount();
       var oracle = new NaiveDominators(c.graph(), c.entries());
-      var dominators = Dominators.of(c.graph().biAdjacentGraph(), c.entries());
+      var dominators = Dominators.of(BiAdjacentGraph.of(c.graph()), c.entries());
 
       var tree = Graphs.dominatorTree(dominators);
       int treeEdges = 0;
@@ -104,7 +104,7 @@ class DominatorsFuzzTest {
       int n = c.graph().nodeCount();
       var expected = new NaiveDominators(c.graph(), c.entries()).frontiers();
       var df = Graphs.dominanceFrontiers(
-          Dominators.of(c.graph().biAdjacentGraph(), c.entries()));
+          Dominators.of(BiAdjacentGraph.of(c.graph()), c.entries()));
       for (int x = 0; x < n; x++) {
         for (int m = 0; m < n; m++) {
           assertThat(df.hasOutNode(x, m))

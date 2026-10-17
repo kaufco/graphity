@@ -128,7 +128,7 @@ public final class ControlFlowAlternatives {
    */
   public static int[] cooperHarveyKennedy(Graph graph, IntList entries) {
     int n = graph.nodeCount();
-    var bi = graph.biAdjacentGraph();
+    var bi = BiAdjacentGraph.of(graph);
     int[] inStart = bi.inAdjacencyStart;
     int[] in = bi.inAdjacency;
     int[] out = graph.outAdjacencyStart;

@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 class StrongConnectivityTest {
 
   private static StrongConnectivity of(Graph graph) {
-    return Components.strongConnectivityOf(graph.biAdjacentGraph());
+    return Components.strongConnectivityOf(BiAdjacentGraph.of(graph));
   }
 
   private static List<String> bridges(StrongConnectivity result) {

@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 class IteratedDominanceFrontierTest {
 
   private static IteratedDominanceFrontier of(Graph graph) {
-    return IteratedDominanceFrontier.of(Dominators.of(graph.biAdjacentGraph(), 0));
+    return IteratedDominanceFrontier.of(Dominators.of(BiAdjacentGraph.of(graph), 0));
   }
 
   @Test
@@ -75,7 +75,7 @@ class IteratedDominanceFrontierTest {
   void severalEntries() {
     // Entries 0 and 3 both lead to 1; a definition in 0 needs a phi at 1.
     var idf = IteratedDominanceFrontier.of(
-        Dominators.of(TestGraphs.of(4, 0, 1, 3, 1, 1, 2).biAdjacentGraph(), IntList.of(0, 3)));
+        Dominators.of(BiAdjacentGraph.of(TestGraphs.of(4, 0, 1, 3, 1, 1, 2)), IntList.of(0, 3)));
     assertThat(idf.frontierOf(IntList.of(0)).toIntArray()).containsExactly(1);
   }
 }

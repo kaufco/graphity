@@ -6,7 +6,7 @@ import java.util.Arrays;
 /**
  * Bridges, articulation points and biconnected components of a graph read as undirected.
  * <p>
- * Obtain via {@link Components#biconnectivityOf(Graph)}. All three results come out of one
+ * Obtain via {@link Components#biconnectivityOf(BiAdjacentGraph)}. All three results come out of one
  * depth-first pass; there is no cheaper entry point that computes only one of them.
  * <ul>
  *   <li>A <strong>bridge</strong> is an edge whose removal increases the number of connected
@@ -27,7 +27,7 @@ import java.util.Arrays;
  * cycle with another edge.
  *
  * <pre>{@code
- * var biconnectivity = Components.biconnectivityOf(dependencies);
+ * var biconnectivity = Components.biconnectivityOf(dependencies);   // a BiAdjacentGraph
  * Edges criticalLinks = biconnectivity.bridges();               // source < target
  * SortedIntView singlePointsOfFailure = biconnectivity.articulationPoints();
  * EdgePartition blocks = biconnectivity.blocks();
@@ -36,7 +36,7 @@ import java.util.Arrays;
  * }
  * }</pre>
  *
- * @see Components#biconnectivityOf(Graph)
+ * @see Components#biconnectivityOf(BiAdjacentGraph)
  * @see Components#ccsOf(Graph)
  * @see EdgePartition
  */
@@ -52,13 +52,9 @@ public final class Biconnectivity {
     this.blocks = blocks;
   }
 
-  /**
-   * Computes bridges, articulation points and blocks of the given graph, read as undirected.
-   * In-adjacency is obtained via {@link Graph#biAdjacentGraph()} unless the argument already
-   * provides it.
-   */
-  static Biconnectivity of(Graph graph) {
-    var finder = new BlockFinder(graph.biAdjacentGraph());
+  /** Computes bridges, articulation points and blocks of the given graph, read as undirected. */
+  static Biconnectivity of(BiAdjacentGraph graph) {
+    var finder = new BlockFinder(graph);
     finder.run();
     return new Biconnectivity(finder.bridges(), finder.articulationPoints(), finder.blocks());
   }

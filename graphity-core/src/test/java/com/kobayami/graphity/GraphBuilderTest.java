@@ -664,7 +664,7 @@ class GraphBuilderTest {
     var copy = new GraphBuilder();
     copy.addNodes(4);
     for (int n = 0; n < source.nodeCount(); n++) {
-      copy.addInEdges(n, source.biAdjacentGraph().inNodes(n));
+      copy.addInEdges(n, BiAdjacentGraph.of(source).inNodes(n));
     }
     assertThat(copy.build()).isEqualTo(source);
   }

@@ -13,7 +13,7 @@ import org.openjdk.jmh.annotations.Warmup;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Measures the one-time cost of {@link Graph#biAdjacentGraph()}, i.e. the up-front price of the
+ * Measures the one-time cost of {@link BiAdjacentGraph#of(Graph)}, i.e. the up-front price of the
  * in-adjacency that the {@code *BiAdjacentBenchmark} classes run on. Graphity-only; reported in
  * its own subsection beside the reorder cost.
  *
@@ -33,6 +33,6 @@ public class BiAdjacencyBenchmark {
 
   @Benchmark
   public BiAdjacentGraph biAdjacency(GraphFixture fx) {
-    return fx.graph.biAdjacentGraph();
+    return BiAdjacentGraph.of(fx.graph);
   }
 }
