@@ -61,8 +61,8 @@ var graph = builder.build();           // immutable, thread-safe
 
 // Strongly connected components
 var sccs = Components.sccsOf(graph);
-sccs.groupCount();                     // number of SCCs
-sccs.get(0);                           // SCC ID of node 0
+sccs.sccCount();                       // number of SCCs
+sccs.sccOf(0);                         // SCC ID of node 0
 sccs.nodesOf(0);                       // sorted view of nodes in SCC 0
 sccs.containsCycle(0);                 // does this SCC contain a cycle?
 var condensed = sccs.condense();       // condensation DAG

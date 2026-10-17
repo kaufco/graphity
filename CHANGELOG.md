@@ -14,6 +14,7 @@ Graphity adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - API
   - [Issue #29](../../issues/29) - Add `IterativeDfsEdgeTraverser` - edge-centric depth-first search without a stack limit
   - [Issue #30](../../issues/30) - Let a traversal stop early
+  - [Issue #33](../../issues/33) - Add `sccOf` and `sccCount` to `Sccs`
 - Algorithms
   - [Issue #31](../../issues/31) - Add strong bridges and strong articulation points
   - [Issue #32](../../issues/32) - Add `Graphs.isStronglyConnected`

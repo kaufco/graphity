@@ -87,4 +87,15 @@ class SccsTest {
     var sccs = Components.sccsOf(TestGraphs.path(3));
     assertThat(sccs.isStronglyConnected()).isFalse();
   }
+
+  @Test
+  void sccOfAndSccCountDelegateToThePartitionMethods() {
+    // Cycle {0, 1} feeding sink 2.
+    var sccs = Components.sccsOf(TestGraphs.of(3, 0, 1, 1, 0, 1, 2));
+    assertThat(sccs.sccCount()).isEqualTo(sccs.groupCount()).isEqualTo(2);
+    for (int node = -1; node <= 3; node++) {
+      assertThat(sccs.sccOf(node)).as("node %d", node).isEqualTo(sccs.get(node));
+    }
+    assertThat(sccs.sccOf(0)).isEqualTo(sccs.sccOf(1)).isNotEqualTo(sccs.sccOf(2));
+  }
 }

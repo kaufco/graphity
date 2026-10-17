@@ -53,7 +53,7 @@ public final class StrongConnectivity {
   static StrongConnectivity of(BiAdjacentGraph graph) {
     int n = graph.nodeCount();
     Sccs sccs = Components.sccsOf(graph);
-    int sccCount = sccs.groupCount();
+    int sccCount = sccs.sccCount();
     int[] sccOf = sccs.mapping;
     int[] members = sccs.members;
     int[] memberStart = sccs.memberStart;
