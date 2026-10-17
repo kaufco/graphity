@@ -98,7 +98,7 @@ double[] weights = new double[graph.edgeCount()];
 | `Components.wccsOf(graph)` | `NodePartition` | `nodesOf()`, `condense()`                    |
 | `Components.biconnectivityOf(biAdjacentGraph)` | `Biconnectivity` | `bridges()`, `articulationPoints()`, `blocks()` |
 | `Components.strongConnectivityOf(biAdjacentGraph)` | `StrongConnectivity` | `strongBridges()`, `strongArticulationPoints()` |
-| `EdgeTypes.of(graph)`      | `EdgeTypes`     | `typeOf(edgeIndex)`, `edgesOfType(TREE)`     |
+| `EdgeTypes.of(graph)`      | `EdgeTypes`     | `typeOf(edgeIndex)`, `Edges.of(edgeTypes, TREE)` |
 | `BackEdges.of(graph)`      | `Edges`         | `sourceNodes()`, `targetNodes()`             |
 | `Ancestry.of(forest)`      | `Ancestry`      | `lowestCommonAncestorOf(a, b)`, `depthOf()`  |
 | `PreorderAncestry.of(ancestry)` | `PreorderAncestry` | `isAncestorOf()` in O(1), `subtreeOf(node)`, `subtreeSizeOf()` |

@@ -17,6 +17,7 @@ Graphity adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - [Issue #33](../../issues/33) - Add `sccOf` and `sccCount` to `Sccs`
   - [Issue #34](../../issues/34) - Add `BiAdjacentGraph.of` and a `BiAdjacentGraph` overload of `biconnectivityOf`
   - [Issue #35](../../issues/35) - Add `inverted()` to `NodeMapping` and `EdgeMapping`
+  - [Issue #36](../../issues/36) - Add `Edges.of(edgeTypes, type)`
 - Algorithms
   - [Issue #31](../../issues/31) - Add strong bridges and strong articulation points
   - [Issue #32](../../issues/32) - Add `Graphs.isStronglyConnected`
@@ -36,6 +37,7 @@ All still work, identically, and are marked `forRemoval`: 3.0 removes them.
   - [Issue #34](../../issues/34) - Deprecate `Graph.biAdjacentGraph()` — use `BiAdjacentGraph.of(graph)`;
     deprecate `Components.biconnectivityOf(Graph)` — pass a `BiAdjacentGraph`
   - [Issue #35](../../issues/35) - Deprecate `NodeMapping.inverse()` and `EdgeMapping.inverse()` — use `inverted()`
+  - [Issue #36](../../issues/36) - Deprecate `EdgeTypes.edgesOfType(type)` — use `Edges.of(edgeTypes, type)`
 
 ---
 

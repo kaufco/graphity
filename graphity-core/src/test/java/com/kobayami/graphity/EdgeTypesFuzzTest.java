@@ -45,7 +45,7 @@ class EdgeTypesFuzzTest {
       var et = EdgeTypes.of(g);
 
       int total = 0;
-      for (EdgeType t : EdgeType.values()) total += et.edgesOfType(t).count();
+      for (EdgeType t : EdgeType.values()) total += Edges.of(et, t).count();
       assertThat(total)
           .as("sum of type counts must equal edge count for %s", labeled.describe())
           .isEqualTo(g.edgeCount());
@@ -53,7 +53,7 @@ class EdgeTypesFuzzTest {
   }
 
   @Test
-  void edgesOfTypeAgreeWithTypeOf() {
+  void edgesOfAgreeWithTypeOf() {
     for (int i = 0; i < ITERATIONS; i++) {
       var labeled = RandomGraphs.anyGraph(BASE_SEED + i);
       var g = labeled.graph();
@@ -70,13 +70,13 @@ class EdgeTypesFuzzTest {
       }
 
       for (EdgeType t : EdgeType.values()) {
-        var edges = et.edgesOfType(t);
+        var edges = Edges.of(et, t);
         var collected = new HashSet<Long>();
         for (int k = 0; k < edges.count(); k++) {
           collected.add(pair(edges.sourceNodes().getInt(k), edges.targetNodes().getInt(k)));
         }
         assertThat(collected)
-            .as("edgesOfType(%s) mismatches typeOf scan for %s", t, labeled.describe())
+            .as("Edges.of(%s) mismatches typeOf scan for %s", t, labeled.describe())
             .isEqualTo(byType.get(t));
       }
     }
@@ -87,7 +87,7 @@ class EdgeTypesFuzzTest {
     for (int i = 0; i < ITERATIONS; i++) {
       var labeled = RandomGraphs.anyGraph(BASE_SEED + i);
       var g = labeled.graph();
-      var fromEdgeTypes = EdgeTypes.of(g).edgesOfType(EdgeType.BACK);
+      var fromEdgeTypes = Edges.of(EdgeTypes.of(g), EdgeType.BACK);
       var fromBackEdges = BackEdges.of(g);
 
       assertThat(toPairSet(fromEdgeTypes))

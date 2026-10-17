@@ -11,7 +11,7 @@ class EdgeTypesTest {
   void ofEmptyGraphHasNoEdgeTypes() {
     var et = EdgeTypes.of(TestGraphs.empty());
     for (EdgeType t : EdgeType.values()) {
-      assertThat(et.edgesOfType(t).count()).isZero();
+      assertThat(Edges.of(et, t).count()).isZero();
     }
   }
 
@@ -22,7 +22,7 @@ class EdgeTypesTest {
     for (int i = 0; i < g.edgeCount(); i++) {
       assertThat(et.typeOf(i)).isEqualTo(EdgeType.TREE);
     }
-    assertThat(et.edgesOfType(EdgeType.TREE).count()).isEqualTo(4);
+    assertThat(Edges.of(et, EdgeType.TREE).count()).isEqualTo(4);
   }
 
   @Test
@@ -30,8 +30,8 @@ class EdgeTypesTest {
     // 0 -> 1, 0 -> 2, 1 -> 2. DFS from 0: tree 0->1, tree 1->2, then 0->2 is forward (2 already finished).
     var g = TestGraphs.of(3, 0, 1, 0, 2, 1, 2);
     var et = EdgeTypes.of(g);
-    var sources = et.edgesOfType(EdgeType.FORWARD).sourceNodes();
-    var targets = et.edgesOfType(EdgeType.FORWARD).targetNodes();
+    var sources = Edges.of(et, EdgeType.FORWARD).sourceNodes();
+    var targets = Edges.of(et, EdgeType.FORWARD).targetNodes();
     assertThat(sources.toIntArray()).containsExactly(0);
     assertThat(targets.toIntArray()).containsExactly(2);
   }
@@ -41,8 +41,8 @@ class EdgeTypesTest {
     // 0 -> 1, 0 -> 2, 2 -> 1. DFS from 0: tree 0->1, finish 1, tree 0->2, then 2->1 — 1 is finished, not on stack, disc[2] > disc[1] → cross.
     var g = TestGraphs.of(3, 0, 1, 0, 2, 2, 1);
     var et = EdgeTypes.of(g);
-    var crossSources = et.edgesOfType(EdgeType.CROSS).sourceNodes();
-    var crossTargets = et.edgesOfType(EdgeType.CROSS).targetNodes();
+    var crossSources = Edges.of(et, EdgeType.CROSS).sourceNodes();
+    var crossTargets = Edges.of(et, EdgeType.CROSS).targetNodes();
     assertThat(crossSources.toIntArray()).containsExactly(2);
     assertThat(crossTargets.toIntArray()).containsExactly(1);
   }
@@ -51,11 +51,11 @@ class EdgeTypesTest {
   void ofCycleHasOneBackEdge() {
     var g = TestGraphs.cycle(4);
     var et = EdgeTypes.of(g);
-    var back = et.edgesOfType(EdgeType.BACK);
+    var back = Edges.of(et, EdgeType.BACK);
     assertThat(back.count()).isEqualTo(1);
     assertThat(back.sourceNodes().getInt(0)).isEqualTo(3);
     assertThat(back.targetNodes().getInt(0)).isZero();
-    assertThat(et.edgesOfType(EdgeType.TREE).count()).isEqualTo(3);
+    assertThat(Edges.of(et, EdgeType.TREE).count()).isEqualTo(3);
   }
 
   @Test
@@ -80,7 +80,7 @@ class EdgeTypesTest {
     var et = EdgeTypes.of(g);
     int total = 0;
     for (EdgeType t : EdgeType.values()) {
-      total += et.edgesOfType(t).count();
+      total += Edges.of(et, t).count();
     }
     assertThat(total).isEqualTo(g.edgeCount());
     // Every edge reachable via typeOf.
@@ -94,10 +94,10 @@ class EdgeTypesTest {
     // Any mix of edges.
     var g = TestGraphs.of(4, 0, 1, 0, 2, 1, 2, 1, 3, 2, 3, 3, 0);
     var et = EdgeTypes.of(g);
-    // Cross-check: for each edge type, gather (source, target) via edgesOfType, then verify
+    // Cross-check: for each edge type, gather (source, target) via Edges.of, then verify
     // that typeOf(edgeIndex) returns the same type when looking up that edge.
     for (EdgeType type : EdgeType.values()) {
-      var edges = et.edgesOfType(type);
+      var edges = Edges.of(et, type);
       for (int i = 0; i < edges.count(); i++) {
         int src = edges.sourceNodes().getInt(i);
         int tgt = edges.targetNodes().getInt(i);
@@ -115,12 +115,12 @@ class EdgeTypesTest {
 
   @Test
   void backEdgesAgreeWithBackEdgesClass() {
-    // BackEdges.of(g) and EdgeTypes.of(g).edgesOfType(BACK) must agree on the set of back-edges.
+    // BackEdges.of(g) and Edges.of(EdgeTypes.of(g), BACK) must agree on the set of back-edges.
     var g = TestGraphs.of(5,
         0, 1, 1, 2, 2, 0,
         2, 3,
         3, 4, 4, 3);
-    var viaEt = EdgeTypes.of(g).edgesOfType(EdgeType.BACK);
+    var viaEt = Edges.of(EdgeTypes.of(g), EdgeType.BACK);
     var viaBe = BackEdges.of(g);
     assertThat(viaEt.count()).isEqualTo(viaBe.count());
     // Compare as multisets of (src, tgt) pairs.
@@ -133,5 +133,20 @@ class EdgeTypesTest {
       bePairs.add(((long) viaBe.sourceNodes().getInt(i) << 32) | viaBe.targetNodes().getInt(i));
     }
     assertThat(etPairs).isEqualTo(bePairs);
+  }
+
+  @Test
+  @SuppressWarnings("removal") // the deprecated method until it is removed in 3.0
+  void deprecatedEdgesOfTypeMatchesEdgesOf() {
+    var g = TestGraphs.of(4, 0, 1, 1, 2, 2, 0, 0, 2, 3, 1);
+    var et = EdgeTypes.of(g);
+    for (EdgeType t : EdgeType.values()) {
+      var deprecated = et.edgesOfType(t);
+      var current = Edges.of(et, t);
+      assertThat(deprecated.sourceNodes().toIntArray()).as("%s sources", t)
+          .containsExactly(current.sourceNodes().toIntArray());
+      assertThat(deprecated.targetNodes().toIntArray()).as("%s targets", t)
+          .containsExactly(current.targetNodes().toIntArray());
+    }
   }
 }

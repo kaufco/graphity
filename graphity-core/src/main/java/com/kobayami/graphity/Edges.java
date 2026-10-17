@@ -41,6 +41,22 @@ public final class Edges {
   }
 
   /**
+   * Collects the edges of one type from an edge classification, in edge index order. Each call
+   * scans every edge, however few match; to collect several types, call it once per type and
+   * keep the results.
+   * <p>
+   * <strong>Time:</strong> O(nodeCount + edgeCount).<br>
+   * <strong>Memory:</strong> O(matchingEdgeCount).
+   *
+   * @param edgeTypes the classification to collect from
+   * @param type the edge type to collect
+   * @return the edges of the given type
+   */
+  public static Edges of(EdgeTypes edgeTypes, EdgeType type) {
+    return edgeTypes.collect(type);
+  }
+
+  /**
    * Returns the source node IDs, one per edge.
    * {@code sourceNodes().getInt(i)} is the source of edge {@code i}.
    * <p>

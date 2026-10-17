@@ -19,7 +19,7 @@ import java.util.Objects;
  * <pre>{@code
  * EdgeTypes et = EdgeTypes.of(graph);
  * EdgeType type = et.typeOf(0);                    // type of edge 0
- * Edges backEdges = et.edgesOfType(EdgeType.BACK);  // all back-edges
+ * Edges backEdges = Edges.of(et, EdgeType.BACK);  // all back-edges, one scan per call
  * }</pre>
  *
  * <strong>Time:</strong> O(nodeCount + edgeCount) for computation.<br>
@@ -88,8 +88,17 @@ public final class EdgeTypes {
    *
    * @param type the edge type to filter by
    * @return edges of the given type
+   * @deprecated Reads like a view, as {@code nodesOf} is on a partition, but scans every edge on
+   *     each call. Use {@link Edges#of(EdgeTypes, EdgeType)}, which returns the same result.
+   *     Removed in 3.0.
    */
+  @Deprecated(since = "2.4.0", forRemoval = true)
   public Edges edgesOfType(EdgeType type) {
+    return collect(type);
+  }
+
+  /** The body of {@link Edges#of(EdgeTypes, EdgeType)}: one scan over all edges. */
+  Edges collect(EdgeType type) {
     byte ordinal = (byte) type.ordinal();
     var sources = new IntArrayList();
     var targets = new IntArrayList();
