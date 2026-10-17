@@ -1,5 +1,7 @@
-# Signs graphity-core and uploads it to Maven Central via the Central Publisher
-# Portal.
+# Signs the published modules and uploads them to Maven Central via the Central
+# Publisher Portal. Which modules those are is the parent POM's
+# graphity.releaseModules list, all at the POM's version; today it is
+# graphity-core alone.
 #
 # Two triggers:
 #   * release.published — the regular way. Publishing a GitHub Release is the
@@ -82,24 +84,6 @@ jobs:
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
-      - name: Refuse a version that is already on Central
-        # A second upload for a published version fails at the portal anyway,
-        # after the build. Failing here says why, and says it in ten seconds.
-        env:
-          VERSION: ${{ steps.target.outputs.version }}
-        run: |
-          set -euo pipefail
-          url="https://repo1.maven.org/maven2/com/kobayami/graphity-core/$VERSION/graphity-core-$VERSION.pom"
-          code="$(curl -sSI -o /dev/null -w '%{http_code}' --max-time 30 "$url" || echo 000)"
-          case "$code" in
-            200)
-              echo "graphity-core $VERSION is already on Maven Central. A published version cannot be replaced; release a new version instead." >&2
-              exit 1
-              ;;
-            404) echo "$VERSION is not on Central yet." ;;
-            *)   echo "Could not ask Central (HTTP $code); continuing." ;;
-          esac
-
       - name: Set up JDK 21 (Temurin)
         uses: actions/setup-java@v4
         with:
@@ -141,12 +125,50 @@ jobs:
           fi
           echo "Publishing $pom."
 
+      - name: Read the modules to publish
+        id: modules
+        run: |
+          set -euo pipefail
+          modules="$(mvn -B -ntp -q -N help:evaluate -Dexpression=graphity.releaseModules -DforceStdout)"
+          if [[ ! "$modules" =~ ^[a-z0-9-]+(,[a-z0-9-]+)*$ ]]; then
+            echo "graphity.releaseModules in the parent POM is '$modules', not a comma-separated module list." >&2
+            exit 1
+          fi
+          echo "list=$modules" >> "$GITHUB_OUTPUT"
+          echo "Publishing modules: $modules"
+
+      - name: Refuse a version that is already on Central
+        # A second upload for a published version fails at the portal anyway,
+        # after the build. Failing here says why, and says it before the build.
+        # Every listed module is asked; one that was never published answers 404.
+        env:
+          VERSION: ${{ steps.target.outputs.version }}
+          MODULES: ${{ steps.modules.outputs.list }}
+        run: |
+          set -euo pipefail
+          for module in ${MODULES//,/ }; do
+            url="https://repo1.maven.org/maven2/com/kobayami/$module/$VERSION/$module-$VERSION.pom"
+            code="$(curl -sSI -o /dev/null -w '%{http_code}' --max-time 30 "$url" || echo 000)"
+            case "$code" in
+              200)
+                echo "$module $VERSION is already on Maven Central. A published version cannot be replaced; release a new version instead." >&2
+                exit 1
+                ;;
+              404) echo "$module $VERSION is not on Central yet." ;;
+              *)   echo "Could not ask Central about $module (HTTP $code); continuing." ;;
+            esac
+          done
+
       - name: Build, sign and upload
         # The reactor is narrowed to the parent POM (which consumers need in
-        # order to resolve graphity-core) and the library itself, so the
-        # benchmarks uber-jar stays out of the bundle.
-        run: mvn -B -ntp -pl graphity-core -am clean deploy -P release
+        # order to resolve the modules) and the modules listed in
+        # graphity.releaseModules, so the benchmarks uber-jar stays out of the
+        # bundle. The publishing plugin uploads one bundle for the whole
+        # reactor at its end: a module that fails to build, test or sign stops
+        # the run before anything is uploaded, so a release is all or nothing.
         env:
+          MODULES: ${{ steps.modules.outputs.list }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
           CENTRAL_TOKEN_USERNAME: ${{ secrets.CENTRAL_TOKEN_USERNAME }}
           CENTRAL_TOKEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN_PASSWORD }}
+        run: mvn -B -ntp -pl "$MODULES" -am clean deploy -P release

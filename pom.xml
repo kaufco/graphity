@@ -75,6 +75,16 @@
     <!-- Set by the release profile, so that the test-utility jar of graphity-core never
          reaches a Maven Central bundle. -->
     <graphity.skipTestJar>false</graphity.skipTestJar>
+    <!-- The modules a release publishes, comma-separated, all at this POM's version.
+         release.yml and deploy-javadoc.yml read this list and build it with -pl <list> -am
+         (plus this parent POM, which consumers need to resolve the modules): the Central
+         bundle and the aggregated Javadoc site cover these modules. A module that is not
+         listed is built and tested by CI but not deployed - the benchmarks, and any future
+         module without a consumer yet. Each entry is both a directory (-pl) and an
+         artifactId (the Central pre-check), so the two must match; and since -am also builds
+         and publishes the reactor dependencies of a listed module, each of those must be
+         listed too. -->
+    <graphity.releaseModules>graphity-core</graphity.releaseModules>
 
     <fastutil.version>8.5.17</fastutil.version>
     <jspecify.version>1.0.0</jspecify.version>
@@ -264,8 +274,17 @@
             <failOnWarnings>true</failOnWarnings>
             <notimestamp>true</notimestamp>
             <quiet>true</quiet>
-            <doctitle>${project.name} ${project.version} API</doctitle>
-            <windowtitle>${project.name} ${project.version} API</windowtitle>
+            <!-- One title for the per-module Javadoc jars and the aggregated site alike;
+                 ${project.name} would name the parent POM on the aggregated site. -->
+            <doctitle>Graphity ${project.version} API</doctitle>
+            <windowtitle>Graphity ${project.version} API</windowtitle>
+            <!-- One group per published module on the aggregated site. -->
+            <groups>
+              <group>
+                <title>graphity-core</title>
+                <packages>com.kobayami.graphity*</packages>
+              </group>
+            </groups>
             <bottom><![CDATA[Copyright &#169; {inceptionYear}&#x2013;{currentYear} Marco Kaufmann. Apache License 2.0.]]></bottom>
 
             <links>
@@ -287,10 +306,11 @@
        deploy plugin, but a plain `mvn verify` must not ask for a GPG passphrase.
        Both therefore live in a profile that only the release build activates:
 
-         mvn -pl graphity-core -am clean deploy -P release
+         mvn -pl <graphity.releaseModules> -am clean deploy -P release
 
        The reactor is deliberately narrowed to the parent POM (which consumers
-       need in order to resolve graphity-core) and the library itself. -->
+       need in order to resolve the modules) and the modules listed in
+       graphity.releaseModules. -->
   <profiles>
     <profile>
       <id>release</id>

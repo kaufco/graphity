@@ -1,4 +1,6 @@
-# Builds the graphity-core Javadoc and deploys it to GitHub Pages.
+# Builds one aggregated Javadoc site for the published modules (the parent POM's
+# graphity.releaseModules list) and deploys it to GitHub Pages, so links and the
+# README badge keep a single target however many artifacts there are.
 #
 # The job is guarded with `if: github.repository == 'kaufco/graphity'` so that
 # forks don't attempt a Pages deploy they have neither the settings nor the
@@ -72,10 +74,18 @@ jobs:
           cache: maven
 
       - name: Build Javadoc
-        # javadoc:javadoc on graphity-core only; -am pulls in the parent POM.
-        # doclint=all + failOnWarnings is configured in the parent POM, so a
-        # broken Javadoc build fails this job.
-        run: mvn -B -ntp -pl graphity-core -am javadoc:javadoc
+        # javadoc:aggregate over the published modules; -am pulls in the parent
+        # POM, where the aggregated site is written. doclint=all and
+        # failOnWarnings are configured in the parent POM, so a broken Javadoc
+        # build fails this job.
+        run: |
+          set -euo pipefail
+          modules="$(mvn -B -ntp -q -N help:evaluate -Dexpression=graphity.releaseModules -DforceStdout)"
+          if [[ ! "$modules" =~ ^[a-z0-9-]+(,[a-z0-9-]+)*$ ]]; then
+            echo "graphity.releaseModules in the parent POM is '$modules', not a comma-separated module list." >&2
+            exit 1
+          fi
+          mvn -B -ntp -pl "$modules" -am javadoc:aggregate
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
@@ -83,7 +93,7 @@ jobs:
       - name: Upload Javadoc artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: graphity-core/target/reports/apidocs
+          path: target/reports/apidocs
 
       - name: Deploy to GitHub Pages
         id: deployment

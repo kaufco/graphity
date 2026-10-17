@@ -28,6 +28,8 @@ Graphity adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - [Issue #27](../../issues/27) - Replace the 64-bit packed DFS state with interleaved int32 lanes
 - Internals
   - [Issue #28](../../issues/28) - Route every traversal entry point through one visited check
+- Infrastructure
+  - [Issue #38](../../issues/38) - Prepare the build and the release for more than one artifact
 
 ### Deprecated
 
