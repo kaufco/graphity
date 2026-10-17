@@ -130,7 +130,7 @@ For a single edge instead of a full pass, `BiAdjacentGraph.transposedEdgeIndex(e
 ```java
 var b = new GraphBuilder();
 b.ensureEdgeCapacity(1_000_000);        // no reallocation when the size is known
-b.strict();                             // reject unknown node IDs eagerly
+b.strict();                             // deprecated: validation is always on from 3.0; call it to test against that
 
 int entry = b.addNode();
 int cond = b.addChild(entry);                       // adds a node, links entry -> it, returns its ID

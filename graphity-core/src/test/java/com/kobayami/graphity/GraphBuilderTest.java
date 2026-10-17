@@ -8,6 +8,7 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntLists;
 import org.junit.jupiter.api.Test;
 
+@SuppressWarnings("removal") // strict() is the 3.0 default; tested until it is removed
 class GraphBuilderTest {
 
   @Test

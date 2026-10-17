@@ -38,6 +38,7 @@ All still work, identically, and are marked `forRemoval`: 3.0 removes them.
     deprecate `Components.biconnectivityOf(Graph)` — pass a `BiAdjacentGraph`
   - [Issue #35](../../issues/35) - Deprecate `NodeMapping.inverse()` and `EdgeMapping.inverse()` — use `inverted()`
   - [Issue #36](../../issues/36) - Deprecate `EdgeTypes.edgesOfType(type)` — use `Edges.of(edgeTypes, type)`
+  - [Issue #37](../../issues/37) - Deprecate `GraphBuilder.strict()` — from 3.0 on, every builder validates node references
 
 ---
 

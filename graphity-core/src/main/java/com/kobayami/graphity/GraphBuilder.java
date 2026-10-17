@@ -81,6 +81,11 @@ import java.util.Arrays;
  * {@link IndexOutOfBoundsException}. It must be called before the first edge is added, so
  * that a builder can never hold a mix of validated and unvalidated edges. A batch method that
  * rejects an ID adds none of its edges.
+ * <p>
+ * <strong>From 3.0 on, every builder validates this way</strong>, and {@code strict()} is
+ * removed: an invalid index raises an exception here as everywhere else in the library. Code
+ * that already calls {@code strict()} keeps its behaviour and only has to drop the call; code
+ * that relies on unchecked references can be found now by calling it.
  *
  * @see Graph
  * @see Graphs#remapped(Graph, NodeMapping)
@@ -111,7 +116,11 @@ public final class GraphBuilder {
    * <strong>Time:</strong> O(1).
    *
    * @throws IllegalStateException if an edge has already been added
+   * @deprecated From 3.0 on, every builder validates node references exactly as after this
+   *     call, and the method is removed; there will be no way to turn validation off. Until
+   *     then it keeps working and is the way to test code against the 3.0 behaviour.
    */
+  @Deprecated(since = "2.4.0", forRemoval = true)
   public void strict() {
     if (!edgeSources.isEmpty()) {
       throw new IllegalStateException("strict() must be called before the first edge is added");

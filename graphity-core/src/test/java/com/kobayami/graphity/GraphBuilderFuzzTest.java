@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
  * {@code AndNodes} twins against a pre-allocated equivalent, strict mode against the default
  * mode, and the child/parent helpers against explicit node and edge calls.
  */
+@SuppressWarnings("removal") // strict() is the 3.0 default; tested until it is removed
 class GraphBuilderFuzzTest {
 
   private static final int ITERATIONS = 200;
