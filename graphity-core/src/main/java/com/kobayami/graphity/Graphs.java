@@ -198,10 +198,10 @@ public final class Graphs {
    *     weights, source locations - has to be permuted along with it, and this method throws away
    *     the only thing that can do that. Code that reorders and keeps such data compiles, runs,
    *     and reads the wrong entries. Use {@link NodeMapping#reindex(Graph)} followed by
-   *     {@link #remapped(Graph, NodeMapping)} and keep the mapping. Whether shortcuts of this kind
-   *     belong in the API in any form is under review; nothing replaces this method for now.
+   *     {@link #remapped(Graph, NodeMapping)} and keep the mapping. Marked for removal since 2.4.0;
+   *     removed in 3.0.
    */
-  @Deprecated(since = "2.1.0")
+  @Deprecated(since = "2.1.0", forRemoval = true)
   public static Graph dfsReordered(Graph graph) {
     return remapped(graph, NodeMapping.reindex(graph));
   }
@@ -279,10 +279,10 @@ public final class Graphs {
    * @return {@code true} if the graph is a tree
    * @deprecated Use {@link #isTree(Graph)}. The result is the same in every case; only the name
    *     changed, because an unqualified predicate name here reads the graph as directed and the
-   *     spelled-out direction made this the only exception. Whether this name is removed in a
-   *     later major version is not decided.
+   *     spelled-out direction made this the only exception. Marked for removal since 2.4.0; removed
+   *     in 3.0.
    */
-  @Deprecated(since = "2.1.0")
+  @Deprecated(since = "2.1.0", forRemoval = true)
   public static boolean isOutTree(Graph graph) {
     return isTree(graph);
   }
@@ -797,8 +797,9 @@ public final class Graphs {
    * <p>
    * Every root of the dominator forest - each entry, and each node only the virtual root above
    * several entries dominates - has in-degree 0, and so has every unreachable node. The result
-   * is a forest of out-trees, ready for a traversal such as SSA renaming with
-   * {@link IterativeDfsTraverser#enterNode(int)} and {@code leaveNode(int)}. For ancestor
+   * is a forest of out-trees, ready for a traversal such as SSA renaming — assigning each
+   * use its reaching definition — with {@link IterativeDfsTraverser#enterNode(int)} and
+   * {@code leaveNode(int)}. For ancestor
    * queries, {@link Ancestry#of(Dominators)} is cheaper than {@code Ancestry.of(dominatorTree(d))}:
    * it shares the immediate dominators instead of building and checking a graph.
    * <p>
@@ -822,8 +823,9 @@ public final class Graphs {
    * The dominance frontier of {@code n} holds the nodes where its dominance ends: {@code m} is in
    * it if {@code n} dominates a predecessor of {@code m} but does not strictly dominate {@code m}.
    * A node can be in its own frontier, so the result may have self-loops. Unreachable nodes have
-   * empty frontiers and appear in none. For phi placement, use {@link IteratedDominanceFrontier},
-   * which never materializes this relation.
+   * empty frontiers and appear in none. For placing φ-nodes — the merge of variable versions
+   * where paths meet in SSA form — use {@link IteratedDominanceFrontier}, which never
+   * materializes this relation.
    * <p>
    * Computed on every call, not cached - keep the result. The relation can grow quadratically
    * in the node count, for example on a ladder of branches that all join at the end.

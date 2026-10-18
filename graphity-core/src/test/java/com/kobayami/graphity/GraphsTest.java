@@ -119,7 +119,7 @@ class GraphsTest {
   }
 
   @Test
-  @SuppressWarnings("deprecation")
+  @SuppressWarnings("removal") // the deprecated method until it is removed in 3.0
   void isOutTreeAnswersLikeIsTree() {
     for (var g : new Graph[] {
         TestGraphs.empty(), TestGraphs.isolated(1), TestGraphs.isolated(3),
@@ -510,7 +510,7 @@ class GraphsTest {
   // ---- dfsReordered ----
 
   @Test
-  @SuppressWarnings("deprecation")
+  @SuppressWarnings("removal") // the deprecated method until it is removed in 3.0
   void dfsReorderedMatchesRemappedWithReindexMapping() {
     // Diamond + tail: 0 -> 1, 0 -> 2, 1 -> 3, 2 -> 3, 3 -> 4, 3 -> 5.
     var g = TestGraphs.of(6, 0, 1, 0, 2, 1, 3, 2, 3, 3, 4, 3, 5);
@@ -519,7 +519,7 @@ class GraphsTest {
   }
 
   @Test
-  @SuppressWarnings("deprecation")
+  @SuppressWarnings("removal") // the deprecated method until it is removed in 3.0
   void dfsReorderedOnEmptyGraphIsEmpty() {
     var reordered = Graphs.dfsReordered(TestGraphs.empty());
     assertThat(reordered.nodeCount()).isZero();

@@ -32,7 +32,7 @@ import java.util.Objects;
  * Graph frontiers = Graphs.dominanceFrontiers(dominators);    // edge n -> m, m in DF(n)
  * var index = Ancestry.of(dominators);                        // "a dominates b" in O(log n)
  * boolean dominates = index.isAncestorOf(a, b);
- * var phis = IteratedDominanceFrontier.of(dominators);        // phi placement
+ * var phis = IteratedDominanceFrontier.of(dominators);        // φ: merge variable versions where paths meet
  * }</pre>
  *
  * There is no {@code dominates(a, b)} here: with the immediate dominators alone it would walk up

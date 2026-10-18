@@ -7,12 +7,13 @@ import java.util.Arrays;
 import java.util.Objects;
 
 /**
- * Iterated dominance frontiers of node sets - the phi placement of SSA construction.
+ * Iterated dominance frontiers of node sets — where SSA construction places φ-nodes.
  * <p>
- * The iterated dominance frontier of a set of nodes is their dominance frontier, then the
- * frontier of the result, until nothing new is added. For SSA form, it is where a variable
- * defined in the given blocks needs a phi node. A compiler asks this once per variable, so the
- * type is built once per control-flow graph and then queried:
+ * In SSA form each assignment gets its own variable version; a φ-node merges those versions
+ * where paths meet. The iterated dominance frontier of the blocks that define a variable is
+ * where those merges go: the dominance frontier of those blocks, then the frontier of the
+ * result, until nothing new is added. A compiler asks this once per variable, so the type is
+ * built once per control-flow graph and then queried:
  *
  * <pre>{@code
  * var idf = IteratedDominanceFrontier.of(Dominators.of(cfg, entry));

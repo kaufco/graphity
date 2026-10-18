@@ -9,15 +9,18 @@ Graphity adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [2.4.0] — unreleased
 
+Adds edge-centric DFS you can stop, strong-connectivity analyses, and replacement APIs for
+the methods it marks for removal.
+
 ### Added
 
 - API
   - [Issue #29](../../issues/29) - Add `IterativeDfsEdgeTraverser` - edge-centric depth-first search without a stack limit
   - [Issue #30](../../issues/30) - Let a traversal stop early
   - [Issue #33](../../issues/33) - Add `sccOf` and `sccCount` to `Sccs`
-  - [Issue #34](../../issues/34) - Add `BiAdjacentGraph.of` and a `BiAdjacentGraph` overload of `biconnectivityOf`
-  - [Issue #35](../../issues/35) - Add `inverted()` to `NodeMapping` and `EdgeMapping`
-  - [Issue #36](../../issues/36) - Add `Edges.of(edgeTypes, type)`
+  - [Issue #34](../../issues/34) - Add `BiAdjacentGraph.of`, deprecate `Graph.biAdjacentGraph()` and the `Graph` form of `biconnectivityOf`
+  - [Issue #35](../../issues/35) - Rename `inverse()` to `inverted()` on `NodeMapping` and `EdgeMapping`
+  - [Issue #36](../../issues/36) - Replace `EdgeTypes.edgesOfType` with `Edges.of(edgeTypes, type)`
 - Algorithms
   - [Issue #31](../../issues/31) - Add strong bridges and strong articulation points
   - [Issue #32](../../issues/32) - Add `Graphs.isStronglyConnected`
@@ -25,22 +28,21 @@ Graphity adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 
 - Performance
-  - [Issue #27](../../issues/27) - Replace the 64-bit packed DFS state with interleaved int32 lanes
+  - [Issue #27](../../issues/27) - Store depth-first search state in 32-bit words
 - Internals
-  - [Issue #28](../../issues/28) - Route every traversal entry point through one visited check
+  - [Issue #28](../../issues/28) - Mark visited nodes in one place
 - Infrastructure
-  - [Issue #38](../../issues/38) - Prepare the build and the release for more than one artifact
+  - [Issue #38](../../issues/38) - Prepare the build and the release for more than one published module
 
 ### Deprecated
 
 All still work, identically, and are marked `forRemoval`: 3.0 removes them.
 
 - API
-  - [Issue #34](../../issues/34) - Deprecate `Graph.biAdjacentGraph()` — use `BiAdjacentGraph.of(graph)`;
-    deprecate `Components.biconnectivityOf(Graph)` — pass a `BiAdjacentGraph`
-  - [Issue #35](../../issues/35) - Deprecate `NodeMapping.inverse()` and `EdgeMapping.inverse()` — use `inverted()`
-  - [Issue #36](../../issues/36) - Deprecate `EdgeTypes.edgesOfType(type)` — use `Edges.of(edgeTypes, type)`
-  - [Issue #37](../../issues/37) - Deprecate `GraphBuilder.strict()` — from 3.0 on, every builder validates node references
+  - [Issue #34](../../issues/34) - Add `BiAdjacentGraph.of`, deprecate `Graph.biAdjacentGraph()` and the `Graph` form of `biconnectivityOf`
+  - [Issue #35](../../issues/35) - Rename `inverse()` to `inverted()` on `NodeMapping` and `EdgeMapping`
+  - [Issue #36](../../issues/36) - Replace `EdgeTypes.edgesOfType` with `Edges.of(edgeTypes, type)`
+  - [Issue #37](../../issues/37) - Announce node-reference validation by default in `GraphBuilder`
 
 ---
 
