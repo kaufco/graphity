@@ -170,10 +170,10 @@ Measured on an AMD Ryzen 9 9950X with OpenJDK 25. The parenthesised factor is re
 
 | Shape            | Graphity | JGraphT         | Guava           | WebGraph        |
 |------------------|---------:|----------------:|----------------:|----------------:|
-| Tree             | 2.159 ms | 41.51 ms (19×)  | 38.09 ms (18×)  | 5.712 ms (2.6×) |
-| GNP sparse       | 4.400 ms | 109.6 ms (25×)  | 87.01 ms (20×)  | 10.30 ms (2.3×) |
-| GNP dense        | 7.751 ms | 446.5 ms (58×)  | 333.1 ms (43×)  | 36.12 ms (4.7×) |
-| Chain of cliques | 2.614 ms | 166.0 ms (64×)  | 108.0 ms (41×)  | 37.02 ms (14×)  |
+| Tree             | 2.161 ms | 41.51 ms (19×)  | 38.09 ms (18×)  | 5.712 ms (2.6×) |
+| GNP sparse       | 4.389 ms | 109.6 ms (25×)  | 87.01 ms (20×)  | 10.30 ms (2.3×) |
+| GNP dense        | 9.265 ms | 446.5 ms (48×)  | 333.1 ms (36×)  | 36.12 ms (3.9×) |
+| Chain of cliques | 3.058 ms | 166.0 ms (54×)  | 108.0 ms (35×)  | 37.02 ms (12×)  |
 
 #### Throughput @ 100k nodes (higher is better)
 
@@ -185,9 +185,9 @@ Measured on an AMD Ryzen 9 9950X with OpenJDK 25. The parenthesised factor is re
 
 | Dataset                                  | Graphity | JGraphT          | Guava            | WebGraph        |
 |------------------------------------------|---------:|-----------------:|-----------------:|----------------:|
-| web-Google (875k nodes, 5.1M edges)      | 45.19 ms | 1266.8 ms (28×)  | 799.0 ms (18×)   | 234.3 ms (5.2×) |
-| wiki-Talk (2.4M nodes, 5M edges)         | 61.57 ms | 1391.8 ms (23×)  | 1466.2 ms (24×)  | 153.2 ms (2.5×) |
-| soc-LiveJournal1 (4.8M nodes, 69M edges) | 993.9 ms | 22122 ms (22×)  | 16631 ms (17×)   | 3864.4 ms (3.9×) |
+| web-Google (875k nodes, 5.1M edges)      | 57.55 ms | 1266.8 ms (22×)  | 799.0 ms (14×)   | 234.3 ms (4.1×) |
+| wiki-Talk (2.4M nodes, 5M edges)         | 74.37 ms | 1391.8 ms (19×)  | 1466.2 ms (20×)  | 153.2 ms (2.1×) |
+| soc-LiveJournal1 (4.8M nodes, 69M edges) | 1073.8 ms | 22122 ms (21×) | 16631 ms (15×)   | 3864.4 ms (3.6×) |
 
 #### Throughput (higher is better)
 

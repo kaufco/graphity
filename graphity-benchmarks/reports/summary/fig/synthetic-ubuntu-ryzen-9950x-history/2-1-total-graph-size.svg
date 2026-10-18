@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="2152" height="436" viewBox="0 0 2152 436" role="img">
+<svg xmlns="http://www.w3.org/2000/svg" width="2513" height="452" viewBox="0 0 2513 452" role="img">
 <style>text{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;font-size:11px;fill:#334155}.axis{stroke:#94a3b8;stroke-width:1;fill:none}.grid{stroke:#e2e8f0;stroke-width:1}.ylabel{fill:#64748b;font-size:10px}.tick{fill:#64748b;font-size:10px}.xlabel{font-size:10px}</style>
-<rect x="0" y="0" width="2152" height="436" fill="#ffffff"/>
+<rect x="0" y="0" width="2513" height="452" fill="#ffffff"/>
 <rect x="56" y="5" width="12" height="12" rx="2" fill="#2563eb"/>
 <text x="72" y="14" class="tick">Graphity 1.0</text>
 <rect x="56" y="21" width="12" height="12" rx="2" fill="#dc2626"/>
@@ -11,121 +11,140 @@
 <text x="72" y="62" class="tick">Graphity 2.2.0</text>
 <rect x="56" y="69" width="12" height="12" rx="2" fill="#4f46e5"/>
 <text x="72" y="78" class="tick">Graphity 2.3.0</text>
-<line class="grid" x1="56" y1="340.0" x2="2128" y2="340.0"/>
-<text class="tick" x="48" y="343.0" text-anchor="end">0%</text>
-<line class="grid" x1="56" y1="290.0" x2="2128" y2="290.0"/>
-<text class="tick" x="48" y="293.0" text-anchor="end">25%</text>
-<line class="grid" x1="56" y1="240.0" x2="2128" y2="240.0"/>
-<text class="tick" x="48" y="243.0" text-anchor="end">50%</text>
-<line class="grid" x1="56" y1="190.0" x2="2128" y2="190.0"/>
-<text class="tick" x="48" y="193.0" text-anchor="end">75%</text>
-<line class="grid" x1="56" y1="140.0" x2="2128" y2="140.0"/>
-<text class="tick" x="48" y="143.0" text-anchor="end">100%</text>
-<line class="grid" x1="56" y1="120.0" x2="2128" y2="120.0"/>
-<text class="tick" x="48" y="123.0" text-anchor="end">110%</text>
-<line class="axis" x1="56" y1="120" x2="56" y2="340"/>
-<line class="axis" x1="56" y1="340" x2="2128" y2="340"/>
-<text class="ylabel" x="16" y="230.0" text-anchor="middle" transform="rotate(-90 16 230.0)">% of Graphity 2.3.0</text>
-<text class="xlabel" x="102.0" y="352.0" text-anchor="end" transform="rotate(-40 102.0 352.0)">Path 10k</text>
-<rect x="56.0" y="140.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 1.0 · Path 10k: 100%</title></rect>
-<rect x="75.0" y="140.0" width="16" height="200.0" fill="#dc2626" rx="1"><title>Graphity 2.0.0 · Path 10k: 100%</title></rect>
-<rect x="94.0" y="140.0" width="16" height="200.0" fill="#0891b2" rx="1"><title>Graphity 2.1.0 · Path 10k: 100%</title></rect>
-<rect x="113.0" y="140.0" width="16" height="200.0" fill="#ea580c" rx="1"><title>Graphity 2.2.0 · Path 10k: 100%</title></rect>
-<rect x="132.0" y="140.0" width="16" height="200.0" fill="#4f46e5" rx="1"><title>Graphity 2.3.0 · Path 10k: 100%</title></rect>
-<text class="xlabel" x="212.0" y="352.0" text-anchor="end" transform="rotate(-40 212.0 352.0)">Path shfld. 10k</text>
-<rect x="166.0" y="140.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 1.0 · Path shfld. 10k: 100%</title></rect>
-<rect x="185.0" y="140.0" width="16" height="200.0" fill="#dc2626" rx="1"><title>Graphity 2.0.0 · Path shfld. 10k: 100%</title></rect>
-<rect x="204.0" y="140.0" width="16" height="200.0" fill="#0891b2" rx="1"><title>Graphity 2.1.0 · Path shfld. 10k: 100%</title></rect>
-<rect x="223.0" y="140.0" width="16" height="200.0" fill="#ea580c" rx="1"><title>Graphity 2.2.0 · Path shfld. 10k: 100%</title></rect>
-<rect x="242.0" y="140.0" width="16" height="200.0" fill="#4f46e5" rx="1"><title>Graphity 2.3.0 · Path shfld. 10k: 100%</title></rect>
-<text class="xlabel" x="322.0" y="352.0" text-anchor="end" transform="rotate(-40 322.0 352.0)">Tree 10k</text>
-<rect x="276.0" y="140.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 1.0 · Tree 10k: 100%</title></rect>
-<rect x="295.0" y="140.0" width="16" height="200.0" fill="#dc2626" rx="1"><title>Graphity 2.0.0 · Tree 10k: 100%</title></rect>
-<rect x="314.0" y="140.0" width="16" height="200.0" fill="#0891b2" rx="1"><title>Graphity 2.1.0 · Tree 10k: 100%</title></rect>
-<rect x="333.0" y="140.0" width="16" height="200.0" fill="#ea580c" rx="1"><title>Graphity 2.2.0 · Tree 10k: 100%</title></rect>
-<rect x="352.0" y="140.0" width="16" height="200.0" fill="#4f46e5" rx="1"><title>Graphity 2.3.0 · Tree 10k: 100%</title></rect>
-<text class="xlabel" x="432.0" y="352.0" text-anchor="end" transform="rotate(-40 432.0 352.0)">GNP sparse 10k</text>
-<rect x="386.0" y="140.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 1.0 · GNP sparse 10k: 100%</title></rect>
-<rect x="405.0" y="140.0" width="16" height="200.0" fill="#dc2626" rx="1"><title>Graphity 2.0.0 · GNP sparse 10k: 100%</title></rect>
-<rect x="424.0" y="140.0" width="16" height="200.0" fill="#0891b2" rx="1"><title>Graphity 2.1.0 · GNP sparse 10k: 100%</title></rect>
-<rect x="443.0" y="140.0" width="16" height="200.0" fill="#ea580c" rx="1"><title>Graphity 2.2.0 · GNP sparse 10k: 100%</title></rect>
-<rect x="462.0" y="140.0" width="16" height="200.0" fill="#4f46e5" rx="1"><title>Graphity 2.3.0 · GNP sparse 10k: 100%</title></rect>
-<text class="xlabel" x="542.0" y="352.0" text-anchor="end" transform="rotate(-40 542.0 352.0)">GNP dense 10k</text>
-<rect x="496.0" y="140.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 1.0 · GNP dense 10k: 100%</title></rect>
-<rect x="515.0" y="140.0" width="16" height="200.0" fill="#dc2626" rx="1"><title>Graphity 2.0.0 · GNP dense 10k: 100%</title></rect>
-<rect x="534.0" y="140.0" width="16" height="200.0" fill="#0891b2" rx="1"><title>Graphity 2.1.0 · GNP dense 10k: 100%</title></rect>
-<rect x="553.0" y="140.0" width="16" height="200.0" fill="#ea580c" rx="1"><title>Graphity 2.2.0 · GNP dense 10k: 100%</title></rect>
-<rect x="572.0" y="140.0" width="16" height="200.0" fill="#4f46e5" rx="1"><title>Graphity 2.3.0 · GNP dense 10k: 100%</title></rect>
-<text class="xlabel" x="652.0" y="352.0" text-anchor="end" transform="rotate(-40 652.0 352.0)">GNP dense shfld. 10k</text>
-<text class="xlabel" x="762.0" y="352.0" text-anchor="end" transform="rotate(-40 762.0 352.0)">Chain of cliques 10k</text>
-<rect x="716.0" y="140.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 1.0 · Chain of cliques 10k: 100%</title></rect>
-<rect x="735.0" y="140.0" width="16" height="200.0" fill="#dc2626" rx="1"><title>Graphity 2.0.0 · Chain of cliques 10k: 100%</title></rect>
-<rect x="754.0" y="140.0" width="16" height="200.0" fill="#0891b2" rx="1"><title>Graphity 2.1.0 · Chain of cliques 10k: 100%</title></rect>
-<rect x="773.0" y="140.0" width="16" height="200.0" fill="#ea580c" rx="1"><title>Graphity 2.2.0 · Chain of cliques 10k: 100%</title></rect>
-<rect x="792.0" y="140.0" width="16" height="200.0" fill="#4f46e5" rx="1"><title>Graphity 2.3.0 · Chain of cliques 10k: 100%</title></rect>
-<text class="xlabel" x="872.0" y="352.0" text-anchor="end" transform="rotate(-40 872.0 352.0)">Chain of cliques shfld. 10k</text>
-<rect x="826.0" y="140.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 1.0 · Chain of cliques shfld. 10k: 100%</title></rect>
-<rect x="845.0" y="140.0" width="16" height="200.0" fill="#dc2626" rx="1"><title>Graphity 2.0.0 · Chain of cliques shfld. 10k: 100%</title></rect>
-<rect x="864.0" y="140.0" width="16" height="200.0" fill="#0891b2" rx="1"><title>Graphity 2.1.0 · Chain of cliques shfld. 10k: 100%</title></rect>
-<rect x="883.0" y="140.0" width="16" height="200.0" fill="#ea580c" rx="1"><title>Graphity 2.2.0 · Chain of cliques shfld. 10k: 100%</title></rect>
-<rect x="902.0" y="140.0" width="16" height="200.0" fill="#4f46e5" rx="1"><title>Graphity 2.3.0 · Chain of cliques shfld. 10k: 100%</title></rect>
-<text class="xlabel" x="982.0" y="352.0" text-anchor="end" transform="rotate(-40 982.0 352.0)">Path 100k</text>
-<rect x="936.0" y="140.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 1.0 · Path 100k: 100%</title></rect>
-<rect x="955.0" y="140.0" width="16" height="200.0" fill="#dc2626" rx="1"><title>Graphity 2.0.0 · Path 100k: 100%</title></rect>
-<rect x="974.0" y="140.0" width="16" height="200.0" fill="#0891b2" rx="1"><title>Graphity 2.1.0 · Path 100k: 100%</title></rect>
-<rect x="993.0" y="140.0" width="16" height="200.0" fill="#ea580c" rx="1"><title>Graphity 2.2.0 · Path 100k: 100%</title></rect>
-<rect x="1012.0" y="140.0" width="16" height="200.0" fill="#4f46e5" rx="1"><title>Graphity 2.3.0 · Path 100k: 100%</title></rect>
-<text class="xlabel" x="1092.0" y="352.0" text-anchor="end" transform="rotate(-40 1092.0 352.0)">Path shfld. 100k</text>
-<rect x="1046.0" y="140.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 1.0 · Path shfld. 100k: 100%</title></rect>
-<rect x="1065.0" y="140.0" width="16" height="200.0" fill="#dc2626" rx="1"><title>Graphity 2.0.0 · Path shfld. 100k: 100%</title></rect>
-<rect x="1084.0" y="140.0" width="16" height="200.0" fill="#0891b2" rx="1"><title>Graphity 2.1.0 · Path shfld. 100k: 100%</title></rect>
-<rect x="1103.0" y="140.0" width="16" height="200.0" fill="#ea580c" rx="1"><title>Graphity 2.2.0 · Path shfld. 100k: 100%</title></rect>
-<rect x="1122.0" y="140.0" width="16" height="200.0" fill="#4f46e5" rx="1"><title>Graphity 2.3.0 · Path shfld. 100k: 100%</title></rect>
-<text class="xlabel" x="1202.0" y="352.0" text-anchor="end" transform="rotate(-40 1202.0 352.0)">Tree 100k</text>
-<rect x="1156.0" y="140.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 1.0 · Tree 100k: 100%</title></rect>
-<rect x="1175.0" y="140.0" width="16" height="200.0" fill="#dc2626" rx="1"><title>Graphity 2.0.0 · Tree 100k: 100%</title></rect>
-<rect x="1194.0" y="140.0" width="16" height="200.0" fill="#0891b2" rx="1"><title>Graphity 2.1.0 · Tree 100k: 100%</title></rect>
-<rect x="1213.0" y="140.0" width="16" height="200.0" fill="#ea580c" rx="1"><title>Graphity 2.2.0 · Tree 100k: 100%</title></rect>
-<rect x="1232.0" y="140.0" width="16" height="200.0" fill="#4f46e5" rx="1"><title>Graphity 2.3.0 · Tree 100k: 100%</title></rect>
-<text class="xlabel" x="1312.0" y="352.0" text-anchor="end" transform="rotate(-40 1312.0 352.0)">GNP sparse 100k</text>
-<rect x="1266.0" y="140.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 1.0 · GNP sparse 100k: 100%</title></rect>
-<rect x="1285.0" y="140.0" width="16" height="200.0" fill="#dc2626" rx="1"><title>Graphity 2.0.0 · GNP sparse 100k: 100%</title></rect>
-<rect x="1304.0" y="140.0" width="16" height="200.0" fill="#0891b2" rx="1"><title>Graphity 2.1.0 · GNP sparse 100k: 100%</title></rect>
-<rect x="1323.0" y="140.0" width="16" height="200.0" fill="#ea580c" rx="1"><title>Graphity 2.2.0 · GNP sparse 100k: 100%</title></rect>
-<rect x="1342.0" y="140.0" width="16" height="200.0" fill="#4f46e5" rx="1"><title>Graphity 2.3.0 · GNP sparse 100k: 100%</title></rect>
-<text class="xlabel" x="1422.0" y="352.0" text-anchor="end" transform="rotate(-40 1422.0 352.0)">GNP dense 100k</text>
-<rect x="1376.0" y="140.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 1.0 · GNP dense 100k: 100%</title></rect>
-<rect x="1395.0" y="140.0" width="16" height="200.0" fill="#dc2626" rx="1"><title>Graphity 2.0.0 · GNP dense 100k: 100%</title></rect>
-<rect x="1414.0" y="140.0" width="16" height="200.0" fill="#0891b2" rx="1"><title>Graphity 2.1.0 · GNP dense 100k: 100%</title></rect>
-<rect x="1433.0" y="140.0" width="16" height="200.0" fill="#ea580c" rx="1"><title>Graphity 2.2.0 · GNP dense 100k: 100%</title></rect>
-<rect x="1452.0" y="140.0" width="16" height="200.0" fill="#4f46e5" rx="1"><title>Graphity 2.3.0 · GNP dense 100k: 100%</title></rect>
-<text class="xlabel" x="1532.0" y="352.0" text-anchor="end" transform="rotate(-40 1532.0 352.0)">GNP dense shfld. 100k</text>
-<text class="xlabel" x="1642.0" y="352.0" text-anchor="end" transform="rotate(-40 1642.0 352.0)">Chain of cliques 100k</text>
-<rect x="1596.0" y="140.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 1.0 · Chain of cliques 100k: 100%</title></rect>
-<rect x="1615.0" y="140.0" width="16" height="200.0" fill="#dc2626" rx="1"><title>Graphity 2.0.0 · Chain of cliques 100k: 100%</title></rect>
-<rect x="1634.0" y="140.0" width="16" height="200.0" fill="#0891b2" rx="1"><title>Graphity 2.1.0 · Chain of cliques 100k: 100%</title></rect>
-<rect x="1653.0" y="140.0" width="16" height="200.0" fill="#ea580c" rx="1"><title>Graphity 2.2.0 · Chain of cliques 100k: 100%</title></rect>
-<rect x="1672.0" y="140.0" width="16" height="200.0" fill="#4f46e5" rx="1"><title>Graphity 2.3.0 · Chain of cliques 100k: 100%</title></rect>
-<text class="xlabel" x="1752.0" y="352.0" text-anchor="end" transform="rotate(-40 1752.0 352.0)">Chain of cliques shfld. 100k</text>
-<rect x="1706.0" y="140.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 1.0 · Chain of cliques shfld. 100k: 100%</title></rect>
-<rect x="1725.0" y="140.0" width="16" height="200.0" fill="#dc2626" rx="1"><title>Graphity 2.0.0 · Chain of cliques shfld. 100k: 100%</title></rect>
-<rect x="1744.0" y="140.0" width="16" height="200.0" fill="#0891b2" rx="1"><title>Graphity 2.1.0 · Chain of cliques shfld. 100k: 100%</title></rect>
-<rect x="1763.0" y="140.0" width="16" height="200.0" fill="#ea580c" rx="1"><title>Graphity 2.2.0 · Chain of cliques shfld. 100k: 100%</title></rect>
-<rect x="1782.0" y="140.0" width="16" height="200.0" fill="#4f46e5" rx="1"><title>Graphity 2.3.0 · Chain of cliques shfld. 100k: 100%</title></rect>
-<text class="xlabel" x="1862.0" y="352.0" text-anchor="end" transform="rotate(-40 1862.0 352.0)">GNP sparse 1M</text>
-<rect x="1835.0" y="140.0" width="16" height="200.0" fill="#dc2626" rx="1"><title>Graphity 2.0.0 · GNP sparse 1M: 100%</title></rect>
-<rect x="1854.0" y="140.0" width="16" height="200.0" fill="#0891b2" rx="1"><title>Graphity 2.1.0 · GNP sparse 1M: 100%</title></rect>
-<rect x="1873.0" y="140.0" width="16" height="200.0" fill="#ea580c" rx="1"><title>Graphity 2.2.0 · GNP sparse 1M: 100%</title></rect>
-<rect x="1892.0" y="140.0" width="16" height="200.0" fill="#4f46e5" rx="1"><title>Graphity 2.3.0 · GNP sparse 1M: 100%</title></rect>
-<text class="xlabel" x="1972.0" y="352.0" text-anchor="end" transform="rotate(-40 1972.0 352.0)">GNP sparse 10M</text>
-<rect x="1945.0" y="140.0" width="16" height="200.0" fill="#dc2626" rx="1"><title>Graphity 2.0.0 · GNP sparse 10M: 100%</title></rect>
-<rect x="1964.0" y="140.0" width="16" height="200.0" fill="#0891b2" rx="1"><title>Graphity 2.1.0 · GNP sparse 10M: 100%</title></rect>
-<rect x="1983.0" y="140.0" width="16" height="200.0" fill="#ea580c" rx="1"><title>Graphity 2.2.0 · GNP sparse 10M: 100%</title></rect>
-<rect x="2002.0" y="140.0" width="16" height="200.0" fill="#4f46e5" rx="1"><title>Graphity 2.3.0 · GNP sparse 10M: 100%</title></rect>
-<text class="xlabel" x="2082.0" y="352.0" text-anchor="end" transform="rotate(-40 2082.0 352.0)">GNP sparse 100M</text>
-<rect x="2055.0" y="140.0" width="16" height="200.0" fill="#dc2626" rx="1"><title>Graphity 2.0.0 · GNP sparse 100M: 100%</title></rect>
-<rect x="2074.0" y="140.0" width="16" height="200.0" fill="#0891b2" rx="1"><title>Graphity 2.1.0 · GNP sparse 100M: 100%</title></rect>
-<rect x="2093.0" y="140.0" width="16" height="200.0" fill="#ea580c" rx="1"><title>Graphity 2.2.0 · GNP sparse 100M: 100%</title></rect>
-<rect x="2112.0" y="140.0" width="16" height="200.0" fill="#4f46e5" rx="1"><title>Graphity 2.3.0 · GNP sparse 100M: 100%</title></rect>
-<line x1="56" y1="140.0" x2="2128" y2="140.0" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4 3"/>
+<rect x="56" y="85" width="12" height="12" rx="2" fill="#2563eb"/>
+<text x="72" y="94" class="tick">Graphity 2.4.0</text>
+<line class="grid" x1="56" y1="356.0" x2="2489" y2="356.0"/>
+<text class="tick" x="48" y="359.0" text-anchor="end">0%</text>
+<line class="grid" x1="56" y1="306.0" x2="2489" y2="306.0"/>
+<text class="tick" x="48" y="309.0" text-anchor="end">25%</text>
+<line class="grid" x1="56" y1="256.0" x2="2489" y2="256.0"/>
+<text class="tick" x="48" y="259.0" text-anchor="end">50%</text>
+<line class="grid" x1="56" y1="206.0" x2="2489" y2="206.0"/>
+<text class="tick" x="48" y="209.0" text-anchor="end">75%</text>
+<line class="grid" x1="56" y1="156.0" x2="2489" y2="156.0"/>
+<text class="tick" x="48" y="159.0" text-anchor="end">100%</text>
+<line class="grid" x1="56" y1="136.0" x2="2489" y2="136.0"/>
+<text class="tick" x="48" y="139.0" text-anchor="end">110%</text>
+<line class="axis" x1="56" y1="136" x2="56" y2="356"/>
+<line class="axis" x1="56" y1="356" x2="2489" y2="356"/>
+<text class="ylabel" x="16" y="246.0" text-anchor="middle" transform="rotate(-90 16 246.0)">% of Graphity 2.4.0</text>
+<text class="xlabel" x="111.5" y="368.0" text-anchor="end" transform="rotate(-40 111.5 368.0)">Path 10k</text>
+<rect x="56.0" y="156.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 1.0 · Path 10k: 100%</title></rect>
+<rect x="75.0" y="156.0" width="16" height="200.0" fill="#dc2626" rx="1"><title>Graphity 2.0.0 · Path 10k: 100%</title></rect>
+<rect x="94.0" y="156.0" width="16" height="200.0" fill="#0891b2" rx="1"><title>Graphity 2.1.0 · Path 10k: 100%</title></rect>
+<rect x="113.0" y="156.0" width="16" height="200.0" fill="#ea580c" rx="1"><title>Graphity 2.2.0 · Path 10k: 100%</title></rect>
+<rect x="132.0" y="156.0" width="16" height="200.0" fill="#4f46e5" rx="1"><title>Graphity 2.3.0 · Path 10k: 100%</title></rect>
+<rect x="151.0" y="156.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 2.4.0 · Path 10k: 100%</title></rect>
+<text class="xlabel" x="240.5" y="368.0" text-anchor="end" transform="rotate(-40 240.5 368.0)">Path shfld. 10k</text>
+<rect x="185.0" y="156.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 1.0 · Path shfld. 10k: 100%</title></rect>
+<rect x="204.0" y="156.0" width="16" height="200.0" fill="#dc2626" rx="1"><title>Graphity 2.0.0 · Path shfld. 10k: 100%</title></rect>
+<rect x="223.0" y="156.0" width="16" height="200.0" fill="#0891b2" rx="1"><title>Graphity 2.1.0 · Path shfld. 10k: 100%</title></rect>
+<rect x="242.0" y="156.0" width="16" height="200.0" fill="#ea580c" rx="1"><title>Graphity 2.2.0 · Path shfld. 10k: 100%</title></rect>
+<rect x="261.0" y="156.0" width="16" height="200.0" fill="#4f46e5" rx="1"><title>Graphity 2.3.0 · Path shfld. 10k: 100%</title></rect>
+<rect x="280.0" y="156.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 2.4.0 · Path shfld. 10k: 100%</title></rect>
+<text class="xlabel" x="369.5" y="368.0" text-anchor="end" transform="rotate(-40 369.5 368.0)">Tree 10k</text>
+<rect x="314.0" y="156.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 1.0 · Tree 10k: 100%</title></rect>
+<rect x="333.0" y="156.0" width="16" height="200.0" fill="#dc2626" rx="1"><title>Graphity 2.0.0 · Tree 10k: 100%</title></rect>
+<rect x="352.0" y="156.0" width="16" height="200.0" fill="#0891b2" rx="1"><title>Graphity 2.1.0 · Tree 10k: 100%</title></rect>
+<rect x="371.0" y="156.0" width="16" height="200.0" fill="#ea580c" rx="1"><title>Graphity 2.2.0 · Tree 10k: 100%</title></rect>
+<rect x="390.0" y="156.0" width="16" height="200.0" fill="#4f46e5" rx="1"><title>Graphity 2.3.0 · Tree 10k: 100%</title></rect>
+<rect x="409.0" y="156.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 2.4.0 · Tree 10k: 100%</title></rect>
+<text class="xlabel" x="498.5" y="368.0" text-anchor="end" transform="rotate(-40 498.5 368.0)">GNP sparse 10k</text>
+<rect x="443.0" y="156.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 1.0 · GNP sparse 10k: 100%</title></rect>
+<rect x="462.0" y="156.0" width="16" height="200.0" fill="#dc2626" rx="1"><title>Graphity 2.0.0 · GNP sparse 10k: 100%</title></rect>
+<rect x="481.0" y="156.0" width="16" height="200.0" fill="#0891b2" rx="1"><title>Graphity 2.1.0 · GNP sparse 10k: 100%</title></rect>
+<rect x="500.0" y="156.0" width="16" height="200.0" fill="#ea580c" rx="1"><title>Graphity 2.2.0 · GNP sparse 10k: 100%</title></rect>
+<rect x="519.0" y="156.0" width="16" height="200.0" fill="#4f46e5" rx="1"><title>Graphity 2.3.0 · GNP sparse 10k: 100%</title></rect>
+<rect x="538.0" y="156.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 2.4.0 · GNP sparse 10k: 100%</title></rect>
+<text class="xlabel" x="627.5" y="368.0" text-anchor="end" transform="rotate(-40 627.5 368.0)">GNP dense 10k</text>
+<rect x="572.0" y="156.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 1.0 · GNP dense 10k: 100%</title></rect>
+<rect x="591.0" y="156.0" width="16" height="200.0" fill="#dc2626" rx="1"><title>Graphity 2.0.0 · GNP dense 10k: 100%</title></rect>
+<rect x="610.0" y="156.0" width="16" height="200.0" fill="#0891b2" rx="1"><title>Graphity 2.1.0 · GNP dense 10k: 100%</title></rect>
+<rect x="629.0" y="156.0" width="16" height="200.0" fill="#ea580c" rx="1"><title>Graphity 2.2.0 · GNP dense 10k: 100%</title></rect>
+<rect x="648.0" y="156.0" width="16" height="200.0" fill="#4f46e5" rx="1"><title>Graphity 2.3.0 · GNP dense 10k: 100%</title></rect>
+<rect x="667.0" y="156.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 2.4.0 · GNP dense 10k: 100%</title></rect>
+<text class="xlabel" x="756.5" y="368.0" text-anchor="end" transform="rotate(-40 756.5 368.0)">GNP dense shfld. 10k</text>
+<text class="xlabel" x="885.5" y="368.0" text-anchor="end" transform="rotate(-40 885.5 368.0)">Chain of cliques 10k</text>
+<rect x="830.0" y="156.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 1.0 · Chain of cliques 10k: 100%</title></rect>
+<rect x="849.0" y="156.0" width="16" height="200.0" fill="#dc2626" rx="1"><title>Graphity 2.0.0 · Chain of cliques 10k: 100%</title></rect>
+<rect x="868.0" y="156.0" width="16" height="200.0" fill="#0891b2" rx="1"><title>Graphity 2.1.0 · Chain of cliques 10k: 100%</title></rect>
+<rect x="887.0" y="156.0" width="16" height="200.0" fill="#ea580c" rx="1"><title>Graphity 2.2.0 · Chain of cliques 10k: 100%</title></rect>
+<rect x="906.0" y="156.0" width="16" height="200.0" fill="#4f46e5" rx="1"><title>Graphity 2.3.0 · Chain of cliques 10k: 100%</title></rect>
+<rect x="925.0" y="156.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 2.4.0 · Chain of cliques 10k: 100%</title></rect>
+<text class="xlabel" x="1014.5" y="368.0" text-anchor="end" transform="rotate(-40 1014.5 368.0)">Chain of cliques shfld. 10k</text>
+<rect x="959.0" y="156.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 1.0 · Chain of cliques shfld. 10k: 100%</title></rect>
+<rect x="978.0" y="156.0" width="16" height="200.0" fill="#dc2626" rx="1"><title>Graphity 2.0.0 · Chain of cliques shfld. 10k: 100%</title></rect>
+<rect x="997.0" y="156.0" width="16" height="200.0" fill="#0891b2" rx="1"><title>Graphity 2.1.0 · Chain of cliques shfld. 10k: 100%</title></rect>
+<rect x="1016.0" y="156.0" width="16" height="200.0" fill="#ea580c" rx="1"><title>Graphity 2.2.0 · Chain of cliques shfld. 10k: 100%</title></rect>
+<rect x="1035.0" y="156.0" width="16" height="200.0" fill="#4f46e5" rx="1"><title>Graphity 2.3.0 · Chain of cliques shfld. 10k: 100%</title></rect>
+<rect x="1054.0" y="156.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 2.4.0 · Chain of cliques shfld. 10k: 100%</title></rect>
+<text class="xlabel" x="1143.5" y="368.0" text-anchor="end" transform="rotate(-40 1143.5 368.0)">Path 100k</text>
+<rect x="1088.0" y="156.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 1.0 · Path 100k: 100%</title></rect>
+<rect x="1107.0" y="156.0" width="16" height="200.0" fill="#dc2626" rx="1"><title>Graphity 2.0.0 · Path 100k: 100%</title></rect>
+<rect x="1126.0" y="156.0" width="16" height="200.0" fill="#0891b2" rx="1"><title>Graphity 2.1.0 · Path 100k: 100%</title></rect>
+<rect x="1145.0" y="156.0" width="16" height="200.0" fill="#ea580c" rx="1"><title>Graphity 2.2.0 · Path 100k: 100%</title></rect>
+<rect x="1164.0" y="156.0" width="16" height="200.0" fill="#4f46e5" rx="1"><title>Graphity 2.3.0 · Path 100k: 100%</title></rect>
+<rect x="1183.0" y="156.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 2.4.0 · Path 100k: 100%</title></rect>
+<text class="xlabel" x="1272.5" y="368.0" text-anchor="end" transform="rotate(-40 1272.5 368.0)">Path shfld. 100k</text>
+<rect x="1217.0" y="156.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 1.0 · Path shfld. 100k: 100%</title></rect>
+<rect x="1236.0" y="156.0" width="16" height="200.0" fill="#dc2626" rx="1"><title>Graphity 2.0.0 · Path shfld. 100k: 100%</title></rect>
+<rect x="1255.0" y="156.0" width="16" height="200.0" fill="#0891b2" rx="1"><title>Graphity 2.1.0 · Path shfld. 100k: 100%</title></rect>
+<rect x="1274.0" y="156.0" width="16" height="200.0" fill="#ea580c" rx="1"><title>Graphity 2.2.0 · Path shfld. 100k: 100%</title></rect>
+<rect x="1293.0" y="156.0" width="16" height="200.0" fill="#4f46e5" rx="1"><title>Graphity 2.3.0 · Path shfld. 100k: 100%</title></rect>
+<rect x="1312.0" y="156.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 2.4.0 · Path shfld. 100k: 100%</title></rect>
+<text class="xlabel" x="1401.5" y="368.0" text-anchor="end" transform="rotate(-40 1401.5 368.0)">Tree 100k</text>
+<rect x="1346.0" y="156.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 1.0 · Tree 100k: 100%</title></rect>
+<rect x="1365.0" y="156.0" width="16" height="200.0" fill="#dc2626" rx="1"><title>Graphity 2.0.0 · Tree 100k: 100%</title></rect>
+<rect x="1384.0" y="156.0" width="16" height="200.0" fill="#0891b2" rx="1"><title>Graphity 2.1.0 · Tree 100k: 100%</title></rect>
+<rect x="1403.0" y="156.0" width="16" height="200.0" fill="#ea580c" rx="1"><title>Graphity 2.2.0 · Tree 100k: 100%</title></rect>
+<rect x="1422.0" y="156.0" width="16" height="200.0" fill="#4f46e5" rx="1"><title>Graphity 2.3.0 · Tree 100k: 100%</title></rect>
+<rect x="1441.0" y="156.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 2.4.0 · Tree 100k: 100%</title></rect>
+<text class="xlabel" x="1530.5" y="368.0" text-anchor="end" transform="rotate(-40 1530.5 368.0)">GNP sparse 100k</text>
+<rect x="1475.0" y="156.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 1.0 · GNP sparse 100k: 100%</title></rect>
+<rect x="1494.0" y="156.0" width="16" height="200.0" fill="#dc2626" rx="1"><title>Graphity 2.0.0 · GNP sparse 100k: 100%</title></rect>
+<rect x="1513.0" y="156.0" width="16" height="200.0" fill="#0891b2" rx="1"><title>Graphity 2.1.0 · GNP sparse 100k: 100%</title></rect>
+<rect x="1532.0" y="156.0" width="16" height="200.0" fill="#ea580c" rx="1"><title>Graphity 2.2.0 · GNP sparse 100k: 100%</title></rect>
+<rect x="1551.0" y="156.0" width="16" height="200.0" fill="#4f46e5" rx="1"><title>Graphity 2.3.0 · GNP sparse 100k: 100%</title></rect>
+<rect x="1570.0" y="156.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 2.4.0 · GNP sparse 100k: 100%</title></rect>
+<text class="xlabel" x="1659.5" y="368.0" text-anchor="end" transform="rotate(-40 1659.5 368.0)">GNP dense 100k</text>
+<rect x="1604.0" y="156.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 1.0 · GNP dense 100k: 100%</title></rect>
+<rect x="1623.0" y="156.0" width="16" height="200.0" fill="#dc2626" rx="1"><title>Graphity 2.0.0 · GNP dense 100k: 100%</title></rect>
+<rect x="1642.0" y="156.0" width="16" height="200.0" fill="#0891b2" rx="1"><title>Graphity 2.1.0 · GNP dense 100k: 100%</title></rect>
+<rect x="1661.0" y="156.0" width="16" height="200.0" fill="#ea580c" rx="1"><title>Graphity 2.2.0 · GNP dense 100k: 100%</title></rect>
+<rect x="1680.0" y="156.0" width="16" height="200.0" fill="#4f46e5" rx="1"><title>Graphity 2.3.0 · GNP dense 100k: 100%</title></rect>
+<rect x="1699.0" y="156.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 2.4.0 · GNP dense 100k: 100%</title></rect>
+<text class="xlabel" x="1788.5" y="368.0" text-anchor="end" transform="rotate(-40 1788.5 368.0)">GNP dense shfld. 100k</text>
+<text class="xlabel" x="1917.5" y="368.0" text-anchor="end" transform="rotate(-40 1917.5 368.0)">Chain of cliques 100k</text>
+<rect x="1862.0" y="156.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 1.0 · Chain of cliques 100k: 100%</title></rect>
+<rect x="1881.0" y="156.0" width="16" height="200.0" fill="#dc2626" rx="1"><title>Graphity 2.0.0 · Chain of cliques 100k: 100%</title></rect>
+<rect x="1900.0" y="156.0" width="16" height="200.0" fill="#0891b2" rx="1"><title>Graphity 2.1.0 · Chain of cliques 100k: 100%</title></rect>
+<rect x="1919.0" y="156.0" width="16" height="200.0" fill="#ea580c" rx="1"><title>Graphity 2.2.0 · Chain of cliques 100k: 100%</title></rect>
+<rect x="1938.0" y="156.0" width="16" height="200.0" fill="#4f46e5" rx="1"><title>Graphity 2.3.0 · Chain of cliques 100k: 100%</title></rect>
+<rect x="1957.0" y="156.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 2.4.0 · Chain of cliques 100k: 100%</title></rect>
+<text class="xlabel" x="2046.5" y="368.0" text-anchor="end" transform="rotate(-40 2046.5 368.0)">Chain of cliques shfld. 100k</text>
+<rect x="1991.0" y="156.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 1.0 · Chain of cliques shfld. 100k: 100%</title></rect>
+<rect x="2010.0" y="156.0" width="16" height="200.0" fill="#dc2626" rx="1"><title>Graphity 2.0.0 · Chain of cliques shfld. 100k: 100%</title></rect>
+<rect x="2029.0" y="156.0" width="16" height="200.0" fill="#0891b2" rx="1"><title>Graphity 2.1.0 · Chain of cliques shfld. 100k: 100%</title></rect>
+<rect x="2048.0" y="156.0" width="16" height="200.0" fill="#ea580c" rx="1"><title>Graphity 2.2.0 · Chain of cliques shfld. 100k: 100%</title></rect>
+<rect x="2067.0" y="156.0" width="16" height="200.0" fill="#4f46e5" rx="1"><title>Graphity 2.3.0 · Chain of cliques shfld. 100k: 100%</title></rect>
+<rect x="2086.0" y="156.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 2.4.0 · Chain of cliques shfld. 100k: 100%</title></rect>
+<text class="xlabel" x="2175.5" y="368.0" text-anchor="end" transform="rotate(-40 2175.5 368.0)">GNP sparse 1M</text>
+<rect x="2139.0" y="156.0" width="16" height="200.0" fill="#dc2626" rx="1"><title>Graphity 2.0.0 · GNP sparse 1M: 100%</title></rect>
+<rect x="2158.0" y="156.0" width="16" height="200.0" fill="#0891b2" rx="1"><title>Graphity 2.1.0 · GNP sparse 1M: 100%</title></rect>
+<rect x="2177.0" y="156.0" width="16" height="200.0" fill="#ea580c" rx="1"><title>Graphity 2.2.0 · GNP sparse 1M: 100%</title></rect>
+<rect x="2196.0" y="156.0" width="16" height="200.0" fill="#4f46e5" rx="1"><title>Graphity 2.3.0 · GNP sparse 1M: 100%</title></rect>
+<rect x="2215.0" y="156.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 2.4.0 · GNP sparse 1M: 100%</title></rect>
+<text class="xlabel" x="2304.5" y="368.0" text-anchor="end" transform="rotate(-40 2304.5 368.0)">GNP sparse 10M</text>
+<rect x="2268.0" y="156.0" width="16" height="200.0" fill="#dc2626" rx="1"><title>Graphity 2.0.0 · GNP sparse 10M: 100%</title></rect>
+<rect x="2287.0" y="156.0" width="16" height="200.0" fill="#0891b2" rx="1"><title>Graphity 2.1.0 · GNP sparse 10M: 100%</title></rect>
+<rect x="2306.0" y="156.0" width="16" height="200.0" fill="#ea580c" rx="1"><title>Graphity 2.2.0 · GNP sparse 10M: 100%</title></rect>
+<rect x="2325.0" y="156.0" width="16" height="200.0" fill="#4f46e5" rx="1"><title>Graphity 2.3.0 · GNP sparse 10M: 100%</title></rect>
+<rect x="2344.0" y="156.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 2.4.0 · GNP sparse 10M: 100%</title></rect>
+<text class="xlabel" x="2433.5" y="368.0" text-anchor="end" transform="rotate(-40 2433.5 368.0)">GNP sparse 100M</text>
+<rect x="2397.0" y="156.0" width="16" height="200.0" fill="#dc2626" rx="1"><title>Graphity 2.0.0 · GNP sparse 100M: 100%</title></rect>
+<rect x="2416.0" y="156.0" width="16" height="200.0" fill="#0891b2" rx="1"><title>Graphity 2.1.0 · GNP sparse 100M: 100%</title></rect>
+<rect x="2435.0" y="156.0" width="16" height="200.0" fill="#ea580c" rx="1"><title>Graphity 2.2.0 · GNP sparse 100M: 100%</title></rect>
+<rect x="2454.0" y="156.0" width="16" height="200.0" fill="#4f46e5" rx="1"><title>Graphity 2.3.0 · GNP sparse 100M: 100%</title></rect>
+<rect x="2473.0" y="156.0" width="16" height="200.0" fill="#2563eb" rx="1"><title>Graphity 2.4.0 · GNP sparse 100M: 100%</title></rect>
+<line x1="56" y1="156.0" x2="2489" y2="156.0" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4 3"/>
 </svg>

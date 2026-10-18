@@ -7,7 +7,7 @@ Graphity adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [2.4.0] — unreleased
+## [2.4.0] — 2026-10-18
 
 Adds edge-centric DFS you can stop, strong-connectivity analyses, and replacement APIs for
 the methods it marks for removal.
