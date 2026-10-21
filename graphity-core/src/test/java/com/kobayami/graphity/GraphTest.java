@@ -4,7 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatObject;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.kobayami.graphity.testutils.RandomGraphs;
 import com.kobayami.graphity.testutils.TestGraphs;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -299,5 +302,56 @@ class GraphTest {
   void equalsSameInstanceReturnsTrue() {
     var g = TestGraphs.path(3);
     assertThat(g.equals(g)).isTrue();
+  }
+
+  @Test
+  void nodesStreamsEveryNodeInOrder() {
+    assertThat(TestGraphs.path(4).nodes().toArray()).containsExactly(0, 1, 2, 3);
+    assertThat(TestGraphs.empty().nodes().count()).isZero();
+  }
+
+  @Test
+  void forEachEdgeVisitsEveryEdgeInEdgeIndexOrder() {
+    for (long seed = 0; seed < 20; seed++) {
+      Graph graph = RandomGraphs.gnp(30, 0.1, seed);
+      var indices = new IntArrayList();
+      graph.forEachEdge((source, target, edgeIndex) -> {
+        assertThat(graph.edgeSource(edgeIndex)).isEqualTo(source);
+        assertThat(graph.edgeTarget(edgeIndex)).isEqualTo(target);
+        indices.add(edgeIndex);
+      });
+      assertThat(indices.toIntArray())
+          .containsExactly(IntStream.range(0, graph.edgeCount()).toArray());
+    }
+  }
+
+  @Test
+  void forEachEdgeOnABiAdjacentGraphAndItsTransposeVisitsTheirOwnEdges() {
+    var bi = BiAdjacentGraph.of(TestGraphs.of(3, 0, 1, 0, 2, 2, 1));
+    for (BiAdjacentGraph graph : new BiAdjacentGraph[] {bi, bi.transposed()}) {
+      var seen = new IntArrayList();
+      graph.forEachEdge((source, target, edgeIndex) -> {
+        assertThat(graph.edgeIndexOf(source, target)).isEqualTo(edgeIndex);
+        seen.add(edgeIndex);
+      });
+      assertThat(seen.toIntArray()).containsExactly(0, 1, 2);
+    }
+    var transposedSources = new IntArrayList();
+    bi.transposed().forEachEdge((source, target, edgeIndex) -> transposedSources.add(source));
+    // Transposed: 1 -> 0, 1 -> 2, 2 -> 0.
+    assertThat(transposedSources.toIntArray()).containsExactly(1, 1, 2);
+  }
+
+  @Test
+  void forEachEdgeOnAGraphWithoutEdgesCallsNothing() {
+    TestGraphs.isolated(3).forEachEdge((source, target, edgeIndex) -> {
+      throw new AssertionError("no edge expected");
+    });
+  }
+
+  @Test
+  void forEachEdgeRejectsNull() {
+    assertThatThrownBy(() -> TestGraphs.path(2).forEachEdge(null))
+        .isInstanceOf(NullPointerException.class);
   }
 }

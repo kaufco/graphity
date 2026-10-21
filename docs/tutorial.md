@@ -17,7 +17,11 @@ A walk through the data model and the API, from building a graph to carrying you
 
 ```java
 double[] weights = new double[graph.edgeCount()];
+graph.forEachEdge((source, target, edgeIndex) -> weights[edgeIndex] = distance(source, target));
+int[] sinks = graph.nodes().filter(node -> graph.outDegree(node) == 0).toArray();
 ```
+
+`forEachEdge` walks the adjacency arrays in edge index order and hands over the source for free; `graph.edgeSource(edgeIndex)` on its own is a binary search.
 
 **Direction is an interpretation, not a type.** Edges are stored as directed pairs, but nothing commits a graph to one reading. Where the distinction matters, both variants are available — `Components.sccsOf` reads the graph as directed, `Components.ccsOf` as undirected. An AST that is a tree for one analysis and a dependency graph for the next needs no conversion and no second copy. Reading a graph as undirected collapses `a → b` and `b → a` into one edge and ignores self-loops, so a graph that stores its undirected edges symmetrically has the same components, bridges, articulation points and blocks as one that stores a single direction per edge; results that list edges name the edges the graph actually stores.
 

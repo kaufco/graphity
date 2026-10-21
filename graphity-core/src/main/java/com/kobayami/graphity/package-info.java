@@ -93,6 +93,8 @@
  *       instances; {@link Graph#of(int[], int[])} takes arrays already in CSR form.</li>
  *   <li>{@link SortedIntView} - the zero-copy, sorted view returned by adjacency and
  *       group-membership lookups throughout the library.</li>
+ *   <li>{@link Graph#nodes()} and {@link Graph#forEachEdge(EdgeConsumer)} - every node as a
+ *       stream, every edge with source, target and edge index, in edge index order.</li>
  *   <li>{@link Csr} - read access to the CSR arrays themselves, for algorithm code that loops
  *       over all edges; the built-in algorithms use it too.</li>
  *   <li>{@link GraphFormat} - a versioned binary format for storing and loading the topology.</li>

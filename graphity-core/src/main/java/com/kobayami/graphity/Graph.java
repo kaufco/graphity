@@ -2,6 +2,7 @@ package com.kobayami.graphity;
 
 import java.util.Arrays;
 import java.util.Objects;
+import java.util.stream.IntStream;
 
 /**
  * A read-only directed graph, optimized for performance, low memory and cache-friendly traversal.
@@ -249,6 +250,44 @@ public sealed class Graph permits BiAdjacentGraph {
   public final int outEdgeEnd(int node) {
     Objects.checkIndex(node, nodeCount());
     return outAdjacencyStart[node + 1];
+  }
+
+  /**
+   * Returns the node IDs {@code 0..nodeCount()-1} as a stream, in ascending order.
+   * <p>
+   * <strong>Time:</strong> O(1) to create; the stream yields nodeCount values.
+   *
+   * @return the node IDs
+   */
+  public final IntStream nodes() {
+    return IntStream.range(0, nodeCount());
+  }
+
+  /**
+   * Calls {@code action} once per edge with its source, target and edge index, in edge index
+   * order - that is, by source and then target. On a {@link BiAdjacentGraph} these are its
+   * edges, each once, as stored in the out-adjacency.
+   * <p>
+   * Walks the out-adjacency arrays, so the source of each edge costs nothing, unlike
+   * {@link #edgeSource(int)} per edge.
+   *
+   * <pre>{@code
+   * graph.forEachEdge((source, target, edgeIndex) ->
+   *     System.out.println(names[source] + " -> " + names[target] + ": " + weights[edgeIndex]));
+   * }</pre>
+   *
+   * <strong>Time:</strong> O(nodeCount + edgeCount).
+   *
+   * @param action called with {@code (source, target, edgeIndex)} for every edge
+   */
+  public final void forEachEdge(EdgeConsumer action) {
+    Objects.requireNonNull(action, "action");
+    int n = nodeCount();
+    for (int source = 0; source < n; source++) {
+      for (int e = outAdjacencyStart[source], end = outAdjacencyStart[source + 1]; e < end; e++) {
+        action.accept(source, outAdjacency[e], e);
+      }
+    }
   }
 
   /**
