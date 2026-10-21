@@ -9,8 +9,9 @@ A walk through the data model and the API, from building a graph to carrying you
 5. [Data on nodes and edges](#data-on-nodes-and-edges)
 6. [Views, immutability and threads](#views-immutability-and-threads)
 7. [Comparing versions of a graph](#comparing-versions-of-a-graph)
-8. [Custom traversals](#custom-traversals)
-9. [Algorithm reference](#algorithm-reference)
+8. [Looking at a graph](#looking-at-a-graph)
+9. [Custom traversals](#custom-traversals)
+10. [Algorithm reference](#algorithm-reference)
 
 ## The data model
 
@@ -147,6 +148,24 @@ Edges added = diff.addedEdges();       // edge indices of `after`
 Edges removed = diff.removedEdges();   // edge indices of `before`
 ```
 
+## Looking at a graph
+
+The module `graphity-io` writes a graph for Graphviz or Mermaid. Every hook takes a node ID or an edge index, so labels, colours and groups come straight from your arrays, and the writer escapes what they return:
+
+```java
+DotWriter.of(graph)
+    .nodeLabel(node -> names[node])
+    .edgeAttributes((edge, attributes) -> {
+        if (isBackEdge[edge]) attributes.put("color", "red");
+    })
+    .clusters(Components.sccsOf(graph), scc -> "SCC " + scc)
+    .write(out);
+
+String mermaid = MermaidWriter.of(graph).nodeLabel(node -> names[node]).writeToString();
+```
+
+A node filter writes part of a graph without renumbering it, and `undirected()` writes each reciprocal pair once. Mermaid renders in Markdown, issues and documentation, but only for graphs of a few hundred nodes; DOT handles large ones.
+
 ## Custom traversals
 
 For custom traversals, subclass `IterativeDfsTraverser` — it keeps its DFS stack on the heap, so it handles arbitrarily deep graphs without any `-Xss` tuning. Override `enterNode(int)` for preorder and `leaveNode(int)` for postorder; return `false` from `enterNode` to prune a subtree. `IterativeDfsTraverser`, `IterativeDfsEdgeTraverser` and `FrontierTraverser` also let any hook call `stop()` to end the whole traversal. For edge-centric algorithms that must look at every edge, such as collecting back edges with data of your own, subclass `IterativeDfsEdgeTraverser`: its `visitEdge` hook reports each edge with the state of its target (unvisited, on the current path, finished) and returns whether to descend, skip the edge or stop. Multiple `run()` calls accumulate visited state, so two-phase walks compose without external bookkeeping. One cycle as a list of nodes is ready-made: `Graphs.findCycle(graph)`.
@@ -199,7 +218,7 @@ Depth works the same way in the other direction, set when descending: `if (state
 
 ## Algorithm reference
 
-Graphity ships the following algorithms out of the box. All of them return typed result values; entry points live on the algorithm class itself, not on the graph. The rows marked *controlflow* are in the module `graphity-controlflow`, package `com.kobayami.graphity.controlflow`; everything else is in `graphity-core`.
+Graphity ships the following algorithms out of the box. All of them return typed result values; entry points live on the algorithm class itself, not on the graph. The rows marked *controlflow* are in the module `graphity-controlflow`, package `com.kobayami.graphity.controlflow`, the rows marked *export* in `graphity-io`, package `com.kobayami.graphity.io`; everything else is in `graphity-core`.
 
 | Algorithm                                                       | Entry point                   |
 |-----------------------------------------------------------------|-------------------------------|
@@ -230,5 +249,6 @@ Graphity ships the following algorithms out of the box. All of them return typed
 | Condensation DAG                                                | `sccs.condense()`             |
 | Structural hash, edges added and removed between two versions   | `Graphs.topologyHash(graph)`, `Graphs.diff(before, after)` |
 | Graph from CSR arrays, versioned binary format                  | `Graph.of(offsets, targets)`, `GraphFormat.write(graph, out)`, `GraphFormat.read(in)` |
+| DOT and Mermaid export (*export*)                               | `DotWriter.of(graph)`, `MermaidWriter.of(graph)` |
 | Quotient graph by a partition of your choosing                  | `NodePartition.of(graph, groupOf, groupCount).condense()` |
 | Subgraph extraction and node remapping                          | `Graphs.remapped(...)`        |

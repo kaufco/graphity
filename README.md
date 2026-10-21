@@ -52,7 +52,7 @@ dependencies {
 }
 ```
 
-The control-flow analyses - loops, dominance frontiers, control dependence, phi placement - are in a second artifact, `graphity-controlflow`, released together with the core at the same version; add it the same way if you need them. Dominators stay in the core.
+Two more artifacts are released together with the core, at the same version; add them the same way if you need them: `graphity-controlflow` with the control-flow analyses - loops, dominance frontiers, control dependence, phi placement (dominators stay in the core) - and `graphity-io` with writers for DOT and Mermaid.
 
 Requires JDK 17 or newer.
 
@@ -105,6 +105,7 @@ The result types are themselves graphs or partitions backed by CSR — they comp
 - **Custom traversals:** iterative depth-first traversal with node or edge hooks, breadth-first traversal with levels, pruning and early stop — no stack limit.
 - **Storage:** graphs from CSR arrays you already have, checked and copied; a versioned little-endian binary format for files, caches and typed arrays in the browser.
 - **Comparison:** a 64-bit structural hash to key caches by, and the edges added and removed between two versions of a graph, with their edge indices.
+- **Export** (module `graphity-io`): DOT for Graphviz and Mermaid for Markdown, with labels, attributes, shapes and clusters from your own arrays, a node filter and the undirected reading.
 
 Every entry point and its result type is listed in the [algorithm reference](docs/tutorial.md#algorithm-reference); the [Javadoc](https://kaufco.github.io/graphity/) states each method's contract and cost.
 
@@ -209,7 +210,7 @@ This README is the overview; the tutorial goes into depth, and the Javadoc is th
 
 Most users do not need to build from source — the published artifact (see [Installation](#installation)) is the recommended way to consume Graphity. The instructions below are for contributors who want to fork or extend the library.
 
-The project is a multi-module Maven build: `graphity-core` and `graphity-controlflow` are the library, published to Maven Central at the same version; `graphity-benchmarks` is a development module containing the JMH benchmark suite and is not part of the release.
+The project is a multi-module Maven build: `graphity-core`, `graphity-controlflow` and `graphity-io` are the library, published to Maven Central at the same version; `graphity-benchmarks` is a development module containing the JMH benchmark suite and is not part of the release.
 
 ### Build and test
 
@@ -219,7 +220,7 @@ From the repository root:
 mvn verify
 ```
 
-Compiles all modules and runs the unit and fuzz tests of `graphity-core` and `graphity-controlflow`. For tests only, without packaging:
+Compiles all modules and runs the unit and fuzz tests of the library modules. For tests only, without packaging:
 
 ```bash
 mvn test

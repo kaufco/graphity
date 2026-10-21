@@ -1,7 +1,7 @@
 # Signs the published modules and uploads them to Maven Central via the Central
 # Publisher Portal. Which modules those are is the parent POM's
 # graphity.releaseModules list, all at the POM's version; today these are
-# graphity-core and graphity-controlflow.
+# graphity-core, graphity-controlflow and graphity-io.
 #
 # One trigger, workflow_dispatch, run before the GitHub Release is published:
 # the portal validates the bundle while the release is still private, so a

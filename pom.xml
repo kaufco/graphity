@@ -66,6 +66,7 @@
   <modules>
     <module>graphity-core</module>
     <module>graphity-controlflow</module>
+    <module>graphity-io</module>
     <module>graphity-benchmarks</module>
   </modules>
 
@@ -85,7 +86,7 @@
          artifactId (the Central pre-check), so the two must match; and since -am also builds
          and publishes the reactor dependencies of a listed module, each of those must be
          listed too. -->
-    <graphity.releaseModules>graphity-core,graphity-controlflow</graphity.releaseModules>
+    <graphity.releaseModules>graphity-core,graphity-controlflow,graphity-io</graphity.releaseModules>
 
     <fastutil.version>8.5.17</fastutil.version>
     <jspecify.version>1.0.0</jspecify.version>
@@ -131,6 +132,11 @@
       <dependency>
         <groupId>com.kobayami</groupId>
         <artifactId>graphity-controlflow</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.kobayami</groupId>
+        <artifactId>graphity-io</artifactId>
         <version>${project.version}</version>
       </dependency>
 
@@ -313,6 +319,10 @@
               <group>
                 <title>graphity-controlflow</title>
                 <packages>com.kobayami.graphity.controlflow</packages>
+              </group>
+              <group>
+                <title>graphity-io</title>
+                <packages>com.kobayami.graphity.io</packages>
               </group>
             </groups>
             <bottom><![CDATA[Copyright &#169; {inceptionYear}&#x2013;{currentYear} Marco Kaufmann. Apache License 2.0.]]></bottom>

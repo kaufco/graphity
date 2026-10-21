@@ -62,7 +62,8 @@
  * </ul>
  * <p>
  * Loops, dominance frontiers, control dependence and phi placement are in the module
- * {@code graphity-controlflow}, package {@code com.kobayami.graphity.controlflow}.
+ * {@code graphity-controlflow}, package {@code com.kobayami.graphity.controlflow}; writers for DOT
+ * and Mermaid are in {@code graphity-io}, package {@code com.kobayami.graphity.io}.
  *
  * <h3>Transformations</h3>
  * <ul>

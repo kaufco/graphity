@@ -51,14 +51,18 @@ articulation points, biconnected components, strong bridges</td></tr>
 {@link com.kobayami.graphity.Graph#of(int[], int[])} from CSR arrays</td></tr>
 <tr><td>How do I store and load a graph?</td>
 <td>{@link com.kobayami.graphity.GraphFormat}</td></tr>
+<tr><td>How do I look at a graph? (graphity-io)</td>
+<td>{@link com.kobayami.graphity.io.DotWriter},
+{@link com.kobayami.graphity.io.MermaidWriter}</td></tr>
 </tbody>
 </table>
 <p>
 The library comes as modules released together at the same version: {@code graphity-core} with
 the graph, the builder and every algorithm that applies to any directed graph, and
-{@code graphity-controlflow} with the analyses that need the concepts of control flow. The
-package documentation of {@link com.kobayami.graphity} and of
-{@link com.kobayami.graphity.controlflow} lists every entry point with a short description.
+{@code graphity-controlflow} with the analyses that need the concepts of control flow, and
+{@code graphity-io} with writers for DOT and Mermaid. The package documentation of
+{@link com.kobayami.graphity}, {@link com.kobayami.graphity.controlflow} and
+{@link com.kobayami.graphity.io} lists every entry point with a short description.
 </p>
 </body>
 </html>
