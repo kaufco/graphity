@@ -3,6 +3,7 @@ package com.kobayami.graphity;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.kobayami.graphity.testutils.RandomGraphs;
 import com.kobayami.graphity.testutils.TestGraphs;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
@@ -712,5 +713,72 @@ class GraphsTest {
   void adjacencyListOfABiAdjacentGraphListsItsOutAdjacency() {
     var bi = BiAdjacentGraph.of(TestGraphs.of(3, 0, 1, 0, 2, 2, 0));
     assertThat(Graphs.adjacencyListOf(bi.transposed())).isEqualTo("0 -> [2]\n1 -> [0]\n2 -> [0]\n");
+  }
+
+  // ---- findCycle ----
+
+  private static void assertIsCycle(Graph graph, IntList cycle) {
+    assertThat(cycle.isEmpty()).isFalse();
+    for (int k = 0; k < cycle.size(); k++) {
+      int from = cycle.getInt(k);
+      int to = cycle.getInt((k + 1) % cycle.size());
+      assertThat(graph.hasOutNode(from, to)).as("edge %d -> %d of %s", from, to, cycle).isTrue();
+    }
+    assertThat(cycle.toIntArray()).doesNotHaveDuplicates();
+  }
+
+  @Test
+  void findCycleOnADagIsEmpty() {
+    assertThat(Graphs.findCycle(TestGraphs.path(5)).toIntArray()).isEmpty();
+    assertThat(Graphs.findCycle(TestGraphs.empty()).toIntArray()).isEmpty();
+  }
+
+  @Test
+  void findCycleReturnsTheCycleClosedByTheFirstBackEdge() {
+    // 0 -> 1 -> 2 -> 3, and 3 -> 0, 3 -> 1 back: 3's out-nodes are visited in ascending order,
+    // so 3 -> 0 closes the first cycle.
+    Graph graph = TestGraphs.of(4, 0, 1, 1, 2, 2, 3, 3, 1, 3, 0);
+    assertThat(Graphs.findCycle(graph).toIntArray()).containsExactly(0, 1, 2, 3);
+  }
+
+  @Test
+  void findCycleStartsAtTheTargetOfTheClosingEdgeUnderALaterRoot() {
+    // Root 0 is acyclic (0 -> 1); from root 2: 2 -> 3 -> 4 -> 5 -> 3 closes at 3, mid-stack.
+    Graph graph = TestGraphs.of(6, 0, 1, 2, 3, 3, 4, 4, 5, 5, 3);
+    assertThat(Graphs.findCycle(graph).toIntArray()).containsExactly(3, 4, 5);
+    assertThat(Graphs.findCycle(BiAdjacentGraph.of(graph)).toIntArray()).containsExactly(3, 4, 5);
+  }
+
+  @Test
+  void findCycleFindsASelfLoop() {
+    assertThat(Graphs.findCycle(TestGraphs.of(3, 0, 1, 1, 1)).toIntArray()).containsExactly(1);
+  }
+
+  @Test
+  void findCycleIsUnmodifiable() {
+    var cycle = Graphs.findCycle(TestGraphs.cycle(3));
+    assertThatThrownBy(() -> cycle.add(0)).isInstanceOf(UnsupportedOperationException.class);
+    assertThatThrownBy(() -> Graphs.findCycle(TestGraphs.path(2)).add(0))
+        .isInstanceOf(UnsupportedOperationException.class);
+  }
+
+  @Test
+  void findCycleAgreesWithIsDagOnRandomGraphs() {
+    for (long seed = 0; seed < 300; seed++) {
+      var labeled = RandomGraphs.anyGraph(seed);
+      Graph graph = labeled.graph();
+      var cycle = Graphs.findCycle(graph);
+      assertThat(cycle.isEmpty()).as(labeled.describe()).isEqualTo(Graphs.isDag(graph));
+      if (!cycle.isEmpty()) assertIsCycle(graph, cycle);
+    }
+  }
+
+  @Test
+  void findCycleOnADeepCycleDoesNotOverflowTheStack() {
+    int n = 1_000_000;
+    var cycle = Graphs.findCycle(TestGraphs.cycle(n));
+    assertThat(cycle.size()).isEqualTo(n);
+    assertThat(cycle.getInt(0)).isZero();
+    assertThat(cycle.getInt(n - 1)).isEqualTo(n - 1);
   }
 }

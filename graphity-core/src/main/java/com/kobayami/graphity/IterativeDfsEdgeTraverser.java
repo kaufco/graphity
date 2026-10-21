@@ -25,7 +25,9 @@ import java.util.Objects;
  * its cursor in local variables. A traversal that needs no per-edge logic is faster on
  * {@link IterativeDfsTraverser}, which calls no hook per edge.
  *
- * <h2>Example: find a cycle and stop</h2>
+ * <h2>Example: stop at the first edge that closes a cycle</h2>
+ * The cycle itself, as a list of nodes, comes from {@link Graphs#findCycle(Graph)}; a hook like
+ * this one is for a traversal that needs the closing edge or does more on the way.
  * <pre>{@code
  * class CycleFinder extends IterativeDfsEdgeTraverser {
  *     int closingEdge = -1;

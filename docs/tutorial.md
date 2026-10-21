@@ -149,7 +149,7 @@ Edges removed = diff.removedEdges();   // edge indices of `before`
 
 ## Custom traversals
 
-For custom traversals, subclass `IterativeDfsTraverser` — it keeps its DFS stack on the heap, so it handles arbitrarily deep graphs without any `-Xss` tuning. Override `enterNode(int)` for preorder and `leaveNode(int)` for postorder; return `false` from `enterNode` to prune a subtree. `IterativeDfsTraverser`, `IterativeDfsEdgeTraverser` and `FrontierTraverser` also let any hook call `stop()` to end the whole traversal. For edge-centric algorithms that must look at every edge, such as finding a cycle, subclass `IterativeDfsEdgeTraverser`: its `visitEdge` hook reports each edge with the state of its target (unvisited, on the current path, finished) and returns whether to descend, skip the edge or stop. Multiple `run()` calls accumulate visited state, so two-phase walks compose without external bookkeeping.
+For custom traversals, subclass `IterativeDfsTraverser` — it keeps its DFS stack on the heap, so it handles arbitrarily deep graphs without any `-Xss` tuning. Override `enterNode(int)` for preorder and `leaveNode(int)` for postorder; return `false` from `enterNode` to prune a subtree. `IterativeDfsTraverser`, `IterativeDfsEdgeTraverser` and `FrontierTraverser` also let any hook call `stop()` to end the whole traversal. For edge-centric algorithms that must look at every edge, such as collecting back edges with data of your own, subclass `IterativeDfsEdgeTraverser`: its `visitEdge` hook reports each edge with the state of its target (unvisited, on the current path, finished) and returns whether to descend, skip the edge or stop. Multiple `run()` calls accumulate visited state, so two-phase walks compose without external bookkeeping. One cycle as a list of nodes is ready-made: `Graphs.findCycle(graph)`.
 
 To start from the root nodes of a `BiAdjacentGraph`, pass them in: `traverser.runFromNodes(Graphs.rootNodes(biAdjacentGraph))`. Inside any hook, the `BiAdjacentGraph` you hold gives access to predecessors.
 
@@ -214,6 +214,7 @@ Graphity ships the following algorithms out of the box. All of them return typed
 | Topological order with levels (Kahn's)                          | `TopOrderAndLevels.of(graph)` |
 | DFS edge classification (TREE / BACK / FORWARD / CROSS)         | `EdgeTypes.of(graph)`         |
 | Back edges                                                      | `BackEdges.of(graph)`         |
+| One cycle as a witness (first back edge, deterministic)         | `Graphs.findCycle(graph)`     |
 | Lowest common ancestor (trees and forests)                      | `Ancestry.of(forest)`         |
 | Constant-time ancestor test and subtree views (trees and forests) | `PreorderAncestry.of(ancestry)` |
 | Dominators, one or several entries (Lengauer-Tarjan)            | `Dominators.of(biAdjacentGraph, entries)` |

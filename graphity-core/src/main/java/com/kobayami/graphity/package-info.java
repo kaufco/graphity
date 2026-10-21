@@ -28,7 +28,8 @@
  * <ul>
  *   <li>{@link TopOrder#of(Graph)} - topological order by depth-first search;
  *       {@link TopOrderAndLevels#of(Graph)} - Kahn's order with a level per node.</li>
- *   <li>{@link Graphs#isDag(Graph)} and {@link Sccs#containsCycle(int)} - cycle tests.</li>
+ *   <li>{@link Graphs#isDag(Graph)} and {@link Sccs#containsCycle(int)} - cycle tests;
+ *       {@link Graphs#findCycle(Graph)} - one concrete cycle as a witness.</li>
  *   <li>{@link EdgeTypes#of(Graph)} - tree, back, forward and cross edges;
  *       {@link BackEdges#of(Graph)} - the back edges alone.</li>
  * </ul>

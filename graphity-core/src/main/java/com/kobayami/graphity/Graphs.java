@@ -5,15 +5,16 @@ import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.ints.IntLists;
 import java.util.Arrays;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Utility methods for graph transformations and shape checks.
  * <p>
  * Provides operations that create new {@link Graph} instances from existing graphs
  * and {@link NodeMapping}s (the original graph is never modified), predicate methods to test
- * structural properties of a graph, its complete text form, {@link #adjacencyListOf(Graph)}, a
- * structural hash, {@link #topologyHash(Graph)}, and the {@link #diff(Graph, Graph)} of two
- * versions.
+ * structural properties of a graph - with {@link #findCycle(Graph)} as the witness for
+ * {@link #isDag(Graph)} -, its complete text form, {@link #adjacencyListOf(Graph)}, a structural
+ * hash, {@link #topologyHash(Graph)}, and the {@link #diff(Graph, Graph)} of two versions.
  * <p>
  * A predicate whose name does not say otherwise reads the graph as directed; the ones prefixed
  * {@code undirected} read it as {@link Components#ccsOf(Graph)} does. {@code isBipartite} and
@@ -204,11 +205,47 @@ public final class Graphs {
    * @return {@code true} if the graph contains no cycles
    * @throws IllegalArgumentException if a depth-first path is longer than 2^30 - 5 nodes, the most
    *     frames an array can hold
+   * @see #findCycle(Graph)
    */
   public static boolean isDag(Graph graph) {
-    var checker = new CycleChecker(graph);
+    var checker = new CycleChecker(graph, false);
     checker.run();
     return !checker.hasCycle;
+  }
+
+  /**
+   * Returns the nodes of one cycle of the graph in order, or an empty list if the graph is a DAG.
+   * <p>
+   * A depth-first search from node 0 upwards, successors in ascending order, stops at the first
+   * edge {@code u -> v} back to a node on its current path; the result is that path from
+   * {@code v} to {@code u}, and the edge {@code u -> v} closes it. A self-loop is a cycle of one
+   * node. The result is deterministic, but not necessarily the shortest cycle. To find a cycle
+   * inside one strongly connected component, call this on the component's subgraph; the result
+   * then holds node IDs of the subgraph, which the {@link NodeMapping} of the subgraph translates
+   * back.
+   *
+   * <pre>{@code
+   * IntList cycle = Graphs.findCycle(dependencies);
+   * if (!cycle.isEmpty()) {
+   *     // report cycle.getInt(0) -> cycle.getInt(1) -> ... -> cycle.getInt(0)
+   * }
+   * }</pre>
+   *
+   * <strong>Time:</strong> O(nodeCount + edgeCount), stopping at the first cycle.<br>
+   * <strong>Memory:</strong> O(nodeCount) during computation; 4 bytes per node of the cycle for
+   * the result.
+   *
+   * @param graph the graph to search
+   * @return the nodes of one cycle in order, each once, or an empty list; unmodifiable
+   * @throws IllegalArgumentException if a depth-first path is longer than 2^30 - 5 nodes, the most
+   *     frames an array can hold
+   * @see #isDag(Graph)
+   */
+  public static IntList findCycle(Graph graph) {
+    var checker = new CycleChecker(graph, true);
+    checker.run();
+    int[] cycle = checker.cycle;
+    return cycle == null ? IntLists.EMPTY_LIST : IntLists.unmodifiable(IntArrayList.wrap(cycle));
   }
 
   /**
@@ -1027,11 +1064,19 @@ public final class Graphs {
 
     private final Graph graph;
     private final int[] state;
+
+    /** Whether to keep the cycle; {@link #isDag(Graph)} needs only the answer. */
+    private final boolean recordCycle;
+
     boolean hasCycle;
 
-    CycleChecker(Graph graph) {
+    /** The cycle closed by the first back edge, from its target to its source. */
+    int @Nullable [] cycle;
+
+    CycleChecker(Graph graph, boolean recordCycle) {
       this.graph = graph;
       this.state = new int[(graph.nodeCount() >> 4) + 1];
+      this.recordCycle = recordCycle;
     }
 
     void run() {
@@ -1066,6 +1111,13 @@ public final class Graphs {
             int flags = state[v >> 4] >>> shift;
             if ((flags & ON_STACK) != 0) {
               hasCycle = true;
+              if (recordCycle) {
+                // The path from v up to u, the top, is on the frame stack: the cycle u -> v closes.
+                int at = top;
+                while (frames[2 * at] != v) at--;
+                cycle = new int[top - at + 1];
+                for (int k = 0; k < cycle.length; k++) cycle[k] = frames[2 * (at + k)];
+              }
               return;
             }
             if ((flags & VISITED) == 0) {

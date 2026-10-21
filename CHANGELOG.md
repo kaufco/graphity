@@ -18,6 +18,7 @@ Graphity adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - [Issue #51](../../issues/51) - Give Graph a bounded toString
   - [Issue #52](../../issues/52) - Add a structural hash and a diff for graphs
   - [Issue #53](../../issues/53) - Load graphs from CSR arrays, and add a binary CSR format
+  - [Issue #54](../../issues/54) - Find one cycle
 
 ### Changed
 
