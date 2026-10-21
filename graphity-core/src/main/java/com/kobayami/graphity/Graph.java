@@ -260,26 +260,6 @@ public sealed class Graph permits BiAdjacentGraph {
   }
 
   /**
-   * Returns a {@link BiAdjacentGraph} with both in- and out-adjacency.
-   * The result shares the out-adjacency data; only in-adjacency is newly computed.
-   * Not cached - store the result if needed across multiple calls.
-   * <p>
-   * If this graph is already a {@link BiAdjacentGraph}, returns {@code this} in O(1).
-   * <p>
-   * <strong>Time:</strong> O(nodeCount + edgeCount), or O(1) if already bi-adjacent.<br>
-   * <strong>Memory:</strong> +4 x (nodeCount + edgeCount) bytes, or none if already bi-adjacent.
-   *
-   * @return a bi-adjacent graph with constant-time in- and out-node access
-   * @deprecated Reads like an accessor but builds the in-adjacency on every call on a plain
-   *     {@code Graph}. Use {@link BiAdjacentGraph#of(Graph)}, which behaves identically and shows
-   *     the cost at the call site. Removed in 3.0.
-   */
-  @Deprecated(since = "2.4.0", forRemoval = true)
-  public BiAdjacentGraph biAdjacentGraph() {
-    return BiAdjacentGraph.of(this);
-  }
-
-  /**
    * Builds the in-adjacency of this graph; the body of {@link BiAdjacentGraph#of(Graph)} for a
    * graph that is not yet bi-adjacent.
    */

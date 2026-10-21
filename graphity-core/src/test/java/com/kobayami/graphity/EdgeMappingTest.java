@@ -29,19 +29,6 @@ class EdgeMappingTest {
   }
 
   @Test
-  @SuppressWarnings("removal") // the deprecated name until it is removed in 3.0
-  void deprecatedInverseMatchesInverted() {
-    var em = new EdgeMapping(new int[] {2, -1, 0}, 2, true);
-    assertThatObject(em.inverse()).isInstanceOf(EdgeMapping.class);
-    var deprecated = em.inverse();
-    var current = em.inverted();
-    assertThat(deprecated.size()).isEqualTo(current.size());
-    for (int i = -1; i <= 3; i++) {
-      assertThat(deprecated.get(i)).as("index %d", i).isEqualTo(current.get(i));
-    }
-  }
-
-  @Test
   void composeReturnsEdgeMapping() {
     var outer = new EdgeMapping(new int[] {10, 20, 30}, 3, false);
     var inner = new EdgeMapping(new int[] {1, 0, 2}, 3, false);

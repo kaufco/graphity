@@ -194,27 +194,6 @@ public final class Components {
   }
 
   /**
-   * Computes bridges, articulation points and biconnected components of the given graph,
-   * building its in-adjacency first unless the graph already is a {@link BiAdjacentGraph}.
-   * Results are identical to {@link #biconnectivityOf(BiAdjacentGraph)}.
-   * <p>
-   * <strong>Time:</strong> as for {@link #biconnectivityOf(BiAdjacentGraph)}.<br>
-   * <strong>Memory:</strong> as for {@link #biconnectivityOf(BiAdjacentGraph)}, plus
-   * 4 x (nodeCount + edgeCount) bytes for the in-adjacency unless the graph is a
-   * {@code BiAdjacentGraph}.
-   *
-   * @param graph the graph to analyze
-   * @return bridges, articulation points and blocks as a {@link Biconnectivity} instance
-   * @deprecated Builds the in-adjacency on every call, hidden behind the call. Pass
-   *     {@code BiAdjacentGraph.of(graph)} to {@link #biconnectivityOf(BiAdjacentGraph)} instead;
-   *     a {@code BiAdjacentGraph} argument already resolves to that overload. Removed in 3.0.
-   */
-  @Deprecated(since = "2.4.0", forRemoval = true)
-  public static Biconnectivity biconnectivityOf(Graph graph) {
-    return Biconnectivity.of(BiAdjacentGraph.of(graph));
-  }
-
-  /**
    * Computes the strong bridges and strong articulation points of the given graph: the edges
    * and nodes whose removal increases the number of strongly connected components.
    * <p>

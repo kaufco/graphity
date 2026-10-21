@@ -303,18 +303,6 @@ class GraphTest {
   }
 
   @Test
-  @SuppressWarnings("removal") // the deprecated accessor until it is removed in 3.0
-  void deprecatedBiAdjacentGraphMatchesOf() {
-    var g = TestGraphs.of(4, 0, 1, 0, 2, 1, 3, 2, 3);
-    var viaAccessor = g.biAdjacentGraph();
-    var viaFactory = BiAdjacentGraph.of(g);
-    assertThat(viaAccessor).isNotSameAs(viaFactory).isEqualTo(viaFactory);
-    for (int v = 0; v < 4; v++) {
-      assertThat(viaAccessor.inNodes(v).toIntArray()).containsExactly(viaFactory.inNodes(v).toIntArray());
-    }
-  }
-
-  @Test
   void equalsIgnoresBiVsUniAdjacentType() {
     var uni = TestGraphs.of(3, 0, 1, 1, 2);
     var bi = BiAdjacentGraph.of(uni);

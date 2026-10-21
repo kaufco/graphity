@@ -80,23 +80,6 @@ public final class EdgeTypes {
     return EDGE_TYPE_VALUES[types[edgeIndex]];
   }
 
-  /**
-   * Returns all edges of the given type as an {@link Edges} collection.
-   * <p>
-   * <strong>Time:</strong> O(nodeCount + edgeCount).<br>
-   * <strong>Memory:</strong> O(matchingEdgeCount).
-   *
-   * @param type the edge type to filter by
-   * @return edges of the given type
-   * @deprecated Reads like a view, as {@code nodesOf} is on a partition, but scans every edge on
-   *     each call. Use {@link Edges#of(EdgeTypes, EdgeType)}, which returns the same result.
-   *     Removed in 3.0.
-   */
-  @Deprecated(since = "2.4.0", forRemoval = true)
-  public Edges edgesOfType(EdgeType type) {
-    return collect(type);
-  }
-
   /** The body of {@link Edges#of(EdgeTypes, EdgeType)}: one scan over all edges. */
   Edges collect(EdgeType type) {
     byte ordinal = (byte) type.ordinal();

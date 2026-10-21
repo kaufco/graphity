@@ -237,18 +237,6 @@ class NodeMappingTest {
   }
 
   @Test
-  @SuppressWarnings("removal") // the deprecated name until it is removed in 3.0
-  void deprecatedInverseMatchesInverted() {
-    var nm = NodeMapping.of(new int[] {2, -1, 0});
-    var deprecated = nm.inverse();
-    var current = nm.inverted();
-    assertThat(deprecated.size()).isEqualTo(current.size());
-    for (int i = -1; i <= 3; i++) {
-      assertThat(deprecated.get(i)).as("index %d", i).isEqualTo(current.get(i));
-    }
-  }
-
-  @Test
   void composeChainsTwoMappings() {
     var outer = NodeMapping.of(new int[] {10, 20, 30});
     var inner = NodeMapping.of(new int[] {1, 0, 2});

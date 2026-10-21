@@ -119,17 +119,6 @@ class GraphsTest {
   }
 
   @Test
-  @SuppressWarnings("removal") // the deprecated method until it is removed in 3.0
-  void isOutTreeAnswersLikeIsTree() {
-    for (var g : new Graph[] {
-        TestGraphs.empty(), TestGraphs.isolated(1), TestGraphs.isolated(3),
-        TestGraphs.path(5), TestGraphs.outStar(5), TestGraphs.inStar(4),
-        TestGraphs.cycle(3), TestGraphs.of(4, 0, 1, 2, 3)}) {
-      assertThat(Graphs.isOutTree(g)).isEqualTo(Graphs.isTree(g));
-    }
-  }
-
-  @Test
   void isPathTrueForEmptyGraph() {
     assertThat(Graphs.isPath(TestGraphs.empty())).isTrue();
   }
@@ -505,25 +494,6 @@ class GraphsTest {
     var remapped = Graphs.remapped(g, NodeMapping.forPermutation(perm));
     // Old node 0 becomes new node 3. Its out-edges: 0->1 stays 3->1; 0->2 stays 3->2; 0->3 becomes 3->0.
     assertThat(remapped.outNodes(3).toIntArray()).containsExactly(0, 1, 2);
-  }
-
-  // ---- dfsReordered ----
-
-  @Test
-  @SuppressWarnings("removal") // the deprecated method until it is removed in 3.0
-  void dfsReorderedMatchesRemappedWithReindexMapping() {
-    // Diamond + tail: 0 -> 1, 0 -> 2, 1 -> 3, 2 -> 3, 3 -> 4, 3 -> 5.
-    var g = TestGraphs.of(6, 0, 1, 0, 2, 1, 3, 2, 3, 3, 4, 3, 5);
-    var expected = Graphs.remapped(g, NodeMapping.reindex(g));
-    assertThat(Graphs.dfsReordered(g)).isEqualTo(expected);
-  }
-
-  @Test
-  @SuppressWarnings("removal") // the deprecated method until it is removed in 3.0
-  void dfsReorderedOnEmptyGraphIsEmpty() {
-    var reordered = Graphs.dfsReordered(TestGraphs.empty());
-    assertThat(reordered.nodeCount()).isZero();
-    assertThat(reordered.edgeCount()).isZero();
   }
 
   // ---- edgeMapping ----

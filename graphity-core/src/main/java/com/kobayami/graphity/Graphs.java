@@ -167,46 +167,6 @@ public final class Graphs {
   }
 
   /**
-   * Returns a copy of {@code graph} with node IDs reassigned in DFS preorder, so that nodes
-   * visited close together during traversal receive adjacent IDs.
-   * <p>
-   * This is a convenience method for cache-friendly reindexing. It is equivalent to:
-   * <pre>{@code
-   * NodeMapping newToOld = NodeMapping.reindex(graph);
-   * Graph reordered = Graphs.remapped(graph, newToOld);
-   * }</pre>
-   * It adds nothing beyond those two calls and discards {@code newToOld}. Write them out instead:
-   * the mapping is what translates results, and any data the caller keys by node ID, back to the
-   * original numbering.
-   * <p>
-   * DFS-preorder relabeling clusters each node's out-neighbors near it in ID space. This turns
-   * the random {@code state[target]} accesses of the DFS-based algorithms (SCC, WCC, CCs,
-   * TopOrder, back-edge and edge-type classification) into near-sequential scans. On
-   * poorly-ordered inputs this speeds those traversals up by a multiple; on already
-   * well-ordered inputs it is effectively a no-op.
-   * <p>
-   * <strong>Time:</strong> O(nodeCount + edgeCount).<br>
-   * <strong>Memory:</strong> O(nodeCount + edgeCount) for the result.
-   *
-   * @param graph the graph to reorder
-   * @return a new graph with DFS-preorder node IDs
-   * @see NodeMapping#reindex(Graph)
-   * @see #remapped(Graph, NodeMapping)
-   * @throws IllegalArgumentException if a depth-first path is longer than 2^30 - 5 nodes, the most
-   *     frames an array can hold
-   * @deprecated Reordering renumbers every node, so anything the caller keys by node ID - labels,
-   *     weights, source locations - has to be permuted along with it, and this method throws away
-   *     the only thing that can do that. Code that reorders and keeps such data compiles, runs,
-   *     and reads the wrong entries. Use {@link NodeMapping#reindex(Graph)} followed by
-   *     {@link #remapped(Graph, NodeMapping)} and keep the mapping. Marked for removal since 2.4.0;
-   *     removed in 3.0.
-   */
-  @Deprecated(since = "2.1.0", forRemoval = true)
-  public static Graph dfsReordered(Graph graph) {
-    return remapped(graph, NodeMapping.reindex(graph));
-  }
-
-  /**
    * Returns whether the given graph is a DAG (contains no cycles).
    * <p>
    * Uses a single DFS pass with back-edge detection. Self-loops are detected as cycles.
@@ -267,24 +227,6 @@ public final class Graphs {
   public static boolean isTree(Graph graph) {
     var info = computeForestInfo(graph);
     return info != null && info.rootCount <= 1;
-  }
-
-  /**
-   * Returns whether the given graph is a tree. Equivalent to {@link #isTree(Graph)}.
-   * <p>
-   * <strong>Time:</strong> O(nodeCount + edgeCount).<br>
-   * <strong>Memory:</strong> O(nodeCount).
-   *
-   * @param graph the graph to check
-   * @return {@code true} if the graph is a tree
-   * @deprecated Use {@link #isTree(Graph)}. The result is the same in every case; only the name
-   *     changed, because an unqualified predicate name here reads the graph as directed and the
-   *     spelled-out direction made this the only exception. Marked for removal since 2.4.0; removed
-   *     in 3.0.
-   */
-  @Deprecated(since = "2.1.0", forRemoval = true)
-  public static boolean isOutTree(Graph graph) {
-    return isTree(graph);
   }
 
   /**

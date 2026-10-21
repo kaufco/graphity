@@ -135,18 +135,4 @@ class EdgeTypesTest {
     assertThat(etPairs).isEqualTo(bePairs);
   }
 
-  @Test
-  @SuppressWarnings("removal") // the deprecated method until it is removed in 3.0
-  void deprecatedEdgesOfTypeMatchesEdgesOf() {
-    var g = TestGraphs.of(4, 0, 1, 1, 2, 2, 0, 0, 2, 3, 1);
-    var et = EdgeTypes.of(g);
-    for (EdgeType t : EdgeType.values()) {
-      var deprecated = et.edgesOfType(t);
-      var current = Edges.of(et, t);
-      assertThat(deprecated.sourceNodes().toIntArray()).as("%s sources", t)
-          .containsExactly(current.sourceNodes().toIntArray());
-      assertThat(deprecated.targetNodes().toIntArray()).as("%s targets", t)
-          .containsExactly(current.targetNodes().toIntArray());
-    }
-  }
 }

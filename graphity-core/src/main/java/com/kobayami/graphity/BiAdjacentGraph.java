@@ -124,21 +124,6 @@ public final class BiAdjacentGraph extends Graph {
   }
 
   /**
-   * Already bi-adjacent - returns {@code this}.
-   * <p>
-   * <strong>Time:</strong> O(1).
-   *
-   * @deprecated Use {@link #of(Graph)}, which returns a {@code BiAdjacentGraph} unchanged.
-   *     Removed in 3.0.
-   */
-  @Deprecated(since = "2.4.0", forRemoval = true)
-  @SuppressWarnings("removal") // overrides the deprecated method it replaces in kind
-  @Override
-  public final BiAdjacentGraph biAdjacentGraph() {
-    return this;
-  }
-
-  /**
    * Returns a {@link Graph} view with only out-adjacency, sharing the underlying arrays.
    * <p>
    * <strong>Time:</strong> O(1).

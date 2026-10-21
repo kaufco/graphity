@@ -90,13 +90,6 @@ class BiAdjacentGraphTest {
   }
 
   @Test
-  @SuppressWarnings("removal") // the deprecated accessor until it is removed in 3.0
-  void deprecatedBiAdjacentGraphReturnsSelf() {
-    var g = diamond();
-    assertThatObject(g.biAdjacentGraph()).isSameAs(g);
-  }
-
-  @Test
   void uniAdjacentGraphReturnsEqualUniGraph() {
     var bi = diamond();
     var uni = bi.uniAdjacentGraph();

@@ -197,22 +197,6 @@ public final class NodeMapping extends IndexMapping {
   }
 
   /**
-   * Creates the inverse mapping (target → source). Identical to {@link #inverted()}.
-   * <p>
-   * <strong>Time:</strong> as for {@link #inverted()}.<br>
-   * <strong>Memory:</strong> as for {@link #inverted()}.
-   *
-   * @return the inverse mapping
-   * @throws IllegalArgumentException if multiple source IDs map to the same target
-   * @deprecated Reads like a constant-time view, as {@code inverse()} is in other libraries,
-   *     but computes a new mapping on every call. Use {@link #inverted()}. Removed in 3.0.
-   */
-  @Deprecated(since = "2.4.0", forRemoval = true)
-  public NodeMapping inverse() {
-    return inverted();
-  }
-
-  /**
    * Composes this mapping with an inner mapping: {@code result(x) = this(inner(x))}.
    * <p>
    * If {@code this} maps B → C and {@code inner} maps A → B, the result maps A → C.

@@ -154,26 +154,6 @@ class BiconnectivityFuzzTest {
     });
   }
 
-  @Test
-  @SuppressWarnings("removal") // the deprecated Graph form against the BiAdjacentGraph form
-  void resultIsIdenticalForBiAdjacentInput() {
-    forEachGraph((description, graph) -> {
-      var fromUniAdjacent = Components.biconnectivityOf(graph);
-      var fromBiAdjacent = Components.biconnectivityOf(BiAdjacentGraph.of(graph));
-      assertThat(bridgeKeys(fromBiAdjacent))
-          .as("bridges for %s", description)
-          .isEqualTo(bridgeKeys(fromUniAdjacent));
-      assertThat(fromBiAdjacent.articulationPoints().toIntArray())
-          .as("articulation points for %s", description)
-          .containsExactly(fromUniAdjacent.articulationPoints().toIntArray());
-      for (int edgeIndex = 0; edgeIndex < graph.edgeCount(); edgeIndex++) {
-        assertThat(fromBiAdjacent.blocks().get(edgeIndex))
-            .as("block of edge %d for %s", edgeIndex, description)
-            .isEqualTo(fromUniAdjacent.blocks().get(edgeIndex));
-      }
-    });
-  }
-
   /**
    * Guards the corpus itself: a fuzz run in which every graph happens to have no bridge, no
    * articulation point and no block larger than one edge would agree with any oracle.

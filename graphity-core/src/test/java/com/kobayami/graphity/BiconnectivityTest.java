@@ -180,22 +180,6 @@ class BiconnectivityTest {
     assertThat(b.blocks().groupCount()).isEqualTo(2);
   }
 
-  @Test
-  @SuppressWarnings("removal") // the deprecated Graph form against the BiAdjacentGraph form
-  void resultIsIdenticalForBiAdjacentInput() {
-    var g = bowtieWithTail();
-    var fromUniAdjacent = Components.biconnectivityOf(g);
-    var fromBiAdjacent = Components.biconnectivityOf(BiAdjacentGraph.of(g));
-    assertThat(fromBiAdjacent.bridges().sourceNodes().toIntArray())
-        .containsExactly(fromUniAdjacent.bridges().sourceNodes().toIntArray());
-    assertThat(fromBiAdjacent.articulationPoints().toIntArray())
-        .containsExactly(fromUniAdjacent.articulationPoints().toIntArray());
-    for (int edgeIndex = 0; edgeIndex < g.edgeCount(); edgeIndex++) {
-      assertThat(fromBiAdjacent.blocks().get(edgeIndex))
-          .isEqualTo(fromUniAdjacent.blocks().get(edgeIndex));
-    }
-  }
-
   /** Edge index of {@code source → target}, or of the reverse edge if only that one exists. */
   private static int edgeIndexOf(Graph graph, int source, int target) {
     for (int edgeIndex = graph.outEdgeStart(source); edgeIndex < graph.outEdgeEnd(source); edgeIndex++) {
