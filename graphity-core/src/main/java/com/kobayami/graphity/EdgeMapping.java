@@ -10,7 +10,8 @@ package com.kobayami.graphity;
  * Edge indices correspond to positions in the CSR adjacency array of a {@link Graph}:
  * edge 0 is the first out-edge of node 0, edge 1 the second, etc.
  * <p>
- * Instances are created via {@link Graphs#edgeMapping(Graph, Graph, NodeMapping)}.
+ * Instances are created via {@link Graphs#edgeMapping(Graph, Graph, NodeMapping)} and
+ * {@link Graphs#transposedEdgeMapping(Graph)}.
  * Use {@link #inverted()} to obtain the reverse direction,
  * {@link #compose(EdgeMapping)} to chain multiple mappings, and {@link #gather(int[])} to carry
  * per-edge data along.
@@ -21,11 +22,20 @@ package com.kobayami.graphity;
  *
  * // Translate edge metadata; edges with no correspondence in the old graph get 0
  * double[] newWeights = em.gather(oldWeights);
+ *
+ * // A subgraph keeps the edges between selected nodes, and their data with them
+ * NodeMapping keep = NodeMapping.forSubgraph(selected);
+ * Graph sub = Graphs.remapped(graph, keep);
+ * double[] subWeights = Graphs.edgeMapping(sub, graph, keep).gather(weights);
  * }</pre>
+ *
+ * A transpose keeps node IDs but swaps the roles of source and target; its mapping comes from
+ * {@link Graphs#transposedEdgeMapping(Graph)} instead.
  *
  * @see IndexMapping
  * @see EdgePartition
  * @see Graphs#edgeMapping(Graph, Graph, NodeMapping)
+ * @see Graphs#transposedEdgeMapping(Graph)
  */
 public final class EdgeMapping extends IndexMapping {
 

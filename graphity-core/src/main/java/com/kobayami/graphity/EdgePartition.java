@@ -30,6 +30,10 @@ import java.util.function.LongBinaryOperator;
  * EdgePartition ep = Graphs.edgePartition(condensed, original, partition);
  * SortedIntView origEdges = ep.edgesOf(condensedEdge);         // edges behind one condensed edge
  * double[] weights = ep.reduce(originalWeights, 0.0, Double::sum);  // one value per condensed edge
+ *
+ * // the edges from node group g to node group h of the partition
+ * int gh = condensed.edgeIndexOf(g, h);                         // -1 if none runs from g to h
+ * SortedIntView between = gh < 0 ? SortedIntView.EMPTY : ep.edgesOf(gh);
  * }</pre>
  *
  * @see EdgeMapping

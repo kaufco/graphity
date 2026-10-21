@@ -128,6 +128,51 @@ double[] weightPerCondensedEdge = provenance.reduce(weights, 0.0, Double::sum);
 
 For a single edge instead of a full pass, `BiAdjacentGraph.transposedEdgeIndex(edgeIndex)` answers the same question in the other direction.
 
+### Recipes for edge data
+
+The graph never aggregates edge data itself - it does not know what a weight means. These are the pieces that do it, and how they fit together. Every snippet is also a test of the library.
+
+**Visit every edge with its data.** `forEachEdge` hands over source, target and edge index, in edge index order:
+
+```java
+double[] total = {0};
+graph.forEachEdge((source, target, edgeIndex) -> total[0] += weights[edgeIndex]);
+```
+
+**Sum the weights behind each contracted edge.** A condensed edge stands for every original edge between its two groups; the edge partition lists them, and `reduce` folds their values:
+
+```java
+Graph condensed = partition.condense();
+EdgePartition provenance = Graphs.edgePartition(condensed, graph, partition);
+double[] weightPerCondensedEdge = provenance.reduce(weights, 0.0, Double::sum);
+```
+
+**Collect the edges between two node groups.** The condensed edge `g -> h` is the key: its edge index in the condensation names the original edges from node group `g` to node group `h`, which `edgesOf` lists in ascending order:
+
+```java
+int condensedEdge = condensed.edgeIndexOf(g, h);                 // -1 if no edge runs from g to h
+SortedIntView between = condensedEdge < 0 ? SortedIntView.EMPTY : provenance.edgesOf(condensedEdge);
+double betweenWeight = 0;
+for (int i = 0; i < between.size(); i++) {
+    betweenWeight += weights[between.getInt(i)];                 // between holds edge indices of graph
+}
+```
+
+Edges inside one node group are in no condensed edge; `provenance.get(edgeIndex)` is `-1` for them.
+
+**Carry edge data across a subgraph or a renumbering.** `remapped` takes a node mapping from new to old IDs; `Graphs.edgeMapping` derives the matching edge mapping, and both gather the arrays that belong to them:
+
+```java
+NodeMapping keep = NodeMapping.forSubgraph(selected);            // selected: a BitSet of old IDs
+Graph sub = Graphs.remapped(graph, keep);
+EdgeMapping subToGraph = Graphs.edgeMapping(sub, graph, keep);
+double[] subWeights = subToGraph.gather(weights);                // subWeights[e] = weights[subToGraph.get(e)]
+String[] subNames = new String[sub.nodeCount()];
+keep.gather(names, subNames);
+```
+
+**Carry edge data across a transpose.** The transpose keeps node IDs but not edge indices, and `edgeMapping` does not apply to it - `Graphs.transposedEdgeMapping(graph)` does, as shown above.
+
 ## Views, immutability and threads
 
 **Zero-copy views.** Adjacency lists, partition members, edge lists — wherever the underlying CSR already holds the data in the right form, the API hands back a view, not a copy. No allocation on hot loops.

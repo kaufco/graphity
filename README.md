@@ -124,7 +124,7 @@ EdgePartition provenance = Graphs.edgePartition(condensed, graph, sccs);
 double[] condensedWeights = provenance.reduce(weights, 0.0, Double::sum);
 ```
 
-Subgraphs and renumberings work the same way with `NodeMapping.gather` and `EdgeMapping.gather`; the [tutorial](docs/tutorial.md#data-on-nodes-and-edges) has the details.
+Subgraphs and renumberings work the same way with `NodeMapping.gather` and `EdgeMapping.gather`. The [tutorial](docs/tutorial.md#recipes-for-edge-data) has recipes for the common cases: summing the weights behind each contracted edge, collecting the edges between two groups, and carrying edge data across a subgraph, a renumbering or a transpose.
 
 ## Graphity, Guava and JGraphT
 
