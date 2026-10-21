@@ -72,8 +72,8 @@ public sealed class Ancestry permits PreorderAncestry {
    */
   public static Ancestry of(Graph forest) {
     int n = forest.nodeCount();
-    var adjacency = forest.outAdjacency;
-    var adjacencyStart = forest.outAdjacencyStart;
+    var adjacency = Csr.outAdjacency(forest);
+    var adjacencyStart = Csr.outAdjacencyStart(forest);
 
     // Parent per node. A second parent means in-degree > 1, which no forest has.
     var parent = new int[n];

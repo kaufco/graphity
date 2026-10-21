@@ -157,8 +157,8 @@ public final class Loops {
 
     // Predecessors from the in-adjacency over node IDs, translated per edge through `number`
     // (0 = unreachable).
-    int[] predStart = graph.inAdjacencyStart;
-    int[] preds = graph.inAdjacency;
+    int[] predStart = Csr.inAdjacencyStart(graph);
+    int[] preds = Csr.inAdjacency(graph);
 
     // 2) Headers in reverse preorder, inner before outer. The body of w is the part of its
     //    search subtree that reaches w inside that subtree. Union-find collapses finished loops

@@ -65,8 +65,8 @@ final class DfsPreorder {
     for (int i = 0; i < entryCount; i++) {
       Objects.checkIndex(entries.getInt(i), n);
     }
-    int[] out = graph.outAdjacencyStart;
-    int[] adj = graph.outAdjacency;
+    int[] out = Csr.outAdjacencyStart(graph);
+    int[] adj = Csr.outAdjacency(graph);
 
     var preorderNumber = new int[n];
     var order = new int[n + 1];

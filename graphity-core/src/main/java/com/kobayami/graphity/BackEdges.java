@@ -82,8 +82,8 @@ public final class BackEdges {
 
     void run() {
       int n = graph.nodeCount();
-      int[] out = graph.outAdjacencyStart;
-      int[] adj = graph.outAdjacency;
+      int[] out = Csr.outAdjacencyStart(graph);
+      int[] adj = Csr.outAdjacency(graph);
       int[] state = this.state;
       IntArrayList sources = this.sources;
       IntArrayList targets = this.targets;

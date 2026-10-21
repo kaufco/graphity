@@ -24,22 +24,30 @@ import java.util.Objects;
  */
 public final class BiAdjacentGraph extends Graph {
 
-  /**
-   * Per-node start offset into {@link #inAdjacency}. Same layout as {@code outAdjacencyStart}
-   * but for incoming edges, including the sentinel at index {@code nodeCount}.
+  /*
+   * Per-node start offset into inAdjacency. Same layout as the out-adjacency offsets but for
+   * incoming edges, including the sentinel at index nodeCount.
    */
-  final int[] inAdjacencyStart;
+  private final int[] inAdjacencyStart;
 
-  /**
-   * Flat array of all in-adjacency lists, indexed via {@link #inAdjacencyStart}.
-   */
-  final int[] inAdjacency;
+  /* Flat array of all in-adjacency lists, indexed via inAdjacencyStart. */
+  private final int[] inAdjacency;
 
   // Package-private. Arrays are shared, not copied.
   BiAdjacentGraph(int[] outAdjacencyStart, int[] outAdjacency, int[] inAdjacencyStart, int[] inAdjacency) {
     super(outAdjacencyStart, outAdjacency);
     this.inAdjacencyStart = inAdjacencyStart;
     this.inAdjacency = inAdjacency;
+  }
+
+  /** The in-adjacency offset array, for {@link Csr}. */
+  final int[] inAdjacencyStart() {
+    return inAdjacencyStart;
+  }
+
+  /** The in-adjacency source array, for {@link Csr}. */
+  final int[] inAdjacency() {
+    return inAdjacency;
   }
 
   /**
@@ -132,7 +140,7 @@ public final class BiAdjacentGraph extends Graph {
    */
   @Override
   public final Graph uniAdjacentGraph() {
-    return new Graph(outAdjacencyStart, outAdjacency);
+    return new Graph(outAdjacencyStart(), outAdjacency());
   }
 
   /**
@@ -154,7 +162,7 @@ public final class BiAdjacentGraph extends Graph {
    * @see Graphs#transposedEdgeMapping(Graph)
    */
   public final BiAdjacentGraph transposed() {
-    return new BiAdjacentGraph(inAdjacencyStart, inAdjacency, outAdjacencyStart, outAdjacency);
+    return new BiAdjacentGraph(inAdjacencyStart, inAdjacency, outAdjacencyStart(), outAdjacency());
   }
 
   /**
@@ -184,7 +192,7 @@ public final class BiAdjacentGraph extends Graph {
   public final int transposedEdgeIndex(int edgeIndex) {
     Objects.checkIndex(edgeIndex, edgeCount());
     int source = edgeSource(edgeIndex);
-    int target = outAdjacency[edgeIndex];
+    int target = outAdjacency()[edgeIndex];
     return SortedIntView.indexOfInRange(
         inAdjacency, inAdjacencyStart[target], inAdjacencyEnd(target), source);
   }
@@ -204,8 +212,8 @@ public final class BiAdjacentGraph extends Graph {
     Objects.checkIndex(node, nodeCount());
     return new SortedIntView(
       SortedIntView.union(
-        outAdjacency,
-        outAdjacencyStart[node],
+        outAdjacency(),
+        outAdjacencyStart()[node],
         outAdjacencyEnd(node),
         inAdjacency,
         inAdjacencyStart[node],

@@ -129,10 +129,10 @@ public final class ControlFlowAlternatives {
   public static int[] cooperHarveyKennedy(Graph graph, IntList entries) {
     int n = graph.nodeCount();
     var bi = BiAdjacentGraph.of(graph);
-    int[] inStart = bi.inAdjacencyStart;
-    int[] in = bi.inAdjacency;
-    int[] out = graph.outAdjacencyStart;
-    int[] adj = graph.outAdjacency;
+    int[] inStart = Csr.inAdjacencyStart(bi);
+    int[] in = Csr.inAdjacency(bi);
+    int[] out = Csr.outAdjacencyStart(graph);
+    int[] adj = Csr.outAdjacency(graph);
 
     // Postorder numbers 1..R; the virtual root above the entries gets R + 1.
     var post = new int[n];
@@ -241,8 +241,8 @@ public final class ControlFlowAlternatives {
    * <strong>Memory:</strong> 4 x (reachedCount + reached edges) bytes.
    */
   private static Predecessors predecessors(Graph graph, DfsPreorder dfs) {
-    int[] out = graph.outAdjacencyStart;
-    int[] adj = graph.outAdjacency;
+    int[] out = Csr.outAdjacencyStart(graph);
+    int[] adj = Csr.outAdjacency(graph);
     int[] order = dfs.order;
     int[] number = dfs.preorderNumber;
     int size = dfs.reachedCount + 1;
@@ -362,8 +362,8 @@ public final class ControlFlowAlternatives {
         if (depth[node] < 0 || !given.add(node)) continue;
         heap = push(heap, heapSize++, depth[node], node);
       }
-      int[] out = graph.outAdjacencyStart;
-      int[] adj = graph.outAdjacency;
+      int[] out = Csr.outAdjacencyStart(graph);
+      int[] adj = Csr.outAdjacency(graph);
       var inFrontier = new IntOpenHashSet();
       var walked = new IntOpenHashSet();
       var result = new IntArrayList();

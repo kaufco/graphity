@@ -9,6 +9,11 @@ Graphity adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [3.0.0] — unreleased
 
+### Added
+
+- API
+  - [Issue #46](../../issues/46) - Read access to the CSR arrays for algorithm code
+
 ### Changed
 
 - API

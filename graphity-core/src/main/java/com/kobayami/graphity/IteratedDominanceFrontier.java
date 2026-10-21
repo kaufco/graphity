@@ -133,8 +133,8 @@ public final class IteratedDominanceFrontier {
       heap = push(heap, heapSize++, depth[node], node, n);
     }
 
-    int[] out = dominators.graph.outAdjacencyStart;
-    int[] adj = dominators.graph.outAdjacency;
+    int[] out = Csr.outAdjacencyStart(dominators.graph);
+    int[] adj = Csr.outAdjacency(dominators.graph);
     var inFrontier = new IntOpenHashSet();
     var walked = new IntOpenHashSet();
     var result = new IntArrayList();

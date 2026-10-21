@@ -75,8 +75,8 @@ public final class TopOrder {
 
     void run() {
       int n = graph.nodeCount();
-      int[] out = graph.outAdjacencyStart;
-      int[] adj = graph.outAdjacency;
+      int[] out = Csr.outAdjacencyStart(graph);
+      int[] adj = Csr.outAdjacency(graph);
       int[] state = this.state;
       int[] order = this.order;
       // Each frame is two interleaved ints, the node and its resume position in the

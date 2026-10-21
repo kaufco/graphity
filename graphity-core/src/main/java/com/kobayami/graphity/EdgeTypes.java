@@ -86,8 +86,8 @@ public final class EdgeTypes {
     var sources = new IntArrayList();
     var targets = new IntArrayList();
 
-    var adjacency = graph.outAdjacency;
-    var adjacencyStart = graph.outAdjacencyStart;
+    var adjacency = Csr.outAdjacency(graph);
+    var adjacencyStart = Csr.outAdjacencyStart(graph);
     int n = graph.nodeCount();
 
     for (int node = 0; node < n; node++) {
@@ -143,8 +143,8 @@ public final class EdgeTypes {
 
     void run() {
       int n = graph.nodeCount();
-      int[] out = graph.outAdjacencyStart;
-      int[] adj = graph.outAdjacency;
+      int[] out = Csr.outAdjacencyStart(graph);
+      int[] adj = Csr.outAdjacency(graph);
       int[] state = this.state;
       int[] disc = this.disc;
       byte[] types = this.types;

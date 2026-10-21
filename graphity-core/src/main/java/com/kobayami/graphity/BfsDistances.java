@@ -85,8 +85,8 @@ public final class BfsDistances {
     for (int i = 0; i < sourceCount; i++) {
       Objects.checkIndex(sources.getInt(i), n);
     }
-    int[] out = graph.outAdjacencyStart;
-    int[] adj = graph.outAdjacency;
+    int[] out = Csr.outAdjacencyStart(graph);
+    int[] adj = Csr.outAdjacency(graph);
     var distance = new int[n];
     var predecessor = new int[n];
     Arrays.fill(distance, -1);

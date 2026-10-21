@@ -30,23 +30,31 @@ import java.util.Objects;
  */
 public sealed class Graph permits BiAdjacentGraph {
 
-  /**
-   * Per-node start offset into {@link #outAdjacency}.
-   * Node {@code i}'s out-nodes occupy {@code outAdjacency[outAdjacencyStart[i]..outAdjacencyStart[i+1]-1]},
-   * sorted ascending.
-   * <p>
-   * Length {@code nodeCount + 1}; the sentinel {@code outAdjacencyStart[nodeCount] == edgeCount}
-   * keeps {@code outAdjacencyStart[i+1]} always valid (branchless end lookup).
+  /*
+   * Per-node start offset into outAdjacency. Node i's out-nodes occupy
+   * outAdjacency[outAdjacencyStart[i]..outAdjacencyStart[i+1]-1], sorted ascending. Length
+   * nodeCount + 1; the sentinel outAdjacencyStart[nodeCount] == edgeCount keeps
+   * outAdjacencyStart[i+1] always valid (branchless end lookup).
    */
-  final int[] outAdjacencyStart;
+  private final int[] outAdjacencyStart;
 
-  /** Flat array of all out-adjacency lists, indexed via {@link #outAdjacencyStart}. */
-  final int[] outAdjacency;
+  /* Flat array of all out-adjacency lists, indexed via outAdjacencyStart. */
+  private final int[] outAdjacency;
 
   // Package-private. Arrays are shared, not copied.
   Graph(int[] outAdjacencyStart, int[] outAdjacency) {
     this.outAdjacencyStart = outAdjacencyStart;
     this.outAdjacency = outAdjacency;
+  }
+
+  /** The offset array, for {@link Csr}. */
+  final int[] outAdjacencyStart() {
+    return outAdjacencyStart;
+  }
+
+  /** The target array, for {@link Csr}. */
+  final int[] outAdjacency() {
+    return outAdjacency;
   }
 
   /**

@@ -93,8 +93,8 @@ public final class Components {
       parent[i] = i;
     }
 
-    var adjacency = graph.outAdjacency;
-    var adjacencyStart = graph.outAdjacencyStart;
+    var adjacency = Csr.outAdjacency(graph);
+    var adjacencyStart = Csr.outAdjacencyStart(graph);
 
     for (int u = 0; u < n; u++) {
       int end = adjacencyStart[u + 1];
@@ -294,8 +294,8 @@ public final class Components {
 
     void run() {
       int n = graph.nodeCount();
-      int[] out = graph.outAdjacencyStart;
-      int[] adj = graph.outAdjacency;
+      int[] out = Csr.outAdjacencyStart(graph);
+      int[] adj = Csr.outAdjacency(graph);
       int[] node = this.node;
 
       // DFS frames grow on demand: depth is data-dependent and usually far below n, so

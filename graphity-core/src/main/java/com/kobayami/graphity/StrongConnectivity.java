@@ -72,9 +72,9 @@ public final class StrongConnectivity {
 
     var bridgePairs = new IntArrayList();
     var isArticulation = new boolean[n];
-    collect(forward, graph.inAdjacencyStart, graph.inAdjacency, sccOf, false, bridgePairs,
+    collect(forward, Csr.inAdjacencyStart(graph), Csr.inAdjacency(graph), sccOf, false, bridgePairs,
         isArticulation);
-    collect(backward, graph.outAdjacencyStart, graph.outAdjacency, sccOf, true, bridgePairs,
+    collect(backward, Csr.outAdjacencyStart(graph), Csr.outAdjacency(graph), sccOf, true, bridgePairs,
         isArticulation);
     markEntries(graph, sccOf, members, memberStart, isArticulation);
     return new StrongConnectivity(
@@ -190,9 +190,9 @@ public final class StrongConnectivity {
       if (size < 3) continue;
       int entry = members[memberStart[c]];
       int start = members[memberStart[c] + 1];
-      if (reachedAvoiding(graph.outAdjacencyStart, graph.outAdjacency, sccOf, c, entry, start,
+      if (reachedAvoiding(Csr.outAdjacencyStart(graph), Csr.outAdjacency(graph), sccOf, c, entry, start,
               2 * c + 1, stamp, queue) < size - 1
-          || reachedAvoiding(graph.inAdjacencyStart, graph.inAdjacency, sccOf, c, entry, start,
+          || reachedAvoiding(Csr.inAdjacencyStart(graph), Csr.inAdjacency(graph), sccOf, c, entry, start,
               2 * c + 2, stamp, queue) < size - 1) {
         isArticulation[entry] = true;
       }

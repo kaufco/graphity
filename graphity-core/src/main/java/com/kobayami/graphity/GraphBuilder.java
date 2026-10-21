@@ -572,8 +572,8 @@ public final class GraphBuilder {
 
     reserve(graph.edgeCount());
 
-    var adjacency = graph.outAdjacency;
-    var adjacencyStart = graph.outAdjacencyStart;
+    var adjacency = Csr.outAdjacency(graph);
+    var adjacencyStart = Csr.outAdjacencyStart(graph);
     int srcNodeCount = graph.nodeCount();
 
     for (int node = 0; node < srcNodeCount; node++) {

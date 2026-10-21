@@ -363,8 +363,8 @@ public final class NodeMapping extends IndexMapping {
 
     void run() {
       int n = graph.nodeCount();
-      int[] out = graph.outAdjacencyStart;
-      int[] adj = graph.outAdjacency;
+      int[] out = Csr.outAdjacencyStart(graph);
+      int[] adj = Csr.outAdjacency(graph);
       long[] visited = this.visited;
       // Each frame is two interleaved ints, the node and its resume position in the
       // adjacency array: both share a cache line, and the array grows on demand.

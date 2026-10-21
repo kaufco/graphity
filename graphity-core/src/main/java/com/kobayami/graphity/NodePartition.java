@@ -252,8 +252,8 @@ public sealed class NodePartition extends IndexMapping implements IndexPartition
     }
 
     var nodeToGroup = mapping;
-    var adjacency = graph.outAdjacency;
-    var adjacencyStart = graph.outAdjacencyStart;
+    var adjacency = Csr.outAdjacency(graph);
+    var adjacencyStart = Csr.outAdjacencyStart(graph);
 
     var dagStart = new int[groups + 1];
     var dagAdj = new IntArrayList();

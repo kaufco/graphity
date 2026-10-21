@@ -165,10 +165,10 @@ public final class Biconnectivity {
       this.graph = graph;
       int n = graph.nodeCount();
       int m = graph.edgeCount();
-      this.outAdjacency = graph.outAdjacency;
-      this.outAdjacencyStart = graph.outAdjacencyStart;
-      this.inAdjacency = graph.inAdjacency;
-      this.inAdjacencyStart = graph.inAdjacencyStart;
+      this.outAdjacency = Csr.outAdjacency(graph);
+      this.outAdjacencyStart = Csr.outAdjacencyStart(graph);
+      this.inAdjacency = Csr.inAdjacency(graph);
+      this.inAdjacencyStart = Csr.inAdjacencyStart(graph);
       this.inSlotToEdge = Graphs.transposedEdgeMapping(graph).mapping;
       this.disc = new int[n];
       this.low = new int[n];

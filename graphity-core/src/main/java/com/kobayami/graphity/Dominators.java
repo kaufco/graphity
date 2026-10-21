@@ -133,7 +133,7 @@ public final class Dominators {
     Objects.requireNonNull(entries, "entries");
     int n = graph.nodeCount();
     var dfs = DfsPreorder.of(graph, entries, "Dominators");
-    int[] idom = lengauerTarjan(dfs, graph.inAdjacencyStart, graph.inAdjacency, false);
+    int[] idom = lengauerTarjan(dfs, Csr.inAdjacencyStart(graph), Csr.inAdjacency(graph), false);
 
     // Back to node IDs; the virtual root becomes -1.
     int[] order = dfs.order;
@@ -160,7 +160,7 @@ public final class Dominators {
    */
   static int[] withinBlocks(BiAdjacentGraph graph, IntList entries, String analysis) {
     var dfs = DfsPreorder.of(graph, entries, analysis);
-    int[] idom = lengauerTarjan(dfs, graph.inAdjacencyStart, graph.inAdjacency, true);
+    int[] idom = lengauerTarjan(dfs, Csr.inAdjacencyStart(graph), Csr.inAdjacency(graph), true);
     int[] order = dfs.order;
     var immediateDominator = new int[graph.nodeCount()];
     Arrays.fill(immediateDominator, -1);

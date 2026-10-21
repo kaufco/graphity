@@ -253,8 +253,8 @@ public abstract class IterativeDfsTraverser {
    * @return {@code false} if the traversal was stopped
    */
   private boolean dfsFrom(int root) {
-    int[] out = graph.outAdjacencyStart;
-    int[] adj = graph.outAdjacency;
+    int[] out = Csr.outAdjacencyStart(graph);
+    int[] adj = Csr.outAdjacency(graph);
     int[] state = this.state;
     int[] frames = this.frames;
 

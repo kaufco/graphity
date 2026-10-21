@@ -97,6 +97,8 @@
  *       instances.</li>
  *   <li>{@link SortedIntView} - the zero-copy, sorted view returned by adjacency and
  *       group-membership lookups throughout the library.</li>
+ *   <li>{@link Csr} - read access to the CSR arrays themselves, for algorithm code that loops
+ *       over all edges; the built-in algorithms use it too.</li>
  * </ul>
  * <p>
  * Graphs are stored in a CSR (Compressed Sparse Row) layout: nodes are contiguous {@code int}

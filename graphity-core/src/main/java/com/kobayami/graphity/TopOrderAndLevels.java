@@ -58,12 +58,12 @@ public final class TopOrderAndLevels {
     // Compute in-degrees.
     var inDegree = new int[n];
     if (graph instanceof BiAdjacentGraph biGraph) {
-      var inStart = biGraph.inAdjacencyStart;
+      var inStart = Csr.inAdjacencyStart(biGraph);
       for (int i = 0; i < n; i++) {
         inDegree[i] = inStart[i + 1] - inStart[i];
       }
     } else {
-      var outAdj = graph.outAdjacency;
+      var outAdj = Csr.outAdjacency(graph);
       for (int i = 0; i < outAdj.length; i++) {
         inDegree[outAdj[i]]++;
       }
@@ -85,8 +85,8 @@ public final class TopOrderAndLevels {
     int orderPos = 0;
     int level = 0;
 
-    var adjacency = graph.outAdjacency;
-    var adjacencyStart = graph.outAdjacencyStart;
+    var adjacency = Csr.outAdjacency(graph);
+    var adjacencyStart = Csr.outAdjacencyStart(graph);
 
     while (queueHead < queueTail) {
       int levelEnd = queueTail;

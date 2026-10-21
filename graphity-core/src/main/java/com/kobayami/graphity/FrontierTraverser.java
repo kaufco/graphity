@@ -134,8 +134,8 @@ public abstract class FrontierTraverser {
    * @param node the node whose children to enqueue
    */
   protected final void enqueueChildren(int node) {
-    var adjacency = graph.outAdjacency;
-    var adjacencyStart = graph.outAdjacencyStart;
+    var adjacency = Csr.outAdjacency(graph);
+    var adjacencyStart = Csr.outAdjacencyStart(graph);
     int end = adjacencyStart[node + 1];
     for (int i = adjacencyStart[node]; i < end; i++) {
       int child = adjacency[i];

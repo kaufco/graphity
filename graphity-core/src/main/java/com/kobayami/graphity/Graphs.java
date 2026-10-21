@@ -117,8 +117,8 @@ public final class Graphs {
       bwd[oldNode] = n;
     }
 
-    var origAdj = graph.outAdjacency;
-    var origStart = graph.outAdjacencyStart;
+    var origAdj = Csr.outAdjacency(graph);
+    var origStart = Csr.outAdjacencyStart(graph);
 
     // A mapping that covers every node one-to-one drops no edge, so the target filter below is
     // always true. Knowing that up front turns the degree count into offset arithmetic and saves
@@ -304,8 +304,8 @@ public final class Graphs {
           "isBipartite holds two elements per node and so requires nodeCount < 2^30, but was " + n);
     }
 
-    var adjacency = graph.outAdjacency;
-    var adjacencyStart = graph.outAdjacencyStart;
+    var adjacency = Csr.outAdjacency(graph);
+    var adjacencyStart = Csr.outAdjacencyStart(graph);
 
     // Double cover: element u means "u in class A", element u + n means "u in class B". An edge
     // ties each endpoint to the other's opposite, so once a node shares a set with its own
@@ -425,8 +425,8 @@ public final class Graphs {
       return true;
     }
 
-    var adjacency = graph.outAdjacency;
-    var adjacencyStart = graph.outAdjacencyStart;
+    var adjacency = Csr.outAdjacency(graph);
+    var adjacencyStart = Csr.outAdjacencyStart(graph);
     // Reciprocal pairs need no attention: a second union of the same two nodes merges nothing,
     // and neither does a self-loop.
     var sets = new UnionFind(n);
@@ -473,8 +473,8 @@ public final class Graphs {
     if (n <= 1) {
       return true;
     }
-    int[] out = graph.outAdjacencyStart;
-    int[] adj = graph.outAdjacency;
+    int[] out = Csr.outAdjacencyStart(graph);
+    int[] adj = Csr.outAdjacency(graph);
     var index = new int[n];   // discovery time from 1; 0 = unvisited
     var low = new int[n];
     int[] frames = DfsFrames.initial(n);
@@ -550,8 +550,8 @@ public final class Graphs {
    */
   private static int undirectedMergeCount(Graph graph) {
     int n = graph.nodeCount();
-    var adjacency = graph.outAdjacency;
-    var adjacencyStart = graph.outAdjacencyStart;
+    var adjacency = Csr.outAdjacency(graph);
+    var adjacencyStart = Csr.outAdjacencyStart(graph);
     var sets = new UnionFind(n);
     int merges = 0;
 
@@ -629,8 +629,8 @@ public final class Graphs {
       return new ForestInfo(0, 0);
     }
 
-    var adjacency = graph.outAdjacency;
-    var adjacencyStart = graph.outAdjacencyStart;
+    var adjacency = Csr.outAdjacency(graph);
+    var adjacencyStart = Csr.outAdjacencyStart(graph);
 
     // Count in-degrees via edge scan.
     var inDegree = new int[n];
@@ -685,7 +685,7 @@ public final class Graphs {
    */
   public static SortedIntView rootNodes(BiAdjacentGraph graph) {
     int n = graph.nodeCount();
-    int[] inStart = graph.inAdjacencyStart;
+    int[] inStart = Csr.inAdjacencyStart(graph);
     int count = 0;
     for (int node = 0; node < n; node++) {
       if (inStart[node] == inStart[node + 1]) count++;
@@ -747,8 +747,8 @@ public final class Graphs {
     for (int i = 0; i < sourceCount; i++) {
       Objects.checkIndex(sources.getInt(i), n);
     }
-    int[] out = graph.outAdjacencyStart;
-    int[] adj = graph.outAdjacency;
+    int[] out = Csr.outAdjacencyStart(graph);
+    int[] adj = Csr.outAdjacency(graph);
     var visited = new long[(n >> 6) + 1];
     // Every reachable node enters the queue exactly once, so the queue grows into the result.
     // The initial capacity holds every distinct source.
@@ -838,8 +838,8 @@ public final class Graphs {
     BiAdjacentGraph graph = dominators.graph;
     int[] idom = dominators.immediateDominator;
     int n = idom.length;
-    int[] inStart = graph.inAdjacencyStart;
-    int[] in = graph.inAdjacency;
+    int[] inStart = Csr.inAdjacencyStart(graph);
+    int[] in = Csr.inAdjacency(graph);
 
     // Walk up from every predecessor of m to just below idom(m), adding m on the way (Cooper,
     // Harvey and Kennedy). A node already holding m means the rest of the walk is done, so every
@@ -925,10 +925,10 @@ public final class Graphs {
     int newEdgeCount = newGraph.edgeCount();
     int[] mapping = new int[newEdgeCount];
 
-    var newAdj = newGraph.outAdjacency;
-    var newStart = newGraph.outAdjacencyStart;
-    var oldAdj = oldGraph.outAdjacency;
-    var oldStart = oldGraph.outAdjacencyStart;
+    var newAdj = Csr.outAdjacency(newGraph);
+    var newStart = Csr.outAdjacencyStart(newGraph);
+    var oldAdj = Csr.outAdjacency(oldGraph);
+    var oldStart = Csr.outAdjacencyStart(oldGraph);
 
     int ei = 0;
     for (int newNode = 0; newNode < newGraph.nodeCount(); newNode++) {
@@ -982,14 +982,14 @@ public final class Graphs {
   public static EdgeMapping transposedEdgeMapping(Graph graph) {
     int n = graph.nodeCount();
     int m = graph.edgeCount();
-    var outAdjacency = graph.outAdjacency;
-    var outAdjacencyStart = graph.outAdjacencyStart;
+    var outAdjacency = Csr.outAdjacency(graph);
+    var outAdjacencyStart = Csr.outAdjacencyStart(graph);
 
     // Write pointer per target node: where that node's next in-edge slot goes.
     // A bi-adjacent graph already has those offsets; otherwise count and prefix-sum them.
     int[] writePos;
     if (graph instanceof BiAdjacentGraph biAdjacent) {
-      writePos = Arrays.copyOf(biAdjacent.inAdjacencyStart, n);
+      writePos = Arrays.copyOf(Csr.inAdjacencyStart(biAdjacent), n);
     } else {
       writePos = new int[n];
       for (int target : outAdjacency) {
@@ -1044,10 +1044,10 @@ public final class Graphs {
     int[] mapping = new int[oldEdgeCount];
     Arrays.fill(mapping, -1);
 
-    var origAdj = originalGraph.outAdjacency;
-    var origStart = originalGraph.outAdjacencyStart;
-    var condAdj = condensedGraph.outAdjacency;
-    var condStart = condensedGraph.outAdjacencyStart;
+    var origAdj = Csr.outAdjacency(originalGraph);
+    var origStart = Csr.outAdjacencyStart(originalGraph);
+    var condAdj = Csr.outAdjacency(condensedGraph);
+    var condStart = Csr.outAdjacencyStart(condensedGraph);
 
     // Forward pass: for each original edge, find the condensed edge (if cross-group).
     for (int origNode = 0; origNode < originalGraph.nodeCount(); origNode++) {
@@ -1119,8 +1119,8 @@ public final class Graphs {
 
     void run() {
       int n = graph.nodeCount();
-      int[] out = graph.outAdjacencyStart;
-      int[] adj = graph.outAdjacency;
+      int[] out = Csr.outAdjacencyStart(graph);
+      int[] adj = Csr.outAdjacency(graph);
       int[] state = this.state;
       // Each frame is two interleaved ints, the node and its resume position in the
       // adjacency array: both share a cache line, and the array grows on demand.

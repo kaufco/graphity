@@ -1,5 +1,6 @@
 package com.kobayami.graphity.benchmarks.generators;
 
+import com.kobayami.graphity.Csr;
 import com.kobayami.graphity.Graph;
 import com.kobayami.graphity.GraphArrays;
 
@@ -118,8 +119,8 @@ public final class GraphCache {
   }
 
   private static void write(Path file, Graph graph) throws IOException {
-    int[] start = GraphArrays.outAdjacencyStart(graph);
-    int[] adjacency = GraphArrays.outAdjacency(graph);
+    int[] start = Csr.outAdjacencyStart(graph);
+    int[] adjacency = Csr.outAdjacency(graph);
     Path tmp = file.resolveSibling(file.getFileName() + ".tmp" + ProcessHandle.current().pid());
     try (FileChannel ch = FileChannel.open(tmp, StandardOpenOption.CREATE, StandardOpenOption.WRITE,
         StandardOpenOption.TRUNCATE_EXISTING)) {

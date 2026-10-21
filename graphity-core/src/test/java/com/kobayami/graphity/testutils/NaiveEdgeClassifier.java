@@ -25,7 +25,7 @@ public final class NaiveEdgeClassifier {
 
   /**
    * Returns an array {@code types} where {@code types[ei]} is the {@link EdgeType}
-   * of edge at CSR position {@code ei} in {@link Graph#outAdjacency}.
+   * of the edge with index {@code ei}.
    */
   public static EdgeType[] classify(Graph graph) {
     int n = graph.nodeCount();
