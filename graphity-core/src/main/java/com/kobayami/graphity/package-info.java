@@ -94,11 +94,12 @@
  *   <li>{@link BiAdjacentGraph} - adds in-adjacency for constant-time predecessor access;
  *       obtained via {@link BiAdjacentGraph#of(Graph)}.</li>
  *   <li>{@link GraphBuilder} - mutable, add-only builder that produces immutable {@code Graph}
- *       instances.</li>
+ *       instances; {@link Graph#of(int[], int[])} takes arrays already in CSR form.</li>
  *   <li>{@link SortedIntView} - the zero-copy, sorted view returned by adjacency and
  *       group-membership lookups throughout the library.</li>
  *   <li>{@link Csr} - read access to the CSR arrays themselves, for algorithm code that loops
  *       over all edges; the built-in algorithms use it too.</li>
+ *   <li>{@link GraphFormat} - a versioned binary format for storing and loading the topology.</li>
  * </ul>
  * <p>
  * Graphs are stored in a CSR (Compressed Sparse Row) layout: nodes are contiguous {@code int}

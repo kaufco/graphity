@@ -57,6 +57,29 @@ Every method that takes existing node IDs checks them and throws `IndexOutOfBoun
 
 `build()` sorts each adjacency list and removes duplicate edges, so the order of insertion is not the order of edge indices; `graph.edgeIndexOf(source, target)` tells where an added edge ended up.
 
+### From CSR arrays, and to and from files
+
+A graph whose adjacency lists are already sorted and free of duplicates - computed elsewhere, or read from storage - does not need the builder. `Graph.of` takes the two CSR arrays, checks them in O(nodeCount + edgeCount) and copies them; the position of a target in `outAdjacency` becomes its edge index:
+
+```java
+// 0 -> 1, 0 -> 2, 2 -> 0
+Graph graph = Graph.of(new int[] {0, 2, 2, 3}, new int[] {1, 2, 0});
+```
+
+`GraphFormat` stores exactly these two arrays behind a 16-byte header with a magic number and a format version, as little-endian 32-bit integers - the layout a JavaScript `Int32Array` reads without parsing. Node IDs and edge indices survive the round trip, so arrays of node or edge data saved next to the graph stay aligned with it:
+
+```java
+try (var out = Files.newOutputStream(path)) {
+    GraphFormat.write(graph, out);
+}
+Graph loaded;
+try (var in = Files.newInputStream(path)) {
+    loaded = GraphFormat.read(in);
+}
+```
+
+Both methods move the arrays in 64 KiB blocks, so a file stream needs no extra buffering, and neither closes the stream. A file written by a later format version is rejected with an `IOException` rather than misread.
+
 ## Predecessors: `BiAdjacentGraph`
 
 **`BiAdjacentGraph` for O(1) bidirectional access.** Opt-in via `BiAdjacentGraph.of(graph)`. Doubles the storage to 8 B per (node + edge) and gives constant-time access in both directions — useful for Kahn's topological order, which then reads in-degrees in O(nodeCount) instead of scanning every edge, and for anything that walks predecessors, such as bidirectional BFS or ancestry queries. Connectivity is not among them: `Components.wccsOf` and `ccsOf` are Union-Find over the out-edges and need no in-adjacency. The control-flow analyses, which do walk predecessors, take a `BiAdjacentGraph` as input: the in-adjacency is built once, where the caller sees the cost, and shared by every analysis that needs it.

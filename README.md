@@ -100,6 +100,7 @@ The result types are themselves graphs or partitions backed by CSR — they comp
 - **Control flow:** dominators from one or several entries (Lengauer-Tarjan) and post-dominators; dominator tree, dominance frontiers and control dependence; iterated dominance frontiers for phi placement; the loop nesting forest, irreducible loops included (Havlak).
 - **Transformations:** quotient graph by a partition of your choosing, condensation of the strongly connected components, subgraph extraction, renumbering for cache locality, transpose — each with the mapping that carries your data along.
 - **Custom traversals:** iterative depth-first traversal with node or edge hooks, breadth-first traversal with levels, pruning and early stop — no stack limit.
+- **Storage:** graphs from CSR arrays you already have, checked and copied; a versioned little-endian binary format for files, caches and typed arrays in the browser.
 
 Every entry point and its result type is listed in the [algorithm reference](docs/tutorial.md#algorithm-reference); the [Javadoc](https://kaufco.github.io/graphity/) states each method's contract and cost.
 

@@ -11,6 +11,9 @@ import java.util.Objects;
  * The graph stores only structure (nodes and edges) - labels, weights or metadata
  * must be kept externally (e.g. in parallel arrays indexed by node/edge ID).
  * <p>
+ * Build a graph with {@link GraphBuilder}, or with {@link #of(int[], int[])} from arrays that
+ * are already in CSR form; {@link GraphFormat} stores and loads it.
+ * <p>
  * Use {@code Graph} for algorithms that only need out-edges.
  * For in-edge access, obtain a {@link BiAdjacentGraph} via {@link BiAdjacentGraph#of(Graph)};
  * its {@link BiAdjacentGraph#transposed()} is the transposed graph as a constant-time view.
@@ -26,6 +29,7 @@ import java.util.Objects;
  * @see BiAdjacentGraph#transposed()
  * @see Graphs#rootNodes(BiAdjacentGraph)
  * @see GraphBuilder
+ * @see GraphFormat
  * @see Components
  */
 public sealed class Graph permits BiAdjacentGraph {
@@ -45,6 +49,79 @@ public sealed class Graph permits BiAdjacentGraph {
   Graph(int[] outAdjacencyStart, int[] outAdjacency) {
     this.outAdjacencyStart = outAdjacencyStart;
     this.outAdjacency = outAdjacency;
+  }
+
+  /**
+   * Returns a graph over arrays that are already in CSR form, as {@link Csr} returns them or
+   * {@link GraphFormat} stores them.
+   * <p>
+   * The out-nodes of node {@code v} are
+   * {@code outAdjacency[outAdjacencyStart[v]..outAdjacencyStart[v + 1] - 1]}; the node count is
+   * {@code outAdjacencyStart.length - 1}. Both arrays are copied, then checked: the offsets start
+   * at {@code 0}, never decrease and end at {@code outAdjacency.length}, every target is a node,
+   * and each adjacency list is sorted ascending without duplicates. For edges in any order, with
+   * duplicates, use {@link GraphBuilder}.
+   * <p>
+   * <strong>Time:</strong> O(nodeCount + edgeCount).<br>
+   * <strong>Memory:</strong> 4 x (nodeCount + 1 + edgeCount) bytes for the copies, which the
+   * result keeps.
+   *
+   * @param outAdjacencyStart the offset of each node's out-nodes, length {@code nodeCount + 1}
+   * @param outAdjacency      the out-nodes of all nodes back to back, length {@code edgeCount}
+   * @return a graph with these edges; edge {@code e} is the one at position {@code e} of
+   *         {@code outAdjacency}
+   * @throws IndexOutOfBoundsException if a target is not in {@code 0..nodeCount-1}
+   * @throws IllegalArgumentException if {@code outAdjacencyStart} is empty, does not start at
+   *                                  {@code 0}, decreases or does not end at
+   *                                  {@code outAdjacency.length}, or an adjacency list is not
+   *                                  strictly ascending
+   */
+  public static Graph of(int[] outAdjacencyStart, int[] outAdjacency) {
+    Objects.requireNonNull(outAdjacencyStart, "outAdjacencyStart");
+    Objects.requireNonNull(outAdjacency, "outAdjacency");
+    return ofOwned(outAdjacencyStart.clone(), outAdjacency.clone());
+  }
+
+  /** {@link #of(int[], int[])} on arrays nobody else holds: checked, not copied. */
+  static Graph ofOwned(int[] outAdjacencyStart, int[] outAdjacency) {
+    if (outAdjacencyStart.length == 0) {
+      throw new IllegalArgumentException(
+          "outAdjacencyStart must hold nodeCount + 1 offsets, but is empty");
+    }
+    int n = outAdjacencyStart.length - 1;
+    int m = outAdjacency.length;
+    if (outAdjacencyStart[0] != 0) {
+      throw new IllegalArgumentException(
+          "outAdjacencyStart[0] must be 0, but was " + outAdjacencyStart[0]);
+    }
+    // Offsets first: once they rise from 0 to m, every list below lies inside outAdjacency.
+    for (int v = 0; v < n; v++) {
+      if (outAdjacencyStart[v + 1] < outAdjacencyStart[v]) {
+        throw new IllegalArgumentException("outAdjacencyStart decreases after node " + v + ": "
+            + outAdjacencyStart[v] + " > " + outAdjacencyStart[v + 1]);
+      }
+    }
+    if (outAdjacencyStart[n] != m) {
+      throw new IllegalArgumentException("outAdjacencyStart[" + n
+          + "] must be outAdjacency.length " + m + ", but was " + outAdjacencyStart[n]);
+    }
+    for (int v = 0; v < n; v++) {
+      int end = outAdjacencyStart[v + 1];
+      int previous = -1;
+      for (int e = outAdjacencyStart[v]; e < end; e++) {
+        int target = outAdjacency[e];
+        if (target < 0 || target >= n) {
+          throw new IndexOutOfBoundsException("out-node " + target + " of node " + v
+              + " at position " + e + " is not in 0.." + (n - 1));
+        }
+        if (target <= previous) {
+          throw new IllegalArgumentException("the out-nodes of node " + v
+              + " must be strictly ascending, but " + target + " follows " + previous);
+        }
+        previous = target;
+      }
+    }
+    return new Graph(outAdjacencyStart, outAdjacency);
   }
 
   /** The offset array, for {@link Csr}. */
