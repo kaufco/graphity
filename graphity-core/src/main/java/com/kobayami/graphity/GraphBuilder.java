@@ -73,19 +73,11 @@ import java.util.Arrays;
  *
  * <h2>Validation</h2>
  *
- * By default, node references are checked via {@code assert} - enable assertions
- * ({@code -ea}) during development to catch invalid node references. With assertions
- * disabled, what remains per call is a single predictable branch on the strict-mode flag.
- * <p>
- * {@link #strict()} replaces this with unconditional validation that throws
- * {@link IndexOutOfBoundsException}. It must be called before the first edge is added, so
- * that a builder can never hold a mix of validated and unvalidated edges. A batch method that
- * rejects an ID adds none of its edges.
- * <p>
- * <strong>From 3.0 on, every builder validates this way</strong>, and {@code strict()} is
- * removed: an invalid index raises an exception here as everywhere else in the library. Code
- * that already calls {@code strict()} keeps its behaviour and only has to drop the call; code
- * that relies on unchecked references can be found now by calling it.
+ * Every method that consumes a node ID checks it and throws {@link IndexOutOfBoundsException}
+ * for an ID outside {@code 0..nodeCount-1}, so an edge to a node that does not exist is an error
+ * at the call, not a wrong graph later. The check costs two predictable branches per consumed
+ * ID. A batch method that rejects an ID adds none of its edges. The {@code AndNodes} twins
+ * create the nodes they reference instead of requiring them to exist.
  *
  * @see Graph
  * @see Graphs#remapped(Graph, NodeMapping)
@@ -95,7 +87,6 @@ public final class GraphBuilder {
   private int nodeCount;
   private final IntArrayList edgeSources;
   private final IntArrayList edgeTargets;
-  private boolean strict;
 
   /**
    * Creates an empty builder with no nodes or edges.
@@ -103,29 +94,6 @@ public final class GraphBuilder {
   public GraphBuilder() {
     this.edgeSources = new IntArrayList();
     this.edgeTargets = new IntArrayList();
-  }
-
-  /**
-   * Enables strict validation of node references for the lifetime of this builder.
-   * <p>
-   * Every method that consumes a node ID rejects out-of-range values with an
-   * {@link IndexOutOfBoundsException} instead of relying on assertions, and a batch method
-   * that rejects an ID adds none of its edges. Methods that create nodes on reference still
-   * do so; only the IDs they consume are validated.
-   * <p>
-   * <strong>Time:</strong> O(1).
-   *
-   * @throws IllegalStateException if an edge has already been added
-   * @deprecated From 3.0 on, every builder validates node references exactly as after this
-   *     call, and the method is removed; there will be no way to turn validation off. Until
-   *     then it keeps working and is the way to test code against the 3.0 behaviour.
-   */
-  @Deprecated(since = "2.4.0", forRemoval = true)
-  public void strict() {
-    if (!edgeSources.isEmpty()) {
-      throw new IllegalStateException("strict() must be called before the first edge is added");
-    }
-    strict = true;
   }
 
   /**
@@ -188,7 +156,7 @@ public final class GraphBuilder {
    *
    * @param parent parent node ID, must already exist
    * @return new node ID
-   * @throws IndexOutOfBoundsException in strict mode if {@code parent} does not exist
+   * @throws IndexOutOfBoundsException if {@code parent} does not exist
    */
   public int addChild(int parent) {
     checkNode(parent, "parent");
@@ -208,7 +176,7 @@ public final class GraphBuilder {
    * @param count  number of children to add (must be ≥ 0)
    * @return first added node ID
    * @throws IllegalArgumentException  if {@code count} is negative
-   * @throws IndexOutOfBoundsException in strict mode if {@code parent} does not exist
+   * @throws IndexOutOfBoundsException if {@code parent} does not exist
    */
   public int addChildren(int parent, int count) {
     if (count < 0) throw new IllegalArgumentException("count must be non-negative: " + count);
@@ -230,7 +198,7 @@ public final class GraphBuilder {
    *
    * @param child child node ID, must already exist
    * @return new node ID
-   * @throws IndexOutOfBoundsException in strict mode if {@code child} does not exist
+   * @throws IndexOutOfBoundsException if {@code child} does not exist
    */
   public int addParent(int child) {
     checkNode(child, "child");
@@ -250,7 +218,7 @@ public final class GraphBuilder {
    * @param count number of parents to add (must be ≥ 0)
    * @return first added node ID
    * @throws IllegalArgumentException  if {@code count} is negative
-   * @throws IndexOutOfBoundsException in strict mode if {@code child} does not exist
+   * @throws IndexOutOfBoundsException if {@code child} does not exist
    */
   public int addParents(int child, int count) {
     if (count < 0) throw new IllegalArgumentException("count must be non-negative: " + count);
@@ -276,7 +244,7 @@ public final class GraphBuilder {
    *
    * @param source source node ID
    * @param target target node ID
-   * @throws IndexOutOfBoundsException in strict mode if either node does not exist
+   * @throws IndexOutOfBoundsException if either node does not exist
    */
   public void addEdge(int source, int target) {
     checkNode(source, "source");
@@ -314,7 +282,7 @@ public final class GraphBuilder {
    *
    * @param source  source node ID
    * @param targets list of target node IDs
-   * @throws IndexOutOfBoundsException in strict mode if any node does not exist
+   * @throws IndexOutOfBoundsException if any node does not exist
    */
   public void addEdges(int source, IntList targets) {
     checkNode(source, "source");
@@ -356,7 +324,7 @@ public final class GraphBuilder {
    *
    * @param source  source node ID
    * @param targets target node IDs
-   * @throws IndexOutOfBoundsException in strict mode if any node does not exist
+   * @throws IndexOutOfBoundsException if any node does not exist
    */
   public void addEdges(int source, int... targets) {
     checkNode(source, "source");
@@ -398,7 +366,7 @@ public final class GraphBuilder {
    *
    * @param target  target node ID
    * @param sources list of source node IDs
-   * @throws IndexOutOfBoundsException in strict mode if any node does not exist
+   * @throws IndexOutOfBoundsException if any node does not exist
    */
   public void addInEdges(int target, IntList sources) {
     checkNode(target, "target");
@@ -442,7 +410,7 @@ public final class GraphBuilder {
    *
    * @param target  target node ID
    * @param sources source node IDs
-   * @throws IndexOutOfBoundsException in strict mode if any node does not exist
+   * @throws IndexOutOfBoundsException if any node does not exist
    */
   public void addInEdges(int target, int... sources) {
     checkNode(target, "target");
@@ -483,7 +451,7 @@ public final class GraphBuilder {
    * <strong>Time:</strong> O(k) where k = {@code nodes.size()}.
    *
    * @param nodes list of node IDs to chain, in order
-   * @throws IndexOutOfBoundsException in strict mode if any node does not exist
+   * @throws IndexOutOfBoundsException if any node does not exist
    */
   public void addPath(IntList nodes) {
     checkNodes(nodes, "path");
@@ -524,7 +492,7 @@ public final class GraphBuilder {
    * <strong>Time:</strong> O(k) where k = {@code nodes.length}.
    *
    * @param nodes node IDs to chain, in order
-   * @throws IndexOutOfBoundsException in strict mode if any node does not exist
+   * @throws IndexOutOfBoundsException if any node does not exist
    */
   public void addPath(int... nodes) {
     checkNodes(nodes, "path");
@@ -563,7 +531,7 @@ public final class GraphBuilder {
    *
    * @param fromToPairs alternating source and target node IDs
    * @throws IllegalArgumentException  if the number of arguments is odd
-   * @throws IndexOutOfBoundsException in strict mode if any node does not exist
+   * @throws IndexOutOfBoundsException if any node does not exist
    */
   public void addEdgePairs(int... fromToPairs) {
     checkPairCount(fromToPairs.length);
@@ -704,16 +672,8 @@ public final class GraphBuilder {
     }
   }
 
-  /**
-   * Validates a consumed node ID: unconditionally in strict mode, via assertion otherwise.
-   */
   private void checkNode(int node, String role) {
-    if (strict) {
-      if (node < 0 || node >= nodeCount) throw notFound(role, node);
-    } else {
-      assert node >= 0 && node < nodeCount
-          : role + " node does not exist: " + node + " (nodeCount=" + nodeCount + ")";
-    }
+    if (node < 0 || node >= nodeCount) throw notFound(role, node);
   }
 
   /**
@@ -721,55 +681,16 @@ public final class GraphBuilder {
    * leaves the builder unchanged.
    */
   private void checkNodes(int[] nodes, String role) {
-    if (strict) {
-      for (int node : nodes) {
-        if (node < 0 || node >= nodeCount) throw notFound(role, node);
-      }
-    } else {
-      assert allExist(nodes) : missingMessage(nodes, role);
+    for (int node : nodes) {
+      if (node < 0 || node >= nodeCount) throw notFound(role, node);
     }
   }
 
   private void checkNodes(IntList nodes, String role) {
-    if (strict) {
-      for (int i = 0; i < nodes.size(); i++) {
-        int node = nodes.getInt(i);
-        if (node < 0 || node >= nodeCount) throw notFound(role, node);
-      }
-    } else {
-      assert allExist(nodes) : missingMessage(nodes, role);
-    }
-  }
-
-  private boolean allExist(int[] nodes) {
-    for (int node : nodes) {
-      if (node < 0 || node >= nodeCount) return false;
-    }
-    return true;
-  }
-
-  private boolean allExist(IntList nodes) {
     for (int i = 0; i < nodes.size(); i++) {
       int node = nodes.getInt(i);
-      if (node < 0 || node >= nodeCount) return false;
+      if (node < 0 || node >= nodeCount) throw notFound(role, node);
     }
-    return true;
-  }
-
-  /** Only ever evaluated on the failing assertion path. */
-  private String missingMessage(int[] nodes, String role) {
-    for (int node : nodes) {
-      if (node < 0 || node >= nodeCount) return notFound(role, node).getMessage();
-    }
-    return "";
-  }
-
-  private String missingMessage(IntList nodes, String role) {
-    for (int i = 0; i < nodes.size(); i++) {
-      int node = nodes.getInt(i);
-      if (node < 0 || node >= nodeCount) return notFound(role, node).getMessage();
-    }
-    return "";
   }
 
   private IndexOutOfBoundsException notFound(String role, int node) {

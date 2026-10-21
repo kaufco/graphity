@@ -8,7 +8,6 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntLists;
 import org.junit.jupiter.api.Test;
 
-@SuppressWarnings("removal") // strict() is the 3.0 default; tested until it is removed
 class GraphBuilderTest {
 
   @Test
@@ -54,43 +53,43 @@ class GraphBuilderTest {
   }
 
   @Test
-  void addEdgeWithInvalidSourceTriggersAssertion() {
+  void addEdgeWithInvalidSourceThrows() {
     var b = new GraphBuilder();
     b.addNodes(2);
     assertThatThrownBy(() -> b.addEdge(2, 0))
-        .isInstanceOf(AssertionError.class);
+        .isInstanceOf(IndexOutOfBoundsException.class);
     assertThatThrownBy(() -> b.addEdge(-1, 0))
-        .isInstanceOf(AssertionError.class);
+        .isInstanceOf(IndexOutOfBoundsException.class);
   }
 
   @Test
-  void addEdgeWithInvalidTargetTriggersAssertion() {
+  void addEdgeWithInvalidTargetThrows() {
     var b = new GraphBuilder();
     b.addNodes(2);
     assertThatThrownBy(() -> b.addEdge(0, 5))
-        .isInstanceOf(AssertionError.class);
+        .isInstanceOf(IndexOutOfBoundsException.class);
     assertThatThrownBy(() -> b.addEdge(0, -1))
-        .isInstanceOf(AssertionError.class);
+        .isInstanceOf(IndexOutOfBoundsException.class);
   }
 
   @Test
-  void addEdgesWithInvalidSourceTriggersAssertion() {
+  void addEdgesWithInvalidSourceThrows() {
     var b = new GraphBuilder();
     b.addNodes(2);
     assertThatThrownBy(() -> b.addEdges(5, new IntArrayList(new int[] {0})))
-        .isInstanceOf(AssertionError.class);
+        .isInstanceOf(IndexOutOfBoundsException.class);
     assertThatThrownBy(() -> b.addEdges(-1, new IntArrayList(new int[] {0})))
-        .isInstanceOf(AssertionError.class);
+        .isInstanceOf(IndexOutOfBoundsException.class);
   }
 
   @Test
-  void addEdgesWithInvalidTargetTriggersAssertion() {
+  void addEdgesWithInvalidTargetThrows() {
     var b = new GraphBuilder();
     b.addNodes(2);
     assertThatThrownBy(() -> b.addEdges(0, new IntArrayList(new int[] {0, 99})))
-        .isInstanceOf(AssertionError.class);
+        .isInstanceOf(IndexOutOfBoundsException.class);
     assertThatThrownBy(() -> b.addEdges(0, new IntArrayList(new int[] {0, -1})))
-        .isInstanceOf(AssertionError.class);
+        .isInstanceOf(IndexOutOfBoundsException.class);
   }
 
   @Test
@@ -293,12 +292,11 @@ class GraphBuilderTest {
     assertThat(b.build()).isEqualTo(TestGraphs.of(2, 0, 1));
   }
 
-  // ---- strict mode ----
+  // ---- validation ----
 
   @Test
-  void strictRejectsUnknownNodes() {
+  void rejectsUnknownNodes() {
     var b = new GraphBuilder();
-    b.strict();
     b.addNodes(2);
     assertThatThrownBy(() -> b.addEdge(2, 0)).isInstanceOf(IndexOutOfBoundsException.class);
     assertThatThrownBy(() -> b.addEdge(0, 2)).isInstanceOf(IndexOutOfBoundsException.class);
@@ -313,19 +311,17 @@ class GraphBuilderTest {
     assertThatThrownBy(() -> b.addParents(5, 1)).isInstanceOf(IndexOutOfBoundsException.class);
     assertThatThrownBy(() -> b.addEdges(0, new IntArrayList(new int[] {5})))
         .isInstanceOf(IndexOutOfBoundsException.class);
+    assertThatThrownBy(() -> b.addEdges(5, new int[] {0})).isInstanceOf(IndexOutOfBoundsException.class);
+    assertThatThrownBy(() -> b.addInEdges(5, new int[] {0})).isInstanceOf(IndexOutOfBoundsException.class);
+    assertThatThrownBy(() -> b.addInEdges(5, new IntArrayList(new int[] {0})))
+        .isInstanceOf(IndexOutOfBoundsException.class);
+    // No rejected call created a node or an edge.
+    assertThat(b.build()).isEqualTo(TestGraphs.isolated(2));
   }
 
   @Test
-  void strictIsRejectedAfterImportingAGraphWithEdges() {
+  void rejectsNegativeIdsInEveryBatchForm() {
     var b = new GraphBuilder();
-    b.addGraph(TestGraphs.of(2, 0, 1));
-    assertThatThrownBy(b::strict).isInstanceOf(IllegalStateException.class);
-  }
-
-  @Test
-  void strictRejectsNegativeIdsInEveryBatchForm() {
-    var b = new GraphBuilder();
-    b.strict();
     b.addNodes(2);
     assertThatThrownBy(() -> b.addEdges(0, new int[] {-1})).isInstanceOf(IndexOutOfBoundsException.class);
     assertThatThrownBy(() -> b.addEdges(0, new IntArrayList(new int[] {-1})))
@@ -336,9 +332,8 @@ class GraphBuilderTest {
   }
 
   @Test
-  void strictLeavesTheBuilderUnchangedWhenABatchIsRejected() {
+  void leavesTheBuilderUnchangedWhenABatchIsRejected() {
     var b = new GraphBuilder();
-    b.strict();
     b.addNodes(3);
     b.addEdge(0, 1);
     assertThatThrownBy(() -> b.addEdges(0, new int[] {2, 99}))
@@ -350,9 +345,8 @@ class GraphBuilderTest {
   }
 
   @Test
-  void strictMessageNamesNodeAndCount() {
+  void rejectionMessageNamesNodeAndCount() {
     var b = new GraphBuilder();
-    b.strict();
     b.addNodes(2);
     assertThatThrownBy(() -> b.addEdge(0, 7))
         .hasMessageContaining("7")
@@ -360,9 +354,8 @@ class GraphBuilderTest {
   }
 
   @Test
-  void strictAcceptsValidReferences() {
+  void acceptsValidReferences() {
     var b = new GraphBuilder();
-    b.strict();
     b.addNodes(3);
     b.addEdge(0, 1);
     b.addPath(1, 2);
@@ -370,35 +363,15 @@ class GraphBuilderTest {
   }
 
   @Test
-  void strictAfterFirstEdgeThrows() {
-    var b = new GraphBuilder();
-    b.addNodes(2);
-    b.addEdge(0, 1);
-    assertThatThrownBy(b::strict).isInstanceOf(IllegalStateException.class);
-  }
-
-  @Test
-  void strictIsIdempotentBeforeFirstEdge() {
-    var b = new GraphBuilder();
-    b.addNodes(2);
-    b.strict();
-    b.strict();
-    b.addEdge(0, 1);
-    assertThat(b.build().edgeCount()).isEqualTo(1);
-  }
-
-  @Test
-  void strictIsAllowedAfterImportingAnEdgelessGraph() {
+  void rejectsUnknownNodeAfterImportingAGraph() {
     var b = new GraphBuilder();
     b.addGraph(TestGraphs.isolated(3));
-    b.strict();
     assertThatThrownBy(() -> b.addEdge(0, 3)).isInstanceOf(IndexOutOfBoundsException.class);
   }
 
   @Test
-  void strictStillCreatesNodesInAndNodesMethods() {
+  void andNodesMethodsStillCreateNodes() {
     var b = new GraphBuilder();
-    b.strict();
     b.addEdgeAndNodes(2, 0);
     assertThat(b.build()).isEqualTo(TestGraphs.of(3, 2, 0));
   }
@@ -688,9 +661,8 @@ class GraphBuilderTest {
   }
 
   @Test
-  void strictRejectsUnknownNodesInEveryIntListForm() {
+  void rejectsUnknownNodesInEveryIntListForm() {
     var b = new GraphBuilder();
-    b.strict();
     b.addNodes(2);
     var invalid = new IntArrayList(new int[] {0, 5});
     assertThatThrownBy(() -> b.addEdges(0, invalid))
@@ -776,15 +748,9 @@ class GraphBuilderTest {
 
   @Test
   void addEdgePairsWithOddArgumentCountThrows() {
-    var lenient = new GraphBuilder();
-    lenient.addNodes(3);
-    assertThatThrownBy(() -> lenient.addEdgePairs(0, 1, 2))
-        .isInstanceOf(IllegalArgumentException.class);
-
-    var strict = new GraphBuilder();
-    strict.strict();
-    strict.addNodes(3);
-    assertThatThrownBy(() -> strict.addEdgePairs(0, 1, 2))
+    var b = new GraphBuilder();
+    b.addNodes(3);
+    assertThatThrownBy(() -> b.addEdgePairs(0, 1, 2))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
@@ -898,7 +864,6 @@ class GraphBuilderTest {
   @Test
   void addChildrenReportsAnInvalidCountBeforeAnInvalidAnchor() {
     var b = new GraphBuilder();
-    b.strict();
     assertThatThrownBy(() -> b.addChildren(99, -1))
         .isInstanceOf(IllegalArgumentException.class);
     assertThatThrownBy(() -> b.addParents(99, -1))

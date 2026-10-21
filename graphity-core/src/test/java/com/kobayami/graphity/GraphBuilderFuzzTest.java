@@ -13,10 +13,9 @@ import org.junit.jupiter.api.Test;
  * <p>
  * Covered: capacity hints, the fan-out and fan-in batch forms in both their {@code int[]} and
  * their {@link it.unimi.dsi.fastutil.ints.IntList} shape, the flat edge-pair form, the
- * {@code AndNodes} twins against a pre-allocated equivalent, strict mode against the default
- * mode, and the child/parent helpers against explicit node and edge calls.
+ * {@code AndNodes} twins against a pre-allocated equivalent, and the child/parent helpers
+ * against explicit node and edge calls.
  */
-@SuppressWarnings("removal") // strict() is the 3.0 default; tested until it is removed
 class GraphBuilderFuzzTest {
 
   private static final int ITERATIONS = 200;
@@ -179,23 +178,6 @@ class GraphBuilderFuzzTest {
           .isEqualTo(reference);
       assertThat(fanInList.build()).as("addInEdgesAndNodes from IntList for %s", edges.describe())
           .isEqualTo(reference);
-    }
-  }
-
-  @Test
-  void strictModeAcceptsEveryValidConstruction() {
-    for (long seed = 0; seed < ITERATIONS; seed++) {
-      var edges = randomEdges(seed);
-
-      var b = new GraphBuilder();
-      b.strict();
-      b.addNodes(edges.nodeCount());
-      for (int i = 0; i < edges.size(); i++) {
-        b.addEdge(edges.sources()[i], edges.targets()[i]);
-      }
-
-      assertThat(b.build()).as("strict mode for %s", edges.describe())
-          .isEqualTo(edgeByEdge(edges));
     }
   }
 

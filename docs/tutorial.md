@@ -28,7 +28,6 @@ double[] weights = new double[graph.edgeCount()];
 ```java
 var b = new GraphBuilder();
 b.ensureEdgeCapacity(1_000_000);        // no reallocation when the size is known
-b.strict();                             // deprecated: validation is always on from 3.0; call it to test against that
 
 int entry = b.addNode();
 int cond = b.addChild(entry);                       // adds a node, links entry -> it, returns its ID
@@ -53,6 +52,8 @@ b.addEdgeAndNodes(7, 3);                     // 8 nodes now exist
 b.addEdgePairs(7, 5, 5, 3);                  // flat pair list: 7 -> 5, 5 -> 3
 b.addEdgePairsAndNodes(9, 7, 3, 9);          // 9 -> 7, 3 -> 9; 10 nodes now exist
 ```
+
+Every method that takes existing node IDs checks them and throws `IndexOutOfBoundsException` for one that does not exist; a batch that contains one adds none of its edges.
 
 `build()` sorts each adjacency list and removes duplicate edges, so the order of insertion is not the order of edge indices; `graph.edgeIndexOf(source, target)` tells where an added edge ended up.
 
