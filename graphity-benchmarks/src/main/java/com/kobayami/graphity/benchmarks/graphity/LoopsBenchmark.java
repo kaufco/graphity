@@ -1,6 +1,6 @@
 package com.kobayami.graphity.benchmarks.graphity;
 
-import com.kobayami.graphity.Loops;
+import com.kobayami.graphity.controlflow.Loops;
 import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;

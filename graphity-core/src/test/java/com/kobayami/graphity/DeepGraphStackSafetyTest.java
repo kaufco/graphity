@@ -61,7 +61,6 @@ class DeepGraphStackSafetyTest {
     Dominators dominators = Dominators.of(path, 0);
     assertThat(dominators.immediateDominatorOf(DEEP - 1)).isEqualTo(DEEP - 2);
     assertThat(Graphs.dominatorTree(dominators).edgeCount()).isEqualTo(DEEP - 1);
-    assertThat(Graphs.dominanceFrontiers(dominators).edgeCount()).isZero();
     assertThat(Ancestry.of(dominators).isAncestorOf(0, DEEP - 1)).isTrue();
 
     // Back edges from the end of the chain to every node force long compressions.
@@ -71,20 +70,6 @@ class DeepGraphStackSafetyTest {
     for (int i = 0; i < DEEP; i += 1000) builder.addEdge(DEEP - 1, i);
     Dominators looped = Dominators.of(BiAdjacentGraph.of(builder.build()), 0);
     assertThat(looped.immediateDominatorOf(DEEP - 1)).isEqualTo(DEEP - 2);
-  }
-
-  @Test
-  void deepLoopsDoNotOverflowStack() {
-    // DEEP / 2 loops nested inside each other: i -> i + 1 down the first half, and a back edge
-    // from DEEP - 1 - i to i, so loop i encloses loop i + 1.
-    var builder = new GraphBuilder();
-    builder.addNodes(DEEP);
-    for (int i = 0; i + 1 < DEEP; i++) builder.addEdge(i, i + 1);
-    for (int i = 0; i < DEEP / 2; i++) builder.addEdge(DEEP - 1 - i, i);
-    Loops loops = Loops.of(BiAdjacentGraph.of(builder.build()), 0);
-    assertThat(loops.loopCount()).isEqualTo(DEEP / 2);
-    assertThat(loops.loopDepthOf(DEEP / 2)).isEqualTo(DEEP / 2);
-    assertThat(loops.isReducible()).isTrue();
   }
 
   @Test

@@ -11,10 +11,9 @@ import java.util.Random;
 import org.junit.jupiter.api.Test;
 
 /**
- * Cross-validates {@link Dominators}, {@link Graphs#dominatorTree}, {@link
- * Graphs#dominanceFrontiers} and {@link Ancestry#of(Dominators)} against {@link
- * NaiveDominators}, which decides dominance by removing a node and checking reachability. Inputs
- * are control-flow shapes with a single entry and arbitrary random graphs with up to three
+ * Cross-validates {@link Dominators}, {@link Graphs#dominatorTree} and {@link
+ * Ancestry#of(Dominators)} against {@link NaiveDominators}, which decides dominance by removing a
+ * node and checking reachability. Inputs are control-flow shapes with a single entry and arbitrary random graphs with up to three
  * random entries, duplicates and the empty list included.
  */
 class DominatorsFuzzTest {
@@ -93,24 +92,6 @@ class DominatorsFuzzTest {
         assertThat(preorder.isAncestorOf(a, b))
             .as("%d dominates %d (preorder), %s", a, b, c.describe())
             .isEqualTo(expected);
-      }
-    }
-  }
-
-  @Test
-  void dominanceFrontiersMatchTheDefinition() {
-    for (long seed = 0; seed < ITERATIONS; seed++) {
-      var c = caseFor(seed);
-      int n = c.graph().nodeCount();
-      var expected = new NaiveDominators(c.graph(), c.entries()).frontiers();
-      var df = Graphs.dominanceFrontiers(
-          Dominators.of(BiAdjacentGraph.of(c.graph()), c.entries()));
-      for (int x = 0; x < n; x++) {
-        for (int m = 0; m < n; m++) {
-          assertThat(df.hasOutNode(x, m))
-              .as("%d in DF(%d), %s", m, x, c.describe())
-              .isEqualTo(expected[x][m]);
-        }
       }
     }
   }

@@ -1,8 +1,7 @@
 /**
  * Graph analysis algorithms for Java on a compact, immutable graph: connected components,
  * bridges and articulation points, topological order, cycle and edge classification,
- * reachability and breadth-first distances, tree ancestry, dominators and loops, and quotient
- * graphs.
+ * reachability and breadth-first distances, tree ancestry, dominators, and quotient graphs.
  * <p>
  * Graphity targets compiler and analysis pipelines - abstract syntax trees, control- and
  * data-flow graphs, dependency graphs - and more generally any case where a graph is built from
@@ -52,18 +51,15 @@
  *       {@link Graphs#isBipartite(Graph)}.</li>
  * </ul>
  *
- * <h3>Control flow: dominators and loops</h3>
+ * <h3>Dominators</h3>
  * <ul>
  *   <li>{@link Dominators#of(BiAdjacentGraph, int)} - dominators from one or several entries
- *       (Lengauer-Tarjan), and post-dominators on the transposed graph.
- *       {@link Graphs#dominatorTree(Dominators)} and {@link Graphs#dominanceFrontiers(Dominators)}
- *       build the dominator tree and the dominance frontiers, and with them control
- *       dependence.</li>
- *   <li>{@link IteratedDominanceFrontier#of(Dominators)} - iterated dominance frontiers for phi
- *       placement.</li>
- *   <li>{@link Loops#of(BiAdjacentGraph, int)} - the loop nesting forest, irreducible loops
- *       included (Havlak).</li>
+ *       (Lengauer-Tarjan), and post-dominators on the transposed graph;
+ *       {@link Graphs#dominatorTree(Dominators)} builds the dominator tree.</li>
  * </ul>
+ * <p>
+ * Loops, dominance frontiers, control dependence and phi placement are in the module
+ * {@code graphity-controlflow}, package {@code com.kobayami.graphity.controlflow}.
  *
  * <h3>Transformations</h3>
  * <ul>

@@ -1,4 +1,4 @@
-package com.kobayami.graphity.testutils;
+package com.kobayami.graphity.controlflow;
 
 import com.kobayami.graphity.Components;
 import com.kobayami.graphity.Graph;

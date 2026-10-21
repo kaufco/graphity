@@ -1,5 +1,10 @@
-package com.kobayami.graphity;
+package com.kobayami.graphity.controlflow;
 
+import com.kobayami.graphity.BiAdjacentGraph;
+import com.kobayami.graphity.Csr;
+import com.kobayami.graphity.Dominators;
+import com.kobayami.graphity.Sccs;
+import com.kobayami.graphity.SortedIntView;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntImmutableList;
 import it.unimi.dsi.fastutil.ints.IntList;

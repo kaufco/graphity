@@ -1,8 +1,11 @@
-package com.kobayami.graphity;
+package com.kobayami.graphity.controlflow;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.kobayami.graphity.BiAdjacentGraph;
+import com.kobayami.graphity.Dominators;
+import com.kobayami.graphity.Graph;
 import com.kobayami.graphity.testutils.ControlFlowGraphs;
 import com.kobayami.graphity.testutils.TestGraphs;
 import it.unimi.dsi.fastutil.ints.IntList;

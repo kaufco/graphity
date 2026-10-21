@@ -52,6 +52,8 @@ dependencies {
 }
 ```
 
+The control-flow analyses - loops, dominance frontiers, control dependence, phi placement - are in a second artifact, `graphity-controlflow`, released together with the core at the same version; add it the same way if you need them. Dominators stay in the core.
+
 Requires JDK 17 or newer.
 
 ## Quick start
@@ -97,7 +99,8 @@ The result types are themselves graphs or partitions backed by CSR — they comp
 - **Order and cycles:** topological order by depth-first search, Kahn's order with a level per node; DAG check and a cycle test per strongly connected component; edge classification into tree, back, forward and cross edges; back edges.
 - **Reachability and distances:** breadth-first distances and shortest paths from one or several sources; the set of reachable nodes.
 - **Trees and ancestry:** parent, depth and lowest common ancestor in trees and forests; constant-time ancestor test and subtree views; tree, forest and path checks, directed and undirected; bipartiteness.
-- **Control flow:** dominators from one or several entries (Lengauer-Tarjan) and post-dominators; dominator tree, dominance frontiers and control dependence; iterated dominance frontiers for phi placement; the loop nesting forest, irreducible loops included (Havlak).
+- **Dominators:** dominators from one or several entries (Lengauer-Tarjan) and post-dominators; the dominator tree.
+- **Control flow** (module `graphity-controlflow`): dominance frontiers and control dependence; iterated dominance frontiers for phi placement; the loop nesting forest, irreducible loops included (Havlak).
 - **Transformations:** quotient graph by a partition of your choosing, condensation of the strongly connected components, subgraph extraction, renumbering for cache locality, transpose — each with the mapping that carries your data along.
 - **Custom traversals:** iterative depth-first traversal with node or edge hooks, breadth-first traversal with levels, pruning and early stop — no stack limit.
 - **Storage:** graphs from CSR arrays you already have, checked and copied; a versioned little-endian binary format for files, caches and typed arrays in the browser.
@@ -205,7 +208,7 @@ This README is the overview; the tutorial goes into depth, and the Javadoc is th
 
 Most users do not need to build from source — the published artifact (see [Installation](#installation)) is the recommended way to consume Graphity. The instructions below are for contributors who want to fork or extend the library.
 
-The project is a multi-module Maven build: `graphity-core` is the library and the only artifact published to Maven Central; `graphity-benchmarks` is a development module containing the JMH benchmark suite and is not part of the release.
+The project is a multi-module Maven build: `graphity-core` and `graphity-controlflow` are the library, published to Maven Central at the same version; `graphity-benchmarks` is a development module containing the JMH benchmark suite and is not part of the release.
 
 ### Build and test
 
@@ -215,7 +218,7 @@ From the repository root:
 mvn verify
 ```
 
-Compiles both modules and runs unit and fuzz tests for `graphity-core`. For tests only, without packaging:
+Compiles all modules and runs the unit and fuzz tests of `graphity-core` and `graphity-controlflow`. For tests only, without packaging:
 
 ```bash
 mvn test

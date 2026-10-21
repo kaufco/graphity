@@ -86,7 +86,7 @@ Both methods move the arrays in 64 KiB blocks, so a file stream needs no extra b
 
 ## Algorithm results and their follow-ups
 
-**Algorithm results as first-class typed values.** Where other libraries hand you `Set<Set<V>>` or `Map<V, Integer>` and let you figure out the rest, Graphity returns a domain object with useful follow-ups:
+**Algorithm results as first-class typed values.** Where other libraries hand you `Set<Set<V>>` or `Map<V, Integer>` and let you figure out the rest, Graphity returns a domain object with useful follow-ups (entries marked *controlflow* are in the module `graphity-controlflow`):
 
 | Algorithm                  | Result          | Useful follow-ups                            |
 |----------------------------|-----------------|----------------------------------------------|
@@ -98,8 +98,8 @@ Both methods move the arrays in 64 KiB blocks, so a file stream needs no extra b
 | `BackEdges.of(graph)`      | `Edges`         | `sourceNodes()`, `targetNodes()`             |
 | `Ancestry.of(forest)`      | `Ancestry`      | `lowestCommonAncestorOf(a, b)`, `depthOf()`  |
 | `PreorderAncestry.of(ancestry)` | `PreorderAncestry` | `isAncestorOf()` in O(1), `subtreeOf(node)`, `subtreeSizeOf()` |
-| `Dominators.of(cfg, entry)` | `Dominators` | `immediateDominatorOf()`, `Graphs.dominatorTree()`, `Graphs.dominanceFrontiers()`, `Ancestry.of(dominators)` |
-| `Loops.of(cfg, entry)`     | `Loops`         | `innermostLoopOf()`, `nodesOf(loop)`, `entriesOf(loop)`, `isReducible()` |
+| `Dominators.of(cfg, entry)` | `Dominators` | `immediateDominatorOf()`, `Graphs.dominatorTree()`, `ControlFlow.dominanceFrontiers()` (*controlflow*), `Ancestry.of(dominators)` |
+| `Loops.of(cfg, entry)` (*controlflow*) | `Loops`         | `innermostLoopOf()`, `nodesOf(loop)`, `entriesOf(loop)`, `isReducible()` |
 | `BfsDistances.of(graph, source)` | `BfsDistances` | `distanceOf()`, `pathTo(node)`, `maxDistance()` |
 | `NodeMapping.of(...)`      | `NodeMapping`   | `inverted()`, `compose(other)`, `gather(values)` |
 
@@ -183,7 +183,7 @@ Depth works the same way in the other direction, set when descending: `if (state
 
 ## Algorithm reference
 
-Graphity ships the following algorithms out of the box. All of them return typed result values; entry points live on the algorithm class itself, not on the graph.
+Graphity ships the following algorithms out of the box. All of them return typed result values; entry points live on the algorithm class itself, not on the graph. The rows marked *controlflow* are in the module `graphity-controlflow`, package `com.kobayami.graphity.controlflow`; everything else is in `graphity-core`.
 
 | Algorithm                                                       | Entry point                   |
 |-----------------------------------------------------------------|-------------------------------|
@@ -201,10 +201,12 @@ Graphity ships the following algorithms out of the box. All of them return typed
 | Lowest common ancestor (trees and forests)                      | `Ancestry.of(forest)`         |
 | Constant-time ancestor test and subtree views (trees and forests) | `PreorderAncestry.of(ancestry)` |
 | Dominators, one or several entries (Lengauer-Tarjan)            | `Dominators.of(biAdjacentGraph, entries)` |
-| Dominator tree, dominance frontiers                             | `Graphs.dominatorTree(dominators)`, `Graphs.dominanceFrontiers(dominators)` |
-| Iterated dominance frontiers, phi placement (Sreedhar-Gao)      | `IteratedDominanceFrontier.of(dominators)` |
-| Loop nesting forest, irreducible loops included (Havlak)        | `Loops.of(biAdjacentGraph, entries)` |
-| Post-dominators, control dependence                             | `Dominators.of(cfg.transposed(), exits)`, `BiAdjacentGraph.of(Graphs.dominanceFrontiers(postDominators)).transposed()` |
+| Dominator tree                                                  | `Graphs.dominatorTree(dominators)` |
+| Post-dominators                                                 | `Dominators.of(cfg.transposed(), exits)` |
+| Dominance frontiers (*controlflow*)                             | `ControlFlow.dominanceFrontiers(dominators)` |
+| Control dependence (*controlflow*)                              | `BiAdjacentGraph.of(ControlFlow.dominanceFrontiers(postDominators)).transposed()` |
+| Iterated dominance frontiers, phi placement, Sreedhar-Gao (*controlflow*) | `IteratedDominanceFrontier.of(dominators)` |
+| Loop nesting forest, irreducible loops included, Havlak (*controlflow*) | `Loops.of(biAdjacentGraph, entries)` |
 | Shape predicates (`isDag`, `isForest`, `isTree`, `isPath`, `isStronglyConnected`) | `Graphs.isDag(graph)` |
 | Shape predicates, undirected interpretation (`isBipartite`, `isUndirectedTree`, `isUndirectedForest`, `isWeaklyConnected`) | `Graphs.isBipartite(graph)` |
 | Condensation DAG                                                | `sccs.condense()`             |

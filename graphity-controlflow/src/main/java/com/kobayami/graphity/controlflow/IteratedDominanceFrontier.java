@@ -1,5 +1,10 @@
-package com.kobayami.graphity;
+package com.kobayami.graphity.controlflow;
 
+import com.kobayami.graphity.Csr;
+import com.kobayami.graphity.Dominators;
+import com.kobayami.graphity.Graph;
+import com.kobayami.graphity.Graphs;
+import com.kobayami.graphity.SortedIntView;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
@@ -36,7 +41,7 @@ import java.util.Objects;
  * <strong>Memory:</strong> 16 x nodeCount bytes, plus the {@link Dominators} it reads.
  *
  * @see Dominators
- * @see Graphs#dominanceFrontiers(Dominators)
+ * @see ControlFlow#dominanceFrontiers(Dominators)
  */
 public final class IteratedDominanceFrontier {
 
@@ -76,24 +81,45 @@ public final class IteratedDominanceFrontier {
    * @return the query structure
    */
   public static IteratedDominanceFrontier of(Dominators dominators) {
-    int[] parent = dominators.immediateDominator;
-    int n = parent.length;
+    Graph tree = Graphs.dominatorTree(dominators);
+    int n = tree.nodeCount();
+    int[] childStart = Csr.outAdjacencyStart(tree);
+    int[] children = Csr.outAdjacency(tree);
     var preorderIndex = new int[n];
     var order = new int[n];
     var subtreeSize = new int[n];
-    ParentForest.preorder(
-        parent, ParentForest.childrenOf(parent), preorderIndex, order, subtreeSize);
-
-    // Preorder visits every parent before its children.
     var depth = new int[n];
-    for (int i = 0; i < n; i++) {
-      int node = order[i];
-      int p = parent[node];
-      if (p >= 0) {
-        depth[node] = depth[p] + 1;
-      } else {
+
+    // Canonical preorder - roots ascending, children ascending. Every node is pushed exactly
+    // once, so the stack fits in n slots; the subtree-size array serves as the stack until it is
+    // filled below. Preorder visits every parent before its children, so depth follows on the
+    // way.
+    int[] stack = subtreeSize;
+    int top = 0;
+    for (int node = n - 1; node >= 0; node--) {
+      if (dominators.immediateDominatorOf(node) < 0) {
+        stack[top++] = node;
         depth[node] = dominators.isReachable(node) ? 0 : -1;
       }
+    }
+    int position = 0;
+    while (top > 0) {
+      int node = stack[--top];
+      preorderIndex[node] = position;
+      order[position++] = node;
+      for (int i = childStart[node + 1] - 1; i >= childStart[node]; i--) {
+        int child = children[i];
+        depth[child] = depth[node] + 1;
+        stack[top++] = child;
+      }
+    }
+
+    // Reverse preorder visits every child before its parent.
+    Arrays.fill(subtreeSize, 1);
+    for (int i = n - 1; i >= 0; i--) {
+      int node = order[i];
+      int p = dominators.immediateDominatorOf(node);
+      if (p >= 0) subtreeSize[p] += subtreeSize[node];
     }
     return new IteratedDominanceFrontier(dominators, depth, preorderIndex, subtreeSize, order);
   }
@@ -133,8 +159,8 @@ public final class IteratedDominanceFrontier {
       heap = push(heap, heapSize++, depth[node], node, n);
     }
 
-    int[] out = Csr.outAdjacencyStart(dominators.graph);
-    int[] adj = Csr.outAdjacency(dominators.graph);
+    int[] out = Csr.outAdjacencyStart(dominators.graph());
+    int[] adj = Csr.outAdjacency(dominators.graph());
     var inFrontier = new IntOpenHashSet();
     var walked = new IntOpenHashSet();
     var result = new IntArrayList();

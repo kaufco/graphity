@@ -107,7 +107,6 @@ class DominatorsTest {
   void emptyGraph() {
     var d = Dominators.of(BiAdjacentGraph.of(TestGraphs.empty()), IntList.of());
     assertThat(Graphs.dominatorTree(d).nodeCount()).isZero();
-    assertThat(Graphs.dominanceFrontiers(d).nodeCount()).isZero();
   }
 
   @Test
@@ -134,44 +133,20 @@ class DominatorsTest {
   }
 
   @Test
-  void dominanceFrontiersOfALoop() {
-    // 0 -> 1 -> 2 -> 1, 2 -> 3: the loop header is in its own frontier and in its body's.
-    var d = Dominators.of(bi(4, 0, 1, 1, 2, 2, 1, 2, 3), 0);
-    var df = Graphs.dominanceFrontiers(d);
-    assertThat(df.outNodes(0).toIntArray()).isEmpty();
-    assertThat(df.outNodes(1).toIntArray()).containsExactly(1);
-    assertThat(df.outNodes(2).toIntArray()).containsExactly(1);
-    assertThat(df.outNodes(3).toIntArray()).isEmpty();
-  }
-
-  @Test
-  void dominanceFrontiersOfADiamond() {
-    var d = Dominators.of(bi(4, 0, 1, 0, 2, 1, 3, 2, 3), 0);
-    var df = Graphs.dominanceFrontiers(d);
-    assertThat(df.outNodes(1).toIntArray()).containsExactly(3);
-    assertThat(df.outNodes(2).toIntArray()).containsExactly(3);
-    assertThat(df.edgeCount()).isEqualTo(2);
-  }
-
-  @Test
-  void ladderFrontierGrowsQuadratically() {
-    int rungs = 50;
-    var df = Graphs.dominanceFrontiers(
-        Dominators.of(BiAdjacentGraph.of(ControlFlowGraphs.ladder(rungs)), 0));
-    // b_i (= rungs + i) is in the frontier of every a_j with 1 <= j <= i, plus the exit.
-    assertThat(df.edgeCount()).isGreaterThan(rungs * (rungs - 1) / 2);
-  }
-
-  @Test
-  void postDominatorsAndControlDependence() {
+  void postDominators() {
     // if (0) { 1 } ; 2   -  0 -> 1, 0 -> 2, 1 -> 2, exit 2.
     var cfg = bi(3, 0, 1, 0, 2, 1, 2);
     var postDominators = Dominators.of(cfg.transposed(), 2);
     assertThat(postDominators.immediateDominatorOf(0)).isEqualTo(2);
     assertThat(postDominators.immediateDominatorOf(1)).isEqualTo(2);
-    var controlDependence = BiAdjacentGraph.of(Graphs.dominanceFrontiers(postDominators)).transposed();
-    assertThat(controlDependence.edgeCount()).isEqualTo(1);
-    assertThat(controlDependence.hasOutNode(0, 1)).isTrue();
+  }
+
+  @Test
+  void graphIsTheAnalyzedGraph() {
+    var cfg = bi(3, 0, 1, 1, 2);
+    assertThat(Dominators.of(cfg, 0).graph()).isSameAs(cfg);
+    var transposed = cfg.transposed();
+    assertThat(Dominators.of(transposed, 2).graph()).isSameAs(transposed);
   }
 
   @Test

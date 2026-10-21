@@ -65,6 +65,7 @@
 
   <modules>
     <module>graphity-core</module>
+    <module>graphity-controlflow</module>
     <module>graphity-benchmarks</module>
   </modules>
 
@@ -84,7 +85,7 @@
          artifactId (the Central pre-check), so the two must match; and since -am also builds
          and publishes the reactor dependencies of a listed module, each of those must be
          listed too. -->
-    <graphity.releaseModules>graphity-core</graphity.releaseModules>
+    <graphity.releaseModules>graphity-core,graphity-controlflow</graphity.releaseModules>
 
     <fastutil.version>8.5.17</fastutil.version>
     <jspecify.version>1.0.0</jspecify.version>
@@ -104,6 +105,7 @@
     <javadoc-plugin.version>3.11.2</javadoc-plugin.version>
     <source-plugin.version>3.3.1</source-plugin.version>
     <jar-plugin.version>3.4.1</jar-plugin.version>
+    <build-helper-plugin.version>3.6.1</build-helper-plugin.version>
     <gpg-plugin.version>3.2.8</gpg-plugin.version>
     <central-publishing-plugin.version>0.11.0</central-publishing-plugin.version>
   </properties>
@@ -124,6 +126,11 @@
       <dependency>
         <groupId>com.kobayami</groupId>
         <artifactId>graphity-core</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.kobayami</groupId>
+        <artifactId>graphity-controlflow</artifactId>
         <version>${project.version}</version>
       </dependency>
 
@@ -262,6 +269,17 @@
         </plugin>
 
         <plugin>
+          <!-- Each module adds graphity-core/src/testutils/java, the graph generators and
+               oracles shared by the tests of every module, as a test source root. A source root
+               rather than a dependency on the test jar of graphity-core: the release profile does
+               not build that jar, and a module whose tests depended on it would fail to
+               release. -->
+          <groupId>org.codehaus.mojo</groupId>
+          <artifactId>build-helper-maven-plugin</artifactId>
+          <version>${build-helper-plugin.version}</version>
+        </plugin>
+
+        <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-javadoc-plugin</artifactId>
           <version>${javadoc-plugin.version}</version>
@@ -272,6 +290,10 @@
             <charset>UTF-8</charset>
             <doclint>all</doclint>
             <failOnWarnings>true</failOnWarnings>
+            <!-- Class path, not module path: the jars carry an Automatic-Module-Name but no
+                 module-info, and in module mode the aggregated site finds no sources for the
+                 packages of the automatic modules. -->
+            <legacyMode>true</legacyMode>
             <notimestamp>true</notimestamp>
             <quiet>true</quiet>
             <!-- One title for the per-module Javadoc jars and the aggregated site alike;
@@ -286,7 +308,11 @@
             <groups>
               <group>
                 <title>graphity-core</title>
-                <packages>com.kobayami.graphity*</packages>
+                <packages>com.kobayami.graphity</packages>
+              </group>
+              <group>
+                <title>graphity-controlflow</title>
+                <packages>com.kobayami.graphity.controlflow</packages>
               </group>
             </groups>
             <bottom><![CDATA[Copyright &#169; {inceptionYear}&#x2013;{currentYear} Marco Kaufmann. Apache License 2.0.]]></bottom>

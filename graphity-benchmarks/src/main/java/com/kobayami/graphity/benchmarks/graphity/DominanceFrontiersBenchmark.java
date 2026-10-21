@@ -1,6 +1,6 @@
 package com.kobayami.graphity.benchmarks.graphity;
 
-import com.kobayami.graphity.Graphs;
+import com.kobayami.graphity.controlflow.ControlFlow;
 import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -11,7 +11,7 @@ import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.infra.Blackhole;
 
-/** {@code Graphs.dominanceFrontiers} on precomputed dominators. */
+/** {@code ControlFlow.dominanceFrontiers} on precomputed dominators. */
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @Warmup(iterations = 2, time = 500, timeUnit = TimeUnit.MILLISECONDS)
@@ -21,6 +21,6 @@ public class DominanceFrontiersBenchmark {
 
   @Benchmark
   public void dominanceFrontiers(ControlFlowFixture fx, Blackhole bh) {
-    for (var dominators : fx.dominators) bh.consume(Graphs.dominanceFrontiers(dominators));
+    for (var dominators : fx.dominators) bh.consume(ControlFlow.dominanceFrontiers(dominators));
   }
 }

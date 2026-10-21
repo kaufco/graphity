@@ -35,6 +35,10 @@
       <artifactId>graphity-core</artifactId>
     </dependency>
     <dependency>
+      <groupId>com.kobayami</groupId>
+      <artifactId>graphity-controlflow</artifactId>
+    </dependency>
+    <dependency>
       <!-- The generators and oracles from the core tests (control-flow shapes, among others). -->
       <groupId>com.kobayami</groupId>
       <artifactId>graphity-core</artifactId>

@@ -15,8 +15,8 @@
   <name>graphity-core</name>
   <description>Graph analysis algorithms for Java: strongly and weakly connected components,
     bridges and articulation points, topological order, edge classification, BFS distances,
-    lowest common ancestors, dominators, dominance frontiers and loop nesting - on a compact,
-    immutable CSR graph built for compiler and analysis pipelines.</description>
+    lowest common ancestors and dominators - on a compact, immutable CSR graph built for compiler
+    and analysis pipelines.</description>
 
   <dependencies>
     <dependency>
@@ -60,13 +60,41 @@
         <artifactId>jacoco-maven-plugin</artifactId>
       </plugin>
       <plugin>
-        <!-- The graph generators and oracles of the tests, packaged for graphity-benchmarks so
-             both measure and test on the same shapes. The release profile skips it: it is a
-             build-internal artifact, not part of the published library. -->
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>build-helper-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>add-testutils</id>
+            <phase>generate-test-sources</phase>
+            <goals><goal>add-test-source</goal></goals>
+            <configuration>
+              <sources>
+                <source>${project.basedir}/src/testutils/java</source>
+              </sources>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
         <executions>
           <execution>
+            <id>default-jar</id>
+            <configuration>
+              <archive>
+                <manifestEntries>
+                  <!-- A fixed module name for callers on the module path, independent of the
+                       jar's file name. -->
+                  <Automatic-Module-Name>com.kobayami.graphity</Automatic-Module-Name>
+                </manifestEntries>
+              </archive>
+            </configuration>
+          </execution>
+          <execution>
+            <!-- The graph generators and oracles of the tests, packaged for graphity-benchmarks
+                 so both measure and test on the same shapes. The release profile skips it: it is
+                 a build-internal artifact, not part of the published library. -->
             <id>testutils-jar</id>
             <goals><goal>test-jar</goal></goals>
             <configuration>

@@ -6,7 +6,7 @@ import com.kobayami.graphity.ControlFlowAlternatives;
 import com.kobayami.graphity.Dominators;
 import com.kobayami.graphity.Edges;
 import com.kobayami.graphity.Graph;
-import com.kobayami.graphity.IteratedDominanceFrontier;
+import com.kobayami.graphity.controlflow.IteratedDominanceFrontier;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import java.util.Arrays;

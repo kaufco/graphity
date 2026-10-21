@@ -314,8 +314,8 @@ public final class ControlFlowAlternatives {
   }
 
   /**
-   * {@link IteratedDominanceFrontier} with the dominator tree as child lists instead of in
-   * preorder: 12 instead of 16 bytes per node, but a subtree is walked through an explicit stack
+   * {@link com.kobayami.graphity.controlflow.IteratedDominanceFrontier} with the dominator tree
+   * as child lists instead of in preorder: 12 instead of 16 bytes per node, but a subtree is walked through an explicit stack
    * that checks every child against the walked set.
    */
   public static final class ChildListFrontier {
@@ -326,7 +326,7 @@ public final class ControlFlowAlternatives {
     private final int[] children;
 
     public ChildListFrontier(Dominators dominators) {
-      this.graph = dominators.graph;
+      this.graph = dominators.graph();
       int[] parent = dominators.immediateDominator;
       var forest = ParentForest.childrenOf(parent);
       childStart = forest.start();
@@ -393,7 +393,7 @@ public final class ControlFlowAlternatives {
       return sorted;
     }
 
-    /** Same pair heap as in {@link IteratedDominanceFrontier}. */
+    /** Same pair heap as in {@link com.kobayami.graphity.controlflow.IteratedDominanceFrontier}. */
     private static int[] push(int[] heap, int size, int key, int node) {
       if (2 * (size + 1) > heap.length) heap = Arrays.copyOf(heap, 2 * heap.length);
       int i = size;

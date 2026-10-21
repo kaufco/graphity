@@ -1,8 +1,10 @@
-package com.kobayami.graphity;
+package com.kobayami.graphity.controlflow;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.kobayami.graphity.BiAdjacentGraph;
+import com.kobayami.graphity.GraphBuilder;
 import com.kobayami.graphity.testutils.TestGraphs;
 import it.unimi.dsi.fastutil.ints.IntList;
 import org.junit.jupiter.api.Test;
@@ -150,5 +152,20 @@ class LoopsTest {
     assertThatThrownBy(() -> loops.entriesOf(1)).isInstanceOf(IndexOutOfBoundsException.class);
     assertThatThrownBy(() -> loops.parentOf(1)).isInstanceOf(IndexOutOfBoundsException.class);
     assertThatThrownBy(() -> loops.nodesOf(1)).isInstanceOf(IndexOutOfBoundsException.class);
+  }
+
+  @Test
+  void deepNestingDoesNotOverflowStack() {
+    // deep / 2 loops nested inside each other: i -> i + 1 down the chain, and a back edge from
+    // deep - 1 - i to i, so loop i encloses loop i + 1.
+    int deep = 1_000_000;
+    var builder = new GraphBuilder();
+    builder.addNodes(deep);
+    for (int i = 0; i + 1 < deep; i++) builder.addEdge(i, i + 1);
+    for (int i = 0; i < deep / 2; i++) builder.addEdge(deep - 1 - i, i);
+    Loops loops = Loops.of(BiAdjacentGraph.of(builder.build()), 0);
+    assertThat(loops.loopCount()).isEqualTo(deep / 2);
+    assertThat(loops.loopDepthOf(deep / 2)).isEqualTo(deep / 2);
+    assertThat(loops.isReducible()).isTrue();
   }
 }

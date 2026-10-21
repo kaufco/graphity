@@ -1,7 +1,10 @@
-package com.kobayami.graphity;
+package com.kobayami.graphity.controlflow;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.kobayami.graphity.BiAdjacentGraph;
+import com.kobayami.graphity.Dominators;
+import com.kobayami.graphity.Graph;
 import com.kobayami.graphity.testutils.ControlFlowGraphs;
 import com.kobayami.graphity.testutils.NaiveDominators;
 import com.kobayami.graphity.testutils.RandomGraphs;

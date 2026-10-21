@@ -5,8 +5,9 @@ import java.util.Arrays;
 import java.util.Objects;
 
 /**
- * Depth-first preorder of the nodes reachable from a list of entries - the common first step of
- * {@link Dominators} and {@link Loops}.
+ * Depth-first preorder of the nodes reachable from a list of entries - the first step of
+ * {@link Dominators}. The {@code graphity-controlflow} module keeps its own copy for the loop
+ * nesting forest.
  * <p>
  * Preorder numbers start at 1. Number 0 is a virtual root above all entries, so that several
  * entries need no special case downstream: every entry the search starts from is a child of

@@ -1,6 +1,6 @@
 package com.kobayami.graphity.benchmarks.graphity;
 
-import com.kobayami.graphity.IteratedDominanceFrontier;
+import com.kobayami.graphity.controlflow.IteratedDominanceFrontier;
 import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;

@@ -19,8 +19,8 @@ import java.util.Objects;
  * its {@link BiAdjacentGraph#transposed()} is the transposed graph as a constant-time view.
  * <p>
  * Algorithms are not methods on the graph: they take it as input and live on their own classes,
- * {@link Components}, {@link TopOrder}, {@link EdgeTypes}, {@link BfsDistances}, {@link Ancestry},
- * {@link Dominators} and {@link Loops} among them. The
+ * {@link Components}, {@link TopOrder}, {@link EdgeTypes}, {@link BfsDistances}, {@link Ancestry}
+ * and {@link Dominators} among them. The
  * {@linkplain com.kobayami.graphity package documentation} lists all of them by question.
  * <p>
  * <strong>Memory:</strong> 4 x (nodeCount + edgeCount) bytes.

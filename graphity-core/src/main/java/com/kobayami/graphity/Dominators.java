@@ -17,7 +17,8 @@ import java.util.Objects;
  * <p>
  * The analysis reads the predecessors of each node and so takes a {@link BiAdjacentGraph}. A
  * caller holding a plain {@link Graph} builds the in-adjacency once, at a visible cost, and can
- * hand the same graph to {@link Loops} and the other analyses that need it:
+ * hand the same graph to the other analyses that need it, such as the loop nesting forest of the
+ * {@code graphity-controlflow} module:
  *
  * <pre>{@code
  * BiAdjacentGraph cfg = BiAdjacentGraph.of(graph);   // +4 x (nodeCount + edgeCount) bytes
@@ -29,11 +30,13 @@ import java.util.Objects;
  * <pre>{@code
  * var dominators = Dominators.of(cfg, entry);
  * Graph tree = Graphs.dominatorTree(dominators);              // edge idom(n) -> n
- * Graph frontiers = Graphs.dominanceFrontiers(dominators);    // edge n -> m, m in DF(n)
  * var index = Ancestry.of(dominators);                        // "a dominates b" in O(log n)
  * boolean dominates = index.isAncestorOf(a, b);
- * var phis = IteratedDominanceFrontier.of(dominators);        // φ: merge variable versions where paths meet
  * }</pre>
+ *
+ * Dominance frontiers, control dependence and the iterated dominance frontiers for φ placement
+ * are control-flow concepts and come with the {@code graphity-controlflow} module, which reads
+ * this type through its public methods.
  *
  * There is no {@code dominates(a, b)} here: with the immediate dominators alone it would walk up
  * the tree in O(depth), and a long straight-line region makes the depth linear in the graph.
@@ -44,14 +47,10 @@ import java.util.Objects;
  * <strong>Post-dominators</strong> are the dominators of the transposed graph, with the exits
  * as entries. The caller chooses the exits; a node from which no exit is reachable - an
  * infinite loop - has no post-dominator unless a virtual exit node with edges from such loops is
- * added before the analysis. Control dependence is the transposed dominance frontier of the
- * post-dominators:
+ * added before the analysis:
  *
  * <pre>{@code
  * var postDominators = Dominators.of(cfg.transposed(), exits);   // cfg: a BiAdjacentGraph
- * Graph controlDependence =
- *     BiAdjacentGraph.of(Graphs.dominanceFrontiers(postDominators)).transposed();
- * // edge x -> y: x decides whether y runs
  * }</pre>
  *
  * With {@code cfg} a {@link BiAdjacentGraph}, the transpose is a constant-time view sharing its
@@ -68,8 +67,6 @@ import java.util.Objects;
  * graph, which stays reachable for as long as the dominators are held.
  *
  * @see Graphs#dominatorTree(Dominators)
- * @see Graphs#dominanceFrontiers(Dominators)
- * @see IteratedDominanceFrontier
  * @see Ancestry#of(Dominators)
  */
 public final class Dominators {
@@ -77,7 +74,7 @@ public final class Dominators {
   /** Unlinked marker in the ancestor lane of the path-compression forest. */
   private static final int UNLINKED = -1;
 
-  final BiAdjacentGraph graph;
+  private final BiAdjacentGraph graph;
 
   /** Immediate dominator of each node, {@code -1} for a root of the forest and when unreachable. */
   final int[] immediateDominator;
@@ -279,6 +276,18 @@ public final class Dominators {
       lanes[2 * y] = lanes[2 * x];
       x = y;
     }
+  }
+
+  /**
+   * Returns the graph these dominators were computed on, for analyses that combine both, such as
+   * dominance frontiers.
+   * <p>
+   * <strong>Time:</strong> O(1).
+   *
+   * @return the analyzed graph
+   */
+  public BiAdjacentGraph graph() {
+    return graph;
   }
 
   /**

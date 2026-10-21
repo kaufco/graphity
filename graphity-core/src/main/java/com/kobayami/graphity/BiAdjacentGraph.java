@@ -11,16 +11,16 @@ import java.util.Objects;
  * Obtain via {@link #of(Graph)}; convert back via {@link #uniAdjacentGraph()}.
  * <p>
  * The analyses that walk predecessors take a {@code BiAdjacentGraph}, so that the in-adjacency is
- * built once and shared: {@link Dominators}, {@link Loops},
- * {@link Components#biconnectivityOf(BiAdjacentGraph)} and
- * {@link Components#strongConnectivityOf(BiAdjacentGraph)}.
+ * built once and shared: {@link Dominators},
+ * {@link Components#biconnectivityOf(BiAdjacentGraph)},
+ * {@link Components#strongConnectivityOf(BiAdjacentGraph)} and the loop nesting forest of the
+ * {@code graphity-controlflow} module.
  * <p>
  * <strong>Memory:</strong> 8 x (nodeCount + edgeCount) bytes (2x {@link Graph}).
  *
  * @see Graph
  * @see Graphs#rootNodes(BiAdjacentGraph)
  * @see Dominators
- * @see Loops
  */
 public final class BiAdjacentGraph extends Graph {
 

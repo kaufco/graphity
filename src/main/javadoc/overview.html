@@ -33,9 +33,12 @@ articulation points, biconnected components, strong bridges</td></tr>
 {@link com.kobayami.graphity.Graphs#reachableFrom(com.kobayami.graphity.Graph, int)}</td></tr>
 <tr><td>Who is the ancestor of whom in a tree?</td>
 <td>{@link com.kobayami.graphity.Ancestry}, {@link com.kobayami.graphity.PreorderAncestry}</td></tr>
-<tr><td>Which node dominates which, and where are the loops?</td>
-<td>{@link com.kobayami.graphity.Dominators}, {@link com.kobayami.graphity.Loops},
-{@link com.kobayami.graphity.IteratedDominanceFrontier}</td></tr>
+<tr><td>Which node dominates which?</td>
+<td>{@link com.kobayami.graphity.Dominators}</td></tr>
+<tr><td>Where are the loops, where do phi-nodes go, what controls what? (graphity-controlflow)</td>
+<td>{@link com.kobayami.graphity.controlflow.Loops},
+{@link com.kobayami.graphity.controlflow.IteratedDominanceFrontier},
+{@link com.kobayami.graphity.controlflow.ControlFlow}</td></tr>
 <tr><td>How do I contract, filter or renumber a graph?</td>
 <td>{@link com.kobayami.graphity.NodePartition},
 {@link com.kobayami.graphity.Graphs#remapped(com.kobayami.graphity.Graph, com.kobayami.graphity.NodeMapping)},
@@ -48,8 +51,11 @@ articulation points, biconnected components, strong bridges</td></tr>
 </tbody>
 </table>
 <p>
-The package documentation of {@link com.kobayami.graphity} lists every entry point with a short
-description.
+The library comes as modules released together at the same version: {@code graphity-core} with
+the graph, the builder and every algorithm that applies to any directed graph, and
+{@code graphity-controlflow} with the analyses that need the concepts of control flow. The
+package documentation of {@link com.kobayami.graphity} and of
+{@link com.kobayami.graphity.controlflow} lists every entry point with a short description.
 </p>
 </body>
 </html>
