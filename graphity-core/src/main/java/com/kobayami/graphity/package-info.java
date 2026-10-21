@@ -94,7 +94,9 @@
  *   <li>{@link SortedIntView} - the zero-copy, sorted view returned by adjacency and
  *       group-membership lookups throughout the library.</li>
  *   <li>{@link Graph#nodes()} and {@link Graph#forEachEdge(EdgeConsumer)} - every node as a
- *       stream, every edge with source, target and edge index, in edge index order.</li>
+ *       stream, every edge with source, target and edge index, in edge index order;
+ *       {@link Graphs#adjacencyListOf(Graph)} - the complete adjacency list as text, where
+ *       {@code toString()} is bounded.</li>
  *   <li>{@link Csr} - read access to the CSR arrays themselves, for algorithm code that loops
  *       over all edges; the built-in algorithms use it too.</li>
  *   <li>{@link GraphFormat} - a versioned binary format for storing and loading the topology.</li>

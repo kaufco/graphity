@@ -9,8 +9,9 @@ import java.util.Objects;
  * Utility methods for graph transformations and shape checks.
  * <p>
  * Provides operations that create new {@link Graph} instances from existing graphs
- * and {@link NodeMapping}s (the original graph is never modified), as well as
- * predicate methods to test structural properties of a graph.
+ * and {@link NodeMapping}s (the original graph is never modified), predicate methods to test
+ * structural properties of a graph, and its complete text form,
+ * {@link #adjacencyListOf(Graph)}.
  * <p>
  * A predicate whose name does not say otherwise reads the graph as directed; the ones prefixed
  * {@code undirected} read it as {@link Components#ccsOf(Graph)} does. {@code isBipartite} and
@@ -1081,5 +1082,40 @@ public final class Graphs {
         }
       }
     }
+  }
+
+  /**
+   * Returns the complete adjacency list of the graph, one line per node in ascending order:
+   * <pre>
+   * 0 -&gt; [17, 532]
+   * 1 -&gt; [4]
+   * 2 -&gt; []
+   * </pre>
+   * Each line ends with a line feed. Unlike {@link Graph#toString()}, which is bounded because it
+   * runs implicitly, this lists every node and edge; a {@link BiAdjacentGraph} lists its
+   * out-adjacency. The text of a graph with a few hundred million edges exceeds what a
+   * {@code String} can hold and ends in an {@link OutOfMemoryError}.
+   * <p>
+   * <strong>Time:</strong> O(nodeCount + edgeCount).<br>
+   * <strong>Memory:</strong> O(nodeCount + edgeCount) characters for the result.
+   *
+   * @param graph the graph to list
+   * @return the adjacency list, one line per node
+   */
+  public static String adjacencyListOf(Graph graph) {
+    int n = graph.nodeCount();
+    int[] start = Csr.outAdjacencyStart(graph);
+    int[] targets = Csr.outAdjacency(graph);
+    var sb = new StringBuilder((int) Math.min(Integer.MAX_VALUE - 8,
+        16L * n + 8L * graph.edgeCount()));
+    for (int v = 0; v < n; v++) {
+      sb.append(v).append(" -> [");
+      for (int e = start[v], end = start[v + 1]; e < end; e++) {
+        if (e > start[v]) sb.append(", ");
+        sb.append(targets[e]);
+      }
+      sb.append("]\n");
+    }
+    return sb.toString();
   }
 }

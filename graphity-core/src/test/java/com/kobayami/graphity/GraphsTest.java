@@ -699,4 +699,18 @@ class GraphsTest {
     assertThat(ep.edgesOf(0).toIntArray()).containsExactly(0, 2);
     assertThat(ep.edgesOf(1).toIntArray()).containsExactly(1);
   }
+
+  @Test
+  void adjacencyListOfListsEveryNode() {
+    assertThat(Graphs.adjacencyListOf(TestGraphs.of(3, 0, 1, 0, 2, 2, 0)))
+        .isEqualTo("0 -> [1, 2]\n1 -> []\n2 -> [0]\n");
+    assertThat(Graphs.adjacencyListOf(TestGraphs.empty())).isEmpty();
+    assertThat(Graphs.adjacencyListOf(TestGraphs.isolated(40)).lines().count()).isEqualTo(40);
+  }
+
+  @Test
+  void adjacencyListOfABiAdjacentGraphListsItsOutAdjacency() {
+    var bi = BiAdjacentGraph.of(TestGraphs.of(3, 0, 1, 0, 2, 2, 0));
+    assertThat(Graphs.adjacencyListOf(bi.transposed())).isEqualTo("0 -> [2]\n1 -> [0]\n2 -> [0]\n");
+  }
 }

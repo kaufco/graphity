@@ -35,6 +35,12 @@ import java.util.stream.IntStream;
  */
 public sealed class Graph permits BiAdjacentGraph {
 
+  /** Most nodes {@link #toString()} lists. */
+  private static final int TO_STRING_NODES = 16;
+
+  /** Most out-nodes {@link #toString()} lists, over all listed nodes together. */
+  private static final int TO_STRING_TARGETS = 64;
+
   /*
    * Per-node start offset into outAdjacency. Node i's out-nodes occupy
    * outAdjacency[outAdjacencyStart[i]..outAdjacencyStart[i+1]-1], sorted ascending. Length
@@ -462,5 +468,51 @@ public sealed class Graph permits BiAdjacentGraph {
   @Override
   public final int hashCode() {
     return 31 * Arrays.hashCode(outAdjacencyStart) + Arrays.hashCode(outAdjacency);
+  }
+
+  /**
+   * Returns the node and edge counts and the out-nodes of the first nodes, bounded regardless of
+   * the graph's size, for debuggers and logs:
+   * <pre>
+   * Graph[nodes=5, edges=4] {0 -&gt; [1, 2], 1 -&gt; [3], 2 -&gt; [], 3 -&gt; [4], 4 -&gt; []}
+   * </pre>
+   * At most 16 nodes and 64 out-nodes in total are listed; {@code ...} marks where a list or the
+   * listing is cut - after node 15 in a larger graph, inside the list that reaches the 64th
+   * out-node, as in {@code {0 -> [1, 2, 3, ..., 64, ...], ...}} for a hub. A
+   * {@link BiAdjacentGraph} is named as such and lists its out-adjacency. For the complete
+   * listing, use {@link Graphs#adjacencyListOf(Graph)}.
+   * <p>
+   * <strong>Time:</strong> O(1) - bounded by the limits above.
+   *
+   * @return a bounded description of this graph
+   */
+  @Override
+  public final String toString() {
+    int n = nodeCount();
+    var sb = new StringBuilder(1024);
+    sb.append(getClass().getSimpleName()).append("[nodes=").append(n)
+        .append(", edges=").append(edgeCount()).append("] {");
+    int budget = TO_STRING_TARGETS;
+    int listed = Math.min(n, TO_STRING_NODES);
+    for (int v = 0; v < listed; v++) {
+      if (v > 0) sb.append(", ");
+      sb.append(v).append(" -> [");
+      int start = outAdjacencyStart[v];
+      int end = outAdjacencyStart[v + 1];
+      int shown = Math.min(end - start, budget);
+      for (int e = start; e < start + shown; e++) {
+        if (e > start) sb.append(", ");
+        sb.append(outAdjacency[e]);
+      }
+      budget -= shown;
+      if (shown < end - start) {
+        sb.append(shown > 0 ? ", ...]" : "...]");
+        if (v + 1 < n) sb.append(", ...");
+        return sb.append('}').toString();
+      }
+      sb.append(']');
+    }
+    if (listed < n) sb.append(", ...");
+    return sb.append('}').toString();
   }
 }

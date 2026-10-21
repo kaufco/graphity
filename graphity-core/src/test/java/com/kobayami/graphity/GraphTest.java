@@ -354,4 +354,69 @@ class GraphTest {
     assertThatThrownBy(() -> TestGraphs.path(2).forEachEdge(null))
         .isInstanceOf(NullPointerException.class);
   }
+
+  @Test
+  void toStringListsSmallGraphsCompletely() {
+    assertThat(TestGraphs.of(3, 0, 1, 0, 2, 2, 0).toString())
+        .isEqualTo("Graph[nodes=3, edges=3] {0 -> [1, 2], 1 -> [], 2 -> [0]}");
+    assertThat(TestGraphs.empty().toString()).isEqualTo("Graph[nodes=0, edges=0] {}");
+  }
+
+  @Test
+  void toStringNamesTheBiAdjacentType() {
+    assertThat(BiAdjacentGraph.of(TestGraphs.path(2)).toString())
+        .isEqualTo("BiAdjacentGraph[nodes=2, edges=1] {0 -> [1], 1 -> []}");
+  }
+
+  @Test
+  void toStringCutsAfterSixteenNodes() {
+    String text = TestGraphs.isolated(17).toString();
+    assertThat(text).startsWith("Graph[nodes=17, edges=0] {0 -> [], ")
+        .endsWith("15 -> [], ...}")
+        .doesNotContain("16 ->");
+  }
+
+  @Test
+  void toStringListsExactlySixteenNodesWithoutAMarker() {
+    assertThat(TestGraphs.isolated(16).toString()).endsWith("15 -> []}").doesNotContain("...");
+  }
+
+  @Test
+  void toStringCutInTheLastListHasNoTrailingMarker() {
+    // Nodes 0..8 with 7 out-nodes each use 63 of the budget; node 9 is the last node.
+    var b = new GraphBuilder();
+    b.addNodes(10);
+    for (int v = 0; v < 9; v++) {
+      for (int t = 0; t < 7; t++) b.addEdge(v, t);
+    }
+    b.addEdges(9, 0, 1);
+    assertThat(b.build().toString()).endsWith("9 -> [0, ...]}");
+  }
+
+  @Test
+  void toStringIsBoundedOnAHub() {
+    var b = new GraphBuilder();
+    b.addNodes(1_000_000);
+    for (int v = 1; v < 1_000_000; v++) b.addEdge(0, v);
+    String text = b.build().toString();
+    assertThat(text).hasSizeLessThan(600)
+        .startsWith("Graph[nodes=1000000, edges=999999] {0 -> [1, 2, ")
+        .endsWith(", 64, ...], ...}");
+
+    var high = new GraphBuilder();
+    high.addNodes(1_000_000);
+    for (int v = 1; v <= 100; v++) high.addEdge(0, 1_000_000 - v);
+    assertThat(high.build().toString()).hasSizeLessThan(1024).endsWith(", ...], ...}");
+  }
+
+  @Test
+  void toStringStopsWhenTheTargetBudgetRunsOutBetweenLists() {
+    // 64 out-nodes on node 0 exhaust the budget; node 1 still has edges.
+    var b = new GraphBuilder();
+    b.addNodes(66);
+    for (int v = 1; v <= 64; v++) b.addEdge(0, v);
+    b.addEdge(1, 65);
+    String text = b.build().toString();
+    assertThat(text).contains("63, 64], 1 -> [...], ...}");
+  }
 }

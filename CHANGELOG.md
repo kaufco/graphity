@@ -15,6 +15,7 @@ Graphity adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - [Issue #46](../../issues/46) - Read access to the CSR arrays for algorithm code
   - [Issue #49](../../issues/49) - Let GraphBuilder take an Edges list
   - [Issue #50](../../issues/50) - Iterate over nodes and edges
+  - [Issue #51](../../issues/51) - Give Graph a bounded toString
   - [Issue #53](../../issues/53) - Load graphs from CSR arrays, and add a binary CSR format
 
 ### Changed
