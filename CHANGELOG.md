@@ -24,6 +24,7 @@ Graphity adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - API
   - [Issue #41](../../issues/41) - Remove the API deprecated in 2.x
+  - [Issue #45](../../issues/45) - Keep only the iterative traversers
 
 ---
 

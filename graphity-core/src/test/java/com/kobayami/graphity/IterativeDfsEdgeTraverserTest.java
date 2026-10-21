@@ -409,4 +409,46 @@ class IterativeDfsEdgeTraverserTest {
       assertThat(t.preOrder.toIntArray()).as("variant %d", variant).containsExactly(0, 1, 2);
     }
   }
+
+  // ---- Equivalent of the recursion-to-hooks example in docs/tutorial.md ----
+
+  static class SubtreeSizes extends IterativeDfsEdgeTraverser {
+    final int[] parent;
+    final int[] size;
+
+    SubtreeSizes(Graph tree) {
+      super(tree);
+      parent = new int[tree.nodeCount()];
+      size = new int[tree.nodeCount()];
+      java.util.Arrays.fill(parent, -1);
+    }
+
+    @Override protected EdgeAction visitEdge(int source, int target, int edgeIndex,
+        TargetState state) {
+      if (state == TargetState.UNVISITED) parent[target] = source;
+      return EdgeAction.DESCEND;
+    }
+
+    @Override protected void leaveNode(int node) {
+      size[node]++;
+      if (parent[node] >= 0) size[parent[node]] += size[node];
+    }
+  }
+
+  @Test
+  void tutorialSubtreeSizesOnATree() {
+    // 0 -> 1, 0 -> 2, 1 -> 3, 1 -> 4, 2 -> 5
+    var sizes = new SubtreeSizes(TestGraphs.of(6, 0, 1, 0, 2, 1, 3, 1, 4, 2, 5));
+    sizes.run();
+    assertThat(sizes.size).containsExactly(6, 3, 2, 1, 1, 1);
+  }
+
+  @Test
+  void tutorialSubtreeSizesOnADeepPath() {
+    int n = 1_000_000;
+    var sizes = new SubtreeSizes(TestGraphs.path(n));
+    sizes.run();
+    assertThat(sizes.size[0]).isEqualTo(n);
+    assertThat(sizes.size[n - 1]).isEqualTo(1);
+  }
 }

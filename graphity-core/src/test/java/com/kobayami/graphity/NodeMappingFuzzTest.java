@@ -3,12 +3,12 @@ package com.kobayami.graphity;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.kobayami.graphity.testutils.RandomGraphs;
-import com.kobayami.graphity.testutils.RecordingDfsTraverser;
+import com.kobayami.graphity.testutils.RecursiveDfsOrder;
 import org.junit.jupiter.api.Test;
 
 /**
- * Cross-validates {@link NodeMapping#reindex(Graph)} against the recursive {@link DfsTraverser}
- * as an independent oracle for the documented DFS-preorder semantics. The iterative reindex
+ * Cross-validates {@link NodeMapping#reindex(Graph)} against a plain recursive depth-first
+ * search ({@link RecursiveDfsOrder}) as an independent oracle for the documented DFS-preorder semantics. The iterative reindex
  * traverser must agree node for node, not merely produce some permutation.
  */
 class NodeMappingFuzzTest {
@@ -21,7 +21,7 @@ class NodeMappingFuzzTest {
       var labeled = RandomGraphs.anyGraph(seed);
       var g = labeled.graph();
 
-      var recursive = new RecordingDfsTraverser(g);
+      var recursive = new RecursiveDfsOrder(g);
       recursive.run();
       var nm = NodeMapping.reindex(g);
 

@@ -9,7 +9,7 @@ import com.kobayami.graphity.Graph;
  * {@link com.kobayami.graphity.BackEdges}.
  * <p>
  * Uses plain primitive arrays ({@code boolean[]}, {@code int[]}) and direct CSR
- * access — deliberately not built on {@link com.kobayami.graphity.DfsTraverser}
+ * access — deliberately not built on any library traverser
  * so that integration bugs (visited-set handling, BitSet semantics, visitor dispatch)
  * are not masked.
  * <p>

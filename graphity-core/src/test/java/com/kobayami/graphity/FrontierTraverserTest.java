@@ -80,6 +80,18 @@ class FrontierTraverserTest {
     t.runFromNodes(IntList.of(4, 0, 2));
     assertThat(t.visitOrder.toIntArray()).containsExactly(4, 0, 2, 5, 1, 3);
     assertThat(t.levelAtVisit.toIntArray()).containsExactly(0, 0, 0, 1, 1, 1);
+    assertThat(t.completedLevels.toIntArray()).containsExactly(0, 1);
+  }
+
+  @Test
+  void runFromTheRootNodesTreatsAllRootsAsLevelZero() {
+    // Roots 0 and 3: 0 -> 1 -> 2, 3 -> 2.
+    var g = BiAdjacentGraph.of(TestGraphs.of(4, 0, 1, 1, 2, 3, 2));
+    var t = new RecordingFrontierTraverser(g);
+    t.runFromNodes(Graphs.rootNodes(g));
+    assertThat(t.visitOrder.toIntArray()).containsExactly(0, 3, 1, 2);
+    assertThat(t.levelAtVisit.toIntArray()).containsExactly(0, 0, 1, 1);
+    assertThat(t.completedLevels.toIntArray()).containsExactly(0, 1);
   }
 
   @Test
@@ -244,6 +256,15 @@ class FrontierTraverserTest {
   }
 
   // ---- stop() ----
+
+  @Test
+  void stopAtTheFirstSeedDropsTheOtherSeedsOfTheSameLevel() {
+    var t = new StoppingFrontier(TestGraphs.of(4, 0, 1, 2, 3));
+    t.stopOnVisit = 0;
+    t.runFromNodes(IntList.of(0, 2));
+    assertThat(t.visits.toIntArray()).containsExactly(0);
+    assertThat(t.levels.toIntArray()).isEmpty();
+  }
 
   /** Records visits and completed levels; stops when visiting a node or completing a level. */
   private static class StoppingFrontier extends FrontierTraverser {

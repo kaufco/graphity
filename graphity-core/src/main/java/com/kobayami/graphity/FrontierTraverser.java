@@ -63,7 +63,7 @@ import java.util.Objects;
  * <p><strong>Cut (pruning):</strong> omit the {@link #enqueueChildren(int)} call (or don't
  * {@link #enqueue(int)} any nodes) to prevent further expansion from a node.
  * <p>
- * <strong>Note on post-order:</strong> unlike {@link DfsTraverser}, there is no post-order
+ * <strong>Note on post-order:</strong> unlike {@link IterativeDfsTraverser}, there is no post-order
  * processing. When {@code visitNode} returns, the enqueued children have not yet been visited.
  * <p>
  * {@code run} methods may be called <strong>multiple times</strong>, and freely combined
@@ -79,10 +79,9 @@ import java.util.Objects;
  * across the traverser's lifetime, not just the currently active wave, though its size
  * is still bounded by nodeCount since each node is enqueued at most once.
  *
- * @see DfsTraverser
+ * @see IterativeDfsTraverser
  * @see Graph
- * @see BiAdjacentGraph
- * @see BiAdjacentFrontierTraverser
+ * @see Graphs#rootNodes(BiAdjacentGraph)
  */
 public abstract class FrontierTraverser {
 

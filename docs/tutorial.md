@@ -110,7 +110,51 @@ For a single edge instead of a full pass, `BiAdjacentGraph.transposedEdgeIndex(e
 
 For custom traversals, subclass `IterativeDfsTraverser` — it keeps its DFS stack on the heap, so it handles arbitrarily deep graphs without any `-Xss` tuning. Override `enterNode(int)` for preorder and `leaveNode(int)` for postorder; return `false` from `enterNode` to prune a subtree. `IterativeDfsTraverser`, `IterativeDfsEdgeTraverser` and `FrontierTraverser` also let any hook call `stop()` to end the whole traversal. For edge-centric algorithms that must look at every edge, such as finding a cycle, subclass `IterativeDfsEdgeTraverser`: its `visitEdge` hook reports each edge with the state of its target (unvisited, on the current path, finished) and returns whether to descend, skip the edge or stop. Multiple `run()` calls accumulate visited state, so two-phase walks compose without external bookkeeping.
 
-To start from the root nodes of a `BiAdjacentGraph`, pass them in: `traverser.runFromNodes(Graphs.rootNodes(biAdjacentGraph))`. Inside any hook, the `BiAdjacentGraph` you hold gives access to predecessors. The recursive `DfsTraverser` and its `BiAdjacentDfsTraverser` subclass are limited by the JVM call stack and fail on deep graphs; prefer the iterative traversers.
+To start from the root nodes of a `BiAdjacentGraph`, pass them in: `traverser.runFromNodes(Graphs.rootNodes(biAdjacentGraph))`. Inside any hook, the `BiAdjacentGraph` you hold gives access to predecessors.
+
+### From recursion to hooks
+
+A recursive depth-first search puts work before the children, after each child, and between children into one method, with the call stack holding the state. The traversers have no recursion, so that state moves into arrays and the work into hooks:
+
+| Recursive pattern | With the traversers |
+|---|---|
+| Work before the children (preorder) | `enterNode(node)` |
+| Work after all children (postorder) | `leaveNode(node)` |
+| Combine a child's result into its parent | record the parent in `visitEdge` when descending, add to it in the child's `leaveNode` |
+| Pass a value down (depth, path length) | compute the child's value from the source's in `visitEdge` when descending |
+| Work between two children | `visitEdge` of the next child, before it descends - it also fires before the first child and for edges to visited targets, so filter on `UNVISITED` and on whether a child was seen already |
+| Skip a subtree | return `false` from `enterNode`, or `SKIP` from `visitEdge` |
+
+Subtree sizes, the classic example of combining child results, look like this:
+
+```java
+class SubtreeSizes extends IterativeDfsEdgeTraverser {
+    final int[] parent;
+    final int[] size;
+
+    SubtreeSizes(Graph tree) {
+        super(tree);
+        parent = new int[tree.nodeCount()];
+        size = new int[tree.nodeCount()];
+        Arrays.fill(parent, -1);
+    }
+
+    @Override protected EdgeAction visitEdge(int source, int target, int edgeIndex, TargetState state) {
+        if (state == TargetState.UNVISITED) parent[target] = source;   // about to descend
+        return EdgeAction.DESCEND;
+    }
+
+    @Override protected void leaveNode(int node) {
+        size[node]++;                                                   // the node itself
+        if (parent[node] >= 0) size[parent[node]] += size[node];       // pass the total up
+    }
+}
+
+var sizes = new SubtreeSizes(tree);
+sizes.run();
+```
+
+Depth works the same way in the other direction, set when descending: `if (state == TargetState.UNVISITED) depth[target] = depth[source] + 1;` in `visitEdge`. The results match the recursive version, also on a path of a million nodes, where recursion overflows.
 
 ## Algorithm reference
 

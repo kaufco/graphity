@@ -111,12 +111,10 @@
  *   <li>{@link IterativeDfsEdgeTraverser} - the same with a hook per edge that reports the
  *       target's state, for algorithms that must look at every edge.</li>
  *   <li>{@link FrontierTraverser} - breadth-first traversal with level tracking.</li>
- *   <li>{@link DfsTraverser} - recursive depth-first traversal, limited by the call stack; and
- *       {@link BiAdjacentDfsTraverser} and {@link BiAdjacentFrontierTraverser}, which start from
- *       the root nodes of a {@code BiAdjacentGraph}.</li>
  * </ul>
  * <p>
- * All of them can be run several times with accumulated visited state. All except the two
- * recursive ones can be stopped from any hook.
+ * None of them recurses, so none is limited by the call stack. All of them can be run several
+ * times with accumulated visited state, started from any set of nodes - for instance
+ * {@link Graphs#rootNodes(BiAdjacentGraph)} - and stopped from any hook.
  */
 package com.kobayami.graphity;

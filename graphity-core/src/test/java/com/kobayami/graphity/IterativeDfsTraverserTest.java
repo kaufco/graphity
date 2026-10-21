@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.kobayami.graphity.testutils.RandomGraphs;
-import com.kobayami.graphity.testutils.RecordingDfsTraverser;
+import com.kobayami.graphity.testutils.RecursiveDfsOrder;
 import com.kobayami.graphity.testutils.RecordingIterativeDfsTraverser;
 import com.kobayami.graphity.testutils.TestGraphs;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
@@ -16,7 +16,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 class IterativeDfsTraverserTest {
 
-  // ---- Basic order (mirrors DfsTraverserTest) ----
+  // ---- Basic order ----
 
   @Test
   void runVisitsSinglePathInPreOrder() {
@@ -210,7 +210,7 @@ class IterativeDfsTraverserTest {
     t.run(0);
   }
 
-  // ---- Order parity with the recursive DfsTraverser ----
+  // ---- Order parity with a recursive depth-first search ----
 
   @Test
   void orderMatchesRecursiveOnDeterministicShapes() {
@@ -238,7 +238,7 @@ class IterativeDfsTraverserTest {
   }
 
   private static void assertSameOrderAsRecursive(Graph g, String desc) {
-    var recursive = new RecordingDfsTraverser(g);
+    var recursive = new RecursiveDfsOrder(g);
     recursive.run();
     var iterative = new RecordingIterativeDfsTraverser(g);
     iterative.run();

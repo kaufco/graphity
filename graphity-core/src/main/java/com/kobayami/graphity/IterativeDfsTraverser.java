@@ -7,8 +7,8 @@ import java.util.Objects;
 /**
  * Abstract base class for <strong>stack-safe</strong> depth-first traversal of a {@link Graph}.
  * <p>
- * Unlike the recursive {@link DfsTraverser}, this traverser keeps its DFS stack on the heap, so
- * it never overflows the call stack even on graphs with very deep paths (DFS depth &ge; 10^6).
+ * It keeps its DFS stack on the heap rather than on the call stack, so
+ * it never overflows even on graphs with very deep paths (DFS depth &ge; 10^6).
  * It is <strong>node-centric</strong>: subclasses override {@link #enterNode(int)} (preorder) and
  * optionally {@link #leaveNode(int)} (postorder). There are deliberately no per-edge hooks, which
  * keeps the traversal loop tight and fast.
@@ -54,7 +54,7 @@ import java.util.Objects;
  * }
  * }</pre>
  *
- * <p>Discovery order is identical to the recursive {@link DfsTraverser}: out-neighbors are scanned
+ * <p>Discovery order is that of a textbook recursive depth-first search: out-neighbors are scanned
  * in ascending adjacency order, descending immediately into the first unvisited child.
  * <p>{@code run} methods may be called <strong>multiple times</strong>, and freely combined
  * (e.g., {@code run(int); run(); runFromNodes(list)}). Already-visited nodes are never revisited -
@@ -66,8 +66,8 @@ import java.util.Objects;
  * single {@code int[]}; the explicit stack grows on demand up to the longest DFS path.
  *
  * @see Graph
- * @see DfsTraverser
  * @see IterativeDfsEdgeTraverser
+ * @see Graphs#rootNodes(BiAdjacentGraph)
  */
 public abstract class IterativeDfsTraverser {
 

@@ -7,8 +7,7 @@ import it.unimi.dsi.fastutil.ints.IntList;
 
 /**
  * An {@link IterativeDfsTraverser} that records preorder and postorder visit sequences.
- * The stack-safe counterpart to {@link RecordingDfsTraverser}, used to cross-validate that
- * both traversers discover nodes in the same order.
+ * Cross-validated against {@link RecursiveDfsOrder} for the same discovery order.
  */
 public final class RecordingIterativeDfsTraverser extends IterativeDfsTraverser {
 
