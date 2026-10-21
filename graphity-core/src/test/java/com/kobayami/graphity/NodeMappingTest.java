@@ -42,6 +42,13 @@ class NodeMappingTest {
   }
 
   @Test
+  void ofRejectsValuesBelowMinusOne() {
+    assertThatThrownBy(() -> NodeMapping.of(new int[] {0, -2, 1}))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("-2");
+  }
+
+  @Test
   void ofCopiesInputArray() {
     int[] input = {1, 2, 3};
     var nm = NodeMapping.of(input);
@@ -98,10 +105,36 @@ class NodeMappingTest {
   }
 
   @Test
-  void forSubgraphDuplicatesInUnsortedListTriggerAssertion() {
+  void forSubgraphRejectsDuplicatesInList() {
     IntList withDupes = new IntArrayList(new int[] {3, 1, 3});
     assertThatThrownBy(() -> NodeMapping.forSubgraph(withDupes))
-        .isInstanceOf(AssertionError.class);
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("3");
+  }
+
+  @Test
+  void forSubgraphRejectsDuplicatesInSortedIntView() {
+    var withDupes = SortedIntView.viewOf(new int[] {1, 2, 2}, 0, 3);
+    assertThatThrownBy(() -> NodeMapping.forSubgraph(withDupes))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  void forSubgraphRejectsAnUnsortedSortedIntView() {
+    for (int[] unsorted : new int[][] {{2, -1}, {1, 2, 1}, {1, 0}}) {
+      var view = SortedIntView.viewOf(unsorted, 0, unsorted.length);
+      assertThatThrownBy(() -> NodeMapping.forSubgraph(view))
+          .as("%s", java.util.Arrays.toString(unsorted))
+          .isInstanceOf(IllegalArgumentException.class);
+    }
+  }
+
+  @Test
+  void forSubgraphRejectsNegativeIds() {
+    assertThatThrownBy(() -> NodeMapping.forSubgraph(new IntArrayList(new int[] {2, -1})))
+        .isInstanceOf(IndexOutOfBoundsException.class);
+    assertThatThrownBy(() -> NodeMapping.forSubgraph(2, -1))
+        .isInstanceOf(IndexOutOfBoundsException.class);
   }
 
   @Test
@@ -145,9 +178,9 @@ class NodeMappingTest {
   }
 
   @Test
-  void forSubgraphDuplicatesInArrayTriggerAssertion() {
+  void forSubgraphRejectsDuplicatesInArray() {
     assertThatThrownBy(() -> NodeMapping.forSubgraph(3, 1, 3))
-        .isInstanceOf(AssertionError.class);
+        .isInstanceOf(IllegalArgumentException.class);
   }
 
   @Test
@@ -162,24 +195,26 @@ class NodeMappingTest {
   }
 
   @Test
-  void forPermutationInvalidPermutationTriggersAssertion() {
+  void forPermutationRejectsDuplicates() {
     IntList withDupes = new IntArrayList(new int[] {0, 1, 1});
     assertThatThrownBy(() -> NodeMapping.forPermutation(withDupes))
-        .isInstanceOf(AssertionError.class);
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("1");
   }
 
   @Test
-  void forPermutationOutOfRangeValueTriggersAssertion() {
+  void forPermutationRejectsOutOfRangeValue() {
     IntList outOfRange = new IntArrayList(new int[] {0, 3, 1});
     assertThatThrownBy(() -> NodeMapping.forPermutation(outOfRange))
-        .isInstanceOf(AssertionError.class);
+        .isInstanceOf(IndexOutOfBoundsException.class)
+        .hasMessageContaining("3");
   }
 
   @Test
-  void forPermutationNegativeValueTriggersAssertion() {
+  void forPermutationRejectsNegativeValue() {
     IntList withNegative = new IntArrayList(new int[] {0, -1, 1});
     assertThatThrownBy(() -> NodeMapping.forPermutation(withNegative))
-        .isInstanceOf(AssertionError.class);
+        .isInstanceOf(IndexOutOfBoundsException.class);
   }
 
   @Test

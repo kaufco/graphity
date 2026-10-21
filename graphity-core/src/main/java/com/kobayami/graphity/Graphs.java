@@ -84,8 +84,10 @@ public final class Graphs {
    * @param graph    the original graph
    * @param newToOld mapping from new node IDs to original node IDs
    * @return a new graph with remapped node IDs
-   * @throws IllegalArgumentException if the mapping contains duplicate targets
-   *         (not injective - cannot compute inverse)
+   * @throws IllegalArgumentException if a new node is unmapped, or two new nodes map to the same
+   *         original node
+   * @throws IndexOutOfBoundsException if a new node maps to an ID that is not a node of
+   *         {@code graph}
    * @see NodeMapping#reindex(Graph)
    * @see NodeMapping#forSubgraph(java.util.BitSet)
    * @see NodeMapping#forPermutation(IntList)
@@ -96,9 +98,24 @@ public final class Graphs {
       return new Graph(new int[]{0}, new int[0]);
     }
 
-    // Compute inverse (old → new) for edge-target translation.
+    // Inverse (old → new) for edge-target translation, sized by the graph rather than by the
+    // largest mapped value, and built in the same pass that checks every mapped node.
     int[] fwd = newToOld.mapping;
-    int[] bwd = newToOld.inverted().mapping;
+    int oldNodeCount = graph.nodeCount();
+    int[] bwd = new int[oldNodeCount];
+    Arrays.fill(bwd, -1);
+    for (int n = 0; n < newNodeCount; n++) {
+      int oldNode = fwd[n];
+      if (oldNode == -1) {
+        throw new IllegalArgumentException("new node " + n + " is unmapped");
+      }
+      if (oldNode < 0 || oldNode >= oldNodeCount) throw notANode(n, oldNode, oldNodeCount);
+      if (bwd[oldNode] != -1) {
+        throw new IllegalArgumentException("new nodes " + bwd[oldNode] + " and " + n
+            + " both map to node " + oldNode);
+      }
+      bwd[oldNode] = n;
+    }
 
     var origAdj = graph.outAdjacency;
     var origStart = graph.outAdjacencyStart;
@@ -122,7 +139,7 @@ public final class Graphs {
         int count = 0;
         for (int i = origStart[oldNode]; i < end; i++) {
           int oldTarget = origAdj[i];
-          if (oldTarget < bwd.length && bwd[oldTarget] >= 0) {
+          if (bwd[oldTarget] >= 0) {
             count++;
           }
         }
@@ -155,7 +172,7 @@ public final class Graphs {
         int end = origStart[oldNode + 1];
         for (int i = origStart[oldNode]; i < end; i++) {
           int oldTarget = origAdj[i];
-          if (oldTarget < bwd.length && bwd[oldTarget] >= 0) {
+          if (bwd[oldTarget] >= 0) {
             outAdj[writePos++] = bwd[oldTarget];
           }
         }
@@ -164,6 +181,11 @@ public final class Graphs {
     }
 
     return new Graph(outStart, outAdj);
+  }
+
+  private static IndexOutOfBoundsException notANode(int newNode, int oldNode, int oldNodeCount) {
+    return new IndexOutOfBoundsException("new node " + newNode + " maps to " + oldNode
+        + ", which is not a node of the graph (nodeCount=" + oldNodeCount + ")");
   }
 
   /**

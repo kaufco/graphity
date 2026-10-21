@@ -1,6 +1,7 @@
 package com.kobayami.graphity;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.kobayami.graphity.testutils.TestGraphs;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
@@ -415,6 +416,39 @@ class GraphsTest {
   }
 
   // ---- remapped ----
+
+  @Test
+  void remappedRejectsAMappingToANodeOutsideTheGraph() {
+    var g = TestGraphs.path(2);
+    // Two distinct values for two nodes: shaped like a total mapping, but 5 is not a node.
+    assertThatThrownBy(() -> Graphs.remapped(g, NodeMapping.of(new int[] {0, 5})))
+        .isInstanceOf(IndexOutOfBoundsException.class)
+        .hasMessageContaining("5");
+    assertThatThrownBy(() -> Graphs.remapped(TestGraphs.path(3), NodeMapping.forSubgraph(0, 9)))
+        .isInstanceOf(IndexOutOfBoundsException.class);
+  }
+
+  @Test
+  void remappedRejectsAHugeTargetWithoutAllocatingForIt() {
+    var g = TestGraphs.path(2);
+    assertThatThrownBy(() -> Graphs.remapped(g, NodeMapping.of(new int[] {0, Integer.MAX_VALUE})))
+        .isInstanceOf(IndexOutOfBoundsException.class);
+    assertThatThrownBy(() -> Graphs.remapped(g, NodeMapping.forSubgraph(0, Integer.MAX_VALUE)))
+        .isInstanceOf(IndexOutOfBoundsException.class);
+  }
+
+  @Test
+  void remappedRejectsAnUnmappedNewNode() {
+    assertThatThrownBy(() -> Graphs.remapped(TestGraphs.path(3), NodeMapping.of(new int[] {0, -1, 1})))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("unmapped");
+  }
+
+  @Test
+  void remappedRejectsTwoNewNodesForOneOriginalNode() {
+    assertThatThrownBy(() -> Graphs.remapped(TestGraphs.path(3), NodeMapping.of(new int[] {0, 2, 0})))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
 
   @Test
   void remappedWithIdentityYieldsIsomorphicGraph() {

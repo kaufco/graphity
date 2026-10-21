@@ -13,6 +13,7 @@ Graphity adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - API
   - [Issue #42](../../issues/42) - Validate node references in `GraphBuilder` by default
+  - [Issue #43](../../issues/43) - Validate the input of every factory at runtime
 - Infrastructure
   - [Issue #40](../../issues/40) - Build the published artifacts from the tagged commit
 - Documentation

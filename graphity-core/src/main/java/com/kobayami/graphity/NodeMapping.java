@@ -46,10 +46,9 @@ import java.util.BitSet;
  * NodeMapping nm13 = nm12.compose(nm23);  // g3 → g1
  * }</pre>
  *
- * <p>Input arrays are not validated at runtime (no duplicate checks, no range checks).
- * Invalid inputs (e.g. duplicate target values in a permutation) lead to undefined behavior.
- * Factory methods contain {@code assert} statements that catch common errors when
- * assertions are enabled ({@code -ea}).
+ * <p>The factories check their input at runtime: a negative or out-of-range node ID raises
+ * {@link IndexOutOfBoundsException}, a repeated or otherwise invalid value
+ * {@link IllegalArgumentException}.
  * <p>
  * <strong>Memory:</strong> same as {@link IndexMapping} - no fields beyond the inherited mapping array.
  *
@@ -78,9 +77,16 @@ public final class NodeMapping extends IndexMapping {
    *
    * @param mapping source-to-target mapping
    * @return a new node mapping
+   * @throws IllegalArgumentException if a value is below {@code -1}
    */
   public static NodeMapping of(int[] mapping) {
     int[] copy = Arrays.copyOf(mapping, mapping.length);
+    for (int source = 0; source < copy.length; source++) {
+      if (copy[source] < -1) {
+        throw new IllegalArgumentException(
+            "mapping value must be -1 or a node ID, but source " + source + " maps to " + copy[source]);
+      }
+    }
     int valid = countValid(copy);
     return new NodeMapping(copy, valid, valid < copy.length);
   }
@@ -117,8 +123,11 @@ public final class NodeMapping extends IndexMapping {
    * <p>
    * <strong>Time:</strong> O(k) if sorted, O(k log k) otherwise.
    *
-   * @param selected list of selected node IDs (duplicates lead to undefined behavior)
+   * @param selected list of selected node IDs
    * @return mapping from dense IDs to original IDs
+   * @throws IndexOutOfBoundsException if an ID is negative
+   * @throws IllegalArgumentException if an ID occurs more than once, or a {@link SortedIntView}
+   *                                  argument is not sorted ascending
    */
   public static NodeMapping forSubgraph(IntList selected) {
     int k = selected.size();
@@ -129,7 +138,7 @@ public final class NodeMapping extends IndexMapping {
     if (!(selected instanceof SortedIntView)) {
       Arrays.sort(map);
     }
-    assert noDuplicates(map) : "selected contains duplicate node IDs";
+    checkSelection(map);
     return new NodeMapping(map, k, false);
   }
 
@@ -144,13 +153,15 @@ public final class NodeMapping extends IndexMapping {
    * detected - pass a {@link SortedIntView} to the {@link #forSubgraph(IntList)} overload to
    * skip the sort.
    *
-   * @param selected selected node IDs in any order (duplicates lead to undefined behavior)
+   * @param selected selected node IDs in any order
    * @return mapping from dense IDs to original IDs
+   * @throws IndexOutOfBoundsException if an ID is negative
+   * @throws IllegalArgumentException if an ID occurs more than once
    */
   public static NodeMapping forSubgraph(int... selected) {
     int[] map = Arrays.copyOf(selected, selected.length);
     Arrays.sort(map);
-    assert noDuplicates(map) : "selected contains duplicate node IDs";
+    checkSelection(map);
     return new NodeMapping(map, map.length, false);
   }
 
@@ -163,16 +174,26 @@ public final class NodeMapping extends IndexMapping {
    * <strong>Time:</strong> O(n).
    *
    * @param order permutation: {@code order.getInt(newId)} is the old ID
-   *              (duplicates lead to undefined behavior)
    * @return mapping from new IDs to old IDs
+   * @throws IndexOutOfBoundsException if a value lies outside {@code 0..order.size()-1}
+   * @throws IllegalArgumentException if a value occurs more than once
    */
   public static NodeMapping forPermutation(IntList order) {
     int n = order.size();
     int[] map = new int[n];
+    var seen = new BitSet(n);
     for (int i = 0; i < n; i++) {
-      map[i] = order.getInt(i);
+      int old = order.getInt(i);
+      if (old < 0 || old >= n) {
+        throw new IndexOutOfBoundsException(
+            "order value out of range 0.." + (n - 1) + " at position " + i + ": " + old);
+      }
+      if (seen.get(old)) {
+        throw new IllegalArgumentException("order contains " + old + " more than once");
+      }
+      seen.set(old);
+      map[i] = old;
     }
-    assert isValidPermutation(map) : "order is not a valid permutation (out-of-range or duplicate values)";
     return new NodeMapping(map, n, false);
   }
 
@@ -403,22 +424,22 @@ public final class NodeMapping extends IndexMapping {
     }
   }
 
-  /** Checks that a sorted array contains no consecutive duplicates. */
-  private static boolean noDuplicates(int[] sorted) {
+  /**
+   * Rejects a selection that is not strictly ascending - a repeated ID, or a {@link SortedIntView}
+   * that is not sorted - and then a negative first ID, the only place one can be.
+   */
+  private static void checkSelection(int[] sorted) {
     for (int i = 1; i < sorted.length; i++) {
-      if (sorted[i] == sorted[i - 1]) return false;
+      if (sorted[i] == sorted[i - 1]) {
+        throw new IllegalArgumentException("selected contains node " + sorted[i] + " more than once");
+      }
+      if (sorted[i] < sorted[i - 1]) {
+        throw new IllegalArgumentException(
+            "selected view is not sorted ascending at position " + i + ": " + sorted[i]);
+      }
     }
-    return true;
-  }
-
-  /** Checks that the array is a valid permutation of 0..n-1. */
-  private static boolean isValidPermutation(int[] map) {
-    int n = map.length;
-    var seen = new BitSet(n);
-    for (int v : map) {
-      if (v < 0 || v >= n || seen.get(v)) return false;
-      seen.set(v);
+    if (sorted.length > 0 && sorted[0] < 0) {
+      throw new IndexOutOfBoundsException("selected node ID must be non-negative: " + sorted[0]);
     }
-    return true;
   }
 }
