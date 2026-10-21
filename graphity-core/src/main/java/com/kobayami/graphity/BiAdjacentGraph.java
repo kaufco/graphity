@@ -1,6 +1,5 @@
 package com.kobayami.graphity;
 
-import it.unimi.dsi.fastutil.ints.IntArrayList;
 import java.util.Objects;
 
 /**
@@ -19,6 +18,7 @@ import java.util.Objects;
  * <strong>Memory:</strong> 8 x (nodeCount + edgeCount) bytes (2x {@link Graph}).
  *
  * @see Graph
+ * @see Graphs#rootNodes(BiAdjacentGraph)
  * @see Dominators
  * @see Loops
  */
@@ -143,13 +143,16 @@ public final class BiAdjacentGraph extends Graph {
    * external edge metadata across the transpose, translate the index with
    * {@link #transposedEdgeIndex(int)} or {@link Graphs#transposedEdgeMapping(Graph)}.
    * <p>
+   * A plain {@link Graph} has no transpose of its own: building one costs the in-adjacency, so
+   * a caller writes {@code BiAdjacentGraph.of(graph).transposed()}, which shows that cost and
+   * keeps the {@code BiAdjacentGraph} for further use.
+   * <p>
    * <strong>Time:</strong> O(1).
    *
    * @return a bi-adjacent view with all edge directions reversed
    * @see #transposedEdgeIndex(int)
    * @see Graphs#transposedEdgeMapping(Graph)
    */
-  @Override
   public final BiAdjacentGraph transposed() {
     return new BiAdjacentGraph(inAdjacencyStart, inAdjacency, outAdjacencyStart, outAdjacency);
   }
@@ -235,25 +238,9 @@ public final class BiAdjacentGraph extends Graph {
    * @param node node ID in {@code 0..nodeCount()-1}
    * @return {@code true} if {@code node} has in-degree 0
    * @throws IndexOutOfBoundsException if {@code node} is out of range
+   * @see Graphs#rootNodes(BiAdjacentGraph)
    */
   public final boolean isRootNode(int node) {
     return inDegree(node) == 0;
-  }
-
-  /**
-   * Returns a sorted view of all root nodes (nodes with in-degree 0).
-   * <p>
-   * <strong>Time:</strong> O(nodeCount).<br>
-   * <strong>Memory:</strong> allocates an array of size equal to the number of root nodes.
-   *
-   * @return root nodes as a sorted view
-   */
-  public final SortedIntView rootNodes() {
-    var roots = new IntArrayList();
-    int n = nodeCount();
-    for (int i = 0; i < n; i++) {
-      if (inAdjacencyStart[i] == inAdjacencyStart[i + 1]) roots.add(i);
-    }
-    return new SortedIntView(roots.elements(), 0, roots.size());
   }
 }

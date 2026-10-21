@@ -12,7 +12,8 @@ import java.util.Objects;
  * must be kept externally (e.g. in parallel arrays indexed by node/edge ID).
  * <p>
  * Use {@code Graph} for algorithms that only need out-edges.
- * For in-edge access, obtain a {@link BiAdjacentGraph} via {@link BiAdjacentGraph#of(Graph)}.
+ * For in-edge access, obtain a {@link BiAdjacentGraph} via {@link BiAdjacentGraph#of(Graph)};
+ * its {@link BiAdjacentGraph#transposed()} is the transposed graph as a constant-time view.
  * <p>
  * Algorithms are not methods on the graph: they take it as input and live on their own classes,
  * {@link Components}, {@link TopOrder}, {@link EdgeTypes}, {@link BfsDistances}, {@link Ancestry},
@@ -22,6 +23,8 @@ import java.util.Objects;
  * <strong>Memory:</strong> 4 x (nodeCount + edgeCount) bytes.
  *
  * @see BiAdjacentGraph
+ * @see BiAdjacentGraph#transposed()
+ * @see Graphs#rootNodes(BiAdjacentGraph)
  * @see GraphBuilder
  * @see Components
  */
@@ -310,26 +313,6 @@ public sealed class Graph permits BiAdjacentGraph {
    */
   public Graph uniAdjacentGraph() {
     return this;
-  }
-
-  /**
-   * Returns the transposed graph (all edge directions reversed).
-   * <p>
-   * Node IDs are preserved, <strong>edge indices are not</strong>: the edge at index {@code i}
-   * of the transpose is a different edge from the one at index {@code i} here. To address
-   * external edge metadata across the transpose, translate the index with
-   * {@link Graphs#transposedEdgeMapping(Graph)}, or with
-   * {@link BiAdjacentGraph#transposedEdgeIndex(int)} for a single edge.
-   * <p>
-   * <strong>Time:</strong> O(nodeCount + edgeCount)<br>
-   * <strong>Memory:</strong> 4 x (nodeCount + edgeCount) bytes.
-   *
-   * @return the transposed graph
-   * @see Graphs#transposedEdgeMapping(Graph)
-   * @see BiAdjacentGraph#transposedEdgeIndex(int)
-   */
-  public Graph transposed() {
-    return BiAdjacentGraph.of(this).transposed();
   }
 
   /**

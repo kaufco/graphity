@@ -169,7 +169,7 @@ class DominatorsTest {
     var postDominators = Dominators.of(cfg.transposed(), 2);
     assertThat(postDominators.immediateDominatorOf(0)).isEqualTo(2);
     assertThat(postDominators.immediateDominatorOf(1)).isEqualTo(2);
-    var controlDependence = Graphs.dominanceFrontiers(postDominators).transposed();
+    var controlDependence = BiAdjacentGraph.of(Graphs.dominanceFrontiers(postDominators)).transposed();
     assertThat(controlDependence.edgeCount()).isEqualTo(1);
     assertThat(controlDependence.hasOutNode(0, 1)).isTrue();
   }

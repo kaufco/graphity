@@ -261,29 +261,6 @@ class GraphTest {
   }
 
   @Test
-  void transposedReversesAllEdges() {
-    var g = TestGraphs.of(3, 0, 1, 1, 2);
-    var t = g.transposed();
-    assertThat(t.outNodes(0).toIntArray()).isEmpty();
-    assertThat(t.outNodes(1).toIntArray()).containsExactly(0);
-    assertThat(t.outNodes(2).toIntArray()).containsExactly(1);
-  }
-
-  @Test
-  void transposedTwiceEqualsOriginal() {
-    var g = TestGraphs.of(4, 0, 1, 0, 2, 1, 3, 2, 3);
-    assertThat(g.transposed().transposed()).isEqualTo(g);
-  }
-
-  @Test
-  void transposedOnSelfLoopKeepsSelfLoop() {
-    var g = TestGraphs.of(2, 0, 0, 0, 1);
-    var t = g.transposed();
-    assertThat(t.containsSelfLoop(0)).isTrue();
-    assertThat(t.outNodes(1).toIntArray()).containsExactly(0);
-  }
-
-  @Test
   void equalsBasedOnStructure() {
     var a = TestGraphs.of(3, 0, 1, 1, 2);
     var b = TestGraphs.of(3, 0, 1, 1, 2);

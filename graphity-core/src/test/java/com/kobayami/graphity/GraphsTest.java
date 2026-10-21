@@ -415,6 +415,39 @@ class GraphsTest {
     assertThat(Graphs.isWeaklyConnected(TestGraphs.of(2, 0, 0, 1, 1))).isFalse();
   }
 
+  // ---- rootNodes ----
+
+  @Test
+  void rootNodesReturnsAllSources() {
+    var g = BiAdjacentGraph.of(TestGraphs.of(4, 0, 1, 0, 2, 1, 3, 2, 3));
+    assertThat(Graphs.rootNodes(g).toIntArray()).containsExactly(0);
+  }
+
+  @Test
+  void rootNodesOnIsolatedGraphReturnsAllNodes() {
+    var g = BiAdjacentGraph.of(TestGraphs.isolated(3));
+    assertThat(Graphs.rootNodes(g).toIntArray()).containsExactly(0, 1, 2);
+  }
+
+  @Test
+  void rootNodesOnCycleIsEmpty() {
+    var g = BiAdjacentGraph.of(TestGraphs.cycle(4));
+    assertThat(Graphs.rootNodes(g).isEmpty()).isTrue();
+  }
+
+  @Test
+  void rootNodesOnEmptyGraphIsEmpty() {
+    assertThat(Graphs.rootNodes(BiAdjacentGraph.of(TestGraphs.empty())).isEmpty()).isTrue();
+  }
+
+  @Test
+  void rootNodesOfTheTransposeAreTheSinks() {
+    // 0 -> 1, 0 -> 2, 1 -> 3, 2 -> 3, and 4 -> 3: sinks are 3 alone.
+    var g = BiAdjacentGraph.of(TestGraphs.of(5, 0, 1, 0, 2, 1, 3, 2, 3, 4, 3));
+    assertThat(Graphs.rootNodes(g).toIntArray()).containsExactly(0, 4);
+    assertThat(Graphs.rootNodes(g.transposed()).toIntArray()).containsExactly(3);
+  }
+
   // ---- remapped ----
 
   @Test
@@ -590,7 +623,7 @@ class GraphsTest {
   @Test
   void transposedEdgeMappingIdentifiesTheSwappedEdge() {
     var g = TestGraphs.of(4, 0, 1, 0, 2, 1, 3, 2, 3);
-    var transposed = g.transposed();
+    var transposed = BiAdjacentGraph.of(g).transposed();
     var em = Graphs.transposedEdgeMapping(g);
     for (int q = 0; q < transposed.edgeCount(); q++) {
       int p = em.get(q);

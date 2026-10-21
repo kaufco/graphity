@@ -196,7 +196,7 @@ class AncestryTest {
   @Test
   void ofAcceptsAnInTreeForestViaTheTranspose() {
     // In-tree: 1 -> 0 and 2 -> 0. Transposed it becomes the out-star rooted at 0.
-    var a = Ancestry.of(TestGraphs.inStar(3).transposed());
+    var a = Ancestry.of(BiAdjacentGraph.of(TestGraphs.inStar(3)).transposed());
     assertThat(a.lowestCommonAncestorOf(1, 2)).isZero();
   }
 

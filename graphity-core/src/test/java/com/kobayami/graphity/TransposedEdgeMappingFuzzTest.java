@@ -22,7 +22,7 @@ class TransposedEdgeMappingFuzzTest {
     for (long seed = 0; seed < ITERATIONS; seed++) {
       var labeled = RandomGraphs.anyGraph(seed);
       var g = labeled.graph();
-      var transposed = g.transposed();
+      var transposed = BiAdjacentGraph.of(g).transposed();
       var mapping = Graphs.transposedEdgeMapping(g);
 
       assertThat(mapping.isPartial())

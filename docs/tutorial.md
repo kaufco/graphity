@@ -87,7 +87,7 @@ These types compose. `sccs.condense()` returns a `Graph` plus a `NodeMapping` fr
 **Edge indices as the bridge to user metadata.** Edges have stable CSR positions. You hold edge-attached data in a parallel array of length `graph.edgeCount()`. When a transformation reorders or filters edges (subgraph, condensation, remap, transpose), Graphity returns the corresponding `EdgeMapping` so you can reindex your metadata array in one pass, and a partition folds the data of merged nodes or edges into one value per group:
 
 ```java
-Graph transpose = graph.transposed();                            // node IDs kept, edge indices not
+Graph transpose = BiAdjacentGraph.of(graph).transposed();        // node IDs kept, edge indices not
 EdgeMapping newToOld = Graphs.transposedEdgeMapping(graph);      // one linear pass, total
 double[] transposedWeights = newToOld.gather(weights);           // transposedWeights[e] = weights[newToOld.get(e)]
 
@@ -110,7 +110,7 @@ For a single edge instead of a full pass, `BiAdjacentGraph.transposedEdgeIndex(e
 
 For custom traversals, subclass `IterativeDfsTraverser` — it keeps its DFS stack on the heap, so it handles arbitrarily deep graphs without any `-Xss` tuning. Override `enterNode(int)` for preorder and `leaveNode(int)` for postorder; return `false` from `enterNode` to prune a subtree. `IterativeDfsTraverser`, `IterativeDfsEdgeTraverser` and `FrontierTraverser` also let any hook call `stop()` to end the whole traversal. For edge-centric algorithms that must look at every edge, such as finding a cycle, subclass `IterativeDfsEdgeTraverser`: its `visitEdge` hook reports each edge with the state of its target (unvisited, on the current path, finished) and returns whether to descend, skip the edge or stop. Multiple `run()` calls accumulate visited state, so two-phase walks compose without external bookkeeping.
 
-To start from the root nodes of a `BiAdjacentGraph`, pass them in: `traverser.runFromNodes(biAdjacentGraph.rootNodes())`. Inside any hook, the `BiAdjacentGraph` you hold gives access to predecessors. The recursive `DfsTraverser` and its `BiAdjacentDfsTraverser` subclass are limited by the JVM call stack and fail on deep graphs; prefer the iterative traversers.
+To start from the root nodes of a `BiAdjacentGraph`, pass them in: `traverser.runFromNodes(Graphs.rootNodes(biAdjacentGraph))`. Inside any hook, the `BiAdjacentGraph` you hold gives access to predecessors. The recursive `DfsTraverser` and its `BiAdjacentDfsTraverser` subclass are limited by the JVM call stack and fail on deep graphs; prefer the iterative traversers.
 
 ## Algorithm reference
 
@@ -135,7 +135,7 @@ Graphity ships the following algorithms out of the box. All of them return typed
 | Dominator tree, dominance frontiers                             | `Graphs.dominatorTree(dominators)`, `Graphs.dominanceFrontiers(dominators)` |
 | Iterated dominance frontiers, phi placement (Sreedhar-Gao)      | `IteratedDominanceFrontier.of(dominators)` |
 | Loop nesting forest, irreducible loops included (Havlak)        | `Loops.of(biAdjacentGraph, entries)` |
-| Post-dominators, control dependence                             | `Dominators.of(cfg.transposed(), exits)`, `Graphs.dominanceFrontiers(postDominators).transposed()` |
+| Post-dominators, control dependence                             | `Dominators.of(cfg.transposed(), exits)`, `BiAdjacentGraph.of(Graphs.dominanceFrontiers(postDominators)).transposed()` |
 | Shape predicates (`isDag`, `isForest`, `isTree`, `isPath`, `isStronglyConnected`) | `Graphs.isDag(graph)` |
 | Shape predicates, undirected interpretation (`isBipartite`, `isUndirectedTree`, `isUndirectedForest`, `isWeaklyConnected`) | `Graphs.isBipartite(graph)` |
 | Condensation DAG                                                | `sccs.condense()`             |

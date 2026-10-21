@@ -39,6 +39,6 @@ public abstract class BiAdjacentFrontierTraverser extends FrontierTraverser {
    * <strong>Memory:</strong> allocates an array holding the root node IDs.
    */
   public final void runFromRoots() {
-    runFromNodes(biAdjacentGraph.rootNodes());
+    runFromNodes(Graphs.rootNodes(biAdjacentGraph));
   }
 }

@@ -237,8 +237,8 @@ public final class Graphs {
    * <p>
    * Reads the graph as directed. For the undirected reading see
    * {@link #isUndirectedTree(Graph)}; for the reading in which edges point toward the root,
-   * apply this to {@link Graph#transposed()} - which builds a second graph and therefore costs
-   * 4 x (nodeCount + edgeCount) bytes, unlike this method itself.
+   * apply this to the transpose, {@code BiAdjacentGraph.of(graph).transposed()} - which builds the
+   * in-adjacency and therefore costs 4 x (nodeCount + edgeCount) bytes, unlike this method itself.
    * <p>
    * <strong>Time:</strong> O(nodeCount + edgeCount).<br>
    * <strong>Memory:</strong> O(nodeCount).
@@ -669,6 +669,36 @@ public final class Graphs {
   private record ForestInfo(int rootCount, int maxOutDegree) {}
 
   /**
+   * Returns the root nodes of the given graph - the nodes without incoming edges - in ascending
+   * order. They are the natural starting points of a traversal over a DAG or a forest:
+   * <pre>{@code
+   * traverser.runFromNodes(Graphs.rootNodes(graph));
+   * }</pre>
+   * Each call scans all nodes; keep the result if it is needed more than once. For a single node,
+   * {@link BiAdjacentGraph#isRootNode(int)} answers in constant time.
+   * <p>
+   * <strong>Time:</strong> O(nodeCount).<br>
+   * <strong>Memory:</strong> 4 bytes per root node for the result.
+   *
+   * @param graph the graph to search, with in-adjacency
+   * @return the root nodes, sorted ascending; newly allocated
+   */
+  public static SortedIntView rootNodes(BiAdjacentGraph graph) {
+    int n = graph.nodeCount();
+    int[] inStart = graph.inAdjacencyStart;
+    int count = 0;
+    for (int node = 0; node < n; node++) {
+      if (inStart[node] == inStart[node + 1]) count++;
+    }
+    int[] roots = new int[count];
+    int next = 0;
+    for (int node = 0; node < n; node++) {
+      if (inStart[node] == inStart[node + 1]) roots[next++] = node;
+    }
+    return new SortedIntView(roots, 0, count);
+  }
+
+  /**
    * Returns the nodes reachable from {@code source}, the source included, in ascending order.
    * <p>
    * Equivalent to {@link #reachableFrom(Graph, IntList)} with a one-element list.
@@ -876,8 +906,8 @@ public final class Graphs {
    * {@link NodeMapping} factory methods).
    * <p>
    * <strong>Not applicable to a transpose.</strong> The lookup searches the target of each
-   * new edge in the out-adjacency of its source, and {@link Graph#transposed()} swaps those
-   * two roles - so {@code edgeMapping(graph.transposed(), graph, identity)} returns almost
+   * new edge in the out-adjacency of its source, and {@link BiAdjacentGraph#transposed()} swaps
+   * those two roles - so {@code edgeMapping(transpose, graph, identity)} returns almost
    * exclusively {@code -1} instead of failing. Use
    * {@link #transposedEdgeMapping(Graph)} for that case.
    * <p>
@@ -921,12 +951,12 @@ public final class Graphs {
   /**
    * Derives the edge mapping between a graph and its transpose.
    * <p>
-   * Maps each edge index of {@code graph.transposed()} to the edge index of the same edge
+   * Maps each edge index of the transpose of {@code graph} to the edge index of the same edge
    * in {@code graph}, in the direction new → old like every other mapping factory here.
-   * {@link Graph#transposed()} preserves nodes but not edge indices, so this is what
+   * {@link BiAdjacentGraph#transposed()} preserves nodes but not edge indices, so this is what
    * translates edge metadata onto the transpose:
    * <pre>{@code
-   * Graph transpose = graph.transposed();
+   * Graph transpose = BiAdjacentGraph.of(graph).transposed();
    * EdgeMapping newToOld = Graphs.transposedEdgeMapping(graph);
    * double[] transposedWeights = new double[transpose.edgeCount()];
    * for (int e = 0; e < transpose.edgeCount(); e++) {
@@ -946,7 +976,7 @@ public final class Graphs {
    *
    * @param graph the graph whose transpose is to be addressed
    * @return edge mapping from the transpose's edge indices to this graph's edge indices
-   * @see Graph#transposed()
+   * @see BiAdjacentGraph#transposed()
    * @see BiAdjacentGraph#transposedEdgeIndex(int)
    */
   public static EdgeMapping transposedEdgeMapping(Graph graph) {

@@ -48,8 +48,9 @@ import java.util.Objects;
  * post-dominators:
  *
  * <pre>{@code
- * var postDominators = Dominators.of(cfg.transposed(), exits);
- * Graph controlDependence = Graphs.dominanceFrontiers(postDominators).transposed();
+ * var postDominators = Dominators.of(cfg.transposed(), exits);   // cfg: a BiAdjacentGraph
+ * Graph controlDependence =
+ *     BiAdjacentGraph.of(Graphs.dominanceFrontiers(postDominators)).transposed();
  * // edge x -> y: x decides whether y runs
  * }</pre>
  *

@@ -16,7 +16,7 @@ import java.util.Objects;
  * <p>
  * The input must be a forest of <strong>out-trees</strong> - edges point from parent to child.
  * For a forest of in-trees, pass the transpose:
- * {@code Ancestry.of(inTreeForest.transposed())}. A graph that is not a forest is rejected;
+ * {@code Ancestry.of(BiAdjacentGraph.of(inTreeForest).transposed())}. A graph that is not a forest is rejected;
  * in a general directed acyclic graph a node can have several parents, and then the common
  * ancestors of two nodes have no unique deepest element.
  *
@@ -36,7 +36,7 @@ import java.util.Objects;
  * 12 x nodeCount bytes additional during construction.
  *
  * @see Graphs#isForest(Graph)
- * @see Graph#transposed()
+ * @see BiAdjacentGraph#transposed()
  */
 public sealed class Ancestry permits PreorderAncestry {
 

@@ -222,26 +222,4 @@ class BiAdjacentGraphTest {
     assertThat(g.isRootNode(0)).isFalse();
   }
 
-  @Test
-  void rootNodesReturnsAllSources() {
-    var g = diamond();
-    assertThat(g.rootNodes().toIntArray()).containsExactly(0);
-  }
-
-  @Test
-  void rootNodesOnIsolatedGraphReturnsAllNodes() {
-    var g = BiAdjacentGraph.of(TestGraphs.isolated(3));
-    assertThat(g.rootNodes().toIntArray()).containsExactly(0, 1, 2);
-  }
-
-  @Test
-  void rootNodesOnCycleIsEmpty() {
-    var g = BiAdjacentGraph.of(TestGraphs.cycle(4));
-    assertThat(g.rootNodes().isEmpty()).isTrue();
-  }
-
-  @Test
-  void rootNodesOnEmptyGraphIsEmpty() {
-    assertThat(BiAdjacentGraph.of(TestGraphs.empty()).rootNodes().isEmpty()).isTrue();
-  }
 }
