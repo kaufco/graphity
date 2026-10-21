@@ -19,7 +19,7 @@ A walk through the data model and the API, from building a graph to carrying you
 double[] weights = new double[graph.edgeCount()];
 ```
 
-**Direction is an interpretation, not a type.** Edges are stored as directed pairs, but nothing commits a graph to one reading. Where the distinction matters, both variants are available — `Components.sccsOf` reads the graph as directed, `Components.ccsOf` as undirected. An AST that is a tree for one analysis and a dependency graph for the next needs no conversion and no second copy. Reading a graph as undirected collapses `a → b` and `b → a` into one edge and ignores self-loops, so a graph that stores its undirected edges symmetrically behaves exactly like one that stores a single direction per edge.
+**Direction is an interpretation, not a type.** Edges are stored as directed pairs, but nothing commits a graph to one reading. Where the distinction matters, both variants are available — `Components.sccsOf` reads the graph as directed, `Components.ccsOf` as undirected. An AST that is a tree for one analysis and a dependency graph for the next needs no conversion and no second copy. Reading a graph as undirected collapses `a → b` and `b → a` into one edge and ignores self-loops, so a graph that stores its undirected edges symmetrically has the same components, bridges, articulation points and blocks as one that stores a single direction per edge; results that list edges name the edges the graph actually stores.
 
 ## Building graphs
 
@@ -95,7 +95,7 @@ Both methods move the arrays in 64 KiB blocks, so a file stream needs no extra b
 | `Components.biconnectivityOf(biAdjacentGraph)` | `Biconnectivity` | `bridges()`, `articulationPoints()`, `blocks()` |
 | `Components.strongConnectivityOf(biAdjacentGraph)` | `StrongConnectivity` | `strongBridges()`, `strongArticulationPoints()` |
 | `EdgeTypes.of(graph)`      | `EdgeTypes`     | `typeOf(edgeIndex)`, `Edges.of(edgeTypes, TREE)` |
-| `BackEdges.of(graph)`      | `Edges`         | `sourceNodes()`, `targetNodes()`             |
+| `BackEdges.of(graph)`      | `Edges`         | `sourceNodes()`, `targetNodes()`, `edgeIndices()` |
 | `Ancestry.of(forest)`      | `Ancestry`      | `lowestCommonAncestorOf(a, b)`, `depthOf()`  |
 | `PreorderAncestry.of(ancestry)` | `PreorderAncestry` | `isAncestorOf()` in O(1), `subtreeOf(node)`, `subtreeSizeOf()` |
 | `Dominators.of(cfg, entry)` | `Dominators` | `immediateDominatorOf()`, `Graphs.dominatorTree()`, `ControlFlow.dominanceFrontiers()` (*controlflow*), `Ancestry.of(dominators)` |
@@ -107,7 +107,7 @@ These types compose. `sccs.condense()` returns a `Graph` plus a `NodeMapping` fr
 
 ## Data on nodes and edges
 
-**Edge indices as the bridge to user metadata.** Edges have stable CSR positions. You hold edge-attached data in a parallel array of length `graph.edgeCount()`. When a transformation reorders or filters edges (subgraph, condensation, remap, transpose), Graphity returns the corresponding `EdgeMapping` so you can reindex your metadata array in one pass, and a partition folds the data of merged nodes or edges into one value per group:
+**Edge indices as the bridge to user metadata.** Edges have stable CSR slots, their edge indices. You hold edge-attached data in a parallel array of length `graph.edgeCount()`. When a transformation reorders or filters edges (subgraph, condensation, remap, transpose), Graphity returns the corresponding `EdgeMapping` so you can reindex your metadata array in one pass, and a partition folds the data of merged nodes or edges into one value per group:
 
 ```java
 Graph transpose = BiAdjacentGraph.of(graph).transposed();        // node IDs kept, edge indices not

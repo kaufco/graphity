@@ -6,20 +6,23 @@ import it.unimi.dsi.fastutil.ints.IntLists;
 import java.util.Arrays;
 
 /**
- * A lightweight, immutable collection of directed edges.
+ * A lightweight, immutable list of edges of a graph, as an algorithm returns them.
  * <p>
- * Each edge is identified by its index in {@code 0..count()-1}. Edge {@code i} goes from
- * {@code sourceNodes().getInt(i)} to {@code targetNodes().getInt(i)}.
+ * The edge at position {@code p} in {@code 0..count()-1} goes from
+ * {@code sourceNodes().getInt(p)} to {@code targetNodes().getInt(p)}, and
+ * {@code edgeIndices().getInt(p)} is its edge index in the graph the algorithm ran on - the key
+ * of arrays of edge data, so a result reaches that data without looking the edge up. Each
+ * result documents the order of its positions.
  * <p>
- * Both lists are unmodifiable {@link IntList} instances - use their standard API for
+ * The three lists are unmodifiable {@link IntList} instances - use their standard API for
  * iteration, streaming, and element access. No Collection API is replicated on this class.
  *
  * <pre>{@code
  * Edges edges = BackEdges.of(graph);
- * for (int i = 0; i < edges.count(); i++) {
- *     int source = edges.sourceNodes().getInt(i);
- *     int target = edges.targetNodes().getInt(i);
- *     // process edge source → target
+ * for (int p = 0; p < edges.count(); p++) {
+ *     int source = edges.sourceNodes().getInt(p);
+ *     int target = edges.targetNodes().getInt(p);
+ *     double weight = weights[edges.edgeIndices().getInt(p)];   // weights[edgeIndex]
  * }
  * }</pre>
  *
@@ -28,16 +31,25 @@ import java.util.Arrays;
  */
 public final class Edges {
 
-  private static final Edges EMPTY = new Edges(
-      IntLists.unmodifiable(new IntArrayList()),
-      IntLists.unmodifiable(new IntArrayList()));
+  private static final Edges EMPTY = new Edges(IntLists.EMPTY_LIST, IntLists.EMPTY_LIST,
+      IntLists.EMPTY_LIST);
 
   private final IntList sourceNodes;
   private final IntList targetNodes;
+  private final IntList edgeIndices;
 
-  Edges(IntList sourceNodes, IntList targetNodes) {
+  /** The three lists must have the same size and be unmodifiable. */
+  Edges(IntList sourceNodes, IntList targetNodes, IntList edgeIndices) {
     this.sourceNodes = sourceNodes;
     this.targetNodes = targetNodes;
+    this.edgeIndices = edgeIndices;
+  }
+
+  /** Edges over three lists of equal length that nobody else holds. */
+  static Edges wrap(int[] sourceNodes, int[] targetNodes, int[] edgeIndices) {
+    return new Edges(IntLists.unmodifiable(IntArrayList.wrap(sourceNodes)),
+        IntLists.unmodifiable(IntArrayList.wrap(targetNodes)),
+        IntLists.unmodifiable(IntArrayList.wrap(edgeIndices)));
   }
 
   /**
@@ -57,8 +69,8 @@ public final class Edges {
   }
 
   /**
-   * Returns the source node IDs, one per edge.
-   * {@code sourceNodes().getInt(i)} is the source of edge {@code i}.
+   * Returns the source node IDs, one per position.
+   * {@code sourceNodes().getInt(p)} is the source of the edge at position {@code p}.
    * <p>
    * <strong>Time:</strong> O(1).
    *
@@ -69,8 +81,8 @@ public final class Edges {
   }
 
   /**
-   * Returns the target node IDs, one per edge.
-   * {@code targetNodes().getInt(i)} is the target of edge {@code i}.
+   * Returns the target node IDs, one per position.
+   * {@code targetNodes().getInt(p)} is the target of the edge at position {@code p}.
    * <p>
    * <strong>Time:</strong> O(1).
    *
@@ -78,6 +90,20 @@ public final class Edges {
    */
   public IntList targetNodes() {
     return targetNodes;
+  }
+
+  /**
+   * Returns the edge indices in the analyzed graph, one per position.
+   * {@code edgeIndices().getInt(p)} is the index of the edge at position {@code p}: in that
+   * graph, {@code edgeTarget(edgeIndices().getInt(p)) == targetNodes().getInt(p)}, and the edge
+   * starts at {@code sourceNodes().getInt(p)}.
+   * <p>
+   * <strong>Time:</strong> O(1).
+   *
+   * @return unmodifiable list of edge indices
+   */
+  public IntList edgeIndices() {
+    return edgeIndices;
   }
 
   /**
@@ -110,60 +136,72 @@ public final class Edges {
   }
 
   /**
-   * Orders {@code count} edges, given as interleaved (source, target) pairs, by source and then
-   * target, optionally dropping repeated pairs. Two stable counting passes, first by target, then
-   * by source: O(nodeCount + count) without comparisons. Input that is already in order, or in
-   * exactly reverse order - the bridges of a path arrive that way - is copied instead; the check
-   * stops at the first pair out of line.
+   * Orders {@code count} edges of {@code graph}, given as interleaved (source, target, edge index)
+   * triples in their direction in the graph, by source and then target - which is edge index
+   * order -, optionally dropping repeated edges. An edge index of {@code -1} is looked up with one
+   * binary search in the source's adjacency; callers pass the index wherever they know it. Two
+   * stable counting passes, first by target, then by source: O(nodeCount + count) without
+   * comparisons. Input that is already in order, or in exactly reverse order - the bridges of a
+   * path arrive that way - is copied instead; the check stops at the first edge out of line.
    * <p>
-   * <strong>Memory:</strong> 4 x nodeCount bytes for the counts and 16 x count bytes for the
+   * <strong>Memory:</strong> 4 x nodeCount bytes for the counts and 24 x count bytes for the
    * intermediate and final lists.
    *
-   * @param pairs interleaved pairs, each node ID in {@code 0..nodeCount-1}; read only
-   * @param count number of pairs
-   * @param nodeCount size of the node ID range
-   * @param dropDuplicates whether to keep only the first of equal pairs
+   * @param triples interleaved triples, each an edge of {@code graph}; read only
+   * @param count number of triples
+   * @param dropDuplicates whether to keep only the first of equal edges
    */
-  static Edges sortedPairs(int[] pairs, int count, int nodeCount, boolean dropDuplicates) {
+  static Edges sortedEdges(Graph graph, int[] triples, int count, boolean dropDuplicates) {
     if (count == 0) return EMPTY;
     var sources = new int[count];
     var targets = new int[count];
-    int direction = direction(pairs, count);
+    var edgeIndices = new int[count];
+    int direction = direction(triples, count);
     if (direction != 0) {
       for (int i = 0; i < count; i++) {
-        int from = direction > 0 ? i : count - 1 - i;
-        sources[i] = pairs[2 * from];
-        targets[i] = pairs[2 * from + 1];
+        int from = 3 * (direction > 0 ? i : count - 1 - i);
+        sources[i] = triples[from];
+        targets[i] = triples[from + 1];
+        edgeIndices[i] = triples[from + 2];
       }
     } else {
-      countingSort(pairs, count, nodeCount, sources, targets);
+      countingSort(triples, count, graph.nodeCount(), sources, targets, edgeIndices);
     }
     int kept = count;
     if (dropDuplicates) {
       kept = 0;
       for (int i = 0; i < count; i++) {
         if (kept > 0 && sources[kept - 1] == sources[i] && targets[kept - 1] == targets[i]) {
+          if (edgeIndices[kept - 1] < 0) edgeIndices[kept - 1] = edgeIndices[i];
           continue;
         }
         sources[kept] = sources[i];
         targets[kept] = targets[i];
+        edgeIndices[kept] = edgeIndices[i];
         kept++;
       }
     }
     if (kept < count) {
       sources = Arrays.copyOf(sources, kept);
       targets = Arrays.copyOf(targets, kept);
+      edgeIndices = Arrays.copyOf(edgeIndices, kept);
     }
-    return new Edges(IntLists.unmodifiable(IntArrayList.wrap(sources)),
-        IntLists.unmodifiable(IntArrayList.wrap(targets)));
+    for (int p = 0; p < kept; p++) {
+      if (edgeIndices[p] < 0) edgeIndices[p] = graph.edgeIndexOf(sources[p], targets[p]);
+      assert edgeIndices[p] == graph.edgeIndexOf(sources[p], targets[p])
+          : sources[p] + " -> " + targets[p] + " is not edge " + edgeIndices[p];
+    }
+    return wrap(sources, targets, edgeIndices);
   }
 
-  /** {@code 1} if the pairs are in order, {@code -1} if exactly reversed, else {@code 0}. */
-  private static int direction(int[] pairs, int count) {
+  /** {@code 1} if the triples are in order, {@code -1} if exactly reversed, else {@code 0}. */
+  private static int direction(int[] triples, int count) {
     int direction = 0;
     for (int i = 1; i < count; i++) {
-      int bySource = Integer.compare(pairs[2 * i - 2], pairs[2 * i]);
-      int step = bySource != 0 ? bySource : Integer.compare(pairs[2 * i - 1], pairs[2 * i + 1]);
+      int a = 3 * (i - 1);
+      int b = 3 * i;
+      int bySource = Integer.compare(triples[a], triples[b]);
+      int step = bySource != 0 ? bySource : Integer.compare(triples[a + 1], triples[b + 1]);
       if (step == 0) continue;
       int sign = step < 0 ? 1 : -1;
       if (direction == 0) {
@@ -176,35 +214,35 @@ public final class Edges {
   }
 
   /** Two stable counting passes, by target and then by source, into the given arrays. */
-  private static void countingSort(
-      int[] pairs, int count, int nodeCount, int[] sources, int[] targets) {
+  private static void countingSort(int[] triples, int count, int nodeCount, int[] sources,
+      int[] targets, int[] edgeIndices) {
     var start = new int[nodeCount + 1];
     for (int i = 0; i < count; i++) {
-      start[pairs[2 * i + 1] + 1]++;
+      start[triples[3 * i + 1] + 1]++;
     }
     for (int v = 0; v < nodeCount; v++) {
       start[v + 1] += start[v];
     }
-    var byTargetSource = new int[count];
-    var byTargetTarget = new int[count];
+    var byTarget = new int[3 * count];
     for (int i = 0; i < count; i++) {
-      int target = pairs[2 * i + 1];
-      int slot = start[target]++;
-      byTargetSource[slot] = pairs[2 * i];
-      byTargetTarget[slot] = target;
+      int slot = 3 * start[triples[3 * i + 1]]++;
+      byTarget[slot] = triples[3 * i];
+      byTarget[slot + 1] = triples[3 * i + 1];
+      byTarget[slot + 2] = triples[3 * i + 2];
     }
     Arrays.fill(start, 0);
     for (int i = 0; i < count; i++) {
-      start[byTargetSource[i] + 1]++;
+      start[byTarget[3 * i] + 1]++;
     }
     for (int v = 0; v < nodeCount; v++) {
       start[v + 1] += start[v];
     }
     for (int i = 0; i < count; i++) {
-      int source = byTargetSource[i];
+      int source = byTarget[3 * i];
       int slot = start[source]++;
       sources[slot] = source;
-      targets[slot] = byTargetTarget[i];
+      targets[slot] = byTarget[3 * i + 1];
+      edgeIndices[slot] = byTarget[3 * i + 2];
     }
   }
 }

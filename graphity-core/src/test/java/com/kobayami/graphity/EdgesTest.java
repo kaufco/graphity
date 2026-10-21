@@ -12,36 +12,32 @@ import org.junit.jupiter.api.Test;
 class EdgesTest {
 
   @Test
-  void constructorStoresBothLists() {
+  void constructorStoresAllThreeLists() {
     IntList src = IntLists.unmodifiable(new IntArrayList(new int[] {0, 1, 2}));
     IntList tgt = IntLists.unmodifiable(new IntArrayList(new int[] {3, 4, 5}));
-    var edges = new Edges(src, tgt);
+    IntList idx = IntLists.unmodifiable(new IntArrayList(new int[] {6, 7, 8}));
+    var edges = new Edges(src, tgt, idx);
     assertThatObject(edges.sourceNodes()).isSameAs(src);
     assertThatObject(edges.targetNodes()).isSameAs(tgt);
+    assertThatObject(edges.edgeIndices()).isSameAs(idx);
   }
 
   @Test
   void countReturnsNumberOfEdges() {
-    var edges = new Edges(
-        IntLists.unmodifiable(new IntArrayList(new int[] {0, 1, 2})),
-        IntLists.unmodifiable(new IntArrayList(new int[] {3, 4, 5})));
+    var edges = Edges.wrap(new int[] {0, 1, 2}, new int[] {3, 4, 5}, new int[] {0, 1, 2});
     assertThat(edges.count()).isEqualTo(3);
   }
 
   @Test
   void isEmptyOnEmptyListsTrue() {
-    var edges = new Edges(
-        IntLists.unmodifiable(new IntArrayList()),
-        IntLists.unmodifiable(new IntArrayList()));
+    var edges = Edges.wrap(new int[0], new int[0], new int[0]);
     assertThat(edges.isEmpty()).isTrue();
     assertThat(edges.count()).isZero();
   }
 
   @Test
   void isEmptyOnNonEmptyListsFalse() {
-    var edges = new Edges(
-        IntLists.unmodifiable(new IntArrayList(new int[] {0})),
-        IntLists.unmodifiable(new IntArrayList(new int[] {1})));
+    var edges = Edges.wrap(new int[] {0}, new int[] {1}, new int[] {0});
     assertThat(edges.isEmpty()).isFalse();
     assertThat(edges.count()).isEqualTo(1);
   }
@@ -52,6 +48,7 @@ class EdgesTest {
     assertThat(Edges.empty().count()).isZero();
     assertThat(Edges.empty().sourceNodes().toIntArray()).isEmpty();
     assertThat(Edges.empty().targetNodes().toIntArray()).isEmpty();
+    assertThat(Edges.empty().edgeIndices().toIntArray()).isEmpty();
   }
 
   @Test
@@ -60,13 +57,15 @@ class EdgesTest {
   }
 
   @Test
-  void sourceAndTargetNodesAreUnmodifiable() {
-    var edges = new Edges(
-        IntLists.unmodifiable(new IntArrayList(new int[] {0, 1})),
-        IntLists.unmodifiable(new IntArrayList(new int[] {2, 3})));
+  void allListsAreUnmodifiable() {
+    var edges = Edges.wrap(new int[] {0, 1}, new int[] {2, 3}, new int[] {0, 1});
     assertThatThrownBy(() -> edges.sourceNodes().add(99))
         .isInstanceOf(UnsupportedOperationException.class);
     assertThatThrownBy(() -> edges.targetNodes().add(99))
+        .isInstanceOf(UnsupportedOperationException.class);
+    assertThatThrownBy(() -> edges.edgeIndices().add(99))
+        .isInstanceOf(UnsupportedOperationException.class);
+    assertThatThrownBy(() -> Edges.empty().edgeIndices().add(99))
         .isInstanceOf(UnsupportedOperationException.class);
   }
 }

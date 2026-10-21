@@ -67,7 +67,7 @@ public final class EdgeTypes {
   /**
    * Returns the type of the edge at the given index.
    * <p>
-   * Edge indices correspond to positions in the CSR adjacency array.
+   * Edge indices correspond to slots in the CSR adjacency array.
    * <p>
    * <strong>Time:</strong> O(1).
    *
@@ -85,6 +85,7 @@ public final class EdgeTypes {
     byte ordinal = (byte) type.ordinal();
     var sources = new IntArrayList();
     var targets = new IntArrayList();
+    var edgeIndices = new IntArrayList();
 
     var adjacency = Csr.outAdjacency(graph);
     var adjacencyStart = Csr.outAdjacencyStart(graph);
@@ -97,6 +98,7 @@ public final class EdgeTypes {
         if (types[ei] == ordinal) {
           sources.add(node);
           targets.add(adjacency[ei]);
+          edgeIndices.add(ei);
         }
       }
     }
@@ -104,7 +106,8 @@ public final class EdgeTypes {
     if (sources.isEmpty()) {
       return Edges.empty();
     }
-    return new Edges(IntLists.unmodifiable(sources), IntLists.unmodifiable(targets));
+    return new Edges(IntLists.unmodifiable(sources), IntLists.unmodifiable(targets),
+        IntLists.unmodifiable(edgeIndices));
   }
 
   /**

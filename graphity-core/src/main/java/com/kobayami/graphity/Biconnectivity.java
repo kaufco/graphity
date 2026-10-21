@@ -28,7 +28,7 @@ import java.util.Arrays;
  *
  * <pre>{@code
  * var biconnectivity = Components.biconnectivityOf(dependencies);   // a BiAdjacentGraph
- * Edges criticalLinks = biconnectivity.bridges();               // source < target
+ * Edges criticalLinks = biconnectivity.bridges();               // with their edge indices
  * SortedIntView singlePointsOfFailure = biconnectivity.articulationPoints();
  * EdgePartition blocks = biconnectivity.blocks();
  * for (int block = 0; block < blocks.groupCount(); block++) {
@@ -60,8 +60,9 @@ public final class Biconnectivity {
   }
 
   /**
-   * Returns the bridges, each as a single undirected edge with the lower node ID as source,
-   * ordered by source and then target.
+   * Returns the bridges, each as one edge of the graph with its edge index, ordered by edge
+   * index. A bridge the graph stores in both directions is reported as the edge from the lower
+   * to the higher node ID; its other direction lies in the same block of {@link #blocks()}.
    * <p>
    * <strong>Time:</strong> O(1).
    *
@@ -104,8 +105,8 @@ public final class Biconnectivity {
    * <p>
    * Neighbours are read as undirected by merging a node's out- and in-adjacency, both sorted
    * ascending, emitting each neighbour once. The merge is also where a block's edge indices
-   * come from: for one undirected edge it sees the out-adjacency position - already an edge
-   * index - and the in-adjacency position in the same step, and the latter translates to an
+   * come from: for one undirected edge it sees the out-adjacency slot - already an edge index -
+   * and the in-adjacency slot in the same step, and the latter translates to an
    * edge index through {@link Graphs#transposedEdgeMapping(Graph)}.
    * <p>
    * Collapsing the reciprocal pair removes the usual complication around the edge back to the
@@ -147,8 +148,8 @@ public final class Biconnectivity {
     private int edgeTop;
 
     private final boolean[] isArticulation;
-    /** Bridges as (lower node, higher node) pairs, interleaved. */
-    private final IntArrayList bridgePairs = new IntArrayList();
+    /** Bridges as (source, target, edge index) triples, interleaved, each a stored edge. */
+    private final IntArrayList bridgeTriples = new IntArrayList();
 
     /** Edge index → block ID, {@code -1} for a self-loop. */
     private final int[] blockOfEdge;
@@ -222,13 +223,10 @@ public final class Biconnectivity {
           if (parent >= 0) {
             if (low[u] < low[parent]) low[parent] = low[u];
             if (low[u] >= disc[parent]) {
+              if (low[u] > disc[parent]) addBridge(parent, u, blockMark[u]);
               closeBlock(blockMark[u]);
               // The root is an articulation point only if it has two or more subtrees.
               if (parent != root) isArticulation[parent] = true;
-            }
-            if (low[u] > disc[parent]) {
-              bridgePairs.add(Math.min(parent, u));
-              bridgePairs.add(Math.max(parent, u));
             }
           }
         }
@@ -311,6 +309,21 @@ public final class Biconnectivity {
       edgeStack[edgeTop++] = edgeIndex;
     }
 
+    /**
+     * Records the bridge {@code parent - child} before its block closes. Every block below the
+     * child is closed already, so the edges above {@code mark} are exactly the one or two stored
+     * directions of the bridge, pushed {@code parent -> child} first. A bridge stored both ways is
+     * reported from the lower node ID.
+     */
+    private void addBridge(int parent, int child, int mark) {
+      assert edgeTop - mark == 1 || edgeTop - mark == 2;
+      int edge = edgeTop - mark == 2 && parent > child ? edgeStack[mark + 1] : edgeStack[mark];
+      int target = outAdjacency[edge];
+      bridgeTriples.add(target == child ? parent : child);
+      bridgeTriples.add(target);
+      bridgeTriples.add(edge);
+    }
+
     /** Turns the edges above {@code mark} into one block. */
     private void closeBlock(int mark) {
       int block = blockCount++;
@@ -320,8 +333,7 @@ public final class Biconnectivity {
     }
 
     Edges bridges() {
-      return Edges.sortedPairs(bridgePairs.elements(), bridgePairs.size() >> 1,
-          graph.nodeCount(), false);
+      return Edges.sortedEdges(graph, bridgeTriples.elements(), bridgeTriples.size() / 3, false);
     }
 
     SortedIntView articulationPoints() {

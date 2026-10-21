@@ -70,15 +70,15 @@ public final class StrongConnectivity {
     int[] backward =
         Dominators.withinBlocks(graph.transposed(), sourcesFirst, "Strong connectivity");
 
-    var bridgePairs = new IntArrayList();
+    var bridgeTriples = new IntArrayList();
     var isArticulation = new boolean[n];
-    collect(forward, Csr.inAdjacencyStart(graph), Csr.inAdjacency(graph), sccOf, false, bridgePairs,
+    collect(forward, Csr.inAdjacencyStart(graph), Csr.inAdjacency(graph), sccOf, false, bridgeTriples,
         isArticulation);
-    collect(backward, Csr.outAdjacencyStart(graph), Csr.outAdjacency(graph), sccOf, true, bridgePairs,
+    collect(backward, Csr.outAdjacencyStart(graph), Csr.outAdjacency(graph), sccOf, true, bridgeTriples,
         isArticulation);
     markEntries(graph, sccOf, members, memberStart, isArticulation);
     return new StrongConnectivity(
-        Edges.sortedPairs(bridgePairs.elements(), bridgePairs.size() >> 1, n, true),
+        Edges.sortedEdges(graph, bridgeTriples.elements(), bridgeTriples.size() / 3, true),
         articulationPoints(isArticulation));
   }
 
@@ -90,30 +90,32 @@ public final class StrongConnectivity {
    * {@code v}.
    *
    * @param transposed whether the flow graph is the transpose, so a bridge {@code u → v} found
-   *     there is the edge {@code v → u} of the graph
+   *     there is the edge {@code v → u} of the graph, and the in-adjacency slot of {@code u} is
+   *     the out-adjacency slot of the graph - its edge index
    */
   private static void collect(int[] idom, int[] inStart, int[] in, int[] sccOf,
-      boolean transposed, IntArrayList bridgePairs, boolean[] isArticulation) {
+      boolean transposed, IntArrayList bridgeTriples, boolean[] isArticulation) {
     int[] interval = intervals(idom);
     for (int v = 0; v < idom.length; v++) {
       int u = idom[v];
       if (u < 0) continue;
       if (idom[u] >= 0) isArticulation[u] = true;
       int scc = sccOf[v];
-      boolean fromIdom = false;
+      int fromIdom = -1;
       boolean bridge = true;
       for (int i = inStart[v], end = inStart[v + 1]; i < end; i++) {
         int w = in[i];
         if (w == u) {
-          fromIdom = true;
+          fromIdom = i;
         } else if (sccOf[w] == scc && !dominates(interval, v, w)) {
           bridge = false;
           break;
         }
       }
-      if (bridge && fromIdom) {
-        bridgePairs.add(transposed ? v : u);
-        bridgePairs.add(transposed ? u : v);
+      if (bridge && fromIdom >= 0) {
+        bridgeTriples.add(transposed ? v : u);
+        bridgeTriples.add(transposed ? u : v);
+        bridgeTriples.add(transposed ? fromIdom : -1);
       }
     }
   }
@@ -235,7 +237,8 @@ public final class StrongConnectivity {
   }
 
   /**
-   * Returns the strong bridges, ordered by source and then target.
+   * Returns the strong bridges with their edge indices, ordered by edge index - that is, by
+   * source and then target.
    * <p>
    * <strong>Time:</strong> O(1).
    *

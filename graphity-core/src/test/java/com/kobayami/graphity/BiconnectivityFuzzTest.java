@@ -137,11 +137,17 @@ class BiconnectivityFuzzTest {
       }
 
       var bridges = biconnectivity.bridges();
-      for (int i = 0; i < bridges.count(); i++) {
-        int source = bridges.sourceNodes().getInt(i);
-        int target = bridges.targetNodes().getInt(i);
-        assertThat(source).as("bridge normalization for %s", description).isLessThan(target);
-        int edgeIndex = anyEdgeIndexBetween(graph, source, target);
+      for (int p = 0; p < bridges.count(); p++) {
+        int source = bridges.sourceNodes().getInt(p);
+        int target = bridges.targetNodes().getInt(p);
+        int edgeIndex = bridges.edgeIndices().getInt(p);
+        assertThat(graph.edgeIndexOf(source, target)).as("bridge edge index for %s", description)
+            .isEqualTo(edgeIndex);
+        if (source > target) {
+          assertThat(graph.hasOutNode(target, source))
+              .as("a bridge stored both ways comes from the lower node, %s", description)
+              .isFalse();
+        }
         int block = blocks.get(edgeIndex);
         var edgeIndices = blocks.edgesOf(block);
         for (int j = 0; j < edgeIndices.size(); j++) {
@@ -192,8 +198,8 @@ class BiconnectivityFuzzTest {
   private static LongOpenHashSet bridgeKeys(Biconnectivity biconnectivity) {
     var keys = new LongOpenHashSet();
     var bridges = biconnectivity.bridges();
-    for (int i = 0; i < bridges.count(); i++) {
-      keys.add(pairKey(bridges.sourceNodes().getInt(i), bridges.targetNodes().getInt(i)));
+    for (int p = 0; p < bridges.count(); p++) {
+      keys.add(pairKey(bridges.sourceNodes().getInt(p), bridges.targetNodes().getInt(p)));
     }
     return keys;
   }
@@ -204,12 +210,6 @@ class BiconnectivityFuzzTest {
 
   private static int reverseEdgeIndex(Graph graph, int edgeIndex) {
     return edgeIndexOf(graph, graph.edgeTarget(edgeIndex), graph.edgeSource(edgeIndex));
-  }
-
-  /** Edge index of {@code source → target}, or of the reverse edge if only that one exists. */
-  private static int anyEdgeIndexBetween(Graph graph, int source, int target) {
-    int forward = edgeIndexOf(graph, source, target);
-    return forward >= 0 ? forward : edgeIndexOf(graph, target, source);
   }
 
   /** Edge index of {@code source → target} via binary search, or {@code -1}. */

@@ -16,9 +16,10 @@ import it.unimi.dsi.fastutil.ints.IntLists;
  * <pre>{@code
  * Edges backEdges = BackEdges.of(graph);
  * // backEdges.count() == 0  ⟺  graph is a DAG
- * for (int i = 0; i < backEdges.count(); i++) {
- *     int src = backEdges.sourceNodes().getInt(i);
- *     int tgt = backEdges.targetNodes().getInt(i);
+ * for (int p = 0; p < backEdges.count(); p++) {
+ *     int src = backEdges.sourceNodes().getInt(p);
+ *     int tgt = backEdges.targetNodes().getInt(p);
+ *     int edgeIndex = backEdges.edgeIndices().getInt(p);
  *     // src → tgt is a back-edge (cycle-causing)
  * }
  * }</pre>
@@ -41,7 +42,7 @@ public final class BackEdges {
    * <strong>Memory:</strong> O(nodeCount) + O(backEdgeCount) for the result.
    *
    * @param graph the graph to analyze
-   * @return the back-edges as an {@link Edges} collection
+   * @return the back-edges with their edge indices, in the order the search finds them
    * @throws IllegalArgumentException if a depth-first path is longer than 2^30 - 5 nodes, the most
    *     frames an array can hold
    */
@@ -53,7 +54,8 @@ public final class BackEdges {
     traverser.run();
     return new Edges(
         IntLists.unmodifiable(traverser.sources),
-        IntLists.unmodifiable(traverser.targets));
+        IntLists.unmodifiable(traverser.targets),
+        IntLists.unmodifiable(traverser.edgeIndices));
   }
 
   /**
@@ -74,6 +76,7 @@ public final class BackEdges {
     private final int[] state;
     final IntArrayList sources = new IntArrayList();
     final IntArrayList targets = new IntArrayList();
+    final IntArrayList edgeIndices = new IntArrayList();
 
     BackEdgeCollector(Graph graph) {
       this.graph = graph;
@@ -87,6 +90,7 @@ public final class BackEdges {
       int[] state = this.state;
       IntArrayList sources = this.sources;
       IntArrayList targets = this.targets;
+      IntArrayList edgeIndices = this.edgeIndices;
       // Each frame is two interleaved ints, the node and its resume position in the
       // adjacency array: both share a cache line, and the array grows on demand.
       int[] frames = DfsFrames.initial(n);
@@ -124,6 +128,7 @@ public final class BackEdges {
             } else if ((flags & ON_STACK) != 0) {
               sources.add(u);
               targets.add(v);
+              edgeIndices.add(i - 1);
             }
           }
           state[u >> 4] &= ~(ON_STACK << ((u & 0xF) << 1));   // postorder: leave the DFS stack
