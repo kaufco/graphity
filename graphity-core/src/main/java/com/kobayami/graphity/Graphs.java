@@ -1284,4 +1284,158 @@ public final class Graphs {
     }
     return Edges.wrap(sources, targets, edgeIndices);
   }
+
+  /**
+   * Returns the transitive closure: an edge {@code u -> v} whenever {@code v} is reachable from
+   * {@code u} by a non-empty path. A node has an edge to itself exactly if it lies on a cycle.
+   * <p>
+   * Computed on one bit row per strongly connected component over the condensation, sinks first,
+   * so the work is about sccCount x condensationEdgeCount / 64 word operations, and the rows
+   * hold sccCount<sup>2</sup> / 8 bytes while it runs - about 1.25 GB for 10<sup>5</sup>
+   * components. The result can have up to nodeCount<sup>2</sup> edges, 4 bytes each. For the
+   * nodes reachable from one node, {@link #reachableFrom(Graph, int)} is far cheaper.
+   * <p>
+   * <strong>Time:</strong> O(nodeCount + edgeCount + sccCount x (sccCount + condensationEdgeCount)
+   * / 64 + resultEdgeCount x log nodeCount) - the rows are allocated and scanned whole, and the
+   * logarithm sorts each component's targets once.<br>
+   * <strong>Memory:</strong> 4 x (nodeCount + 1 + resultEdgeCount) bytes for the result;
+   * sccCount<sup>2</sup> / 8 bytes for the rows plus O(nodeCount + edgeCount) during
+   * computation, rows and result side by side at the peak.
+   *
+   * @param graph the graph to close
+   * @return the transitive closure, over the same nodes
+   * @throws IllegalArgumentException if the closure has more than {@code Integer.MAX_VALUE - 8}
+   *                                  edges
+   */
+  public static Graph transitiveClosure(Graph graph) {
+    int n = graph.nodeCount();
+    var sccs = Components.sccsOf(graph);
+    int k = sccs.sccCount();
+    Graph dag = sccs.condense();
+    int[] dagStart = Csr.outAdjacencyStart(dag);
+    int[] dagTargets = Csr.outAdjacency(dag);
+    int words = (k + 63) >>> 6;
+
+    // SCC IDs are in reverse topological order: every successor of c has a smaller ID.
+    var reach = new long[k][];
+    var reachSize = new int[k];
+    long total = 0;
+    for (int c = 0; c < k; c++) {
+      var row = new long[words];
+      if (sccs.containsCycle(c)) row[c >>> 6] |= 1L << c;
+      for (int e = dagStart[c], end = dagStart[c + 1]; e < end; e++) {
+        int d = dagTargets[e];
+        row[d >>> 6] |= 1L << d;
+        long[] below = reach[d];
+        for (int w = 0; w < words; w++) row[w] |= below[w];
+      }
+      reach[c] = row;
+      long size = 0;
+      for (int w = 0; w < words; w++) {
+        for (long bits = row[w]; bits != 0; bits &= bits - 1) {
+          size += sccs.sizeOf((w << 6) + Long.numberOfTrailingZeros(bits));
+        }
+      }
+      reachSize[c] = (int) size;
+      total += size * sccs.sizeOf(c);
+      if (total > Integer.MAX_VALUE - 8) {
+        throw new IllegalArgumentException(
+            "the transitive closure has more than " + (Integer.MAX_VALUE - 8) + " edges");
+      }
+    }
+
+    // Each component's sorted target list is written once, at its first node, and copied from
+    // there to its other nodes; its bit row is dropped as soon as the list exists.
+    var start = new int[n + 1];
+    for (int v = 0; v < n; v++) start[v + 1] = start[v] + reachSize[sccs.sccOf(v)];
+    var targets = new int[(int) total];
+    for (int c = 0; c < k; c++) {
+      long[] row = reach[c];
+      var nodes = sccs.nodesOf(c);
+      int first = start[nodes.getInt(0)];
+      int at = first;
+      for (int w = 0; w < words; w++) {
+        for (long bits = row[w]; bits != 0; bits &= bits - 1) {
+          var members = sccs.nodesOf((w << 6) + Long.numberOfTrailingZeros(bits));
+          for (int i = 0; i < members.size(); i++) targets[at++] = members.getInt(i);
+        }
+      }
+      Arrays.sort(targets, first, at);
+      for (int i = 1; i < nodes.size(); i++) {
+        System.arraycopy(targets, first, targets, start[nodes.getInt(i)], at - first);
+      }
+      reach[c] = null;
+    }
+    return new Graph(start, targets);
+  }
+
+  /**
+   * Returns the transitive reduction of a DAG: the edges not implied by a longer path. The result
+   * has the same reachability as the input with as few edges as possible, and on a DAG it is
+   * unique. For a graph with cycles, reduce its condensation, {@link Sccs#condense()}.
+   * <p>
+   * Visits each node's out-nodes in topological order and keeps an edge only if no earlier
+   * out-node already reaches its target, on one bit row per node, sinks first: about
+   * edgeCount x nodeCount / 64 word operations, and nodeCount<sup>2</sup> / 8 bytes for the rows
+   * while it runs - about 1.25 GB for 10<sup>5</sup> nodes.
+   * <p>
+   * <strong>Time:</strong> O(nodeCount + (nodeCount + edgeCount) x nodeCount / 64 +
+   * edgeCount x log maxOutDegree) - the rows are allocated whole.<br>
+   * <strong>Memory:</strong> 4 x (nodeCount + 1 + resultEdgeCount) bytes for the result;
+   * nodeCount<sup>2</sup> / 8 bytes plus O(nodeCount + edgeCount) during computation.
+   *
+   * @param dag the DAG to reduce
+   * @return the transitive reduction, over the same nodes
+   * @throws IllegalArgumentException if the graph has a cycle, a self-loop included
+   */
+  public static Graph transitiveReduction(Graph dag) {
+    int n = dag.nodeCount();
+    IntList order = TopOrder.of(dag);
+    var position = new int[n];
+    for (int i = 0; i < n; i++) position[order.getInt(i)] = i;
+    int[] start = Csr.outAdjacencyStart(dag);
+    int[] targets = Csr.outAdjacency(dag);
+    int words = (n + 63) >>> 6;
+    var reach = new long[n][];
+    var keep = new boolean[targets.length];
+    int kept = 0;
+    var byPosition = new long[16];
+
+    for (int i = n - 1; i >= 0; i--) {
+      int u = order.getInt(i);
+      int from = start[u];
+      int degree = start[u + 1] - from;
+      if (byPosition.length < degree) {
+        byPosition = new long[Math.max(degree, 2 * byPosition.length)];
+      }
+      for (int j = 0; j < degree; j++) {
+        byPosition[j] = (long) position[targets[from + j]] << 32 | (from + j);
+      }
+      Arrays.sort(byPosition, 0, degree);
+      var row = new long[words];
+      for (int j = 0; j < degree; j++) {
+        int e = (int) byPosition[j];
+        int w = targets[e];
+        if ((row[w >>> 6] & (1L << w)) != 0) continue;
+        keep[e] = true;
+        kept++;
+        row[w >>> 6] |= 1L << w;
+        long[] below = reach[w];
+        for (int x = 0; x < words; x++) row[x] |= below[x];
+      }
+      reach[u] = row;
+    }
+
+    var resultStart = new int[n + 1];
+    var resultTargets = new int[kept];
+    int next = 0;
+    for (int v = 0; v < n; v++) {
+      resultStart[v] = next;
+      for (int e = start[v], end = start[v + 1]; e < end; e++) {
+        if (keep[e]) resultTargets[next++] = targets[e];
+      }
+    }
+    resultStart[n] = next;
+    return new Graph(resultStart, resultTargets);
+  }
 }

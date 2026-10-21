@@ -97,7 +97,7 @@ The result types are themselves graphs or partitions backed by CSR — they comp
 
 - **Components and connectivity:** strongly connected components (Tarjan), weakly connected components, connected components in the undirected reading; bridges, articulation points and biconnected components; strong bridges and strong articulation points; strong and weak connectivity checks.
 - **Order and cycles:** topological order by depth-first search, Kahn's order with a level per node; DAG check, one concrete cycle as a witness, and a cycle test per strongly connected component; edge classification into tree, back, forward and cross edges; back edges.
-- **Reachability and distances:** breadth-first distances and shortest paths from one or several sources; the set of reachable nodes.
+- **Reachability and distances:** breadth-first distances and shortest paths from one or several sources; the set of reachable nodes; transitive closure, and transitive reduction of a DAG.
 - **Trees and ancestry:** parent, depth and lowest common ancestor in trees and forests; constant-time ancestor test and subtree views; tree, forest and path checks, directed and undirected; bipartiteness.
 - **Dominators:** dominators from one or several entries (Lengauer-Tarjan) and post-dominators; the dominator tree.
 - **Control flow** (module `graphity-controlflow`): dominance frontiers and control dependence; iterated dominance frontiers for phi placement; the loop nesting forest, irreducible loops included (Havlak).

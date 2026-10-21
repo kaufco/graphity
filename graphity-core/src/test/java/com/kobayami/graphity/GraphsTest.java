@@ -8,6 +8,8 @@ import com.kobayami.graphity.testutils.TestGraphs;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import java.util.BitSet;
+import java.util.Random;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 
 class GraphsTest {
@@ -780,5 +782,157 @@ class GraphsTest {
     assertThat(cycle.size()).isEqualTo(n);
     assertThat(cycle.getInt(0)).isZero();
     assertThat(cycle.getInt(n - 1)).isEqualTo(n - 1);
+  }
+
+  // ---- transitive closure and reduction ----
+
+  /** Whether {@code v} is reachable from {@code u} by a non-empty path, for every pair. */
+  private static boolean[][] reachability(Graph graph) {
+    int n = graph.nodeCount();
+    var reach = new boolean[n][n];
+    for (int u = 0; u < n; u++) {
+      var queue = new IntArrayList();
+      for (int t : graph.outNodes(u).toIntArray()) {
+        if (!reach[u][t]) {
+          reach[u][t] = true;
+          queue.add(t);
+        }
+      }
+      for (int i = 0; i < queue.size(); i++) {
+        for (int t : graph.outNodes(queue.getInt(i)).toIntArray()) {
+          if (!reach[u][t]) {
+            reach[u][t] = true;
+            queue.add(t);
+          }
+        }
+      }
+    }
+    return reach;
+  }
+
+  @Test
+  void transitiveClosureMatchesReachability() {
+    for (long seed = 0; seed < 120; seed++) {
+      Graph graph = RandomGraphs.gnp(2 + (int) (seed % 40), 0.06, seed);
+      boolean[][] expected = reachability(graph);
+      Graph closure = Graphs.transitiveClosure(graph);
+      assertThat(closure.nodeCount()).isEqualTo(graph.nodeCount());
+      for (int u = 0; u < graph.nodeCount(); u++) {
+        for (int v = 0; v < graph.nodeCount(); v++) {
+          assertThat(closure.hasOutNode(u, v)).as("%d -> %d, seed %d", u, v, seed)
+              .isEqualTo(expected[u][v]);
+        }
+      }
+    }
+  }
+
+  @Test
+  void transitiveClosureHasASelfLoopExactlyOnCycles() {
+    // 0 -> 1 -> 2 -> 1, 3 -> 3, 4 alone.
+    Graph closure = Graphs.transitiveClosure(TestGraphs.of(5, 0, 1, 1, 2, 2, 1, 3, 3));
+    assertThat(closure.hasOutNode(0, 0)).isFalse();
+    assertThat(closure.hasOutNode(1, 1)).isTrue();
+    assertThat(closure.hasOutNode(2, 2)).isTrue();
+    assertThat(closure.hasOutNode(3, 3)).isTrue();
+    assertThat(closure.outDegree(4)).isZero();
+    assertThat(closure.outNodes(0).toIntArray()).containsExactly(1, 2);
+  }
+
+  @Test
+  void transitiveClosureOfAnEmptyGraph() {
+    assertThat(Graphs.transitiveClosure(TestGraphs.empty()).nodeCount()).isZero();
+  }
+
+  @Test
+  void transitiveReductionKeepsReachabilityWithoutRedundantEdges() {
+    for (long seed = 0; seed < 120; seed++) {
+      // Renumbered, so that ascending IDs are not already a topological order.
+      Graph sorted = RandomGraphs.randomDag(2 + (int) (seed % 40), 0.15, seed);
+      Graph dag = Graphs.remapped(sorted,
+          NodeMapping.forPermutation(IntArrayList.wrap(shuffled(sorted.nodeCount(), seed))));
+      long currentSeed = seed;
+      Graph reduced = Graphs.transitiveReduction(dag);
+      boolean[][] expected = reachability(dag);
+      boolean[][] actual = reachability(reduced);
+      for (int u = 0; u < dag.nodeCount(); u++) {
+        assertThat(actual[u]).as("reachability from %d, seed %d", u, seed).isEqualTo(expected[u]);
+      }
+      // Every kept edge is an edge of the DAG, and none is implied by the other kept edges.
+      reduced.forEachEdge((source, target, edgeIndex) -> {
+        assertThat(dag.hasOutNode(source, target)).isTrue();
+        var without = new GraphBuilder();
+        without.addNodes(reduced.nodeCount());
+        reduced.forEachEdge((s, t, e) -> {
+          if (e != edgeIndex) without.addEdge(s, t);
+        });
+        assertThat(reachability(without.build())[source][target])
+            .as("%d -> %d is implied, seed %d", source, target, currentSeed).isFalse();
+      });
+    }
+  }
+
+  private static int[] shuffled(int n, long seed) {
+    var order = IntStream.range(0, n).toArray();
+    var random = new Random(seed);
+    for (int i = n - 1; i > 0; i--) {
+      int j = random.nextInt(i + 1);
+      int t = order[i];
+      order[i] = order[j];
+      order[j] = t;
+    }
+    return order;
+  }
+
+  @Test
+  void transitiveClosureAndReductionAcrossSeveralBitWords() {
+    for (long seed = 0; seed < 6; seed++) {
+      Graph graph = RandomGraphs.gnp(150, 0.012, seed);
+      boolean[][] expected = reachability(graph);
+      Graph closure = Graphs.transitiveClosure(graph);
+      for (int u = 0; u < 150; u++) {
+        for (int v = 0; v < 150; v++) {
+          assertThat(closure.hasOutNode(u, v)).as("%d -> %d, seed %d", u, v, seed)
+              .isEqualTo(expected[u][v]);
+        }
+      }
+      Graph sorted = RandomGraphs.randomDag(150, 0.03, seed);
+      Graph dag = Graphs.remapped(sorted,
+          NodeMapping.forPermutation(IntArrayList.wrap(shuffled(150, seed))));
+      Graph reduced = Graphs.transitiveReduction(dag);
+      boolean[][] dagReach = reachability(dag);
+      boolean[][] reducedReach = reachability(reduced);
+      for (int u = 0; u < 150; u++) {
+        assertThat(reducedReach[u]).as("from %d, seed %d", u, seed).isEqualTo(dagReach[u]);
+      }
+      assertThat(Graphs.transitiveReduction(Graphs.transitiveClosure(reduced))).isEqualTo(reduced);
+    }
+  }
+
+  @Test
+  void transitiveClosureRejectsMoreEdgesThanAnArrayHolds() {
+    // One cycle through 46341 nodes: every node reaches every node, 46341^2 > 2^31 - 9 edges.
+    assertThatThrownBy(() -> Graphs.transitiveClosure(TestGraphs.cycle(46_341)))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("transitive closure");
+  }
+
+  @Test
+  void transitiveReductionOfATransitiveTriangle() {
+    Graph reduced = Graphs.transitiveReduction(TestGraphs.of(3, 0, 1, 1, 2, 0, 2));
+    assertThat(reduced).isEqualTo(TestGraphs.of(3, 0, 1, 1, 2));
+  }
+
+  @Test
+  void transitiveReductionOfTheClosureOfAPathIsThePath() {
+    Graph path = TestGraphs.path(30);
+    assertThat(Graphs.transitiveReduction(Graphs.transitiveClosure(path))).isEqualTo(path);
+  }
+
+  @Test
+  void transitiveReductionRejectsCycles() {
+    assertThatThrownBy(() -> Graphs.transitiveReduction(TestGraphs.cycle(3)))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> Graphs.transitiveReduction(TestGraphs.of(2, 0, 1, 1, 1)))
+        .isInstanceOf(IllegalArgumentException.class);
   }
 }

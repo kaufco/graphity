@@ -210,6 +210,7 @@ Graphity ships the following algorithms out of the box. All of them return typed
 | Strong bridges, strong articulation points (directed)           | `Components.strongConnectivityOf(biAdjacentGraph)` |
 | Breadth-first distances and shortest paths, one or several sources | `BfsDistances.of(graph, sources)` |
 | Reachable nodes, sorted (input for subgraph extraction)         | `Graphs.reachableFrom(graph, sources)` |
+| Transitive closure; transitive reduction of a DAG               | `Graphs.transitiveClosure(graph)`, `Graphs.transitiveReduction(dag)` |
 | Topological order (DFS reverse postorder)                       | `TopOrder.of(graph)`          |
 | Topological order with levels (Kahn's)                          | `TopOrderAndLevels.of(graph)` |
 | DFS edge classification (TREE / BACK / FORWARD / CROSS)         | `EdgeTypes.of(graph)`         |

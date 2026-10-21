@@ -27,10 +27,13 @@ articulation points, biconnected components, strong bridges</td></tr>
 <tr><td>In which order, and where are the cycles?</td>
 <td>{@link com.kobayami.graphity.TopOrder}, {@link com.kobayami.graphity.TopOrderAndLevels},
 {@link com.kobayami.graphity.EdgeTypes}, {@link com.kobayami.graphity.BackEdges},
-{@link com.kobayami.graphity.Graphs#isDag(com.kobayami.graphity.Graph)}</td></tr>
+{@link com.kobayami.graphity.Graphs#isDag(com.kobayami.graphity.Graph)},
+{@link com.kobayami.graphity.Graphs#findCycle(com.kobayami.graphity.Graph)}</td></tr>
 <tr><td>What is reachable, and how far?</td>
 <td>{@link com.kobayami.graphity.BfsDistances},
-{@link com.kobayami.graphity.Graphs#reachableFrom(com.kobayami.graphity.Graph, int)}</td></tr>
+{@link com.kobayami.graphity.Graphs#reachableFrom(com.kobayami.graphity.Graph, int)},
+{@link com.kobayami.graphity.Graphs#transitiveClosure(com.kobayami.graphity.Graph)},
+{@link com.kobayami.graphity.Graphs#transitiveReduction(com.kobayami.graphity.Graph)}</td></tr>
 <tr><td>Who is the ancestor of whom in a tree?</td>
 <td>{@link com.kobayami.graphity.Ancestry}, {@link com.kobayami.graphity.PreorderAncestry}</td></tr>
 <tr><td>Which node dominates which?</td>

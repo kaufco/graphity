@@ -39,6 +39,8 @@
  *   <li>{@link BfsDistances#of(Graph, int)} - breadth-first distances and shortest paths from
  *       one or several sources.</li>
  *   <li>{@link Graphs#reachableFrom(Graph, int)} - the nodes reachable from a source, sorted.</li>
+ *   <li>{@link Graphs#transitiveClosure(Graph)} and {@link Graphs#transitiveReduction(Graph)} -
+ *       every pair connected by a path, and the edges of a DAG not implied by others.</li>
  * </ul>
  *
  * <h3>Trees and ancestry</h3>
