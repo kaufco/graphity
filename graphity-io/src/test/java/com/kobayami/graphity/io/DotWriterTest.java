@@ -181,15 +181,21 @@ class DotWriterTest {
   }
 
   @Test
-  void nullValuesAreSkippedAndAttributesReplaceTheLabel() {
+  void attributesReplaceTheLabel() {
     String dot = DotWriter.of(TestGraphs.path(2))
         .edgeLabel(edge -> "plain")
-        .edgeAttributes((edge, attributes) -> {
-          attributes.put("label", "replaced");
-          attributes.put("color", null);
-        })
+        .edgeAttributes((edge, attributes) -> attributes.put("label", "replaced"))
         .writeToString();
     assertThat(dot).contains("  0 -> 1 [label=\"replaced\"];\n");
+  }
+
+  @Test
+  void attributesRemoveTheLabel() {
+    String dot = DotWriter.of(TestGraphs.path(2))
+        .edgeLabel(edge -> "plain")
+        .edgeAttributes((edge, attributes) -> attributes.remove("label"))
+        .writeToString();
+    assertThat(dot).contains("  0 -> 1;\n");
   }
 
   @Test

@@ -350,12 +350,6 @@ class GraphTest {
   }
 
   @Test
-  void forEachEdgeRejectsNull() {
-    assertThatThrownBy(() -> TestGraphs.path(2).forEachEdge(null))
-        .isInstanceOf(NullPointerException.class);
-  }
-
-  @Test
   void toStringListsSmallGraphsCompletely() {
     assertThat(TestGraphs.of(3, 0, 1, 0, 2, 2, 0).toString())
         .isEqualTo("Graph[nodes=3, edges=3] {0 -> [1, 2], 1 -> [], 2 -> [0]}");

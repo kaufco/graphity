@@ -30,6 +30,7 @@ Graphity adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - [Issue #44](../../issues/44) - Remove `Graph.transposed()` and move `rootNodes()` to `Graphs`
   - [Issue #47](../../issues/47) - Move the control-flow analyses to graphity-controlflow
   - [Issue #48](../../issues/48) - Identify the edges in results by their edge index
+  - [Issue #59](../../issues/59) - Declare where the API allows null
 - Infrastructure
   - [Issue #40](../../issues/40) - Build the published artifacts from the tagged commit
 - Documentation

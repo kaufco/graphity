@@ -126,5 +126,15 @@
  * None of them recurses, so none is limited by the call stack. All of them can be run several
  * times with accumulated visited state, started from any set of nodes - for instance
  * {@link Graphs#rootNodes(BiAdjacentGraph)} - and stopped from any hook.
+ *
+ * <h2>Null</h2>
+ * <p>
+ * No parameter, return value or element is {@code null} unless its type is annotated
+ * {@code @Nullable}: the package is {@code @NullMarked} (JSpecify), so Kotlin and nullness
+ * checkers read the contract from the signatures. Passing {@code null} where it is not allowed
+ * violates the contract; the library does not check for it at run time.
  */
+@NullMarked
 package com.kobayami.graphity;
+
+import org.jspecify.annotations.NullMarked;

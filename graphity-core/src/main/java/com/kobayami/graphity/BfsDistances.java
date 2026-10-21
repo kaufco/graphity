@@ -78,8 +78,6 @@ public final class BfsDistances {
    * @throws IndexOutOfBoundsException if a source is out of range
    */
   public static BfsDistances of(Graph graph, IntList sources) {
-    Objects.requireNonNull(graph, "graph");
-    Objects.requireNonNull(sources, "sources");
     int n = graph.nodeCount();
     int sourceCount = sources.size();
     for (int i = 0; i < sourceCount; i++) {

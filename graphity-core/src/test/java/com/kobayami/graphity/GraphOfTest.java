@@ -61,13 +61,6 @@ class GraphOfTest {
   }
 
   @Test
-  void rejectsNull() {
-    assertThatThrownBy(() -> Graph.of(null, new int[0])).isInstanceOf(NullPointerException.class);
-    assertThatThrownBy(() -> Graph.of(new int[] {0}, null))
-        .isInstanceOf(NullPointerException.class);
-  }
-
-  @Test
   void rejectsEmptyOffsets() {
     assertThatThrownBy(() -> Graph.of(new int[0], new int[0]))
         .isInstanceOf(IllegalArgumentException.class)

@@ -54,7 +54,7 @@ dependencies {
 
 Two more artifacts are released together with the core, at the same version; add them the same way if you need them: `graphity-controlflow` with the control-flow analyses - loops, dominance frontiers, control dependence, phi placement (dominators stay in the core) - and `graphity-io` with writers for DOT and Mermaid.
 
-Requires JDK 17 or newer.
+Requires JDK 17 or newer. The API declares its nullness with [JSpecify](https://jspecify.dev/): nothing is `null` unless its type is annotated `@Nullable`, which Kotlin and nullness checkers read from the signatures.
 
 ## Quick start
 

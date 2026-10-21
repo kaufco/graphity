@@ -8,9 +8,8 @@ import java.util.Map;
  * <p>
  * The map holds the label from {@code nodeLabel} or {@code edgeLabel}, if one is set, and nothing
  * else; the hook may add to it, replace the label or remove it. Entries are written in insertion
- * order, values escaped by the writer; a {@code null} value is skipped, and a name must be an
- * identifier other than a DOT keyword. The writer reuses the map for every element, so the hook
- * must not keep it.
+ * order, values escaped by the writer, and a name must be an identifier other than a DOT
+ * keyword. The writer reuses the map for every element, so the hook must not keep it.
  *
  * @see DotWriter
  */

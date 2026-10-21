@@ -205,17 +205,6 @@ class IterativeDfsEdgeTraverserTest {
     assertThat(t.preOrder.toIntArray()).containsExactly(0, 1, 2);
   }
 
-  @Test
-  void nullActionIsRejected() {
-    var t = new IterativeDfsEdgeTraverser(TestGraphs.path(2)) {
-      @Override protected EdgeAction visitEdge(int source, int target, int edgeIndex,
-                                               TargetState state) {
-        return null;
-      }
-    };
-    assertThatThrownBy(t::run).isInstanceOf(NullPointerException.class);
-  }
-
   // ---- Pruning ----
 
   @Test

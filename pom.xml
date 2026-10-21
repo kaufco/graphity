@@ -99,6 +99,11 @@
     <jmh.version>1.37</jmh.version>
     <jol.version>0.17</jol.version>
 
+    <!-- Error Prone 2.43 and later need JDK 21 to run; 2.42 is the last release that runs
+         on JDK 17, the oldest JDK the build is tested on. NullAway needs Error Prone 2.36+. -->
+    <errorprone.version>2.42.0</errorprone.version>
+    <nullaway.version>0.14.2</nullaway.version>
+
     <compiler-plugin.version>3.11.0</compiler-plugin.version>
     <surefire.version>3.5.2</surefire.version>
     <jacoco.version>0.8.13</jacoco.version>
@@ -228,6 +233,41 @@
           <configuration>
             <release>17</release>
           </configuration>
+          <executions>
+            <!-- NullAway checks the main code of every @NullMarked package against its
+                 JSpecify annotations; tests are not part of the contract and stay unchecked.
+                 Of Error Prone, only NullAway runs. Running Error Prone inside javac needs
+                 the exports in .mvn/jvm.config. -->
+            <execution>
+              <id>default-compile</id>
+              <configuration>
+                <compilerArgs>
+                  <arg>-XDcompilePolicy=simple</arg>
+                  <arg>--should-stop=ifError=FLOW</arg>
+                  <arg>-Xplugin:ErrorProne -XepDisableAllChecks -Xep:NullAway:ERROR -XepOpt:NullAway:OnlyNullMarked=true</arg>
+                </compilerArgs>
+                <annotationProcessorPaths>
+                  <!-- Ahead of Error Prone's own Guava 33.4, which makes JDK 24 and later
+                       warn about sun.misc.Unsafe on every build. -->
+                  <path>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>${guava.version}</version>
+                  </path>
+                  <path>
+                    <groupId>com.google.errorprone</groupId>
+                    <artifactId>error_prone_core</artifactId>
+                    <version>${errorprone.version}</version>
+                  </path>
+                  <path>
+                    <groupId>com.uber.nullaway</groupId>
+                    <artifactId>nullaway</artifactId>
+                    <version>${nullaway.version}</version>
+                  </path>
+                </annotationProcessorPaths>
+              </configuration>
+            </execution>
+          </executions>
         </plugin>
 
         <plugin>

@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Objects;
 import java.util.function.IntFunction;
 import java.util.function.IntPredicate;
 import org.jspecify.annotations.Nullable;
@@ -104,7 +103,6 @@ public final class MermaidWriter {
   private @Nullable IntFunction<@Nullable Shape> nodeShape;
   private @Nullable IntFunction<@Nullable String> nodeClass;
   private @Nullable IntFunction<@Nullable String> linkStyle;
-  private @Nullable IntFunction<@Nullable String> clusterLabel;
 
   private MermaidWriter(Graph graph) {
     this.selection = new Selection(graph);
@@ -120,7 +118,7 @@ public final class MermaidWriter {
    * @return a new writer
    */
   public static MermaidWriter of(Graph graph) {
-    return new MermaidWriter(Objects.requireNonNull(graph, "graph"));
+    return new MermaidWriter(graph);
   }
 
   /**
@@ -132,7 +130,7 @@ public final class MermaidWriter {
    * @return this writer
    */
   public MermaidWriter direction(Direction direction) {
-    this.direction = Objects.requireNonNull(direction, "direction");
+    this.direction = direction;
     return this;
   }
 
@@ -146,7 +144,7 @@ public final class MermaidWriter {
    * @return this writer
    */
   public MermaidWriter nodeLabel(IntFunction<@Nullable String> label) {
-    this.nodeLabel = Objects.requireNonNull(label, "label");
+    this.nodeLabel = label;
     return this;
   }
 
@@ -159,7 +157,7 @@ public final class MermaidWriter {
    * @return this writer
    */
   public MermaidWriter edgeLabel(IntFunction<@Nullable String> label) {
-    this.edgeLabel = Objects.requireNonNull(label, "label");
+    this.edgeLabel = label;
     return this;
   }
 
@@ -172,7 +170,7 @@ public final class MermaidWriter {
    * @return this writer
    */
   public MermaidWriter nodeShape(IntFunction<@Nullable Shape> shape) {
-    this.nodeShape = Objects.requireNonNull(shape, "shape");
+    this.nodeShape = shape;
     return this;
   }
 
@@ -202,7 +200,7 @@ public final class MermaidWriter {
    * @return this writer
    */
   public MermaidWriter nodeClass(IntFunction<@Nullable String> className) {
-    this.nodeClass = Objects.requireNonNull(className, "className");
+    this.nodeClass = className;
     return this;
   }
 
@@ -216,7 +214,7 @@ public final class MermaidWriter {
    * @return this writer
    */
   public MermaidWriter linkStyle(IntFunction<@Nullable String> style) {
-    this.linkStyle = Objects.requireNonNull(style, "style");
+    this.linkStyle = style;
     return this;
   }
 
@@ -232,13 +230,11 @@ public final class MermaidWriter {
    * @throws IllegalArgumentException if the partition covers a different number of nodes
    */
   public MermaidWriter clusters(NodePartition partition, IntFunction<@Nullable String> label) {
-    Objects.requireNonNull(partition, "partition");
     if (partition.nodeCount() != selection.graph.nodeCount()) {
       throw new IllegalArgumentException("the partition covers " + partition.nodeCount()
           + " nodes, the graph has " + selection.graph.nodeCount());
     }
-    selection.clusters = partition;
-    this.clusterLabel = Objects.requireNonNull(label, "label");
+    selection.clusters = new Selection.Clusters(partition, label);
     return this;
   }
 
@@ -252,7 +248,7 @@ public final class MermaidWriter {
    * @return this writer
    */
   public MermaidWriter nodeFilter(IntPredicate include) {
-    selection.nodeFilter = Objects.requireNonNull(include, "include");
+    selection.nodeFilter = include;
     return this;
   }
 
@@ -283,7 +279,6 @@ public final class MermaidWriter {
    *                                  {@code out}
    */
   public void write(Appendable out) throws IOException {
-    Objects.requireNonNull(out, "out");
     Graph graph = selection.graph;
     int n = graph.nodeCount();
     out.append("flowchart ").append(direction.code).append('\n');
@@ -292,17 +287,18 @@ public final class MermaidWriter {
           .append('\n');
     }
 
-    NodePartition clusters = selection.clusters;
+    Selection.Clusters clusters = selection.clusters;
     if (clusters != null) {
-      for (int group = 0; group < clusters.groupCount(); group++) {
-        var nodes = clusters.nodesOf(group);
+      NodePartition partition = clusters.partition();
+      for (int group = 0; group < partition.groupCount(); group++) {
+        var nodes = partition.nodesOf(group);
         boolean opened = false;
         for (int i = 0; i < nodes.size(); i++) {
           int node = nodes.getInt(i);
           if (!selection.includes(node)) continue;
           if (!opened) {
             out.append("  subgraph c").append(Integer.toString(group));
-            String label = clusterLabel.apply(group);
+            String label = clusters.label().apply(group);
             if (label != null) {
               out.append('[');
               quote(label, out);
@@ -387,7 +383,6 @@ public final class MermaidWriter {
   }
 
   private static String checkClass(String name) {
-    Objects.requireNonNull(name, "name");
     if (!Selection.isIdentifier(name) || name.equalsIgnoreCase("end")) {
       throw new IllegalArgumentException("not a Mermaid class name: " + name);
     }
@@ -395,7 +390,6 @@ public final class MermaidWriter {
   }
 
   private static String checkStyle(String style) {
-    Objects.requireNonNull(style, "style");
     if (style.isBlank() || style.indexOf('\n') >= 0 || style.indexOf('\r') >= 0
         || style.indexOf(';') >= 0) {
       throw new IllegalArgumentException("a Mermaid style must be non-empty, without a line break "

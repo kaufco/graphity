@@ -144,8 +144,6 @@ public final class Loops {
    * @throws IllegalArgumentException if {@code graph.nodeCount() >= 2^30 - 2}
    */
   public static Loops of(BiAdjacentGraph graph, IntList entries) {
-    Objects.requireNonNull(graph, "graph");
-    Objects.requireNonNull(entries, "entries");
     int n = graph.nodeCount();
     var dfs = DfsPreorder.of(graph, entries, "Loops");
     int size = dfs.reachedCount + 1;

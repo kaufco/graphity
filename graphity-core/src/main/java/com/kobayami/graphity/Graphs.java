@@ -3,6 +3,7 @@ package com.kobayami.graphity;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.ints.IntLists;
+import it.unimi.dsi.fastutil.longs.LongArrays;
 import java.util.Arrays;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
@@ -663,7 +664,7 @@ public final class Graphs {
    * Computes forest properties in a single edge scan pass. Returns null if the graph
    * is not a forest (some node has in-degree > 1, or the graph contains a cycle).
    */
-  private static ForestInfo computeForestInfo(Graph graph) {
+  private static @Nullable ForestInfo computeForestInfo(Graph graph) {
     int n = graph.nodeCount();
     if (n == 0) {
       return new ForestInfo(0, 0);
@@ -780,8 +781,6 @@ public final class Graphs {
    * @throws IndexOutOfBoundsException if a source is out of range
    */
   public static SortedIntView reachableFrom(Graph graph, IntList sources) {
-    Objects.requireNonNull(graph, "graph");
-    Objects.requireNonNull(sources, "sources");
     int n = graph.nodeCount();
     int sourceCount = sources.size();
     for (int i = 0; i < sourceCount; i++) {
@@ -1364,7 +1363,7 @@ public final class Graphs {
       for (int i = 1; i < nodes.size(); i++) {
         System.arraycopy(targets, first, targets, start[nodes.getInt(i)], at - first);
       }
-      reach[c] = null;
+      reach[c] = LongArrays.EMPTY_ARRAY;
     }
     return new Graph(start, targets);
   }

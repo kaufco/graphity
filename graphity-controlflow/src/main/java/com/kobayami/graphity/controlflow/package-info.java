@@ -6,7 +6,8 @@
  * {@link com.kobayami.graphity.BiAdjacentGraph} for the control-flow graph and
  * {@link com.kobayami.graphity.Dominators} from the core, and reads the graph through
  * {@link com.kobayami.graphity.Csr} like the core's own algorithms. It is released together with
- * the core, at the same version.
+ * the core, at the same version, and follows the core's null contract: nothing is {@code null}
+ * unless its type is annotated {@code @Nullable}.
  *
  * <h2>Algorithms</h2>
  * <ul>
@@ -27,4 +28,7 @@
  * SortedIntView phiBlocks = phis.frontierOf(definitionBlocks);
  * }</pre>
  */
+@NullMarked
 package com.kobayami.graphity.controlflow;
+
+import org.jspecify.annotations.NullMarked;

@@ -19,5 +19,12 @@
  * return, write in node and edge index order so the same input always gives the same text,
  * export part of a graph through a node filter without renumbering it, and can write the
  * undirected reading with each reciprocal pair as one edge.
+ * <p>
+ * The package follows the core's null contract: nothing is {@code null} unless its type is
+ * annotated {@code @Nullable}. The hooks for labels, shapes, classes and styles may return
+ * {@code null}, which means none.
  */
+@NullMarked
 package com.kobayami.graphity.io;
+
+import org.jspecify.annotations.NullMarked;

@@ -6,6 +6,7 @@ import java.util.function.BinaryOperator;
 import java.util.function.DoubleBinaryOperator;
 import java.util.function.IntBinaryOperator;
 import java.util.function.LongBinaryOperator;
+import org.jspecify.annotations.Nullable;
 
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 
@@ -111,8 +112,6 @@ public sealed class NodePartition extends IndexMapping implements IndexPartition
    *                                  outside {@code -1..groupCount-1}
    */
   public static NodePartition of(Graph graph, int[] groupOf, int groupCount) {
-    Objects.requireNonNull(graph, "graph");
-    Objects.requireNonNull(groupOf, "groupOf");
     int n = graph.nodeCount();
     if (groupOf.length != n) {
       throw new IllegalArgumentException(
@@ -361,14 +360,15 @@ public sealed class NodePartition extends IndexMapping implements IndexPartition
    * <p>
    * <strong>Time:</strong> O(indexCount + groupCount).
    *
-   * @param <T>         element type
+   * @param <T>         element type, nullable or not
    * @param values      values indexed by node, of length {@link #indexCount()}
    * @param groupValues receives one value per group; length {@link #groupCount()}
    * @param combine     folds the accumulated value with the next member's value
    * @throws IllegalArgumentException if {@code values.length != indexCount()} or
    *                                  {@code groupValues.length != groupCount()}
    */
-  public <T> void reduce(T[] values, T[] groupValues, BinaryOperator<T> combine) {
+  public <T extends @Nullable Object> void reduce(T[] values, T[] groupValues,
+      BinaryOperator<T> combine) {
     reduce(members, memberStart, indexCount(), values, groupValues, combine);
   }
 }

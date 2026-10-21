@@ -3,6 +3,7 @@ package com.kobayami.graphity;
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.stream.IntStream;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A read-only directed graph, optimized for performance, low memory and cache-friendly traversal.
@@ -84,8 +85,6 @@ public sealed class Graph permits BiAdjacentGraph {
    *                                  strictly ascending
    */
   public static Graph of(int[] outAdjacencyStart, int[] outAdjacency) {
-    Objects.requireNonNull(outAdjacencyStart, "outAdjacencyStart");
-    Objects.requireNonNull(outAdjacency, "outAdjacency");
     return ofOwned(outAdjacencyStart.clone(), outAdjacency.clone());
   }
 
@@ -287,7 +286,6 @@ public sealed class Graph permits BiAdjacentGraph {
    * @param action called with {@code (source, target, edgeIndex)} for every edge
    */
   public final void forEachEdge(EdgeConsumer action) {
-    Objects.requireNonNull(action, "action");
     int n = nodeCount();
     for (int source = 0; source < n; source++) {
       for (int e = outAdjacencyStart[source], end = outAdjacencyStart[source + 1]; e < end; e++) {
@@ -453,7 +451,7 @@ public sealed class Graph permits BiAdjacentGraph {
    * <strong>Time:</strong> O(nodeCount + edgeCount).
    */
   @Override
-  public final boolean equals(Object obj) {
+  public final boolean equals(@Nullable Object obj) {
     if (this == obj) return true;
     if (!(obj instanceof Graph other)) return false;
     return Arrays.equals(outAdjacencyStart, other.outAdjacencyStart)

@@ -7,7 +7,6 @@ import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
-import java.util.Objects;
 
 /**
  * A binary format for the topology of a {@link Graph}: its two CSR arrays, as
@@ -80,8 +79,6 @@ public final class GraphFormat {
    * @throws IOException if writing to the stream fails
    */
   public static void write(Graph graph, OutputStream out) throws IOException {
-    Objects.requireNonNull(graph, "graph");
-    Objects.requireNonNull(out, "out");
     var buffer = ByteBuffer.allocate(4 * CHUNK_INTS).order(ByteOrder.LITTLE_ENDIAN);
     buffer.putInt(MAGIC).putInt(VERSION).putInt(graph.nodeCount()).putInt(graph.edgeCount());
     out.write(buffer.array(), 0, HEADER_BYTES);
@@ -112,7 +109,6 @@ public final class GraphFormat {
    *                     cause
    */
   public static Graph read(InputStream in) throws IOException {
-    Objects.requireNonNull(in, "in");
     var buffer = ByteBuffer.allocate(4 * CHUNK_INTS).order(ByteOrder.LITTLE_ENDIAN);
     readFully(in, buffer.array(), HEADER_BYTES);
     int magic = buffer.getInt(0);

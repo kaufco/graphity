@@ -126,8 +126,6 @@ public final class Dominators {
    * @throws IllegalArgumentException if {@code graph.nodeCount() >= 2^30 - 2}
    */
   public static Dominators of(BiAdjacentGraph graph, IntList entries) {
-    Objects.requireNonNull(graph, "graph");
-    Objects.requireNonNull(entries, "entries");
     int n = graph.nodeCount();
     var dfs = DfsPreorder.of(graph, entries, "Dominators");
     int[] idom = lengauerTarjan(dfs, Csr.inAdjacencyStart(graph), Csr.inAdjacency(graph), false);

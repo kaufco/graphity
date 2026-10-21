@@ -188,7 +188,7 @@ public abstract class IterativeDfsEdgeTraverser {
    * @param target the node the edge enters
    * @param edgeIndex the edge's index, as used by {@link Graph#edgeTarget(int)}
    * @param state the target's state
-   * @return what to do with the edge; not {@code null}
+   * @return what to do with the edge
    */
   protected EdgeAction visitEdge(int source, int target, int edgeIndex, TargetState state) {
     return state == TargetState.UNVISITED ? EdgeAction.DESCEND : EdgeAction.SKIP;

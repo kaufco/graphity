@@ -5,6 +5,7 @@ import java.util.function.BinaryOperator;
 import java.util.function.DoubleBinaryOperator;
 import java.util.function.IntBinaryOperator;
 import java.util.function.LongBinaryOperator;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Bidirectional partition of edges into disjoint groups, with efficient reverse lookup.
@@ -205,14 +206,15 @@ public final class EdgePartition extends IndexMapping implements IndexPartition 
    * <p>
    * <strong>Time:</strong> O(indexCount + groupCount).
    *
-   * @param <T>         element type
+   * @param <T>         element type, nullable or not
    * @param values      values indexed by edge, of length {@link #indexCount()}
    * @param groupValues receives one value per group; length {@link #groupCount()}
    * @param combine     folds the accumulated value with the next member's value
    * @throws IllegalArgumentException if {@code values.length != indexCount()} or
    *                                  {@code groupValues.length != groupCount()}
    */
-  public <T> void reduce(T[] values, T[] groupValues, BinaryOperator<T> combine) {
+  public <T extends @Nullable Object> void reduce(T[] values, T[] groupValues,
+      BinaryOperator<T> combine) {
     reduce(members, memberStart, indexCount(), values, groupValues, combine);
   }
 }

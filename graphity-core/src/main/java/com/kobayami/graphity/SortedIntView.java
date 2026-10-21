@@ -196,7 +196,7 @@ public final class SortedIntView extends AbstractIntList implements IntList, Ran
    * <strong>Memory:</strong> 4 x n bytes if {@code dest} is {@code null} or too small; none otherwise.
    */
   @Override
-  public int[] toArray(@Nullable int[] dest) {
+  public int[] toArray(int @Nullable [] dest) {
     var size = size();
     if (dest == null || dest.length < size) {
       return toIntArray();

@@ -4,6 +4,7 @@ import com.kobayami.graphity.Csr;
 import com.kobayami.graphity.Graph;
 import com.kobayami.graphity.NodePartition;
 import java.io.IOException;
+import java.util.function.IntFunction;
 import java.util.function.IntPredicate;
 import org.jspecify.annotations.Nullable;
 
@@ -18,7 +19,7 @@ final class Selection {
   final int[] targets;
   @Nullable IntPredicate nodeFilter;
   boolean undirected;
-  @Nullable NodePartition clusters;
+  @Nullable Clusters clusters;
 
   Selection(Graph graph) {
     this.graph = graph;
@@ -32,7 +33,7 @@ final class Selection {
 
   /** The cluster of a node, {@code -1} for none. */
   int clusterOf(int node) {
-    return clusters == null ? -1 : clusters.get(node);
+    return clusters == null ? -1 : clusters.partition().get(node);
   }
 
   /**
@@ -61,6 +62,9 @@ final class Selection {
   interface EdgeAction {
     void accept(int source, int target, int edgeIndex) throws IOException;
   }
+
+  /** The groups drawn as clusters, with the label of each; set together, so held together. */
+  record Clusters(NodePartition partition, IntFunction<@Nullable String> label) {}
 
   /** Whether {@code name} is a plain identifier: a letter or underscore, then also digits. */
   static boolean isIdentifier(String name) {

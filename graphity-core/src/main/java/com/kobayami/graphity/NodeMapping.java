@@ -4,6 +4,7 @@ import it.unimi.dsi.fastutil.ints.IntList;
 
 import java.util.Arrays;
 import java.util.BitSet;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Unidirectional mapping between two node ID spaces.
@@ -295,13 +296,13 @@ public final class NodeMapping extends IndexMapping {
    * <p>
    * <strong>Time:</strong> O(n) where n = source space size.
    *
-   * @param <T>       element type
+   * @param <T>       element type, nullable or not
    * @param values    values indexed by the target space; must cover every mapped target
    * @param newValues receives the values indexed by the source space; length n
    * @throws IllegalArgumentException if {@code newValues.length} is not the source space size
    * @throws IndexOutOfBoundsException if a mapped target lies outside {@code values}
    */
-  public <T> void gather(T[] values, T[] newValues) {
+  public <T extends @Nullable Object> void gather(T[] values, T[] newValues) {
     gather(mapping, values, newValues);
   }
 
