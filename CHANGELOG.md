@@ -11,6 +11,8 @@ Graphity adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Infrastructure
+  - [Issue #40](../../issues/40) - Build the published artifacts from the tagged commit
 - Documentation
   - [Issue #58](../../issues/58) - Make the README and the Javadoc show what the library offers at a glance
 

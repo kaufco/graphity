@@ -3,23 +3,31 @@
 # graphity.releaseModules list, all at the POM's version; today it is
 # graphity-core alone.
 #
-# Two triggers:
-#   * release.published — the regular way. Publishing a GitHub Release is the
-#     single act that starts a release; this workflow and deploy-javadoc.yml
-#     both hang off that one event. Only `published`, not `released`/`edited`:
-#     a later correction of the release notes must not start a second deploy.
-#   * workflow_dispatch — the fallback, for a release that already exists and
-#     for re-running a job that failed halfway.
+# One trigger, workflow_dispatch, run before the GitHub Release is published:
+# the portal validates the bundle while the release is still private, so a
+# rejection stops the release instead of following it. The GitHub Release comes
+# afterwards and starts only deploy-javadoc.yml. A second trigger on
+# release.published would upload the same version again, which the portal
+# rejects as a duplicate of the deployment this run left behind.
+#
+# Two inputs, because the ref that is built and the ref the workflow file comes
+# from are different things. The run always uses the workflow file of the branch
+# it is started from (normally main, so fixes to this file apply). What it
+# builds is `ref`: a tag, a branch, or a full 40-character commit SHA (a short
+# SHA is looked up as a branch or tag and fails). Left empty, it builds the tag
+# named `version`. The regular release pushes that tag to the release commit
+# first and leaves `ref` empty; the GitHub Release then picks up the existing
+# tag, so the built commit and the released one are the same by construction.
 #
 # What the job does — and where it stops: it builds, tests, signs, uploads a
 # bundle and waits for the portal to validate it. That is all. Making the release
 # visible on Maven Central is a separate "Publish" in the portal, by hand,
 # because a published version can never be withdrawn.
 #
-# The version comes from the release tag, or from the `version` input on a
-# manual run, and is checked against the POM. That check is the real guard: it
-# is the only place that notices when the release sits on something other than
-# the release commit — most likely because the sync has not run yet.
+# The version comes from the `version` input and is checked against the POM of
+# the ref that is built. That check notices a ref whose POM carries another
+# version — most likely because the sync has not run yet. It cannot tell two
+# commits with the same version apart; that is what building the tag is for.
 #
 # Required repository secrets:
 #   GPG_PRIVATE_KEY         armored secret key (gpg --armor --export-secret-keys)
@@ -33,14 +41,17 @@
 name: Release to Maven Central
 
 on:
-  release:
-    types: [published]
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to publish; must match the POM (e.g. 2.0.0)'
+        description: 'Version to publish; must match the POM of the ref that is built (e.g. 3.0.0)'
         required: true
         type: string
+      ref:
+        description: 'Tag, branch or full commit SHA to build; empty builds the tag named like the version'
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -59,30 +70,35 @@ jobs:
     timeout-minutes: 20
 
     steps:
+      - name: Determine the version and the ref to build
+        id: target
+        # Both inputs are passed through the environment rather than
+        # interpolated into the script, so neither can be read as shell syntax.
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_REF: ${{ inputs.ref }}
+        run: |
+          set -euo pipefail
+          # Tags are unprefixed by convention; a v-prefixed version still works.
+          version="${INPUT_VERSION#v}"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            echo "'$INPUT_VERSION' does not look like a release version." >&2
+            exit 1
+          fi
+          # Blank input counts as empty: actions/checkout trims it and would fall
+          # back to the dispatch branch, which is the mistake this input prevents.
+          ref="${INPUT_REF//[[:space:]]/}"
+          ref="${ref:-$version}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+          echo "Publishing $version, built from '$ref'."
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          # On a release event this is the tag, not the default branch: the
-          # bundle must be built from the commit the release points at.
-          ref: ${{ github.event.release.tag_name || github.ref }}
-
-      - name: Determine the version being published
-        id: target
-        # Both values are passed through the environment rather than
-        # interpolated into the script, so neither can be read as shell syntax.
-        env:
-          DISPATCH_VERSION: ${{ inputs.version }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
-        run: |
-          set -euo pipefail
-          version="${DISPATCH_VERSION:-$RELEASE_TAG}"
-          # Tags are unprefixed by convention; a v-prefixed one still works.
-          version="${version#v}"
-          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
-            echo "'$version' does not look like a release version." >&2
-            exit 1
-          fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+          # The ref to build, not the branch the workflow file came from: the
+          # bundle must be built from the release commit.
+          ref: ${{ steps.target.outputs.ref }}
 
       - name: Set up JDK 21 (Temurin)
         uses: actions/setup-java@v4
@@ -120,7 +136,7 @@ jobs:
           pom="$(mvn -B -ntp -q help:evaluate -Dexpression=project.version -DforceStdout)"
           if [[ "$pom" != "$EXPECTED" ]]; then
             echo "The POM is at $pom, but this run was started for $EXPECTED." >&2
-            echo "Either the release does not sit on the release commit, or that commit has not been synced yet." >&2
+            echo "Either the ref is not the release commit, or that commit has not been synced yet." >&2
             exit 1
           fi
           echo "Publishing $pom."

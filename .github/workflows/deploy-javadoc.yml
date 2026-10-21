@@ -7,12 +7,12 @@
 # permissions for.
 #
 # Two triggers:
-#   * release.published — automatic run, the same event that starts the Maven
-#     deploy (release.yml), so publishing a GitHub Release is the only act a
-#     release needs. Only `published`, not `released`/`edited`: a later
-#     correction of the release notes must not redeploy. Deliberately not on
-#     push.tags as well — a release created from a new tag would fire both
-#     triggers.
+#   * release.published — automatic run. The Maven upload (release.yml) runs by
+#     hand before the release, so that the portal validates it first; this
+#     workflow follows the release. Only `published`, not `released`/`edited`:
+#     a later correction of the release notes must not redeploy. Deliberately
+#     not on push.tags as well — a release created from a new tag would fire
+#     both triggers.
 #   * workflow_dispatch — manual run, used before 1.0.0 to populate
 #     https://kaufco.github.io/graphity/ from main HEAD so the page is
 #     not blank, and as the fallback when a release already exists.
