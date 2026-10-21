@@ -463,6 +463,10 @@ public sealed class Graph permits BiAdjacentGraph {
   /**
    * Hash code consistent with {@link #equals(Object)}, computed over nodes and edges.
    * <p>
+   * Computed on every call, so every lookup of a graph in a hash-based collection walks the whole
+   * graph. To key a cache by structure, compute {@link Graphs#topologyHash(Graph)} once and keep
+   * it.
+   * <p>
    * <strong>Time:</strong> O(nodeCount + edgeCount).
    */
   @Override

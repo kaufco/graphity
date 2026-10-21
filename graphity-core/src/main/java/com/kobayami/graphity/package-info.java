@@ -100,6 +100,9 @@
  *   <li>{@link Csr} - read access to the CSR arrays themselves, for algorithm code that loops
  *       over all edges; the built-in algorithms use it too.</li>
  *   <li>{@link GraphFormat} - a versioned binary format for storing and loading the topology.</li>
+ *   <li>{@link Graphs#topologyHash(Graph)} and {@link Graphs#diff(Graph, Graph)} - a 64-bit
+ *       structural hash to keep, and the edges added and removed between two versions
+ *       ({@link GraphDiff}).</li>
  * </ul>
  * <p>
  * Graphs are stored in a CSR (Compressed Sparse Row) layout: nodes are contiguous {@code int}

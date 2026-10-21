@@ -1,5 +1,6 @@
 package com.kobayami.graphity;
 
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.ints.IntLists;
 import java.util.Arrays;
@@ -10,8 +11,9 @@ import java.util.Objects;
  * <p>
  * Provides operations that create new {@link Graph} instances from existing graphs
  * and {@link NodeMapping}s (the original graph is never modified), predicate methods to test
- * structural properties of a graph, and its complete text form,
- * {@link #adjacencyListOf(Graph)}.
+ * structural properties of a graph, its complete text form, {@link #adjacencyListOf(Graph)}, a
+ * structural hash, {@link #topologyHash(Graph)}, and the {@link #diff(Graph, Graph)} of two
+ * versions.
  * <p>
  * A predicate whose name does not say otherwise reads the graph as directed; the ones prefixed
  * {@code undirected} read it as {@link Components#ccsOf(Graph)} does. {@code isBipartite} and
@@ -1117,5 +1119,117 @@ public final class Graphs {
       sb.append("]\n");
     }
     return sb.toString();
+  }
+
+  /**
+   * Returns a 64-bit hash of the graph's structure, consistent with {@link Graph#equals(Object)}:
+   * equal graphs - a {@link BiAdjacentGraph} and its uni-adjacent counterpart included - always
+   * have equal hashes, and different graphs rarely do.
+   * <p>
+   * Computed on every call, not cached - compute it once and keep it, for instance as the key of
+   * a cache over graph structure or to detect the fixpoint of a transformation. The value depends
+   * only on the structure, so it is the same in every run and on every JVM; a Graphity release
+   * that changes it says so in its changelog. Equal hashes do not prove equal graphs, and the hash
+   * is not built to resist graphs crafted to collide; compare with {@link Graph#equals(Object)}
+   * where it matters. {@link Graph#hashCode()} stays O(nodeCount + edgeCount) per call.
+   * <p>
+   * <strong>Time:</strong> O(nodeCount + edgeCount).
+   *
+   * @param graph the graph to hash
+   * @return the structural hash
+   */
+  public static long topologyHash(Graph graph) {
+    int n = graph.nodeCount();
+    int[] start = Csr.outAdjacencyStart(graph);
+    int[] targets = Csr.outAdjacency(graph);
+    long h = mixInto(0x6A09E667F3BCC909L, n);
+    h = mixInto(h, graph.edgeCount());
+    for (int v = 0; v < n; v++) {
+      int end = start[v + 1];
+      h = mixInto(h, end - start[v]);
+      for (int e = start[v]; e < end; e++) {
+        h = mixInto(h, targets[e]);
+      }
+    }
+    // SplitMix64 finalizer: every input bit reaches every output bit.
+    h = (h ^ (h >>> 30)) * 0xBF58476D1CE4E5B9L;
+    h = (h ^ (h >>> 27)) * 0x94D049BB133111EBL;
+    return h ^ (h >>> 31);
+  }
+
+  /** One order-sensitive step of {@link #topologyHash(Graph)}. */
+  private static long mixInto(long h, int value) {
+    return Long.rotateLeft(h ^ (value * 0x9E3779B97F4A7C15L), 29) * 0xC2B2AE3D27D4EB4FL;
+  }
+
+  /**
+   * Returns the edges added and removed between two graphs over the same nodes.
+   * <p>
+   * Merges the sorted adjacency lists of both graphs node by node, so both lists of the result
+   * come out in edge index order, each edge named by its index in the graph it belongs to: added
+   * edges by their index in {@code after}, removed edges by their index in {@code before}. An
+   * empty diff means the graphs are equal.
+   * <p>
+   * <strong>Time:</strong> O(nodeCount + edgeCount of both graphs).<br>
+   * <strong>Memory:</strong> 12 bytes per added or removed edge for the result, and up to 18 more
+   * while it is collected.
+   *
+   * @param before the older graph
+   * @param after  the newer graph, with the same node count
+   * @return the added and removed edges
+   * @throws IllegalArgumentException if the node counts differ
+   */
+  public static GraphDiff diff(Graph before, Graph after) {
+    int n = before.nodeCount();
+    if (after.nodeCount() != n) {
+      throw new IllegalArgumentException("diff needs graphs over the same nodes, but before has "
+          + n + " nodes and after " + after.nodeCount());
+    }
+    int[] oldStart = Csr.outAdjacencyStart(before);
+    int[] oldTargets = Csr.outAdjacency(before);
+    int[] newStart = Csr.outAdjacencyStart(after);
+    int[] newTargets = Csr.outAdjacency(after);
+    var added = new IntArrayList();
+    var removed = new IntArrayList();
+    for (int v = 0; v < n; v++) {
+      int o = oldStart[v];
+      int oEnd = oldStart[v + 1];
+      int a = newStart[v];
+      int aEnd = newStart[v + 1];
+      // No target reaches Integer.MAX_VALUE - node IDs stay below it -, so it marks an exhausted
+      // list.
+      while (o < oEnd || a < aEnd) {
+        int oldTarget = o < oEnd ? oldTargets[o] : Integer.MAX_VALUE;
+        int newTarget = a < aEnd ? newTargets[a] : Integer.MAX_VALUE;
+        if (oldTarget == newTarget) {
+          o++;
+          a++;
+        } else if (oldTarget < newTarget) {
+          removed.add(v);
+          removed.add(oldTarget);
+          removed.add(o++);
+        } else {
+          added.add(v);
+          added.add(newTarget);
+          added.add(a++);
+        }
+      }
+    }
+    return new GraphDiff(edgesOf(added), edgesOf(removed));
+  }
+
+  /** Edges from interleaved (source, target, edge index) triples, already in edge index order. */
+  private static Edges edgesOf(IntArrayList triples) {
+    int count = triples.size() / 3;
+    if (count == 0) return Edges.empty();
+    var sources = new int[count];
+    var targets = new int[count];
+    var edgeIndices = new int[count];
+    for (int p = 0; p < count; p++) {
+      sources[p] = triples.getInt(3 * p);
+      targets[p] = triples.getInt(3 * p + 1);
+      edgeIndices[p] = triples.getInt(3 * p + 2);
+    }
+    return Edges.wrap(sources, targets, edgeIndices);
   }
 }

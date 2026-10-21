@@ -104,6 +104,7 @@ The result types are themselves graphs or partitions backed by CSR — they comp
 - **Transformations:** quotient graph by a partition of your choosing, condensation of the strongly connected components, subgraph extraction, renumbering for cache locality, transpose — each with the mapping that carries your data along.
 - **Custom traversals:** iterative depth-first traversal with node or edge hooks, breadth-first traversal with levels, pruning and early stop — no stack limit.
 - **Storage:** graphs from CSR arrays you already have, checked and copied; a versioned little-endian binary format for files, caches and typed arrays in the browser.
+- **Comparison:** a 64-bit structural hash to key caches by, and the edges added and removed between two versions of a graph, with their edge indices.
 
 Every entry point and its result type is listed in the [algorithm reference](docs/tutorial.md#algorithm-reference); the [Javadoc](https://kaufco.github.io/graphity/) states each method's contract and cost.
 

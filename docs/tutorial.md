@@ -8,8 +8,9 @@ A walk through the data model and the API, from building a graph to carrying you
 4. [Algorithm results and their follow-ups](#algorithm-results-and-their-follow-ups)
 5. [Data on nodes and edges](#data-on-nodes-and-edges)
 6. [Views, immutability and threads](#views-immutability-and-threads)
-7. [Custom traversals](#custom-traversals)
-8. [Algorithm reference](#algorithm-reference)
+7. [Comparing versions of a graph](#comparing-versions-of-a-graph)
+8. [Custom traversals](#custom-traversals)
+9. [Algorithm reference](#algorithm-reference)
 
 ## The data model
 
@@ -136,6 +137,16 @@ For a single edge instead of a full pass, `BiAdjacentGraph.transposedEdgeIndex(e
 
 **Iterative algorithms — no recursion, no stack ceiling.** Every DFS-based algorithm (`Sccs`, `TopOrder`, `BackEdges`, `EdgeTypes`, the shape predicates, node reindexing) runs on an explicit heap-allocated stack, not the JVM call stack. They complete on arbitrarily deep graphs — verified at a DFS depth of 1M — under the default `-Xss`, with zero JVM tuning. This is a real differentiator: JGraphT, Guava, and WebGraph (built for billion-node web crawls) all use recursive DFS. On a 4.8M-node graph like `soc-LiveJournal1`, JGraphT's and WebGraph's SCC overflow the default stack and only complete once `-Xss` is raised to 256–512 MB (WebGraph's own SCC Javadoc advises setting "a large stack size"); on deeper topologies they fail regardless of `-Xss`. Graphity just runs.
 
+## Comparing versions of a graph
+
+`Graph.equals` and `hashCode` compare structure, but walk the whole graph on every call. For a cache keyed by structure, or a loop that repeats a transformation until nothing changes, compute `Graphs.topologyHash(graph)` once and keep the 64-bit value. `Graphs.diff(before, after)` lists what changed between two graphs over the same nodes, each edge with its index in the graph it belongs to:
+
+```java
+GraphDiff diff = Graphs.diff(before, after);
+Edges added = diff.addedEdges();       // edge indices of `after`
+Edges removed = diff.removedEdges();   // edge indices of `before`
+```
+
 ## Custom traversals
 
 For custom traversals, subclass `IterativeDfsTraverser` — it keeps its DFS stack on the heap, so it handles arbitrarily deep graphs without any `-Xss` tuning. Override `enterNode(int)` for preorder and `leaveNode(int)` for postorder; return `false` from `enterNode` to prune a subtree. `IterativeDfsTraverser`, `IterativeDfsEdgeTraverser` and `FrontierTraverser` also let any hook call `stop()` to end the whole traversal. For edge-centric algorithms that must look at every edge, such as finding a cycle, subclass `IterativeDfsEdgeTraverser`: its `visitEdge` hook reports each edge with the state of its target (unvisited, on the current path, finished) and returns whether to descend, skip the edge or stop. Multiple `run()` calls accumulate visited state, so two-phase walks compose without external bookkeeping.
@@ -215,5 +226,7 @@ Graphity ships the following algorithms out of the box. All of them return typed
 | Shape predicates (`isDag`, `isForest`, `isTree`, `isPath`, `isStronglyConnected`) | `Graphs.isDag(graph)` |
 | Shape predicates, undirected interpretation (`isBipartite`, `isUndirectedTree`, `isUndirectedForest`, `isWeaklyConnected`) | `Graphs.isBipartite(graph)` |
 | Condensation DAG                                                | `sccs.condense()`             |
+| Structural hash, edges added and removed between two versions   | `Graphs.topologyHash(graph)`, `Graphs.diff(before, after)` |
+| Graph from CSR arrays, versioned binary format                  | `Graph.of(offsets, targets)`, `GraphFormat.write(graph, out)`, `GraphFormat.read(in)` |
 | Quotient graph by a partition of your choosing                  | `NodePartition.of(graph, groupOf, groupCount).condense()` |
 | Subgraph extraction and node remapping                          | `Graphs.remapped(...)`        |
