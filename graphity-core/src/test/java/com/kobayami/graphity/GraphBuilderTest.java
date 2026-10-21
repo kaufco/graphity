@@ -783,6 +783,7 @@ class GraphBuilderTest {
     b.addInEdgesAndNodes(0, new int[] {3});
     b.addPathAndNodes(4, 5);
     b.addEdgePairsAndNodes(6, 7);
+    b.addEdgesAndNodes(BackEdges.of(TestGraphs.cycle(3)));
     assertThat(b.build().nodeCount()).isEqualTo(10);
   }
 
@@ -838,6 +839,10 @@ class GraphBuilderTest {
     assertThatThrownBy(() -> b.addInEdgesAndNodes(0, new int[] {-1})).isInstanceOf(IndexOutOfBoundsException.class);
     assertThatThrownBy(() -> b.addPathAndNodes(0, -1)).isInstanceOf(IndexOutOfBoundsException.class);
     assertThatThrownBy(() -> b.addEdgePairsAndNodes(0, -1)).isInstanceOf(IndexOutOfBoundsException.class);
+    // Not reachable through results of a graph; checked on a hand-made list.
+    var negative = Edges.wrap(new int[] {0}, new int[] {-1}, new int[1]);
+    assertThatThrownBy(() -> b.addEdgesAndNodes(negative))
+        .isInstanceOf(IndexOutOfBoundsException.class);
   }
 
   @Test
@@ -858,6 +863,9 @@ class GraphBuilderTest {
         .isInstanceOf(IndexOutOfBoundsException.class);
     assertThatThrownBy(() -> b.addPathAndNodes(0, 3, -1))
         .isInstanceOf(IndexOutOfBoundsException.class);
+    assertThatThrownBy(() -> b.addEdgesAndNodes(
+        Edges.wrap(new int[] {0, 4}, new int[] {5, Integer.MAX_VALUE}, new int[2])))
+        .isInstanceOf(IndexOutOfBoundsException.class);
     assertThat(b.build()).isEqualTo(TestGraphs.of(2, 0, 1));
   }
 
@@ -868,5 +876,58 @@ class GraphBuilderTest {
         .isInstanceOf(IllegalArgumentException.class);
     assertThatThrownBy(() -> b.addParents(99, -1))
         .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  void addEdgesTakesTheEdgesOfAResult() {
+    // 0 -> 1 -> 2 -> 0, 2 -> 1: the back edges, as a graph of their own.
+    Graph graph = TestGraphs.of(3, 0, 1, 1, 2, 2, 0, 2, 1);
+    var back = BackEdges.of(graph);
+    var b = new GraphBuilder();
+    b.addNodes(graph.nodeCount());
+    b.addEdges(back);
+    Graph backGraph = b.build();
+    assertThat(backGraph.edgeCount()).isEqualTo(back.count());
+    for (int p = 0; p < back.count(); p++) {
+      assertThat(backGraph.hasOutNode(back.sourceNodes().getInt(p), back.targetNodes().getInt(p)))
+          .isTrue();
+    }
+  }
+
+  @Test
+  void addEdgesRejectsAMissingSourceAndAddsNothing() {
+    var back = BackEdges.of(TestGraphs.cycle(3));   // 2 -> 0
+    var b = new GraphBuilder();
+    b.addNodes(2);
+    assertThatThrownBy(() -> b.addEdges(back)).isInstanceOf(IndexOutOfBoundsException.class);
+    assertThat(b.build().edgeCount()).isZero();
+  }
+
+  @Test
+  void addEdgesRejectsAMissingTargetAtALaterPositionAndAddsNothing() {
+    var bridges = Components.biconnectivityOf(BiAdjacentGraph.of(TestGraphs.path(3))).bridges();
+    assertThat(bridges.targetNodes().toIntArray()).containsExactly(1, 2);
+    var b = new GraphBuilder();
+    b.addNodes(2);
+    assertThatThrownBy(() -> b.addEdges(bridges))
+        .isInstanceOf(IndexOutOfBoundsException.class)
+        .hasMessageContaining("target");
+    assertThat(b.build()).isEqualTo(TestGraphs.isolated(2));
+  }
+
+  @Test
+  void addEdgesAndNodesCreatesTheNodesItReferences() {
+    var bridges = Components.biconnectivityOf(BiAdjacentGraph.of(TestGraphs.path(5))).bridges();
+    var b = new GraphBuilder();
+    b.addEdgesAndNodes(bridges);
+    assertThat(b.build()).isEqualTo(TestGraphs.path(5));
+  }
+
+  @Test
+  void addEdgesOfAnEmptyResultAddsNothing() {
+    var b = new GraphBuilder();
+    b.addEdges(BackEdges.of(TestGraphs.path(3)));
+    b.addEdgesAndNodes(BackEdges.of(TestGraphs.path(3)));
+    assertThat(b.build().nodeCount()).isZero();
   }
 }

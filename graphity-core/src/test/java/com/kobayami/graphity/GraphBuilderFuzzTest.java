@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
  * <p>
  * Covered: capacity hints, the fan-out and fan-in batch forms in both their {@code int[]} and
  * their {@link it.unimi.dsi.fastutil.ints.IntList} shape, the flat edge-pair form, the
+ * {@link Edges} form, the
  * {@code AndNodes} twins against a pre-allocated equivalent, and the child/parent helpers
  * against explicit node and edge calls.
  */
@@ -117,6 +118,10 @@ class GraphBuilderFuzzTest {
       pairs.addNodes(edges.nodeCount());
       pairs.addEdgePairs(interleave(edges));
 
+      var edgeList = new GraphBuilder();
+      edgeList.addNodes(edges.nodeCount());
+      edgeList.addEdges(asEdges(edges));
+
       assertThat(fanOutArray.build()).as("fan-out from int[] for %s", edges.describe())
           .isEqualTo(expected);
       assertThat(fanOutList.build()).as("fan-out from IntList for %s", edges.describe())
@@ -126,7 +131,13 @@ class GraphBuilderFuzzTest {
       assertThat(fanInList.build()).as("fan-in from IntList for %s", edges.describe())
           .isEqualTo(expected);
       assertThat(pairs.build()).as("edge pairs for %s", edges.describe()).isEqualTo(expected);
+      assertThat(edgeList.build()).as("Edges for %s", edges.describe()).isEqualTo(expected);
     }
+  }
+
+  /** The random edges as an {@link Edges} list; the builder ignores the edge indices. */
+  private static Edges asEdges(EdgeList edges) {
+    return Edges.wrap(edges.sources().clone(), edges.targets().clone(), new int[edges.size()]);
   }
 
   @Test
@@ -150,6 +161,9 @@ class GraphBuilderFuzzTest {
       var pairs = new GraphBuilder();
       pairs.addEdgePairsAndNodes(interleave(edges));
 
+      var edgeList = new GraphBuilder();
+      edgeList.addEdgesAndNodes(asEdges(edges));
+
       var bySource = group(edges, true, referenced);
       var fanOutArray = new GraphBuilder();
       var fanOutList = new GraphBuilder();
@@ -169,6 +183,8 @@ class GraphBuilderFuzzTest {
       assertThat(single.build()).as("addEdgeAndNodes for %s", edges.describe())
           .isEqualTo(reference);
       assertThat(pairs.build()).as("addEdgePairsAndNodes for %s", edges.describe())
+          .isEqualTo(reference);
+      assertThat(edgeList.build()).as("addEdgesAndNodes from Edges for %s", edges.describe())
           .isEqualTo(reference);
       assertThat(fanOutArray.build()).as("addEdgesAndNodes from int[] for %s", edges.describe())
           .isEqualTo(reference);

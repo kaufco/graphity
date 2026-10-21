@@ -36,13 +36,14 @@ b.addPath(firstBranch, firstBranch + 1);            // chains existing nodes
 b.addInEdges(entry, firstBranch + 1);               // fan-in, the counterpart of addEdges
 ```
 
-The fan-out, fan-in and path methods take their node IDs in whichever form you already have them — loose arguments, an `int[]`, or an `IntList`. The last one matters because it is what Graphity itself returns, so a result can go straight back into a builder without a copy:
+The fan-out, fan-in and path methods take their node IDs in whichever form you already have them — loose arguments, an `int[]`, or an `IntList`. The last one matters because it is what Graphity itself returns, so a result can go straight back into a builder without a copy; a result that lists edges goes in whole:
 
 ```java
 for (int n = 0; n < source.nodeCount(); n++) {
     b.addEdges(n, source.outNodes(n));  // SortedIntView, no intermediate array
 }
 b.addPath(TopOrder.of(source));         // any IntList works
+b.addEdges(BackEdges.of(source));       // the edges of a result, as listed
 ```
 
 Node IDs often come from somewhere else — block numbers in a control-flow graph, symbol IDs from a table — and then arrive in arbitrary order, frequently as a flat list of pairs. Every edge-adding method has an `AndNodes` twin that creates what it references, so no caller has to track the highest ID:

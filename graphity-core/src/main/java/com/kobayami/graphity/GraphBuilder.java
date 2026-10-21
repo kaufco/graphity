@@ -53,6 +53,7 @@ import java.util.Arrays;
  *
  * A list is read during the call and never retained. {@link #addEdgePairs(int...)} has no
  * {@link IntList} form: no result of this library is a flat sequence of alternating endpoints.
+ * The results that list edges, {@link Edges}, go in whole through {@link #addEdges(Edges)}.
  * {@link #addEdge(int, int)}, {@link #addChild(int)} and {@link #addParent(int)} are
  * fixed-arity: they take single IDs and are meant to run per node, where a varargs array per
  * call would dominate the cost.
@@ -555,6 +556,44 @@ public final class GraphBuilder {
   }
 
   /**
+   * Adds the edges of an algorithm result, such as {@link BackEdges#of(Graph)} or
+   * {@link Biconnectivity#bridges()}, in their order.
+   * All nodes must already exist.
+   * <p>
+   * Reads sources and targets; the edge indices refer to the analyzed graph and are ignored.
+   * <p>
+   * <strong>Time:</strong> O(k) where k = {@code edges.count()}.
+   *
+   * @param edges the edges to add
+   * @throws IndexOutOfBoundsException if any node does not exist
+   */
+  public void addEdges(Edges edges) {
+    IntList sources = edges.sourceNodes();
+    IntList targets = edges.targetNodes();
+    checkNodes(sources, "source");
+    checkNodes(targets, "target");
+    addLists(sources, targets);
+  }
+
+  /**
+   * Adds the edges of an algorithm result in their order, creating any node that does not exist
+   * yet.
+   * <p>
+   * Reads sources and targets; the edge indices refer to the analyzed graph and are ignored.
+   * <p>
+   * <strong>Time:</strong> O(k) where k = {@code edges.count()}.
+   *
+   * @param edges the edges to add
+   * @throws IndexOutOfBoundsException if any ID is negative or {@code Integer.MAX_VALUE}
+   */
+  public void addEdgesAndNodes(Edges edges) {
+    IntList sources = edges.sourceNodes();
+    IntList targets = edges.targetNodes();
+    raiseNodeCount(Math.max(highestCreatable(sources), highestCreatable(targets)));
+    addLists(sources, targets);
+  }
+
+  /**
    * Adds all nodes and edges of the given graph to this builder.
    * <p>
    * Node IDs from the source graph are shifted by the current node count (offset).
@@ -669,6 +708,15 @@ public final class GraphBuilder {
     for (int i = 0; i < fromToPairs.length; i += 2) {
       edgeSources.add(fromToPairs[i]);
       edgeTargets.add(fromToPairs[i + 1]);
+    }
+  }
+
+  private void addLists(IntList sources, IntList targets) {
+    int count = sources.size();
+    reserve(count);
+    for (int i = 0; i < count; i++) {
+      edgeSources.add(sources.getInt(i));
+      edgeTargets.add(targets.getInt(i));
     }
   }
 
