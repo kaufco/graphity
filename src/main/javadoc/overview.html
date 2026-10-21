@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>Graphity</title>
+</head>
+<body>
+<p>
+Graph analysis algorithms for Java on a compact, immutable graph: connected components, bridges
+and articulation points, topological order, cycle and edge classification, reachability and
+breadth-first distances, tree ancestry, dominators and loops, and quotient graphs.
+</p>
+<p>
+Built for compiler and analysis pipelines - syntax trees, control- and data-flow graphs,
+dependency graphs. Every algorithm runs without recursion and returns a typed result with
+follow-up queries. Data on nodes and edges stays in arrays you own, indexed by node ID or edge
+index.
+</p>
+<table class="striped">
+<caption>Algorithms by question</caption>
+<thead>
+<tr><th scope="col">Question</th><th scope="col">Entry points</th></tr>
+</thead>
+<tbody>
+<tr><td>Which parts belong together?</td>
+<td>{@link com.kobayami.graphity.Components}: strongly and weakly connected components, bridges,
+articulation points, biconnected components, strong bridges</td></tr>
+<tr><td>In which order, and where are the cycles?</td>
+<td>{@link com.kobayami.graphity.TopOrder}, {@link com.kobayami.graphity.TopOrderAndLevels},
+{@link com.kobayami.graphity.EdgeTypes}, {@link com.kobayami.graphity.BackEdges},
+{@link com.kobayami.graphity.Graphs#isDag(com.kobayami.graphity.Graph)}</td></tr>
+<tr><td>What is reachable, and how far?</td>
+<td>{@link com.kobayami.graphity.BfsDistances},
+{@link com.kobayami.graphity.Graphs#reachableFrom(com.kobayami.graphity.Graph, int)}</td></tr>
+<tr><td>Who is the ancestor of whom in a tree?</td>
+<td>{@link com.kobayami.graphity.Ancestry}, {@link com.kobayami.graphity.PreorderAncestry}</td></tr>
+<tr><td>Which node dominates which, and where are the loops?</td>
+<td>{@link com.kobayami.graphity.Dominators}, {@link com.kobayami.graphity.Loops},
+{@link com.kobayami.graphity.IteratedDominanceFrontier}</td></tr>
+<tr><td>How do I contract, filter or renumber a graph?</td>
+<td>{@link com.kobayami.graphity.NodePartition},
+{@link com.kobayami.graphity.Graphs#remapped(com.kobayami.graphity.Graph, com.kobayami.graphity.NodeMapping)},
+{@link com.kobayami.graphity.NodeMapping}</td></tr>
+<tr><td>How do I build a graph?</td>
+<td>{@link com.kobayami.graphity.GraphBuilder}</td></tr>
+</tbody>
+</table>
+<p>
+The package documentation of {@link com.kobayami.graphity} lists every entry point with a short
+description.
+</p>
+</body>
+</html>

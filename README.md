@@ -6,11 +6,23 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 [![JDK](https://img.shields.io/badge/JDK-17%2B-blue)](https://adoptium.net/temurin/releases/?version=17)
 
-Graphity is a compact, high-performance Java library for analyzing directed and undirected graphs. It is built for compiler and analysis pipelines — abstract syntax trees, control- and data-flow graphs, dependency graphs — and more generally for anywhere you build a graph from your domain model, run analyses on it, and use the results.
+Graphity is a Java library of graph analysis algorithms: strongly and weakly connected components, bridges and articulation points, topological order and levels, cycle detection and edge classification, breadth-first distances and reachability, lowest common ancestors, dominators, dominance frontiers and loop nesting, and quotient graphs. It is built for compiler and analysis pipelines — abstract syntax trees, control- and data-flow graphs, dependency graphs — and more generally for anywhere you build a graph from your domain model, run analyses on it, and use the results.
 
-Graphity stores graphs in a CSR layout and returns algorithm results as typed, immutable value objects with useful follow-up APIs. On the algorithms covered by [JGraphT](https://jgrapht.org/) and [Guava Graph](https://github.com/google/guava/wiki/GraphsExplained), Graphity is **8×–79× faster** and uses **17×–55× less memory per (node + edge)**. [WebGraph](https://webgraph.di.unimi.it/) (LAW Milano), a specialist for compressed billion-node web crawls, beats Graphity on raw memory compactness (see [Limitations](#limitations)); on runtime, Graphity is faster across all measured shapes and sizes (2.4×–21×).
+Every algorithm returns a typed, immutable result with follow-up queries, and runs without recursion, so deep graphs need no stack tuning. On the algorithms covered by [JGraphT](https://jgrapht.org/) and [Guava Graph](https://github.com/google/guava/wiki/GraphsExplained), Graphity is **8×–79× faster** and uses **17×–55× less memory per (node + edge)**. [WebGraph](https://webgraph.di.unimi.it/) (LAW Milano), a specialist for compressed billion-node web crawls, beats Graphity on raw memory compactness (see [when to use something else](#when-to-use-something-else)); on runtime, Graphity is faster across all measured shapes and sizes (2.4×–21×).
 
-Speed and footprint come from the same constraint: Graphity models topology only. Nodes are integer IDs, edges are integer pairs, and labels or weights live in arrays you own, indexed by node or edge ID. The graph itself stays a flat `int[]`.
+Your data stays in your own types: names, weights and any other attributes live in plain arrays indexed by node ID or edge index, and every transformation tells you how to carry them along. The graph itself stores only structure, as a compact CSR layout of 4 bytes per node and per edge — which is where speed and footprint come from.
+
+## Contents
+
+1. [Installation](#installation)
+2. [Quick start](#quick-start)
+3. [Algorithms](#algorithms)
+4. [Data on nodes and edges](#data-on-nodes-and-edges)
+5. [Graphity, Guava and JGraphT](#graphity-guava-and-jgrapht)
+6. [Performance and memory at a glance](#performance-and-memory-at-a-glance)
+7. [Documentation](#documentation)
+8. [Building, testing, and benchmarking from source](#building-testing-and-benchmarking-from-source)
+9. [License](#license)
 
 ## Installation
 
@@ -20,7 +32,7 @@ Speed and footprint come from the same constraint: Graphity models topology only
 <dependency>
     <groupId>com.kobayami</groupId>
     <artifactId>graphity-core</artifactId>
-    <version>2.0.0</version>
+    <version>2.4.0</version>
 </dependency>
 ```
 
@@ -28,7 +40,7 @@ Speed and footprint come from the same constraint: Graphity models topology only
 
 ```groovy
 dependencies {
-    implementation 'com.kobayami:graphity-core:2.0.0'
+    implementation 'com.kobayami:graphity-core:2.4.0'
 }
 ```
 
@@ -36,15 +48,16 @@ dependencies {
 
 ```kotlin
 dependencies {
-    implementation("com.kobayami:graphity-core:2.0.0")
+    implementation("com.kobayami:graphity-core:2.4.0")
 }
 ```
 
 Requires JDK 17 or newer.
 
-## Quick Start
+## Quick start
 
 ```java
+import com.kobayami.graphity.BiAdjacentGraph;
 import com.kobayami.graphity.GraphBuilder;
 import com.kobayami.graphity.Components;
 import com.kobayami.graphity.Sccs;
@@ -76,89 +89,57 @@ bi.inNodes(3);                         // sorted view of predecessors
 var order = TopOrder.of(condensed);
 ```
 
-The result types are themselves graphs or partitions backed by CSR — they compose, and there are no per-call allocations on hot paths. For a deeper introduction and more examples, see [Documentation](#documentation).
+The result types are themselves graphs or partitions backed by CSR — they compose, and there are no per-call allocations on hot paths. The [tutorial](docs/tutorial.md) walks through building graphs, result types and custom traversals in depth.
 
-## What Graphity gives you
+## Algorithms
 
-**Compact, topology-only data model.** Graphs hold nodes as integer IDs and edges as integer pairs. No labels, no weights, no per-node objects. Constant 4 bytes per (node + edge) regardless of topology. Labels and weights live in user-owned parallel arrays indexed by node ID or edge ID:
+- **Components and connectivity:** strongly connected components (Tarjan), weakly connected components, connected components in the undirected reading; bridges, articulation points and biconnected components; strong bridges and strong articulation points; strong and weak connectivity checks.
+- **Order and cycles:** topological order by depth-first search, Kahn's order with a level per node; DAG check and a cycle test per strongly connected component; edge classification into tree, back, forward and cross edges; back edges.
+- **Reachability and distances:** breadth-first distances and shortest paths from one or several sources; the set of reachable nodes.
+- **Trees and ancestry:** parent, depth and lowest common ancestor in trees and forests; constant-time ancestor test and subtree views; tree, forest and path checks, directed and undirected; bipartiteness.
+- **Control flow:** dominators from one or several entries (Lengauer-Tarjan) and post-dominators; dominator tree, dominance frontiers and control dependence; iterated dominance frontiers for phi placement; the loop nesting forest, irreducible loops included (Havlak).
+- **Transformations:** quotient graph by a partition of your choosing, condensation of the strongly connected components, subgraph extraction, renumbering for cache locality, transpose — each with the mapping that carries your data along.
+- **Custom traversals:** iterative depth-first traversal with node or edge hooks, breadth-first traversal with levels, pruning and early stop — no stack limit.
 
-```java
-double[] weights = new double[graph.edgeCount()];
-```
+Every entry point and its result type is listed in the [algorithm reference](docs/tutorial.md#algorithm-reference); the [Javadoc](https://kaufco.github.io/graphity/) states each method's contract and cost.
 
-**Direction is an interpretation, not a type.** Edges are stored as directed pairs, but nothing commits a graph to one reading. Where the distinction matters, both variants are available — `Components.sccsOf` reads the graph as directed, `Components.ccsOf` as undirected. An AST that is a tree for one analysis and a dependency graph for the next needs no conversion and no second copy. Reading a graph as undirected collapses `a → b` and `b → a` into one edge and ignores self-loops, so a graph that stores its undirected edges symmetrically behaves exactly like one that stores a single direction per edge.
+## Data on nodes and edges
 
-**`BiAdjacentGraph` for O(1) bidirectional access.** Opt-in via `BiAdjacentGraph.of(graph)`. Doubles the storage to 8 B per (node + edge) and gives constant-time access in both directions — useful for Kahn's topological order, which then reads in-degrees in O(nodeCount) instead of scanning every edge, and for anything that walks predecessors, such as bidirectional BFS or ancestry queries. Connectivity is not among them: `Components.wccsOf` and `ccsOf` are Union-Find over the out-edges and need no in-adjacency. The control-flow analyses, which do walk predecessors, take a `BiAdjacentGraph` as input: the in-adjacency is built once, where the caller sees the cost, and shared by every analysis that needs it.
-
-**Algorithm results as first-class typed values.** Where other libraries hand you `Set<Set<V>>` or `Map<V, Integer>` and let you figure out the rest, Graphity returns a domain object with useful follow-ups:
-
-| Algorithm                  | Result          | Useful follow-ups                            |
-|----------------------------|-----------------|----------------------------------------------|
-| `Components.sccsOf(graph)` | `Sccs`          | `containsCycle()`, `condense()`, `nodesOf()` |
-| `Components.wccsOf(graph)` | `NodePartition` | `nodesOf()`, `condense()`                    |
-| `Components.biconnectivityOf(biAdjacentGraph)` | `Biconnectivity` | `bridges()`, `articulationPoints()`, `blocks()` |
-| `Components.strongConnectivityOf(biAdjacentGraph)` | `StrongConnectivity` | `strongBridges()`, `strongArticulationPoints()` |
-| `EdgeTypes.of(graph)`      | `EdgeTypes`     | `typeOf(edgeIndex)`, `Edges.of(edgeTypes, TREE)` |
-| `BackEdges.of(graph)`      | `Edges`         | `sourceNodes()`, `targetNodes()`             |
-| `Ancestry.of(forest)`      | `Ancestry`      | `lowestCommonAncestorOf(a, b)`, `depthOf()`  |
-| `PreorderAncestry.of(ancestry)` | `PreorderAncestry` | `isAncestorOf()` in O(1), `subtreeOf(node)`, `subtreeSizeOf()` |
-| `Dominators.of(cfg, entry)` | `Dominators` | `immediateDominatorOf()`, `Graphs.dominatorTree()`, `Graphs.dominanceFrontiers()`, `Ancestry.of(dominators)` |
-| `Loops.of(cfg, entry)`     | `Loops`         | `innermostLoopOf()`, `nodesOf(loop)`, `entriesOf(loop)`, `isReducible()` |
-| `BfsDistances.of(graph, source)` | `BfsDistances` | `distanceOf()`, `pathTo(node)`, `maxDistance()` |
-| `NodeMapping.of(...)`      | `NodeMapping`   | `inverted()`, `compose(other)`, `gather(values)` |
-
-These types compose. `sccs.condense()` returns a `Graph` plus a `NodeMapping` from original nodes to SCC IDs that you can run further algorithms on; `nodeMapping.compose(other)` chains transformations and applies the result to your own metadata arrays in one step.
-
-**Edge indices as the bridge to user metadata.** Edges have stable CSR positions. You hold edge-attached data in a parallel array of length `graph.edgeCount()`. `build()` sorts and deduplicates edges, so the order of insertion is not the order of edge indices; `graph.edgeIndexOf(source, target)` tells where an added edge ended up. When a transformation reorders or filters edges (subgraph, condensation, remap, transpose), Graphity returns the corresponding `EdgeMapping` so you can reindex your metadata array in one pass, and a partition folds the data of merged nodes or edges into one value per group:
+The graph stores structure only, and that is a feature rather than a chore: names, weights and any other data stay in your own arrays, indexed by node ID `0..nodeCount()-1` or by edge index `0..edgeCount()-1`. One array per attribute, read in tight loops, no per-node objects. When a transformation renumbers nodes or merges them, it comes with the mapping or partition that brings your arrays along:
 
 ```java
-Graph transpose = graph.transposed();                            // node IDs kept, edge indices not
-EdgeMapping newToOld = Graphs.transposedEdgeMapping(graph);      // one linear pass, total
-double[] transposedWeights = newToOld.gather(weights);           // transposedWeights[e] = weights[newToOld.get(e)]
+String[] names = ...;                                            // names[node]
+double[] weights = new double[graph.edgeCount()];                // weights[edgeIndex]
+weights[graph.edgeIndexOf(a, b)] = 2.5;                          // where an added edge ended up
 
-Graph condensed = partition.condense();                          // partition: e.g. Components.sccsOf(graph)
-EdgePartition provenance = Graphs.edgePartition(condensed, graph, partition);
-double[] weightPerCondensedEdge = provenance.reduce(weights, 0.0, Double::sum);
+Sccs sccs = Components.sccsOf(graph);
+Graph condensed = sccs.condense();                               // one node per SCC
+EdgePartition provenance = Graphs.edgePartition(condensed, graph, sccs);
+double[] condensedWeights = provenance.reduce(weights, 0.0, Double::sum);
 ```
 
-For a single edge instead of a full pass, `BiAdjacentGraph.transposedEdgeIndex(edgeIndex)` answers the same question in the other direction.
+Subgraphs and renumberings work the same way with `NodeMapping.gather` and `EdgeMapping.gather`; the [tutorial](docs/tutorial.md#data-on-nodes-and-edges) has the details.
 
-**Zero-copy views.** Adjacency lists, partition members, edge lists — wherever the underlying CSR already holds the data in the right form, the API hands back a view, not a copy. No allocation on hot loops.
+## Graphity, Guava and JGraphT
 
-**A builder that matches how graphs are actually written.** `GraphBuilder` covers the recurring construction patterns directly instead of leaving them as boilerplate — top-down and bottom-up node allocation, fan-out and fan-in batches, paths, and flat edge lists:
+The three libraries solve overlapping but different problems.
 
-```java
-var b = new GraphBuilder();
-b.ensureEdgeCapacity(1_000_000);        // no reallocation when the size is known
-b.strict();                             // deprecated: validation is always on from 3.0; call it to test against that
+| | Graphity | JGraphT | Guava Graph |
+|---|---|---|---|
+| Primary job | Fast analysis of large, static structure graphs | A broad toolbox of graph theory and algorithms | A common, generic way to model graph-shaped domain data |
+| Data model | Nodes are `int` IDs, edges `int` pairs, data in your arrays | Arbitrary vertex and edge objects, weights, many graph kinds | Arbitrary node objects; `Graph`, `ValueGraph`, `Network` |
+| Algorithms | Focused: components, connectivity, order, cycles, distances, ancestry, dominators, loops, quotients | Very broad: paths, flows, matching, colouring, clustering, isomorphism, planarity, TSP and more | Deliberately small: traversal, cycle check, reachability, transitive closure, transpose, induced subgraph |
+| Best fit | Compiler and analysis pipelines, dependency graphs, ASTs and CFGs, repeated analyses, deep graphs | Research, optimization, routing, networks, combinatorial problems | Application models with object identity and simple graph operations |
 
-int entry = b.addNode();
-int cond = b.addChild(entry);                       // adds a node, links entry -> it, returns its ID
-int firstBranch = b.addChildren(cond, 2);           // two successors at once, ID of the first
-b.addPath(firstBranch, firstBranch + 1);            // chains existing nodes
-b.addInEdges(entry, firstBranch + 1);               // fan-in, the counterpart of addEdges
-```
+**Deep graphs: Graphity runs where the others need tuning.** JGraphT, Guava and WebGraph use recursive depth-first search. On `soc-LiveJournal1` (4.8M nodes), JGraphT's and WebGraph's SCC overflow the default stack and complete only with `-Xss` raised to 256–512 MB; on deeper topologies they fail regardless. Every Graphity algorithm keeps its stack on the heap and runs under the default `-Xss`, verified at a depth of 1M.
 
-The fan-out, fan-in and path methods take their node IDs in whichever form you already have them — loose arguments, an `int[]`, or an `IntList`. The last one matters because it is what Graphity itself returns, so a result can go straight back into a builder without a copy:
+### When to use something else
 
-```java
-for (int n = 0; n < source.nodeCount(); n++) {
-    b.addEdges(n, source.outNodes(n));  // SortedIntView, no intermediate array
-}
-b.addPath(TopOrder.of(source));         // any IntList works
-```
+**Weighted optimization: use JGraphT.** Graphity works on pure topology — components, ordering, edge classification, condensation, remapping. Weights and capacities are deliberately outside the data model, and with them the optimization domains built on top: weighted shortest paths, flows and cuts, matching and assignment, TSP, colouring. For those, JGraphT is the right tool and a good one.
 
-Node IDs often come from somewhere else — block numbers in a control-flow graph, symbol IDs from a table — and then arrive in arbitrary order, frequently as a flat list of pairs. Every edge-adding method has an `AndNodes` twin that creates what it references, so no caller has to track the highest ID:
+**Mutable graphs of domain objects: use Guava.** Graphity graphs are immutable and built once; nodes are integers. If your graph changes edge by edge and you want to query it by your own objects, Guava's model fits better.
 
-```java
-b.addEdgeAndNodes(7, 3);                     // 8 nodes now exist
-b.addEdgePairs(7, 5, 5, 3);                  // flat pair list: 7 -> 5, 5 -> 3
-b.addEdgePairsAndNodes(9, 7, 3, 9);          // 9 -> 7, 3 -> 9; 10 nodes now exist
-```
-
-**Immutable graphs, safe to share across threads.** Once built, a `Graph` never changes. The same instance can be passed to multiple algorithms or threads without locking or defensive copying. Mutation happens exclusively through transformations (`subgraph`, `remap`, `condense`) that produce new graphs. The immutability is what makes the zero-copy result types and shared-graph parallelism safe by construction, not by convention.
-
-**Iterative algorithms — no recursion, no stack ceiling.** Every DFS-based algorithm (`Sccs`, `TopOrder`, `BackEdges`, `EdgeTypes`, the shape predicates, node reindexing) runs on an explicit heap-allocated stack, not the JVM call stack. They complete on arbitrarily deep graphs — verified at a DFS depth of 1M — under the default `-Xss`, with zero JVM tuning. This is a real differentiator: JGraphT, Guava, and WebGraph (built for billion-node web crawls) all use recursive DFS. On a 4.8M-node graph like `soc-LiveJournal1`, JGraphT's and WebGraph's SCC overflow the default stack and only complete once `-Xss` is raised to 256–512 MB (WebGraph's own SCC Javadoc advises setting "a large stack size"); on deeper topologies they fail regardless of `-Xss`. Graphity just runs.
+**Memory compactness: WebGraph uses less memory.** Graphity stores 4 B per (node + edge) — constant regardless of topology. WebGraph's compressed BVGraph format achieves 0.16–2.38 B per element by exploiting locality and delta coding. On memory-limited machines with very large graphs, that difference matters. Graphity does not target this corner; its CSR layout is optimised for fast random access, not compression.
 
 ## Performance and memory at a glance
 
@@ -208,49 +189,12 @@ For full results — all algorithms (`Build`, `Sccs`, `Wccs`, `Ccs`, `TopOrder`,
 
 How the numbers developed across Graphity releases is a separate report per machine, `…-history.md` next to the two above.
 
-## Algorithms
-
-Graphity ships the following algorithms out of the box. All of them return typed result values; entry points live on the algorithm class itself, not on the graph.
-
-| Algorithm                                                       | Entry point                   |
-|-----------------------------------------------------------------|-------------------------------|
-| Strongly connected components (Tarjan)                          | `Components.sccsOf(graph)`    |
-| Weakly connected components                                     | `Components.wccsOf(graph)`    |
-| Connected components (undirected interpretation)                | `Components.ccsOf(graph)`     |
-| Bridges, articulation points, biconnected components            | `Components.biconnectivityOf(biAdjacentGraph)` |
-| Strong bridges, strong articulation points (directed)           | `Components.strongConnectivityOf(biAdjacentGraph)` |
-| Breadth-first distances and shortest paths, one or several sources | `BfsDistances.of(graph, sources)` |
-| Reachable nodes, sorted (input for subgraph extraction)         | `Graphs.reachableFrom(graph, sources)` |
-| Topological order (DFS reverse postorder)                       | `TopOrder.of(graph)`          |
-| Topological order with levels (Kahn's)                          | `TopOrderAndLevels.of(graph)` |
-| DFS edge classification (TREE / BACK / FORWARD / CROSS)         | `EdgeTypes.of(graph)`         |
-| Back edges                                                      | `BackEdges.of(graph)`         |
-| Lowest common ancestor (trees and forests)                      | `Ancestry.of(forest)`         |
-| Constant-time ancestor test and subtree views (trees and forests) | `PreorderAncestry.of(ancestry)` |
-| Dominators, one or several entries (Lengauer-Tarjan)            | `Dominators.of(biAdjacentGraph, entries)` |
-| Dominator tree, dominance frontiers                             | `Graphs.dominatorTree(dominators)`, `Graphs.dominanceFrontiers(dominators)` |
-| Iterated dominance frontiers, phi placement (Sreedhar-Gao)      | `IteratedDominanceFrontier.of(dominators)` |
-| Loop nesting forest, irreducible loops included (Havlak)        | `Loops.of(biAdjacentGraph, entries)` |
-| Post-dominators, control dependence                             | `Dominators.of(cfg.transposed(), exits)`, `Graphs.dominanceFrontiers(postDominators).transposed()` |
-| Shape predicates (`isDag`, `isForest`, `isTree`, `isPath`, `isStronglyConnected`) | `Graphs.isDag(graph)` |
-| Shape predicates, undirected interpretation (`isBipartite`, `isUndirectedTree`, `isUndirectedForest`, `isWeaklyConnected`) | `Graphs.isBipartite(graph)` |
-| Condensation DAG                                                | `sccs.condense()`             |
-| Quotient graph by a partition of your choosing                  | `NodePartition.of(graph, groupOf, groupCount).condense()` |
-| Subgraph extraction and node remapping                          | `Graphs.remapped(...)`        |
-
-For custom traversals, subclass `IterativeDfsTraverser` (or `BiAdjacentDfsTraverser` for combined in/out access) — it keeps its DFS stack on the heap, so it handles arbitrarily deep graphs without any `-Xss` tuning. Override `enterNode(int)` for preorder and `leaveNode(int)` for postorder; return `false` from `enterNode` to prune a subtree. `IterativeDfsTraverser`, `IterativeDfsEdgeTraverser` and `FrontierTraverser` also let any hook call `stop()` to end the whole traversal. For edge-centric algorithms that must look at every edge, such as finding a cycle, subclass `IterativeDfsEdgeTraverser`: its `visitEdge` hook reports each edge with the state of its target (unvisited, on the current path, finished) and returns whether to descend, skip the edge or stop. Multiple `run()` calls accumulate visited state, so two-phase walks compose without external bookkeeping.
-
-## Limitations
-
-**Scope: structural analysis, not weighted optimization.** Graphity works on pure topology — components, ordering, edge classification, condensation, remapping. Weights and capacities are deliberately outside the data model, and with them the optimization domains built on top: flows and cuts, matching and assignment, TSP, colouring. For those, JGraphT is the right tool and a good one.
-
-**Memory compactness: WebGraph uses less memory.** Graphity stores 4 B per (node + edge) — constant regardless of topology. WebGraph's compressed BVGraph format achieves 0.16–2.38 B per element by exploiting locality and delta coding. On memory-limited machines with very large graphs, that difference matters. Graphity does not target this corner; its CSR layout is optimised for fast random access, not compression.
-
 ## Documentation
 
-This README is the primary user-facing documentation. The API reference is a Javadoc site.
+This README is the overview; the tutorial goes into depth, and the Javadoc is the contract.
 
-- **API reference (Javadoc):** [kaufco.github.io/graphity](https://kaufco.github.io/graphity/). Tracks `main`; every release tag republishes it.
+- **Tutorial:** [`docs/tutorial.md`](docs/tutorial.md) — the data model, building graphs, result types and their follow-ups, carrying your data through transformations, custom traversals, and the reference of all algorithm entry points.
+- **API reference (Javadoc):** [kaufco.github.io/graphity](https://kaufco.github.io/graphity/). It opens on an overview of the algorithms by question and is republished with every release.
 - **Synthetic benchmark report:** [`graphity-benchmarks/reports/summary/synthetic-ubuntu-ryzen-9950x-peers.md`](graphity-benchmarks/reports/summary/synthetic-ubuntu-ryzen-9950x-peers.md) — per-shape, per-algorithm timings and throughput against JGraphT, Guava and WebGraph, plus memory and allocation chapters, with bar charts.
 - **Real-world benchmark report:** [`graphity-benchmarks/reports/summary/realworld-ubuntu-ryzen-9950x-peers.md`](graphity-benchmarks/reports/summary/realworld-ubuntu-ryzen-9950x-peers.md) — SCC, BackEdges, EdgeTypes and weakly connected components across five SNAP datasets up to 4.8M nodes, plus topological levelling on the one acyclic dataset among them.
 - **Version history:** [`graphity-benchmarks/reports/summary/synthetic-ubuntu-ryzen-9950x-history.md`](graphity-benchmarks/reports/summary/synthetic-ubuntu-ryzen-9950x-history.md) — the same measurements with one column per released version instead of the peer libraries.

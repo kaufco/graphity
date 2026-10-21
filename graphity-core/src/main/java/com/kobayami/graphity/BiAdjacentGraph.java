@@ -11,9 +11,16 @@ import java.util.Objects;
  * each node's in-nodes sorted ascending.
  * Obtain via {@link #of(Graph)}; convert back via {@link #uniAdjacentGraph()}.
  * <p>
+ * The analyses that walk predecessors take a {@code BiAdjacentGraph}, so that the in-adjacency is
+ * built once and shared: {@link Dominators}, {@link Loops},
+ * {@link Components#biconnectivityOf(BiAdjacentGraph)} and
+ * {@link Components#strongConnectivityOf(BiAdjacentGraph)}.
+ * <p>
  * <strong>Memory:</strong> 8 x (nodeCount + edgeCount) bytes (2x {@link Graph}).
  *
  * @see Graph
+ * @see Dominators
+ * @see Loops
  */
 public final class BiAdjacentGraph extends Graph {
 

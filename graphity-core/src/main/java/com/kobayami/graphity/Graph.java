@@ -14,9 +14,16 @@ import java.util.Objects;
  * Use {@code Graph} for algorithms that only need out-edges.
  * For in-edge access, obtain a {@link BiAdjacentGraph} via {@link BiAdjacentGraph#of(Graph)}.
  * <p>
+ * Algorithms are not methods on the graph: they take it as input and live on their own classes,
+ * {@link Components}, {@link TopOrder}, {@link EdgeTypes}, {@link BfsDistances}, {@link Ancestry},
+ * {@link Dominators} and {@link Loops} among them. The
+ * {@linkplain com.kobayami.graphity package documentation} lists all of them by question.
+ * <p>
  * <strong>Memory:</strong> 4 x (nodeCount + edgeCount) bytes.
  *
  * @see BiAdjacentGraph
+ * @see GraphBuilder
+ * @see Components
  */
 public sealed class Graph permits BiAdjacentGraph {
 

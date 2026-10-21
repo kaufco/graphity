@@ -11,7 +11,7 @@
   <packaging>pom</packaging>
 
   <name>graphity (parent)</name>
-  <description>Aggregator POM for Graphity: core library and benchmarks.</description>
+  <description>Parent POM of Graphity, a library of graph analysis algorithms for Java.</description>
   <url>https://github.com/kaufco/graphity</url>
   <inceptionYear>2025</inceptionYear>
 
@@ -278,6 +278,10 @@
                  ${project.name} would name the parent POM on the aggregated site. -->
             <doctitle>Graphity ${project.version} API</doctitle>
             <windowtitle>Graphity ${project.version} API</windowtitle>
+            <!-- The doctitle shows only on an overview page, which the aggregated site gets from
+                 src/main/javadoc/overview.html and a single-package module jar does not; the
+                 header puts the version on every page. -->
+            <header>Graphity ${project.version}</header>
             <!-- One group per published module on the aggregated site. -->
             <groups>
               <group>

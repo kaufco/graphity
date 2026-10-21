@@ -13,8 +13,10 @@
   <artifactId>graphity-core</artifactId>
 
   <name>graphity-core</name>
-  <description>Compact, high-performance graph analysis for Java: a CSR-backed,
-    topology-only graph model built for compiler and analysis pipelines.</description>
+  <description>Graph analysis algorithms for Java: strongly and weakly connected components,
+    bridges and articulation points, topological order, edge classification, BFS distances,
+    lowest common ancestors, dominators, dominance frontiers and loop nesting - on a compact,
+    immutable CSR graph built for compiler and analysis pipelines.</description>
 
   <dependencies>
     <dependency>
