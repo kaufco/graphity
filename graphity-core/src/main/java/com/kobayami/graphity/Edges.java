@@ -62,7 +62,40 @@ public final class Edges {
    * @return the edges of type {@code type}
    */
   public static Edges of(EdgeTypes edgeTypes, EdgeType type) {
-    return edgeTypes.collect(type);
+    // Counts the edges of the type first, so that the arrays of the result get their exact length,
+    // then fills them in one scan over all edges.
+    Graph graph = edgeTypes.graph;
+    byte[] types = edgeTypes.types;
+    byte ordinal = (byte) type.ordinal();
+    int count = 0;
+    for (byte t : types) {
+      if (t == ordinal) count++;
+    }
+    if (count == 0) {
+      return empty();
+    }
+    var sources = new int[count];
+    var targets = new int[count];
+    var edgeIndices = new int[count];
+
+    var adjacency = Csr.outAdjacency(graph);
+    var adjacencyStart = Csr.outAdjacencyStart(graph);
+    int n = graph.nodeCount();
+    int p = 0;
+
+    for (int node = 0; node < n; node++) {
+      int start = adjacencyStart[node];
+      int end = adjacencyStart[node + 1];
+      for (int e = start; e < end; e++) {
+        if (types[e] == ordinal) {
+          sources[p] = node;
+          targets[p] = adjacency[e];
+          edgeIndices[p] = e;
+          p++;
+        }
+      }
+    }
+    return wrap(sources, targets, edgeIndices);
   }
 
   /**

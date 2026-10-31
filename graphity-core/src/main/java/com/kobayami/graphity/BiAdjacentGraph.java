@@ -37,6 +37,46 @@ public final class BiAdjacentGraph extends Graph {
     this.inAdjacency = inAdjacency;
   }
 
+  // The body of of(Graph) for a graph without in-adjacency.
+  private static BiAdjacentGraph withInAdjacency(Graph graph) {
+    int[] outAdjacencyStart = graph.outAdjacencyStart();
+    int[] outAdjacency = graph.outAdjacency();
+    int n = graph.nodeCount();
+    int m = graph.edgeCount();
+    int[] inAdjacencyStart = new int[n + 1];
+    int[] inAdjacency = new int[m];
+
+    // 1) Count in-degrees
+    for (int e = 0; e < m; e++) {
+      inAdjacencyStart[outAdjacency[e]]++;
+    }
+
+    // 2) Prefix-sum: convert in-degrees to start offsets
+    int nextStart = 0;
+    for (int v = 0; v < n; v++) {
+      int inDegree = inAdjacencyStart[v];
+      inAdjacencyStart[v] = nextStart;
+      nextStart += inDegree;
+    }
+
+    // 3) Fill in-adjacency. inAdjacencyStart[target]++ doubles as write pointer.
+    //    Ascending node scan ensures each in-list ends up sorted.
+    for (int v = 0; v < n; v++) {
+      for (int e = outAdjacencyStart[v], end = outAdjacencyStart[v + 1]; e < end; e++) {
+        inAdjacency[inAdjacencyStart[outAdjacency[e]]++] = v;
+      }
+    }
+
+    // 4) Repair: step 3 shifted inAdjacencyStart left by one; right-shift restores it, the
+    //    sentinel included.
+    for (int v = n; v > 0; v--) {
+      inAdjacencyStart[v] = inAdjacencyStart[v - 1];
+    }
+    inAdjacencyStart[0] = 0;
+
+    return new BiAdjacentGraph(outAdjacencyStart, outAdjacency, inAdjacencyStart, inAdjacency);
+  }
+
   // For Csr, which hands the arrays to the algorithms of the core and of other modules.
   final int[] inAdjacencyStart() {
     return inAdjacencyStart;
@@ -61,7 +101,7 @@ public final class BiAdjacentGraph extends Graph {
    * @return the graph with in-adjacency
    */
   public static BiAdjacentGraph of(Graph graph) {
-    return graph instanceof BiAdjacentGraph biAdjacent ? biAdjacent : graph.withInAdjacency();
+    return graph instanceof BiAdjacentGraph biAdjacent ? biAdjacent : withInAdjacency(graph);
   }
 
   /**

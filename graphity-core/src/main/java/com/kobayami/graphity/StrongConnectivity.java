@@ -42,7 +42,7 @@ public final class StrongConnectivity {
     int n = graph.nodeCount();
     // The dominators below allow one node less than Tarjan's algorithm: reject before it runs.
     ArrayLimits.checkNodeCount(n, DfsPreorder.MAX_NODE_COUNT, "strongConnectivityOf");
-    Sccs sccs = Components.sccsOf(graph);
+    Sccs sccs = Sccs.of(graph);
     int sccCount = sccs.sccCount();
     int[] sccOf = sccs.mapping;
     int[] members = sccs.members;

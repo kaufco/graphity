@@ -258,7 +258,7 @@ public final class MermaidWriter {
    *                                  graph
    */
   public MermaidWriter clusters(NodePartition partition, IntFunction<@Nullable String> label) {
-    selection.clusters(partition, label);
+    selection.setClusters(partition, label);
     return this;
   }
 

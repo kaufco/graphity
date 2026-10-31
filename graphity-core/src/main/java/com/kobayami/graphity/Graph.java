@@ -174,7 +174,7 @@ public sealed class Graph permits BiAdjacentGraph {
    * @throws IOException if writing to the stream fails
    */
   public final void writeTo(OutputStream out) throws IOException {
-    CsrStreams.write(this, out);
+    CsrStreams.write(outAdjacencyStart, outAdjacency, out);
   }
 
   /**
@@ -206,7 +206,12 @@ public sealed class Graph permits BiAdjacentGraph {
    *                     {@link #of(int[], int[])} accepts, whose exception is then the cause
    */
   public static Graph readFrom(InputStream in) throws IOException {
-    return CsrStreams.read(in);
+    var arrays = CsrStreams.read(in);
+    try {
+      return ofOwned(arrays.outAdjacencyStart(), arrays.outAdjacency());
+    } catch (IllegalArgumentException | IndexOutOfBoundsException e) {
+      throw new IOException("the stream does not hold a valid graph: " + e.getMessage(), e);
+    }
   }
 
   // For Csr, which hands the arrays to the algorithms of the core and of other modules.
@@ -440,44 +445,6 @@ public sealed class Graph permits BiAdjacentGraph {
    */
   public final boolean containsSelfLoop(int node) {
     return hasOutNode(node, node);
-  }
-
-  // The body of BiAdjacentGraph.of(Graph) for a graph without in-adjacency.
-  final BiAdjacentGraph withInAdjacency() {
-    int n = nodeCount();
-    int m = edgeCount();
-    int[] inAdjacencyStart = new int[n + 1];
-    int[] inAdjacency = new int[m];
-
-    // 1) Count in-degrees
-    for (int e = 0; e < m; e++) {
-      inAdjacencyStart[outAdjacency[e]]++;
-    }
-
-    // 2) Prefix-sum: convert in-degrees to start offsets
-    int nextStart = 0;
-    for (int v = 0; v < n; v++) {
-      int inDegree = inAdjacencyStart[v];
-      inAdjacencyStart[v] = nextStart;
-      nextStart += inDegree;
-    }
-
-    // 3) Fill in-adjacency. inAdjacencyStart[target]++ doubles as write pointer.
-    //    Ascending node scan ensures each in-list ends up sorted.
-    for (int v = 0; v < n; v++) {
-      for (int e = outAdjacencyStart[v], end = outAdjacencyStart[v + 1]; e < end; e++) {
-        inAdjacency[inAdjacencyStart[outAdjacency[e]]++] = v;
-      }
-    }
-
-    // 4) Repair: step 3 shifted inAdjacencyStart left by one; right-shift restores it, the
-    //    sentinel included.
-    for (int v = n; v > 0; v--) {
-      inAdjacencyStart[v] = inAdjacencyStart[v - 1];
-    }
-    inAdjacencyStart[0] = 0;
-
-    return new BiAdjacentGraph(outAdjacencyStart, outAdjacency, inAdjacencyStart, inAdjacency);
   }
 
   /**

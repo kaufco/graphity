@@ -7,6 +7,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.kobayami.graphity.testutils.RandomGraphs;
 import com.kobayami.graphity.testutils.TestGraphs;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -336,9 +337,9 @@ class GraphTest {
 
   @Test
   void forEachEdgeOnAGraphWithoutEdgesCallsNothing() {
-    TestGraphs.isolated(3).forEachEdge((source, target, edgeIndex) -> {
-      throw new AssertionError("no edge expected");
-    });
+    var count = new AtomicInteger();
+    TestGraphs.isolated(3).forEachEdge((source, target, edgeIndex) -> count.incrementAndGet());
+    assertThat(count.get()).isZero();
   }
 
   @Test

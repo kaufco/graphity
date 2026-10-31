@@ -106,7 +106,7 @@ public final class Biconnectivity {
   // ascending, emitting each neighbor once. The merge is also where a block's edge indices come
   // from: for one undirected edge it sees the out-adjacency slot - already an edge index - and the
   // in-adjacency slot in the same step, and the latter translates to an edge index through
-  // Graphs.transposedEdgeMapping.
+  // EdgeMapping.forTransposed.
   //
   // Collapsing the reciprocal pair removes the usual complication around the edge back to the
   // depth-first parent: the parent appears exactly once in the merged sequence, so skipping it
@@ -169,7 +169,7 @@ public final class Biconnectivity {
       this.outAdjacencyStart = Csr.outAdjacencyStart(graph);
       this.inAdjacency = Csr.inAdjacency(graph);
       this.inAdjacencyStart = Csr.inAdjacencyStart(graph);
-      this.inSlotToEdge = Graphs.transposedEdgeMapping(graph).mapping;
+      this.inSlotToEdge = EdgeMapping.forTransposed(graph).mapping;
       this.disc = new int[n];
       this.low = new int[n];
       this.dfsParent = new int[n];

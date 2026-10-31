@@ -986,6 +986,9 @@ public final class ReportMain {
       String out = new String(proc.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim();
       proc.waitFor(5, java.util.concurrent.TimeUnit.SECONDS);
       return out.isBlank() ? null : out;
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      return null;
     } catch (Exception ignored) {
       return null;
     }

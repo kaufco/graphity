@@ -27,7 +27,7 @@ final class Selection {
   }
 
   // Checks the node count here, so that a wrong partition fails where it is passed.
-  void clusters(NodePartition partition, IntFunction<@Nullable String> label) {
+  void setClusters(NodePartition partition, IntFunction<@Nullable String> label) {
     if (partition.nodeCount() != graph.nodeCount()) {
       throw new IllegalArgumentException("the partition covers " + partition.nodeCount()
           + " nodes, the graph has " + graph.nodeCount());

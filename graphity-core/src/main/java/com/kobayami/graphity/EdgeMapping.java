@@ -1,5 +1,6 @@
 package com.kobayami.graphity;
 
+import java.util.Arrays;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -30,6 +31,46 @@ public final class EdgeMapping extends IndexMapping {
   // and validCount matches it.
   EdgeMapping(int[] mapping, int validCount) {
     super(mapping, validCount);
+  }
+
+  // The body of Graphs.transposedEdgeMapping, here so that the algorithms that need it do not
+  // call the facade.
+  static EdgeMapping forTransposed(Graph graph) {
+    int n = graph.nodeCount();
+    int m = graph.edgeCount();
+    var targets = Csr.outAdjacency(graph);
+    var start = Csr.outAdjacencyStart(graph);
+
+    // Write pointer per target node: where the next edge into that node goes in the in-adjacency.
+    // A bi-adjacent graph already has those offsets; otherwise count and prefix-sum them.
+    int[] writePos;
+    if (graph instanceof BiAdjacentGraph biAdjacent) {
+      writePos = Arrays.copyOf(Csr.inAdjacencyStart(biAdjacent), n);
+    } else {
+      writePos = new int[n];
+      for (int target : targets) {
+        writePos[target]++;
+      }
+      int nextStart = 0;
+      for (int node = 0; node < n; node++) {
+        int inDegree = writePos[node];
+        writePos[node] = nextStart;
+        nextStart += inDegree;
+      }
+    }
+
+    // Same counting sort as BiAdjacentGraph.of, with the edge index as payload instead
+    // of the source node. Ascending node scan makes edge q of the transposed graph and entry q
+    // of the mapping describe the same edge.
+    int[] mapping = new int[m];
+    for (int node = 0; node < n; node++) {
+      int end = start[node + 1];
+      for (int edgeIndex = start[node]; edgeIndex < end; edgeIndex++) {
+        mapping[writePos[targets[edgeIndex]]++] = edgeIndex;
+      }
+    }
+
+    return new EdgeMapping(mapping, m);
   }
 
   /**

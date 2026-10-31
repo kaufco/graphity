@@ -9,6 +9,7 @@ import java.nio.ByteOrder;
 import java.util.Arrays;
 
 // The binary format of Graph.writeTo and Graph.readFrom, whose Javadoc is its specification.
+// It handles the bare arrays, not Graph, so that Graph and it do not depend on each other.
 final class CsrStreams {
 
   private static final int HEADER_BYTES = 8;
@@ -18,15 +19,19 @@ final class CsrStreams {
 
   private CsrStreams() {}
 
-  static void write(Graph graph, OutputStream out) throws IOException {
+  record CsrArrays(int[] outAdjacencyStart, int[] outAdjacency) {}
+
+  static void write(int[] outAdjacencyStart, int[] outAdjacency, OutputStream out)
+      throws IOException {
     var buffer = ByteBuffer.allocate(Integer.BYTES * CHUNK_INTS).order(ByteOrder.LITTLE_ENDIAN);
-    buffer.putInt(graph.nodeCount()).putInt(graph.edgeCount());
+    buffer.putInt(outAdjacencyStart.length - 1).putInt(outAdjacency.length);
     out.write(buffer.array(), 0, HEADER_BYTES);
-    writeInts(Csr.outAdjacencyStart(graph), buffer, out);
-    writeInts(Csr.outAdjacency(graph), buffer, out);
+    writeInts(outAdjacencyStart, buffer, out);
+    writeInts(outAdjacency, buffer, out);
   }
 
-  static Graph read(InputStream in) throws IOException {
+  // The arrays as read, not yet checked: Graph.readFrom checks them as it builds the graph.
+  static CsrArrays read(InputStream in) throws IOException {
     var buffer = ByteBuffer.allocate(Integer.BYTES * CHUNK_INTS).order(ByteOrder.LITTLE_ENDIAN);
     readFully(in, buffer.array(), HEADER_BYTES);
     int nodeCount = buffer.getInt(0);
@@ -38,11 +43,7 @@ final class CsrStreams {
     }
     int[] start = readInts(in, nodeCount + 1, buffer);
     int[] adjacency = readInts(in, edgeCount, buffer);
-    try {
-      return Graph.ofOwned(start, adjacency);
-    } catch (IllegalArgumentException | IndexOutOfBoundsException e) {
-      throw new IOException("the stream does not hold a valid graph: " + e.getMessage(), e);
-    }
+    return new CsrArrays(start, adjacency);
   }
 
   private static void writeInts(int[] values, ByteBuffer buffer, OutputStream out)
