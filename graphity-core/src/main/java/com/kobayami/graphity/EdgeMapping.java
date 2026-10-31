@@ -70,8 +70,9 @@ public final class EdgeMapping extends IndexMapping {
    *
    * @param targetCount size of the target space, which becomes the source space of the inverse
    * @return the inverse edge mapping, with {@link #indexCount()} equal to {@code targetCount}
-   * @throws IllegalArgumentException  if {@code targetCount} is negative, or multiple source
-   *                                   indices map to the same target
+   * @throws IllegalArgumentException  if {@code targetCount} is negative or larger than
+   *                                   {@code Integer.MAX_VALUE - 8}, the largest array, or
+   *                                   multiple source indices map to the same target
    * @throws IndexOutOfBoundsException if a target is {@code targetCount} or more
    */
   public EdgeMapping inverted(int targetCount) {

@@ -163,8 +163,10 @@ public final class Biconnectivity {
     private int edgeTop;
 
     private final boolean[] isArticulation;
-    /** Bridges as (source, target, edge index) triples, interleaved, each a stored edge. */
-    private final IntArrayList bridgeTriples = new IntArrayList();
+    /** Bridges as parallel lists of source, target and edge index, each a stored edge. */
+    private final IntArrayList bridgeSources = new IntArrayList();
+    private final IntArrayList bridgeTargets = new IntArrayList();
+    private final IntArrayList bridgeEdgeIndices = new IntArrayList();
 
     /** Edge index → block ID, {@code -1} for a self-loop. */
     private final int[] blockOfEdge;
@@ -335,9 +337,9 @@ public final class Biconnectivity {
       assert edgeTop - mark == 1 || edgeTop - mark == 2;
       int edge = edgeTop - mark == 2 && parent > child ? edgeStack[mark + 1] : edgeStack[mark];
       int target = outAdjacency[edge];
-      bridgeTriples.add(target == child ? parent : child);
-      bridgeTriples.add(target);
-      bridgeTriples.add(edge);
+      bridgeSources.add(target == child ? parent : child);
+      bridgeTargets.add(target);
+      bridgeEdgeIndices.add(edge);
     }
 
     /** Turns the edges above {@code mark} into one block. */
@@ -349,7 +351,8 @@ public final class Biconnectivity {
     }
 
     Edges bridges() {
-      return Edges.sortedEdges(graph, bridgeTriples.elements(), bridgeTriples.size() / 3, false);
+      return Edges.sortedEdges(graph, bridgeSources.elements(), bridgeTargets.elements(),
+          bridgeEdgeIndices.elements(), bridgeSources.size(), false);
     }
 
     SortedIntView articulationPoints() {

@@ -229,4 +229,68 @@ class DotWriterTest {
     String dot = DotWriter.of(TestGraphs.isolated(1)).nodeLabel(node -> "a\rb\r\nc").writeToString();
     assertThat(dot).contains("label=\"a\\nb\\nc\"");
   }
+
+  @Test
+  void aClusterWithoutLabelDoesNotInheritTheGraphLabel() {
+    var graph = TestGraphs.path(3);
+    var partition = NodePartition.of(graph, new int[] {0, 1, -1}, 2);
+    String dot = DotWriter.of(graph)
+        .graphAttribute("label", "TITLE")
+        .clusters(partition, group -> group == 1 ? "own" : null)
+        .writeToString();
+    assertThat(dot).isEqualTo("""
+        digraph {
+          label="TITLE";
+          subgraph cluster_0 {
+            label="";
+            0;
+          }
+          subgraph cluster_1 {
+            label="own";
+            1;
+          }
+          0 -> 1;
+          1 -> 2;
+        }
+        """);
+  }
+
+  @Test
+  void labelsEscapeAmpersandsSinceGraphvizDecodesEntitiesThere() {
+    var graph = TestGraphs.path(2);
+    var partition = NodePartition.of(graph, new int[] {0, -1}, 1);
+    String dot = DotWriter.of(graph)
+        .graphAttribute("label", "A & B")
+        .graphAttribute("URL", "x?a=1&b=2")
+        .clusters(partition, group -> "&lt;")
+        .nodeLabel(node -> "p = &sum;")
+        .edgeAttributes((edge, attributes) -> {
+          attributes.put("xlabel", "&");
+          attributes.put("headlabel", "&amp;");
+          attributes.put("taillabel", "&#38;");
+          attributes.put("URL", "y?c=3&d=4");
+        })
+        .writeToString();
+    assertThat(dot).isEqualTo("""
+        digraph {
+          label="A &amp; B";
+          URL="x?a=1&b=2";
+          subgraph cluster_0 {
+            label="&amp;lt;";
+            0 [label="p = &amp;sum;"];
+          }
+          1 [label="p = &amp;sum;"];
+          0 -> 1 [xlabel="&amp;", headlabel="&amp;amp;", taillabel="&amp;#38;", URL="y?c=3&d=4"];
+        }
+        """);
+  }
+
+  @Test
+  void aNulCharacterIsWrittenAsTheReplacementCharacter() {
+    String dot = DotWriter.of(TestGraphs.isolated(1))
+        .nodeLabel(node -> "a\u0000b")
+        .nodeAttributes((node, attributes) -> attributes.put("URL", "\u0000"))
+        .writeToString();
+    assertThat(dot).contains("0 [label=\"a\uFFFDb\", URL=\"\uFFFD\"];");
+  }
 }

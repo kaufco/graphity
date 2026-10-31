@@ -12,11 +12,11 @@ import java.util.Arrays;
  */
 final class DfsFrames {
 
-  /**
-   * The JDK's soft maximum array length ({@code Integer.MAX_VALUE - 8}), rounded down to whole
-   * frames.
-   */
-  static final int MAX_LENGTH = Integer.MAX_VALUE - 9;
+  /** Most frames a stack holds, 2^30 - 5: as many as fit into the largest array. */
+  private static final int MAX_DEPTH = ArrayLimits.MAX_NODE_COUNT_TWO_INTS;
+
+  /** The largest array, rounded down to whole frames. */
+  private static final int MAX_LENGTH = 2 * MAX_DEPTH;
 
   private DfsFrames() {}
 
@@ -35,8 +35,8 @@ final class DfsFrames {
     long wanted = Math.min(2L * frames.length, 2L * nodeCount);
     if (wanted > MAX_LENGTH) {
       if (frames.length >= MAX_LENGTH) {
-        throw new IllegalArgumentException("depth-first search deeper than " + MAX_LENGTH / 2
-            + " nodes; the frame stack cannot grow beyond the largest array");
+        throw new IllegalArgumentException("a depth-first path is longer than " + MAX_DEPTH
+            + " nodes, the most frames an array can hold");
       }
       wanted = MAX_LENGTH;
     }

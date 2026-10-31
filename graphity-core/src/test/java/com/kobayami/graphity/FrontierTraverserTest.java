@@ -272,6 +272,48 @@ class FrontierTraverserTest {
     @Override protected void visitNode(int node) {}
   }
 
+  // ---- enqueue outside a run ----
+
+  @Test
+  void nodesEnqueuedBeforeARunFormItsLevelZeroInEveryRunVariant() {
+    // 0 -> 1 and 3 -> 2. After run(0), the 3 is enqueued outside a run; the start 0 of run(0)
+    // and run(IntList.of(0)) is visited already.
+    for (int variant = 0; variant < 3; variant++) {
+      var t = new RecordingFrontierTraverser(TestGraphs.of(4, 0, 1, 3, 2));
+      t.run(0);
+      t.enqueue(3);
+      switch (variant) {
+        case 0 -> t.run();
+        case 1 -> t.run(0);
+        default -> t.run(IntList.of(0));
+      }
+      assertThat(t.visitOrder.toIntArray()).as("variant %d", variant).containsExactly(0, 1, 3, 2);
+      assertThat(t.levelAtVisit.toIntArray()).as("variant %d", variant)
+          .containsExactly(0, 1, 0, 1);
+      assertThat(t.completedLevels.toIntArray()).as("variant %d", variant)
+          .containsExactly(0, 1, 0, 1);
+    }
+  }
+
+  @Test
+  void runVisitsANodeEnqueuedBeforeItEvenWithNoRootLeft() {
+    var t = new RecordingFrontierTraverser(TestGraphs.isolated(2));
+    t.run(0);
+    t.enqueue(1);
+    t.run();
+    assertThat(t.visitOrder.toIntArray()).containsExactly(0, 1);
+  }
+
+  @Test
+  void nodesEnqueuedBeforeARunComeAheadOfItsStartNode() {
+    // 0 -> 1 and 3 -> 2: the 3 joins the start 0 in level 0, ahead of it.
+    var t = new RecordingFrontierTraverser(TestGraphs.of(4, 0, 1, 3, 2));
+    t.enqueue(3);
+    t.run(0);
+    assertThat(t.visitOrder.toIntArray()).containsExactly(3, 0, 2, 1);
+    assertThat(t.levelAtVisit.toIntArray()).containsExactly(0, 0, 1, 1);
+  }
+
   // ---- stop() ----
 
   @Test
@@ -318,6 +360,47 @@ class FrontierTraverserTest {
         stop();
       }
     }
+  }
+
+  @Test
+  void nodesEnqueuedWhenTheLastLevelCompletesFormTheNextLevel() {
+    // 0 -> 1, plus isolated 2 and 3; level 1 is the last level of run(0) and enqueues 2.
+    var t = new StoppingFrontier(TestGraphs.of(4, 0, 1));
+    t.enqueueOnLevel = 1;
+    t.nodeToEnqueue = 2;
+    t.run(0);
+    assertThat(t.visits.toIntArray()).containsExactly(0, 1, 2);
+    assertThat(t.visitLevels.toIntArray()).containsExactly(0, 1, 2);
+    assertThat(t.levels.toIntArray()).containsExactly(0, 1, 2);
+  }
+
+  @Test
+  void nodesEnqueuedWhenAnInnerLevelCompletesJoinTheNextLevel() {
+    // 0 -> 1, plus isolated 2 and 3; level 0 enqueues 2 next to the child 1.
+    var t = new StoppingFrontier(TestGraphs.of(4, 0, 1));
+    t.enqueueOnLevel = 0;
+    t.nodeToEnqueue = 2;
+    t.run(0);
+    assertThat(t.visits.toIntArray()).containsExactly(0, 1, 2);
+    assertThat(t.visitLevels.toIntArray()).containsExactly(0, 1, 1);
+    assertThat(t.levels.toIntArray()).containsExactly(0, 1);
+  }
+
+  @Test
+  void stopWhenTheLastLevelCompletesDropsTheNodesItEnqueued() {
+    var t = new StoppingFrontier(TestGraphs.of(4, 0, 1));
+    t.enqueueOnLevel = 1;
+    t.nodeToEnqueue = 2;
+    t.stopOnLevel = 1;
+    t.run(0);
+    assertThat(t.visits.toIntArray()).containsExactly(0, 1);
+    assertThat(t.isVisited(2)).as("enqueued before the stop").isTrue();
+
+    t.enqueueOnLevel = -1;
+    t.stopOnLevel = -1;
+    t.run();
+    assertThat(t.visits.toIntArray()).containsExactly(0, 1, 3);
+    assertThat(t.visitLevels.toIntArray()).containsExactly(0, 1, 0);
   }
 
   @Test

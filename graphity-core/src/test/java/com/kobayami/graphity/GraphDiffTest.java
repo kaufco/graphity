@@ -98,6 +98,19 @@ class GraphDiffTest {
   }
 
   @Test
+  void diffListsSourcesTargetsAndIndicesInStepOverSeveralNodes() {
+    Graph before = TestGraphs.of(4, 0, 1, 0, 3, 1, 2, 2, 0);
+    Graph after = TestGraphs.of(4, 0, 2, 0, 3, 1, 0, 1, 2, 2, 1);
+    var diff = Graphs.diff(before, after);
+    assertThat(diff.addedEdges().sourceNodes().toIntArray()).containsExactly(0, 1, 2);
+    assertThat(diff.addedEdges().targetNodes().toIntArray()).containsExactly(2, 0, 1);
+    assertThat(diff.addedEdges().edgeIndices().toIntArray()).containsExactly(0, 2, 4);
+    assertThat(diff.removedEdges().sourceNodes().toIntArray()).containsExactly(0, 2);
+    assertThat(diff.removedEdges().targetNodes().toIntArray()).containsExactly(1, 0);
+    assertThat(diff.removedEdges().edgeIndices().toIntArray()).containsExactly(0, 3);
+  }
+
+  @Test
   void diffAgainstAGraphWithoutEdgesListsEveryEdge() {
     Graph graph = RandomGraphs.gnp(30, 0.1, 9);
     Graph empty = TestGraphs.isolated(30);

@@ -27,7 +27,9 @@ import java.util.Objects;
  * Graph condensed = sccs.condense(); // condensation DAG
  * }</pre>
  *
- * <strong>Time:</strong> O(nodeCount + edgeCount) for computation.<br>
+ * <strong>Time:</strong> O(nodeCount + edgeCount) for computation, plus sorting the members of
+ * each component: O(nodeCount x log nodeCount) in the worst case, as for
+ * {@link Components#sccsOf(Graph)}.<br>
  * <strong>Memory:</strong> O(nodeCount) for the result; O(nodeCount) additional during computation.
  *
  * @see Graph

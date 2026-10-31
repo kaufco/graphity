@@ -55,14 +55,16 @@ public final class Components {
   /**
    * Computes the strongly connected components of the given graph using Tarjan's algorithm.
    * <p>
-   * <strong>Time:</strong> O(nodeCount + edgeCount).<br>
+   * <strong>Time:</strong> O(nodeCount + edgeCount), plus sorting the members of each component,
+   * O(k log k) for a component of k nodes: O(nodeCount x log nodeCount) in the worst case, when
+   * one component holds most of the nodes.<br>
    * <strong>Memory:</strong> O(nodeCount) for the result; O(nodeCount) additional during
    * computation.
    *
    * @param graph the graph to analyze
    * @return the SCCs as an {@link Sccs} instance
-   * @throws IllegalArgumentException if {@code graph.nodeCount() >= 2^30 - 2}, or if a
-   *     depth-first path is longer than 2^30 - 5 nodes, the most frames an array can hold
+   * @throws IllegalArgumentException if {@code graph.nodeCount() > 2^30 - 5}, the most nodes for
+   *     which two ints per node fit into one array
    */
   public static Sccs sccsOf(Graph graph) {
     var tarjan = new TarjanTraverser(graph);
@@ -162,11 +164,12 @@ public final class Components {
    * <strong>Time:</strong> O(nodeCount + edgeCount); the bridges, at most nodeCount - 1, are
    * ordered by counting.<br>
    * <strong>Memory:</strong> O(nodeCount + edgeCount) for the result; during computation
-   * 29 x nodeCount bytes for the traversal state, up to 8 x nodeCount bytes for the collected
-   * bridges and as much again plus 4 x nodeCount bytes while they are ordered, 4 x edgeCount
-   * bytes for the edge index translation and up to 4 x edgeCount bytes for the edge stack, which
-   * grows on demand and never exceeds edgeCount entries - several times the size of the graph
-   * itself, and worth checking against the available heap on very large graphs.
+   * 29 x nodeCount bytes for the traversal state, 4 x edgeCount bytes for the edge index
+   * translation, up to 4 x edgeCount bytes for the edge stack, which grows on demand and never
+   * exceeds edgeCount entries, and for the bridges up to 12 x nodeCount bytes while they are
+   * collected, half as much again in spare list capacity, and another 16 x nodeCount bytes while
+   * they are ordered. That is up to 63 x nodeCount + 8 x edgeCount bytes, several times the size
+   * of the graph itself, and worth checking against the available heap on very large graphs.
    *
    * @param graph the graph to analyze
    * @return bridges, articulation points and blocks as a {@link Biconnectivity} instance
@@ -191,13 +194,14 @@ public final class Components {
    * <p>
    * <strong>Time:</strong> O((nodeCount + edgeCount) x log nodeCount) in the worst case, from the
    * dominators; the strong bridges are ordered by counting.<br>
-   * <strong>Memory:</strong> O(nodeCount) for the result; up to about 70 x nodeCount bytes
-   * additional during computation.
+   * <strong>Memory:</strong> O(nodeCount) for the result; up to about 105 x nodeCount bytes
+   * additional during computation, most of it while the strong bridges are ordered: up to
+   * 2 x nodeCount of them before the duplicates found in both directions are dropped.
    *
    * @param graph the graph to analyze
    * @return strong bridges and strong articulation points as a {@link StrongConnectivity}
-   * @throws IllegalArgumentException if {@code graph.nodeCount() >= 2^30 - 2}, or if a
-   *     depth-first path is longer than 2^30 - 5 nodes, the most frames an array can hold
+   * @throws IllegalArgumentException if {@code graph.nodeCount() > 2^30 - 6}, the limit of
+   *     {@link Dominators}
    * @see StrongConnectivity
    */
   public static StrongConnectivity strongConnectivityOf(BiAdjacentGraph graph) {
@@ -214,7 +218,8 @@ public final class Components {
    * index and lowlink are both node IDs, so 31 bits each suffice. Every node touch is then one
    * cache line instead of two int arrays plus two bit-sets, and the layout stays within 32-bit
    * arithmetic, which a port to a language without 64-bit integer operators can mirror. Two lanes
-   * per node cap the node count below 2^30 - 2.
+   * per node cap the node count at 2^30 - 5, {@link ArrayLimits#MAX_NODE_COUNT_TWO_INTS}; a
+   * depth-first path through every node then still fits into the frame stack.
    * <p>
    * Two stacks drive the traversal: {@code frames} for the DFS descent (each entry a node ID and
    * its resume position), and {@code sccStack} holding nodes not yet assigned to a
@@ -242,10 +247,7 @@ public final class Components {
     TarjanTraverser(Graph graph) {
       this.graph = graph;
       int n = graph.nodeCount();
-      if (n > DfsPreorder.MAX_NODE_COUNT) {
-        throw new IllegalArgumentException("Tarjan's algorithm keeps two ints per node and so"
-            + " requires nodeCount < 2^30 - 2, but was " + n);
-      }
+      ArrayLimits.checkNodeCount(n, ArrayLimits.MAX_NODE_COUNT_TWO_INTS, "Tarjan's algorithm");
       this.lanes = new int[2 * n];
       this.sccStack = new int[n];
       this.nodeToScc = new int[n];

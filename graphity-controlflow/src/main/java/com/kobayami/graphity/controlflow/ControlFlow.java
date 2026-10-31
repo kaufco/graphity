@@ -24,6 +24,13 @@ import java.util.Arrays;
  */
 public final class ControlFlow {
 
+  /**
+   * The JDK's soft maximum array length, the one array limit of the library; the module derives
+   * its other limits from it. Follows {@code ArrayLimits.MAX_ARRAY_LENGTH} in the core, which a
+   * module cannot see.
+   */
+  static final int MAX_ARRAY_LENGTH = Integer.MAX_VALUE - 8;
+
   private ControlFlow() {}
 
   /**
@@ -82,9 +89,9 @@ public final class ControlFlow {
         }
       }
     }
-    if (total > Integer.MAX_VALUE - 8) {
-      throw new IllegalArgumentException(
-          "the dominance frontier relation has " + total + " pairs, more than an array can hold");
+    if (total > MAX_ARRAY_LENGTH) {
+      throw new IllegalArgumentException("the dominance frontier relation has more than "
+          + MAX_ARRAY_LENGTH + " pairs, the largest array length");
     }
     int next = 0;
     for (int node = 0; node < n; node++) {

@@ -52,6 +52,8 @@ public final class StrongConnectivity {
    */
   static StrongConnectivity of(BiAdjacentGraph graph) {
     int n = graph.nodeCount();
+    // The dominators below allow one node less than Tarjan's algorithm: reject before it runs.
+    ArrayLimits.checkNodeCount(n, DfsPreorder.MAX_NODE_COUNT, "strongConnectivityOf");
     Sccs sccs = Components.sccsOf(graph);
     int sccCount = sccs.sccCount();
     int[] sccOf = sccs.mapping;
@@ -66,19 +68,21 @@ public final class StrongConnectivity {
       sinksFirst.add(members[memberStart[c]]);
       sourcesFirst.add(members[memberStart[sccCount - 1 - c]]);
     }
-    int[] forward = Dominators.withinBlocks(graph, sinksFirst, "Strong connectivity");
-    int[] backward =
-        Dominators.withinBlocks(graph.transposed(), sourcesFirst, "Strong connectivity");
+    int[] forward = Dominators.withinBlocks(graph, sinksFirst);
+    int[] backward = Dominators.withinBlocks(graph.transposed(), sourcesFirst);
 
-    var bridgeTriples = new IntArrayList();
+    var sources = new IntArrayList();
+    var targets = new IntArrayList();
+    var edgeIndices = new IntArrayList();
     var isArticulation = new boolean[n];
     collect(forward, Csr.inAdjacencyStart(graph), Csr.inAdjacency(graph), sccOf, false,
-        bridgeTriples, isArticulation);
+        sources, targets, edgeIndices, isArticulation);
     collect(backward, Csr.outAdjacencyStart(graph), Csr.outAdjacency(graph), sccOf, true,
-        bridgeTriples, isArticulation);
+        sources, targets, edgeIndices, isArticulation);
     markEntries(graph, sccOf, members, memberStart, isArticulation);
     return new StrongConnectivity(
-        Edges.sortedEdges(graph, bridgeTriples.elements(), bridgeTriples.size() / 3, true),
+        Edges.sortedEdges(graph, sources.elements(), targets.elements(), edgeIndices.elements(),
+            sources.size(), true),
         Biconnectivity.flaggedNodes(isArticulation));
   }
 
@@ -94,7 +98,8 @@ public final class StrongConnectivity {
    *     the out-adjacency slot of the graph - its edge index
    */
   private static void collect(int[] idom, int[] inStart, int[] in, int[] sccOf,
-      boolean transposed, IntArrayList bridgeTriples, boolean[] isArticulation) {
+      boolean transposed, IntArrayList sources, IntArrayList targets, IntArrayList edgeIndices,
+      boolean[] isArticulation) {
     int n = idom.length;
     var preorderIndex = new int[n];
     var subtreeSize = new int[n];
@@ -122,9 +127,9 @@ public final class StrongConnectivity {
         }
       }
       if (bridge && fromIdom >= 0) {
-        bridgeTriples.add(transposed ? v : u);
-        bridgeTriples.add(transposed ? u : v);
-        bridgeTriples.add(transposed ? fromIdom : -1);
+        sources.add(transposed ? v : u);
+        targets.add(transposed ? u : v);
+        edgeIndices.add(transposed ? fromIdom : -1);
       }
     }
   }

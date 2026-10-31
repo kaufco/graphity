@@ -88,8 +88,11 @@ public sealed class Graph permits BiAdjacentGraph {
    * @throws IndexOutOfBoundsException if a target is not in {@code 0..nodeCount-1}
    * @throws IllegalArgumentException if {@code outAdjacencyStart} is empty, does not start at
    *                                  {@code 0}, decreases or does not end at
-   *                                  {@code outAdjacency.length}, or an adjacency list is not
-   *                                  strictly ascending
+   *                                  {@code outAdjacency.length}, an adjacency list is not
+   *                                  strictly ascending, or the arrays describe more than
+   *                                  {@code Integer.MAX_VALUE - 9} nodes or
+   *                                  {@code Integer.MAX_VALUE - 8} edges, the limits that
+   *                                  {@link GraphFormat} also reads back
    */
   public static Graph of(int[] outAdjacencyStart, int[] outAdjacency) {
     return ofOwned(outAdjacencyStart.clone(), outAdjacency.clone());
@@ -103,6 +106,11 @@ public sealed class Graph permits BiAdjacentGraph {
     }
     int n = outAdjacencyStart.length - 1;
     int m = outAdjacency.length;
+    if (n > ArrayLimits.MAX_NODE_COUNT || m > ArrayLimits.MAX_ARRAY_LENGTH) {
+      throw new IllegalArgumentException("a graph holds at most " + ArrayLimits.MAX_NODE_COUNT
+          + " nodes and " + ArrayLimits.MAX_ARRAY_LENGTH + " edges, but these arrays hold " + n
+          + " and " + m);
+    }
     if (outAdjacencyStart[0] != 0) {
       throw new IllegalArgumentException(
           "outAdjacencyStart[0] must be 0, but was " + outAdjacencyStart[0]);

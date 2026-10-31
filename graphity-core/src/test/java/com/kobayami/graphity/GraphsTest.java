@@ -610,6 +610,36 @@ class GraphsTest {
   }
 
   @Test
+  void edgeMappingMapsTheEdgesOfANewNodeWithoutOldCounterpartToMinusOne() {
+    // New node 2 has no old counterpart: its edge 2->0 has none either, just like 0->2.
+    var oldGraph = TestGraphs.path(2);
+    var newGraph = TestGraphs.of(3, 0, 1, 0, 2, 2, 0);
+    var em = Graphs.edgeMapping(newGraph, oldGraph, NodeMapping.of(new int[] {0, 1, -1}));
+    assertThat(IntStream.range(0, newGraph.edgeCount()).map(em::get).toArray())
+        .containsExactly(0, -1, -1);
+    assertThat(em.mappedCount()).isEqualTo(1);
+    assertThat(em.isPartial()).isTrue();
+  }
+
+  @Test
+  void edgeMappingFromAGraphOntoItsSubgraphMapsTheEdgesOfRemovedNodesToMinusOne() {
+    // Node 2 is removed and has edges both ways: 1->2 loses its target, 2->3 its source.
+    var graph = TestGraphs.of(4, 0, 1, 1, 2, 1, 3, 2, 3, 3, 0);
+    var keep = NodeMapping.forSubgraph(0, 1, 3);
+    var sub = Graphs.remapped(graph, keep);
+    var em = Graphs.edgeMapping(graph, sub, keep.inverted(graph.nodeCount()));
+    assertThat(IntStream.range(0, graph.edgeCount()).map(em::get).toArray())
+        .containsExactly(0, -1, 1, -1, 2);
+    for (int e = 0; e < graph.edgeCount(); e++) {
+      int s = em.get(e);
+      if (s >= 0) {
+        assertThat(keep.get(sub.edgeSource(s))).isEqualTo(graph.edgeSource(e));
+        assertThat(keep.get(sub.edgeTarget(s))).isEqualTo(graph.edgeTarget(e));
+      }
+    }
+  }
+
+  @Test
   void edgeMappingRejectsAMappingToANodeOutsideTheOldGraph() {
     var oldGraph = TestGraphs.path(2);
     // As the source of an edge.
@@ -964,7 +994,8 @@ class GraphsTest {
     // One cycle through 46341 nodes: every node reaches every node, 46341^2 > 2^31 - 9 edges.
     assertThatThrownBy(() -> Graphs.transitiveClosure(TestGraphs.cycle(46_341)))
         .isInstanceOf(IllegalArgumentException.class)
-        .hasMessage("the transitive closure has more than " + (Integer.MAX_VALUE - 8) + " edges");
+        .hasMessage("the transitive closure has more than " + (Integer.MAX_VALUE - 8)
+            + " edges, the largest array length");
   }
 
   @Test

@@ -109,28 +109,28 @@ public abstract sealed class IndexMapping permits NodeMapping, EdgeMapping, Inde
   /**
    * Inverts the given mapping array into a target space of {@code targetCount} indices.
    *
-   * @throws IllegalArgumentException  if {@code targetCount} is negative, or multiple sources map
-   *                                   to the same target
+   * @throws IllegalArgumentException  if {@code targetCount} is negative or larger than the
+   *                                   largest array, or multiple sources map to the same target
    * @throws IndexOutOfBoundsException if a target is {@code targetCount} or more
    */
   static int[] invertArray(int[] mapping, int targetCount) {
-    if (targetCount < 0) {
+    if (targetCount < 0 || targetCount > ArrayLimits.MAX_ARRAY_LENGTH) {
       throw new IllegalArgumentException("targetCount out of range: " + targetCount);
     }
     int[] inverse = new int[targetCount];
     Arrays.fill(inverse, -1);
-    for (int source = 0; source < mapping.length; source++) {
-      int target = mapping[source];
-      if (target < 0) continue;
-      if (target >= targetCount) {
-        throw new IndexOutOfBoundsException("source " + source + " maps to " + target
-            + ", outside the target space 0.." + (targetCount - 1));
+    for (int i = 0; i < mapping.length; i++) {
+      int value = mapping[i];
+      if (value < 0) continue;
+      if (value >= targetCount) {
+        throw new IndexOutOfBoundsException(
+            "index " + i + " maps to " + value + ", but targetCount is " + targetCount);
       }
-      if (inverse[target] != -1) {
-        throw new IllegalArgumentException(
-            "cannot invert mapping: multiple source IDs map to target " + target);
+      if (inverse[value] != -1) {
+        throw new IllegalArgumentException("cannot invert mapping: indices " + inverse[value]
+            + " and " + i + " both map to " + value);
       }
-      inverse[target] = source;
+      inverse[value] = i;
     }
     return inverse;
   }
@@ -151,7 +151,7 @@ public abstract sealed class IndexMapping permits NodeMapping, EdgeMapping, Inde
         result[i] = outer[mid];
       } else {
         throw new IndexOutOfBoundsException("inner maps " + i + " to " + mid
-            + ", outside the outer mapping's source space 0.." + (outer.length - 1));
+            + ", outside the indices 0.." + (outer.length - 1) + " of this mapping");
       }
     }
     return result;

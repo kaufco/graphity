@@ -116,7 +116,7 @@ public final class Loops {
    * @param entry the entry node ID in {@code 0..nodeCount()-1}
    * @return the loop nesting forest
    * @throws IndexOutOfBoundsException if {@code entry} is out of range
-   * @throws IllegalArgumentException if {@code graph.nodeCount() >= 2^30 - 2}
+   * @throws IllegalArgumentException if {@code graph.nodeCount() > 2^30 - 6}
    */
   public static Loops of(BiAdjacentGraph graph, int entry) {
     return of(graph, IntLists.singleton(entry));
@@ -142,7 +142,7 @@ public final class Loops {
    * @param entries the entry node IDs, each in {@code 0..nodeCount()-1}
    * @return the loop nesting forest
    * @throws IndexOutOfBoundsException if an entry is out of range
-   * @throws IllegalArgumentException if {@code graph.nodeCount() >= 2^30 - 2}
+   * @throws IllegalArgumentException if {@code graph.nodeCount() > 2^30 - 6}
    */
   public static Loops of(BiAdjacentGraph graph, IntList entries) {
     int n = graph.nodeCount();

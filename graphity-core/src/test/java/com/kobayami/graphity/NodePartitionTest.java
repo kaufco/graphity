@@ -248,16 +248,25 @@ class NodePartitionTest {
     assertThatThrownBy(() -> NodePartition.of(graph, new int[] {0}, 1))
         .isInstanceOf(IllegalArgumentException.class);
     assertThatThrownBy(() -> NodePartition.of(graph, new int[] {0, 1}, 1))
-        .isInstanceOf(IllegalArgumentException.class);
+        .isInstanceOf(IndexOutOfBoundsException.class);
     assertThatThrownBy(() -> NodePartition.of(graph, new int[] {0, -2}, 1))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(IndexOutOfBoundsException.class)
         .hasMessage("group of node 1 is -2, outside -1..0");
     assertThatThrownBy(() -> NodePartition.of(graph, new int[] {Integer.MIN_VALUE, 0}, 1))
-        .isInstanceOf(IllegalArgumentException.class);
+        .isInstanceOf(IndexOutOfBoundsException.class);
     assertThatThrownBy(() -> NodePartition.of(graph, new int[] {-1, -1}, -1))
         .isInstanceOf(IllegalArgumentException.class);
     assertThatThrownBy(() -> NodePartition.of(graph, new int[] {-1, -1}, Integer.MAX_VALUE))
         .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  void ofRejectsMoreGroupsThanAGraphCanHaveNodes() {
+    // The offsets would exceed the largest array; rejected before anything is allocated.
+    var graph = TestGraphs.of(2, 0, 1);
+    assertThatThrownBy(() -> NodePartition.of(graph, new int[] {-1, -1}, Integer.MAX_VALUE - 8))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("groupCount");
   }
 
   // --- reduce ---

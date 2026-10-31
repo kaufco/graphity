@@ -136,72 +136,85 @@ public final class Edges {
   }
 
   /**
-   * Orders {@code count} edges of {@code graph}, given as interleaved (source, target, edge index)
-   * triples in their direction in the graph, by source and then target - which is edge index
-   * order -, optionally dropping repeated edges. An edge index of {@code -1} is looked up with one
-   * binary search in the source's adjacency; callers pass the index wherever they know it. Two
-   * stable counting passes, first by target, then by source: O(nodeCount + count) without
-   * comparisons. Input that is already in order, or in exactly reverse order - the bridges of a
-   * path arrive that way - is copied instead; the check stops at the first edge out of line.
+   * Orders {@code count} edges of {@code graph}, given as three parallel arrays in their direction
+   * in the graph, by source and then target - which is edge index order -, optionally dropping
+   * repeated edges. An edge index of {@code -1} is looked up with one binary search in the
+   * source's adjacency; callers pass the index wherever they know it. Two stable counting passes,
+   * first by target, then by source: O(nodeCount + count) without comparisons. Input that is
+   * already in order, or in exactly reverse order - the bridges of a path arrive that way - is
+   * copied instead; the check stops at the first edge out of line.
+   * <p>
+   * The arrays are parallel so that none of them needs more than {@code count} entries.
+   * Interleaved in one array, the strong bridges of a graph with a third of the supported node
+   * count would already exceed the largest array.
    * <p>
    * <strong>Memory:</strong> 4 x nodeCount bytes for the counts and 24 x count bytes for the
    * intermediate and final lists.
    *
-   * @param triples interleaved triples, each an edge of {@code graph}; read only
-   * @param count number of triples
+   * @param sources source of each edge, at least {@code count} entries; read only
+   * @param targets target of each edge, at least {@code count} entries; read only
+   * @param edgeIndices edge index of each edge or {@code -1}, at least {@code count} entries;
+   *     read only
+   * @param count number of edges
    * @param dropDuplicates whether to keep only the first of equal edges
    */
-  static Edges sortedEdges(Graph graph, int[] triples, int count, boolean dropDuplicates) {
+  static Edges sortedEdges(Graph graph, int[] sources, int[] targets, int[] edgeIndices,
+      int count, boolean dropDuplicates) {
     if (count == 0) return EMPTY;
-    var sources = new int[count];
-    var targets = new int[count];
-    var edgeIndices = new int[count];
-    int direction = direction(triples, count);
-    if (direction != 0) {
-      for (int i = 0; i < count; i++) {
-        int from = 3 * (direction > 0 ? i : count - 1 - i);
-        sources[i] = triples[from];
-        targets[i] = triples[from + 1];
-        edgeIndices[i] = triples[from + 2];
+    var sortedSources = new int[count];
+    var sortedTargets = new int[count];
+    var sortedEdgeIndices = new int[count];
+    int direction = direction(sources, targets, count);
+    if (direction > 0) {
+      System.arraycopy(sources, 0, sortedSources, 0, count);
+      System.arraycopy(targets, 0, sortedTargets, 0, count);
+      System.arraycopy(edgeIndices, 0, sortedEdgeIndices, 0, count);
+    } else if (direction < 0) {
+      for (int i = 0, from = count - 1; i < count; i++, from--) {
+        sortedSources[i] = sources[from];
+        sortedTargets[i] = targets[from];
+        sortedEdgeIndices[i] = edgeIndices[from];
       }
     } else {
-      countingSort(triples, count, graph.nodeCount(), sources, targets, edgeIndices);
+      countingSort(sources, targets, edgeIndices, count, graph.nodeCount(),
+          sortedSources, sortedTargets, sortedEdgeIndices);
     }
     int kept = count;
     if (dropDuplicates) {
       kept = 0;
       for (int i = 0; i < count; i++) {
-        if (kept > 0 && sources[kept - 1] == sources[i] && targets[kept - 1] == targets[i]) {
-          if (edgeIndices[kept - 1] < 0) edgeIndices[kept - 1] = edgeIndices[i];
+        if (kept > 0 && sortedSources[kept - 1] == sortedSources[i]
+            && sortedTargets[kept - 1] == sortedTargets[i]) {
+          if (sortedEdgeIndices[kept - 1] < 0) sortedEdgeIndices[kept - 1] = sortedEdgeIndices[i];
           continue;
         }
-        sources[kept] = sources[i];
-        targets[kept] = targets[i];
-        edgeIndices[kept] = edgeIndices[i];
+        sortedSources[kept] = sortedSources[i];
+        sortedTargets[kept] = sortedTargets[i];
+        sortedEdgeIndices[kept] = sortedEdgeIndices[i];
         kept++;
       }
     }
     if (kept < count) {
-      sources = Arrays.copyOf(sources, kept);
-      targets = Arrays.copyOf(targets, kept);
-      edgeIndices = Arrays.copyOf(edgeIndices, kept);
+      sortedSources = Arrays.copyOf(sortedSources, kept);
+      sortedTargets = Arrays.copyOf(sortedTargets, kept);
+      sortedEdgeIndices = Arrays.copyOf(sortedEdgeIndices, kept);
     }
     for (int p = 0; p < kept; p++) {
-      if (edgeIndices[p] < 0) edgeIndices[p] = graph.edgeIndexOf(sources[p], targets[p]);
-      assert edgeIndices[p] == graph.edgeIndexOf(sources[p], targets[p])
-          : sources[p] + " -> " + targets[p] + " is not edge " + edgeIndices[p];
+      if (sortedEdgeIndices[p] < 0) {
+        sortedEdgeIndices[p] = graph.edgeIndexOf(sortedSources[p], sortedTargets[p]);
+      }
+      assert sortedEdgeIndices[p] == graph.edgeIndexOf(sortedSources[p], sortedTargets[p])
+          : sortedSources[p] + " -> " + sortedTargets[p] + " is not edge " + sortedEdgeIndices[p];
     }
-    return wrap(sources, targets, edgeIndices);
+    return wrap(sortedSources, sortedTargets, sortedEdgeIndices);
   }
 
-  /** {@code 1} if the triples are in order, {@code -1} if exactly reversed, else {@code 0}. */
-  private static int direction(int[] triples, int count) {
+  /** {@code 1} if the edges are in order, {@code -1} if exactly reversed, else {@code 0}. */
+  private static int direction(int[] sources, int[] targets, int count) {
     int direction = 0;
     for (int i = 1; i < count; i++) {
-      int a = 3 * (i - 1);
-      int b = 3 * i;
-      int bySource = Integer.compare(triples[a], triples[b]);
-      int step = bySource != 0 ? bySource : Integer.compare(triples[a + 1], triples[b + 1]);
+      int bySource = Integer.compare(sources[i - 1], sources[i]);
+      int step = bySource != 0 ? bySource : Integer.compare(targets[i - 1], targets[i]);
       if (step == 0) continue;
       int sign = step < 0 ? 1 : -1;
       if (direction == 0) {
@@ -214,35 +227,37 @@ public final class Edges {
   }
 
   /** Two stable counting passes, by target and then by source, into the given arrays. */
-  private static void countingSort(int[] triples, int count, int nodeCount, int[] sources,
-      int[] targets, int[] edgeIndices) {
+  private static void countingSort(int[] sources, int[] targets, int[] edgeIndices, int count,
+      int nodeCount, int[] sortedSources, int[] sortedTargets, int[] sortedEdgeIndices) {
     var start = new int[nodeCount + 1];
     for (int i = 0; i < count; i++) {
-      start[triples[3 * i + 1] + 1]++;
+      start[targets[i] + 1]++;
     }
     for (int v = 0; v < nodeCount; v++) {
       start[v + 1] += start[v];
     }
-    var byTarget = new int[3 * count];
+    var byTargetSources = new int[count];
+    var byTargetTargets = new int[count];
+    var byTargetEdgeIndices = new int[count];
     for (int i = 0; i < count; i++) {
-      int slot = 3 * start[triples[3 * i + 1]]++;
-      byTarget[slot] = triples[3 * i];
-      byTarget[slot + 1] = triples[3 * i + 1];
-      byTarget[slot + 2] = triples[3 * i + 2];
+      int slot = start[targets[i]]++;
+      byTargetSources[slot] = sources[i];
+      byTargetTargets[slot] = targets[i];
+      byTargetEdgeIndices[slot] = edgeIndices[i];
     }
     Arrays.fill(start, 0);
     for (int i = 0; i < count; i++) {
-      start[byTarget[3 * i] + 1]++;
+      start[byTargetSources[i] + 1]++;
     }
     for (int v = 0; v < nodeCount; v++) {
       start[v + 1] += start[v];
     }
     for (int i = 0; i < count; i++) {
-      int source = byTarget[3 * i];
+      int source = byTargetSources[i];
       int slot = start[source]++;
-      sources[slot] = source;
-      targets[slot] = byTarget[3 * i + 1];
-      edgeIndices[slot] = byTarget[3 * i + 2];
+      sortedSources[slot] = source;
+      sortedTargets[slot] = byTargetTargets[i];
+      sortedEdgeIndices[slot] = byTargetEdgeIndices[i];
     }
   }
 }

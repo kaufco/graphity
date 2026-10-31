@@ -36,7 +36,11 @@ import org.jspecify.annotations.Nullable;
  * to a cluster, or has no written edge - DOT creates every other node from its edges.
  * <p>
  * Labels and attribute values are written as quoted strings: the writer escapes quotes and
- * backslashes and turns line breaks into DOT's {@code \n}. Attribute names must be identifiers -
+ * backslashes, turns line breaks into DOT's {@code \n}, and writes NUL, which DOT cannot hold, as
+ * U+FFFD. Graphviz decodes HTML entities such as {@code &lt;} in labels, so in the attributes
+ * {@code label}, {@code xlabel}, {@code headlabel} and {@code taillabel} the writer also turns
+ * {@code &} into {@code &amp;}, and a label shows exactly its text; other values, such as a
+ * {@code URL}, keep their {@code &}. Attribute names must be identifiers -
  * a letter or underscore, then letters, digits or underscores - other than the DOT keywords
  * {@code node}, {@code edge}, {@code graph}, {@code digraph}, {@code subgraph} and
  * {@code strict}. A hook that returns {@code null} adds nothing.
@@ -50,6 +54,10 @@ public final class DotWriter {
 
   private static final Set<String> KEYWORDS =
       Set.of("node", "edge", "graph", "digraph", "subgraph", "strict");
+
+  /** The attributes whose values Graphviz reads as labels, decoding HTML entities. */
+  private static final Set<String> LABEL_ATTRIBUTES =
+      Set.of("label", "xlabel", "headlabel", "taillabel");
 
   private final Selection selection;
   private final Map<String, String> graphAttributes = new LinkedHashMap<>();
@@ -147,7 +155,8 @@ public final class DotWriter {
 
   /**
    * Draws each group of the partition as a cluster, labeled by group ID; {@code null} leaves a
-   * cluster unlabeled. Nodes in no group stay outside every cluster.
+   * cluster unlabeled, also under a graph {@code label}, which Graphviz would otherwise repeat on
+   * every cluster. Nodes in no group stay outside every cluster.
    * <p>
    * <strong>Time:</strong> O(1).
    *
@@ -207,9 +216,10 @@ public final class DotWriter {
     out.append(selection.undirected ? "graph {\n" : "digraph {\n");
     for (var attribute : graphAttributes.entrySet()) {
       out.append("  ").append(attribute.getKey()).append('=');
-      quote(attribute.getValue(), out);
+      quote(attribute.getValue(), LABEL_ATTRIBUTES.contains(attribute.getKey()), out);
       out.append(";\n");
     }
+    boolean graphLabeled = graphAttributes.containsKey("label");
 
     var hasEdge = new boolean[n];
     selection.forEachWrittenEdge((source, target, edgeIndex) -> {
@@ -232,8 +242,10 @@ public final class DotWriter {
             String label = clusters.label().apply(group);
             if (label != null) {
               out.append("    label=");
-              quote(label, out);
+              quote(label, true, out);
               out.append(";\n");
+            } else if (graphLabeled) {
+              out.append("    label=\"\";\n");
             }
             opened = true;
           }
@@ -301,8 +313,9 @@ public final class DotWriter {
       throws IOException {
     boolean first = true;
     for (var attribute : attributes.entrySet()) {
-      out.append(first ? " [" : ", ").append(checkName(attribute.getKey())).append('=');
-      quote(attribute.getValue(), out);
+      String name = checkName(attribute.getKey());
+      out.append(first ? " [" : ", ").append(name).append('=');
+      quote(attribute.getValue(), LABEL_ATTRIBUTES.contains(name), out);
       first = false;
     }
     if (!first) out.append(']');
@@ -316,8 +329,13 @@ public final class DotWriter {
     return name;
   }
 
-  /** Writes {@code text} as a DOT quoted string that shows exactly that text. */
-  static void quote(String text, Appendable out) throws IOException {
+  /**
+   * Writes {@code text} as a DOT quoted string that shows exactly that text, NUL aside, which DOT
+   * cannot hold. For an attribute in which Graphviz decodes HTML entities, the labels,
+   * {@code decodesEntities} turns {@code &} into {@code &amp;}.
+   */
+  private static void quote(String text, boolean decodesEntities, Appendable out)
+      throws IOException {
     out.append('"');
     for (int i = 0; i < text.length(); i++) {
       char c = text.charAt(i);
@@ -328,6 +346,8 @@ public final class DotWriter {
         case '\r' -> {
           if (i + 1 >= text.length() || text.charAt(i + 1) != '\n') out.append("\\n");
         }
+        case '&' -> out.append(decodesEntities ? "&amp;" : "&");
+        case '\0' -> out.append('\uFFFD');
         default -> out.append(c);
       }
     }

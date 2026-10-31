@@ -4,12 +4,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.kobayami.graphity.testutils.TestGraphs;
+import it.unimi.dsi.fastutil.ints.AbstractIntList;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.ints.IntLists;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 
 class GraphBuilderTest {
+
+  /** The node limit stated in the class Javadoc. */
+  private static final int NODE_LIMIT = Integer.MAX_VALUE - 9;
+
+  /** The edge limit stated in the class Javadoc. */
+  private static final int EDGE_LIMIT = Integer.MAX_VALUE - 8;
 
   @Test
   void newBuilderBuildsEmptyGraph() {
@@ -439,6 +447,73 @@ class GraphBuilderTest {
         .isInstanceOf(IllegalArgumentException.class);
   }
 
+  @Test
+  void ensureEdgeCapacityRejectsMoreThanTheEdgeLimit() {
+    var b = new GraphBuilder();
+    assertThatThrownBy(() -> b.ensureEdgeCapacity(Integer.MAX_VALUE))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("edge limit");
+    assertThatThrownBy(() -> b.ensureEdgeCapacity(EDGE_LIMIT + 1))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThat(b.edgeCapacity()).isZero();
+  }
+
+  @Test
+  void ensureEdgeCapacityReservesExactly() {
+    var b = new GraphBuilder();
+    b.addNodes(2);
+    b.addOutEdges(0, new int[100]);
+    b.ensureEdgeCapacity(101);
+    assertThat(b.edgeCapacity()).isEqualTo(101);
+  }
+
+  // ---- growth of the edge storage under batch calls ----
+
+  @Test
+  void batchCallsInALoopGrowTheEdgeStorageGeometrically() {
+    // 10 000 calls of two edges each: growing by half takes about 20 capacity changes, growing
+    // to the exact size one per call.
+    var targets = new IntArrayList(new int[] {1, 1});
+    var path = TestGraphs.path(3);
+    assertThat(capacityChanges(b -> b.addOutEdges(0, 1, 1))).isLessThanOrEqualTo(30);
+    assertThat(capacityChanges(b -> b.addOutEdges(0, targets))).isLessThanOrEqualTo(30);
+    assertThat(capacityChanges(b -> b.addInEdges(1, targets))).isLessThanOrEqualTo(30);
+    assertThat(capacityChanges(b -> b.addPath(0, 1, 0))).isLessThanOrEqualTo(30);
+    assertThat(capacityChanges(b -> b.addEdgePairs(0, 1, 1, 0))).isLessThanOrEqualTo(30);
+    assertThat(capacityChanges(b -> b.addChildren(0, 2))).isLessThanOrEqualTo(30);
+    assertThat(capacityChanges(b -> b.addParents(0, 2))).isLessThanOrEqualTo(30);
+    assertThat(capacityChanges(b -> b.addGraph(path))).isLessThanOrEqualTo(30);
+  }
+
+  @Test
+  void aBatchBeyondTheGrowthStepAllocatesExactlyOnce() {
+    var imported = new GraphBuilder();
+    imported.addGraph(TestGraphs.path(1001));
+    assertThat(imported.edgeCapacity()).isEqualTo(1000);
+
+    var b = new GraphBuilder();
+    b.addNodes(2);
+    b.addEdge(0, 1);
+    b.addOutEdges(0, new int[1000]);
+    assertThat(b.edgeCapacity()).isEqualTo(1001);
+  }
+
+  /** Counts how often 10 000 applications of {@code call} change the edge capacity. */
+  private static int capacityChanges(Consumer<GraphBuilder> call) {
+    var b = new GraphBuilder();
+    b.addNodes(2);
+    int capacity = b.edgeCapacity();
+    int changes = 0;
+    for (int i = 0; i < 10_000; i++) {
+      call.accept(b);
+      if (b.edgeCapacity() != capacity) {
+        capacity = b.edgeCapacity();
+        changes++;
+      }
+    }
+    return changes;
+  }
+
   // ---- addChild / addChildren / addParent / addParents ----
 
   @Test
@@ -689,7 +764,7 @@ class GraphBuilderTest {
   }
 
   @Test
-  void andNodesIntListMethodsRejectTheHighestPossibleId() {
+  void andNodesIntListMethodsRejectIdsFarBeyondTheNodeLimit() {
     var b = new GraphBuilder();
     var invalid = new IntArrayList(new int[] {Integer.MAX_VALUE});
     assertThatThrownBy(() -> b.addOutEdgesAndNodes(0, invalid))
@@ -847,7 +922,7 @@ class GraphBuilderTest {
   }
 
   @Test
-  void andNodesMethodsRejectTheHighestPossibleId() {
+  void andNodesMethodsRejectIdsFarBeyondTheNodeLimit() {
     var b = new GraphBuilder();
     assertThatThrownBy(() -> b.addEdgeAndNodes(0, Integer.MAX_VALUE))
         .isInstanceOf(IndexOutOfBoundsException.class);
@@ -930,5 +1005,140 @@ class GraphBuilderTest {
     b.addEdges(BackEdges.of(TestGraphs.path(3)));
     b.addEdgesAndNodes(BackEdges.of(TestGraphs.path(3)));
     assertThat(b.build().nodeCount()).isZero();
+  }
+
+  // ---- node limit ----
+
+  @Test
+  void singleNodeMethodsFailAtTheNodeLimit() {
+    var b = new GraphBuilder();
+    b.addNodes(NODE_LIMIT);
+    assertThatThrownBy(b::addNode).isInstanceOf(IllegalStateException.class);
+    assertThatThrownBy(() -> b.addChild(0)).isInstanceOf(IllegalStateException.class);
+    assertThatThrownBy(() -> b.addParent(0)).isInstanceOf(IllegalStateException.class);
+    assertThat(b.addNodes(0)).isEqualTo(NODE_LIMIT);
+    assertThat(b.edgeCapacity()).isZero();
+  }
+
+  @Test
+  void countMethodsRejectACountBeyondTheNodeLimit() {
+    var b = new GraphBuilder();
+    assertThatThrownBy(() -> b.addNodes(Integer.MAX_VALUE))
+        .isInstanceOf(IllegalArgumentException.class);
+    b.addNodes(NODE_LIMIT - 2);
+    assertThatThrownBy(() -> b.addNodes(3))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("node limit");
+    assertThatThrownBy(() -> b.addChildren(0, 3)).isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> b.addParents(0, 3)).isInstanceOf(IllegalArgumentException.class);
+    assertThat(b.addNodes(0)).isEqualTo(NODE_LIMIT - 2);
+    assertThat(b.edgeCapacity()).isZero();
+    assertThat(b.addChildren(0, 2)).isEqualTo(NODE_LIMIT - 2);
+    assertThat(b.addNodes(0)).isEqualTo(NODE_LIMIT);
+  }
+
+  @Test
+  void addGraphRejectsAGraphBeyondTheNodeLimit() {
+    var b = new GraphBuilder();
+    b.addNodes(NODE_LIMIT - 2);
+    assertThatThrownBy(() -> b.addGraph(TestGraphs.path(3)))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThat(b.addNodes(0)).isEqualTo(NODE_LIMIT - 2);
+    assertThat(b.edgeCapacity()).isZero();
+    assertThat(b.addGraph(TestGraphs.path(2))).isEqualTo(NODE_LIMIT - 2);
+    assertThat(b.addNodes(0)).isEqualTo(NODE_LIMIT);
+  }
+
+  @Test
+  void andNodesMethodsRejectIdsAtTheNodeLimit() {
+    var b = new GraphBuilder();
+    assertThatThrownBy(() -> b.addEdgeAndNodes(0, NODE_LIMIT))
+        .isInstanceOf(IndexOutOfBoundsException.class);
+    assertThatThrownBy(() -> b.addOutEdgesAndNodes(NODE_LIMIT, new int[] {0}))
+        .isInstanceOf(IndexOutOfBoundsException.class);
+    assertThatThrownBy(() -> b.addInEdgesAndNodes(0, new IntArrayList(new int[] {NODE_LIMIT})))
+        .isInstanceOf(IndexOutOfBoundsException.class);
+    assertThatThrownBy(() -> b.addPathAndNodes(0, NODE_LIMIT))
+        .isInstanceOf(IndexOutOfBoundsException.class);
+    assertThatThrownBy(() -> b.addEdgePairsAndNodes(NODE_LIMIT, 0))
+        .isInstanceOf(IndexOutOfBoundsException.class);
+    assertThatThrownBy(() -> b.addEdgesAndNodes(
+        Edges.wrap(new int[] {0}, new int[] {NODE_LIMIT}, new int[1])))
+        .isInstanceOf(IndexOutOfBoundsException.class);
+    assertThat(b.addNodes(0)).isZero();
+    // The highest creatable ID fills the builder up to the limit.
+    b.addEdgeAndNodes(0, NODE_LIMIT - 1);
+    assertThat(b.addNodes(0)).isEqualTo(NODE_LIMIT);
+    assertThatThrownBy(b::addNode).isInstanceOf(IllegalStateException.class);
+  }
+
+  // ---- edge limit ----
+
+  @Test
+  void countMethodsRejectEdgesBeyondTheEdgeLimitAndChangeNothing() {
+    // Three edges plus NODE_LIMIT - 1 new ones are one more than the edge limit; the node count
+    // would still fit.
+    var b = new GraphBuilder();
+    b.addNode();
+    b.addOutEdges(0, 0, 0, 0);
+    assertThatThrownBy(() -> b.addChildren(0, NODE_LIMIT - 1))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("edge limit");
+    assertThatThrownBy(() -> b.addParents(0, NODE_LIMIT - 1))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("edge limit");
+    assertThat(b.addNodes(0)).isEqualTo(1);
+    assertThat(b.build()).isEqualTo(TestGraphs.of(1, 0, 0));
+  }
+
+  @Test
+  void batchMethodsRejectEdgesBeyondTheEdgeLimitBeforeCreatingNodes() {
+    // One edge plus EDGE_LIMIT new ones, from lists that hold no memory: the limit is reached
+    // without allocating it. A path of k nodes has k - 1 edges.
+    var b = new GraphBuilder();
+    b.addEdgeAndNodes(0, 0);
+    var zeros = zeros(EDGE_LIMIT);
+    var path = zeros(EDGE_LIMIT + 1);
+    assertThatThrownBy(() -> b.addOutEdges(0, zeros))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("edge limit");
+    assertThatThrownBy(() -> b.addInEdges(0, zeros))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> b.addPath(path)).isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> b.addOutEdgesAndNodes(5, zeros))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> b.addInEdgesAndNodes(5, zeros))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> b.addPathAndNodes(path))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThat(b.addNodes(0)).isEqualTo(1);
+    assertThat(b.build()).isEqualTo(TestGraphs.of(1, 0, 0));
+  }
+
+  @Test
+  void buildRejectsMoreEdgesThanTheEdgeLimit() {
+    // Only the single-edge methods get past the limit, and only with 16 GiB of edges, so the
+    // check that build() runs is tested on its own.
+    GraphBuilder.checkEdgeLimit(EDGE_LIMIT);
+    assertThatThrownBy(() -> GraphBuilder.checkEdgeLimit(EDGE_LIMIT + 1))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage((EDGE_LIMIT + 1) + " edges added exceed the edge limit of " + EDGE_LIMIT);
+    assertThatThrownBy(() -> GraphBuilder.checkEdgeLimit(Integer.MAX_VALUE))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  /** A list of {@code size} zeros backed by no array. */
+  private static IntList zeros(int size) {
+    return new AbstractIntList() {
+      @Override
+      public int getInt(int index) {
+        return 0;
+      }
+
+      @Override
+      public int size() {
+        return size;
+      }
+    };
   }
 }

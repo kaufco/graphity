@@ -179,8 +179,90 @@ class MermaidWriterTest {
     assertThatThrownBy(() -> writer.classDef("a--b", "fill:red"))
         .isInstanceOf(IllegalArgumentException.class);
     assertThatThrownBy(() -> writer.classDef("ok", " "))
-        .isInstanceOf(IllegalArgumentException.class);
+        .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("must not be blank");
     assertThatThrownBy(() -> writer.clusters(Components.sccsOf(TestGraphs.path(3)), scc -> null))
         .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  void anEmptyLabelIsWrittenAsOneSpace() {
+    var graph = TestGraphs.path(2);
+    var partition = NodePartition.of(graph, new int[] {0, -1}, 1);
+    String text = MermaidWriter.of(graph)
+        .nodeLabel(node -> "")
+        .nodeShape(node -> node == 1 ? MermaidWriter.Shape.CIRCLE : null)
+        .edgeLabel(edge -> "")
+        .clusters(partition, group -> "")
+        .writeToString();
+    assertThat(text).isEqualTo("""
+        flowchart TD
+          subgraph c0[" "]
+            n0[" "]
+          end
+          n1((" "))
+          n0 -->|" "| n1
+        """);
+  }
+
+  @Test
+  void rejectsEveryMermaidKeywordAsAClassName() {
+    String[] keywords = {"style", "linkStyle", "interpolate", "classDef", "class", "href", "click",
+        "call", "graph", "flowchart", "subgraph", "end", "_self", "_blank", "_parent", "_top"};
+    for (String keyword : keywords) {
+      assertThatThrownBy(() -> MermaidWriter.of(TestGraphs.path(2)).classDef(keyword, "fill:red"))
+          .as(keyword).isInstanceOf(IllegalArgumentException.class);
+      var writer = MermaidWriter.of(TestGraphs.path(2)).nodeClass(node -> keyword);
+      assertThatThrownBy(writer::writeToString)
+          .as(keyword).isInstanceOf(IllegalArgumentException.class);
+    }
+  }
+
+  @Test
+  void keywordsAreCaseSensitiveAndOnlyWhole() {
+    String text = MermaidWriter.of(TestGraphs.isolated(1))
+        .classDef("End", "fill:red")
+        .classDef("STYLE", "fill:blue")
+        .classDef("styled", "fill:green")
+        .classDef("_topLevel", "fill:gray")
+        .nodeClass(node -> "End")
+        .writeToString();
+    assertThat(text).isEqualTo("""
+        flowchart TD
+          classDef End fill:red
+          classDef STYLE fill:blue
+          classDef styled fill:green
+          classDef _topLevel fill:gray
+          n0
+          class n0 End
+        """);
+  }
+
+  @Test
+  void escapesPercentSignsAndColonsThatMermaidWouldPreprocess() {
+    String text = MermaidWriter.of(TestGraphs.path(2))
+        .nodeLabel(node -> node == 0 ? "50%%{init: {'theme':'dark'}}%% done" : "style:\"bold\";")
+        .edgeLabel(edge -> "100%")
+        .writeToString();
+    assertThat(text).isEqualTo("""
+        flowchart TD
+          n0["50#37;#37;{init#58; {'theme'#58;'dark'}}#37;#37; done"]
+          n1["style#58;#quot;bold#quot;;"]
+          n0 -->|"100#37;"| n1
+        """);
+  }
+
+  @Test
+  void escapesWhitespaceAfterTheWordDirection() {
+    String[] labels = {"direction LR", "go direction\tTB", "Direction LR", "directions LR"};
+    String text = MermaidWriter.of(TestGraphs.isolated(labels.length))
+        .nodeLabel(node -> labels[node])
+        .writeToString();
+    assertThat(text).isEqualTo("""
+        flowchart TD
+          n0["direction#32;LR"]
+          n1["go direction#9;TB"]
+          n2["Direction LR"]
+          n3["directions LR"]
+        """);
   }
 }

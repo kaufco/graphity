@@ -64,6 +64,14 @@ class EdgeMappingTest {
   }
 
   @Test
+  void inverseRejectsATargetCountBeyondTheLargestArray() {
+    var em = new EdgeMapping(new int[0], 0);
+    assertThatThrownBy(() -> em.inverted(Integer.MAX_VALUE - 7))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("targetCount");
+  }
+
+  @Test
   void composeWithHolesPropagatesPartiality() {
     var outer = new EdgeMapping(new int[] {10, 20, 30}, 3);
     var inner = new EdgeMapping(new int[] {1, -1, 2}, 2);

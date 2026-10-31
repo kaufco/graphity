@@ -18,16 +18,18 @@ import java.util.Arrays;
  * byte offset               size in bytes         field
  * 0                         4                     magic number, the ASCII bytes "GPHY"
  * 4                         4                     format version, 1
- * 8                         4                     nodeCount, 0 &lt;= nodeCount &lt; 2^31 - 1
- * 12                        4                     edgeCount, 0 &lt;= edgeCount
+ * 8                         4                     nodeCount, 0 &lt;= nodeCount &lt;= 2^31 - 10
+ * 12                        4                     edgeCount, 0 &lt;= edgeCount &lt;= 2^31 - 9
  * 16                        4 x (nodeCount + 1)   outAdjacencyStart
  * 16 + 4 x (nodeCount + 1)  4 x edgeCount         outAdjacency
  * </pre>
  * A graph takes exactly {@code 16 + 4 x (nodeCount + 1 + edgeCount)} bytes, without padding or
- * checksum. The arrays must satisfy the rules of {@link Graph#of(int[], int[])}. Little-endian,
- * so that consumers on common hardware - a JavaScript {@code Int32Array} over the buffer, a
- * NumPy array of type {@code <i4} - read the arrays without conversion; the header keeps them
- * 4-byte aligned. A reader rejects a version it does not know rather than guessing.
+ * checksum. The bounds on the counts keep each array within the JDK's soft maximum array length,
+ * {@code 2^31 - 9}, the largest array the library allocates. The arrays must satisfy the rules of
+ * {@link Graph#of(int[], int[])}. Little-endian, so that consumers on common hardware - a
+ * JavaScript {@code Int32Array} over the buffer, a NumPy array of type {@code <i4} - read the
+ * arrays without conversion; the header keeps them 4-byte aligned. A reader rejects a version it
+ * does not know rather than guessing.
  * <p>
  * The format holds topology only. Edge {@code e} of the read graph is edge {@code e} of the
  * written one, and node IDs are kept, so data per node or per edge stored separately in arrays
@@ -104,9 +106,9 @@ public final class GraphFormat {
    * @return the graph
    * @throws EOFException if the stream ends before the graph does
    * @throws IOException if reading fails, the data does not start with the magic number of the
-   *                     format, has a version other than 1, or does not form a valid graph;
-   *                     invalid arrays carry the exception of {@link Graph#of(int[], int[])} as
-   *                     cause
+   *                     format, has a version other than 1, has a header with a count outside
+   *                     the bounds of the layout, or does not form a valid graph; invalid arrays
+   *                     carry the exception of {@link Graph#of(int[], int[])} as cause
    */
   public static Graph read(InputStream in) throws IOException {
     var buffer = ByteBuffer.allocate(Integer.BYTES * CHUNK_INTS).order(ByteOrder.LITTLE_ENDIAN);
@@ -123,7 +125,8 @@ public final class GraphFormat {
     }
     int nodeCount = buffer.getInt(8);
     int edgeCount = buffer.getInt(12);
-    if (nodeCount < 0 || nodeCount == Integer.MAX_VALUE || edgeCount < 0) {
+    if (nodeCount < 0 || nodeCount > ArrayLimits.MAX_NODE_COUNT
+        || edgeCount < 0 || edgeCount > ArrayLimits.MAX_ARRAY_LENGTH) {
       throw new IOException(
           "invalid header: nodeCount " + nodeCount + ", edgeCount " + edgeCount);
     }

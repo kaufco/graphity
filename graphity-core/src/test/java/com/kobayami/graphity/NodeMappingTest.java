@@ -266,7 +266,7 @@ class NodeMappingTest {
     var nm = NodeMapping.forSubgraph(0, 4);
     assertThatThrownBy(() -> nm.inverted(4))
         .isInstanceOf(IndexOutOfBoundsException.class)
-        .hasMessageContaining("4");
+        .hasMessage("index 1 maps to 4, but targetCount is 4");
     assertThat(nm.inverted(5).indexCount()).isEqualTo(5);
   }
 
@@ -278,11 +278,22 @@ class NodeMappingTest {
   }
 
   @Test
+  void inverseRejectsATargetCountBeyondTheLargestArray() {
+    // Rejected before the inverse is allocated, as no graph has that many nodes.
+    var nm = NodeMapping.of(new int[0]);
+    assertThatThrownBy(() -> nm.inverted(Integer.MAX_VALUE))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("targetCount");
+    assertThatThrownBy(() -> nm.inverted(Integer.MAX_VALUE - 7))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
   void inverseOfNonInjectiveThrows() {
     var nm = NodeMapping.of(new int[] {1, 1, 2});
     assertThatThrownBy(() -> nm.inverted(3))
         .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("target 1");
+        .hasMessage("cannot invert mapping: indices 0 and 1 both map to 1");
   }
 
   @Test
@@ -358,7 +369,7 @@ class NodeMappingTest {
     var inner = NodeMapping.of(new int[] {0, 5, 1});
     assertThatThrownBy(() -> outer.compose(inner))
         .isInstanceOf(IndexOutOfBoundsException.class)
-        .hasMessageContaining("5");
+        .hasMessage("inner maps 1 to 5, outside the indices 0..1 of this mapping");
   }
 
   @Test

@@ -8,6 +8,7 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Random;
 import java.util.Spliterator;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
@@ -315,8 +316,15 @@ class SortedIntViewTest {
     assertThat(sp.hasCharacteristics(Spliterator.DISTINCT)).isTrue();
     assertThat(sp.hasCharacteristics(Spliterator.IMMUTABLE)).isTrue();
     assertThat(sp.hasCharacteristics(Spliterator.NONNULL)).isTrue();
-    // SORTED is intentionally not advertised, see spliterator() javadoc.
-    assertThat(sp.hasCharacteristics(Spliterator.SORTED)).isFalse();
+    assertThat(sp.hasCharacteristics(Spliterator.SORTED)).isTrue();
+    assertThat(sp.getComparator()).isNull();
+  }
+
+  @Test
+  void spliteratorSortedStreamsSequentialAndParallel() {
+    var view = new SortedIntView(new int[] {0, 1, 3, 5, 7, 9}, 1, 6);
+    assertThat(view.intStream().sorted().toArray()).containsExactly(1, 3, 5, 7, 9);
+    assertThat(view.intStream().parallel().sorted().toArray()).containsExactly(1, 3, 5, 7, 9);
   }
 
   @Test
@@ -565,5 +573,54 @@ class SortedIntViewTest {
     int[] b = {0, 3, 4, 5, 9};
     int[] result = SortedIntView.unionInRange(a, 1, 4, b, 1, 4);
     assertThat(result).containsExactly(1, 3, 4, 5);
+  }
+
+  // The size of a union against the largest array, on small limits: two views that reach the
+  // real one take gigabytes.
+
+  @Test
+  void unionCapacityIsTheSumOfTheSizesWithinTheLimit() {
+    int[] a = {1, 2, 3};
+    int[] b = {2, 3, 4};
+    assertThat(SortedIntView.unionCapacity(a, 0, 3, b, 0, 3, 6)).isEqualTo(6);
+  }
+
+  @Test
+  void unionCapacityCountsTheUnionWhenTheSumExceedsTheLimit() {
+    // The sizes add up to 6; the union {1, 2, 3, 4} has 4 values.
+    int[] a = {1, 2, 3};
+    int[] b = {2, 3, 4};
+    assertThat(SortedIntView.unionCapacity(a, 0, 3, b, 0, 3, 5)).isEqualTo(4);
+    assertThat(SortedIntView.unionCapacity(a, 0, 3, b, 0, 3, 4)).isEqualTo(4);
+    assertThatThrownBy(() -> SortedIntView.unionCapacity(a, 0, 3, b, 0, 3, 3))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("4 values");
+  }
+
+  @Test
+  void unionCapacityCountsTheUnionOfRandomRanges() {
+    // With the limit at the size of the union, the count runs whenever the ranges share a value.
+    var random = new Random(42);
+    for (int round = 0; round < 500; round++) {
+      int[] a = randomSet(random);
+      int[] b = randomSet(random);
+      int aFrom = random.nextInt(a.length + 1);
+      int aTo = aFrom + random.nextInt(a.length - aFrom + 1);
+      int bFrom = random.nextInt(b.length + 1);
+      int bTo = bFrom + random.nextInt(b.length - bFrom + 1);
+      int size = SortedIntView.unionInRange(a, aFrom, aTo, b, bFrom, bTo).length;
+      assertThat(SortedIntView.unionCapacity(a, aFrom, aTo, b, bFrom, bTo, size))
+          .isEqualTo(size);
+      if (size > 0) {
+        int below = size - 1;
+        assertThatThrownBy(() -> SortedIntView.unionCapacity(a, aFrom, aTo, b, bFrom, bTo, below))
+            .isInstanceOf(IllegalArgumentException.class);
+      }
+    }
+  }
+
+  /** Up to 20 distinct values in -30..29, sorted ascending. */
+  private static int[] randomSet(Random random) {
+    return random.ints(random.nextInt(21), -30, 30).distinct().sorted().toArray();
   }
 }

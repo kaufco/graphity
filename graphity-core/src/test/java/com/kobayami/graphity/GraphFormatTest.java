@@ -33,6 +33,15 @@ class GraphFormatTest {
     assertThat(Csr.outAdjacency(actual)).isEqualTo(Csr.outAdjacency(expected));
   }
 
+  /** The 16 header bytes of a graph with the given counts, and nothing after them. */
+  private static byte[] header(int nodeCount, int edgeCount) throws IOException {
+    byte[] bytes = Arrays.copyOf(bytesOf(TestGraphs.path(1)), 16);
+    ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
+        .putInt(8, nodeCount)
+        .putInt(12, edgeCount);
+    return bytes;
+  }
+
   @Test
   void roundTripsRandomGraphs() throws IOException {
     for (long seed = 0; seed < 20; seed++) {
@@ -141,6 +150,22 @@ class GraphFormatTest {
   }
 
   @Test
+  void rejectsCountsBeyondTheLargestArrayFromTheHeaderAlone() throws IOException {
+    // A stream of the header only: a count the layout allows passes the header and then meets
+    // the end of the stream; one beyond the largest array is rejected as an invalid header.
+    int nodeLimit = Integer.MAX_VALUE - 9;
+    int edgeLimit = Integer.MAX_VALUE - 8;
+    assertThatThrownBy(() -> readBack(header(nodeLimit, 0))).isInstanceOf(EOFException.class);
+    assertThatThrownBy(() -> readBack(header(0, edgeLimit))).isInstanceOf(EOFException.class);
+    int[][] beyond = {{nodeLimit + 1, 0}, {Integer.MAX_VALUE - 1, 0}, {0, edgeLimit + 1}};
+    for (int[] counts : beyond) {
+      assertThatThrownBy(() -> readBack(header(counts[0], counts[1])))
+          .isExactlyInstanceOf(IOException.class)
+          .hasMessageContaining("invalid header");
+    }
+  }
+
+  @Test
   void rejectsATruncatedStream() throws IOException {
     byte[] bytes = bytesOf(TestGraphs.path(5));
 
@@ -153,9 +178,11 @@ class GraphFormatTest {
   @Test
   void aHugeAnnouncedSizeFailsAtTheEndOfTheStreamNotWithAnAllocation() throws IOException {
     var threads = (com.sun.management.ThreadMXBean) ManagementFactory.getThreadMXBean();
-    for (int field : new int[] {8, 12}) {
+    // The largest node count and edge count the header allows.
+    int[][] fieldAndCount = {{8, Integer.MAX_VALUE - 9}, {12, Integer.MAX_VALUE - 8}};
+    for (int[] c : fieldAndCount) {
       byte[] bytes = bytesOf(TestGraphs.path(3));
-      ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).putInt(field, Integer.MAX_VALUE - 8);
+      ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).putInt(c[0], c[1]);
 
       long before = threads.getCurrentThreadAllocatedBytes();
       assertThatThrownBy(() -> readBack(bytes)).isInstanceOf(EOFException.class);

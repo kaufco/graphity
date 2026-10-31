@@ -2,11 +2,15 @@ package com.kobayami.graphity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.kobayami.graphity.testutils.TestGraphs;
 import java.util.Arrays;
 import java.util.Random;
 import org.junit.jupiter.api.Test;
 
 class EdgesSortedEdgesTest {
+
+  /** Fills the slots past {@code count}, as a growing list leaves them; never a valid node. */
+  private static final int JUNK = 1_000_000;
 
   @Test
   void ordersRandomAscendingAndDescendingInputAlike() {
@@ -36,6 +40,53 @@ class EdgesSortedEdgesTest {
     }
   }
 
+  @Test
+  void readsOnlyTheFirstCountEntriesAndLeavesTheArraysUntouched() {
+    // 0 -> 1 (edge 0), 0 -> 2 (1), 1 -> 2 (2), 2 -> 0 (3), 3 -> 1 (4).
+    var graph = TestGraphs.of(4, 0, 1, 0, 2, 1, 2, 2, 0, 3, 1);
+    int[][] mixed = {{2, 0, 3, 0, 1}, {0, 2, 1, 1, 2}, {3, -1, 4, 0, -1}};
+    int[][] ascending = {{0, 0, 1, 2, 3}, {1, 2, 2, 0, 1}, {-1, 1, 2, -1, 4}};
+    int[][] descending = {{3, 2, 1, 0, 0}, {1, 0, 2, 2, 1}, {4, 3, -1, 1, 0}};
+    for (int[][] input : new int[][][] {mixed, ascending, descending}) {
+      int[] sources = withJunkTail(input[0]);
+      int[] targets = withJunkTail(input[1]);
+      int[] edgeIndices = withJunkTail(input[2]);
+      int[] sourcesBefore = sources.clone();
+      int[] targetsBefore = targets.clone();
+      int[] edgeIndicesBefore = edgeIndices.clone();
+
+      var edges = Edges.sortedEdges(graph, sources, targets, edgeIndices, 5, false);
+
+      assertThat(edges.sourceNodes().toIntArray()).containsExactly(0, 0, 1, 2, 3);
+      assertThat(edges.targetNodes().toIntArray()).containsExactly(1, 2, 2, 0, 1);
+      assertThat(edges.edgeIndices().toIntArray()).containsExactly(0, 1, 2, 3, 4);
+      assertThat(sources).containsExactly(sourcesBefore);
+      assertThat(targets).containsExactly(targetsBefore);
+      assertThat(edgeIndices).containsExactly(edgeIndicesBefore);
+    }
+  }
+
+  @Test
+  void dropsDuplicatesFromParallelArrays() {
+    // 0 -> 1 (edge 0), 1 -> 0 (1), 1 -> 2 (2).
+    var graph = TestGraphs.of(3, 0, 1, 1, 0, 1, 2);
+    int[] sources = withJunkTail(new int[] {1, 0, 1, 1, 0});
+    int[] targets = withJunkTail(new int[] {2, 1, 0, 2, 1});
+    int[] edgeIndices = withJunkTail(new int[] {-1, 0, 1, 2, -1});
+
+    var edges = Edges.sortedEdges(graph, sources, targets, edgeIndices, 5, true);
+
+    assertThat(edges.sourceNodes().toIntArray()).containsExactly(0, 1, 1);
+    assertThat(edges.targetNodes().toIntArray()).containsExactly(1, 0, 2);
+    assertThat(edges.edgeIndices().toIntArray()).containsExactly(0, 1, 2);
+  }
+
+  private static int[] withJunkTail(int[] values) {
+    int[] array = Arrays.copyOf(values, values.length + 3);
+    Arrays.fill(array, values.length, array.length, JUNK);
+    return array;
+  }
+
   private static void assertSorted(
       long[] keys, int nodeCount, boolean dropDuplicates, int iteration) {
     int count = keys.length;
@@ -52,14 +103,15 @@ class EdgesSortedEdgesTest {
     Arrays.sort(expected);
     if (dropDuplicates) expected = Arrays.stream(expected).distinct().toArray();
     // Half the iterations pass the edge indices, half leave them to be looked up.
-    int[] triples = new int[3 * count];
+    int[] sources = new int[count];
+    int[] targets = new int[count];
+    int[] edgeIndices = new int[count];
     for (int i = 0; i < count; i++) {
-      triples[3 * i] = pairs[2 * i];
-      triples[3 * i + 1] = pairs[2 * i + 1];
-      triples[3 * i + 2] =
-          iteration % 2 == 0 ? graph.edgeIndexOf(pairs[2 * i], pairs[2 * i + 1]) : -1;
+      sources[i] = pairs[2 * i];
+      targets[i] = pairs[2 * i + 1];
+      edgeIndices[i] = iteration % 2 == 0 ? graph.edgeIndexOf(sources[i], targets[i]) : -1;
     }
-    var edges = Edges.sortedEdges(graph, triples, count, dropDuplicates);
+    var edges = Edges.sortedEdges(graph, sources, targets, edgeIndices, count, dropDuplicates);
     long[] actual = new long[edges.count()];
     for (int p = 0; p < actual.length; p++) {
       int source = edges.sourceNodes().getInt(p);

@@ -80,12 +80,6 @@ public final class Graphs {
   private static final long SPLITMIX64_MULTIPLIER_2 = 0x94D049BB133111EBL;
 
   /**
-   * Node count from which the double cover of {@link #isBipartite(Graph)} would need more elements
-   * than an {@code int[]} can hold.
-   */
-  private static final int MAX_BIPARTITE_NODE_COUNT = 1 << 30;
-
-  /**
    * Characters the {@link #adjacencyListOf(Graph)} builder reserves per node: a line without its
    * targets, {@code "1234567 -> []\n"}, and some slack. An estimate for the initial capacity; the
    * builder grows past it if needed.
@@ -272,7 +266,8 @@ public final class Graphs {
    * @param graph the graph to close
    * @return the transitive closure, over the same nodes
    * @throws IllegalArgumentException if the closure has more than {@code Integer.MAX_VALUE - 8}
-   *                                  edges
+   *                                  edges, or {@code graph.nodeCount() > 2^30 - 5}, the limit of
+   *                                  {@link Components#sccsOf(Graph)}
    */
   public static Graph transitiveClosure(Graph graph) {
     int n = graph.nodeCount();
@@ -305,9 +300,9 @@ public final class Graphs {
       }
       reachSize[c] = (int) size;
       total += size * sccs.sizeOf(c);
-      if (total > Integer.MAX_VALUE - 8) {
-        throw new IllegalArgumentException(
-            "the transitive closure has more than " + (Integer.MAX_VALUE - 8) + " edges");
+      if (total > ArrayLimits.MAX_ARRAY_LENGTH) {
+        throw new IllegalArgumentException("the transitive closure has more than "
+            + ArrayLimits.MAX_ARRAY_LENGTH + " edges, the largest array length");
       }
     }
 
@@ -415,7 +410,10 @@ public final class Graphs {
    * <p>
    * The node mapping must be in the direction new → old (as produced by all
    * {@link NodeMapping} factory methods), and its source space must be the nodes of
-   * {@code newGraph}.
+   * {@code newGraph}. It may be partial: a new edge without a counterpart in {@code oldGraph} maps
+   * to {@code -1}, and so does every edge from or to a new node that maps to {@code -1}. Through
+   * the inverse of a subgraph's node mapping, the edges of a graph thus map onto the subgraph, and
+   * those of removed nodes to {@code -1}.
    * <p>
    * <strong>Not applicable to a transpose.</strong> The lookup searches the target of each
    * new edge in the out-adjacency of its source, and {@link BiAdjacentGraph#transposed()} swaps
@@ -423,13 +421,15 @@ public final class Graphs {
    * exclusively {@code -1} instead of failing. Use
    * {@link #transposedEdgeMapping(Graph)} for that case.
    * <p>
-   * <strong>Time:</strong> O(newEdgeCount x log d̄) where d̄ is the average out-degree
-   * in the old graph (binary search per edge).<br>
+   * <strong>Time:</strong> O(newNodeCount + newEdgeCount + Σ newDegree x log(oldDegree)), summed
+   * over the new nodes, where oldDegree is the out-degree of a node's old counterpart: one binary
+   * search in that list per edge.<br>
    * <strong>Memory:</strong> O(newEdgeCount) for the result.
    *
    * @param newGraph the new (remapped) graph
    * @param oldGraph the original graph
-   * @param newToOld node mapping from new node IDs to old node IDs
+   * @param newToOld node mapping from new node IDs to old node IDs, {@code -1} for a new node
+   *     without an old counterpart
    * @return edge mapping from new edge indices to old edge indices
    * @throws IllegalArgumentException if the source space of {@code newToOld} is not
    *     {@code newGraph.nodeCount()}
@@ -459,10 +459,15 @@ public final class Graphs {
       if (oldNode >= oldNodeCount) {
         throw notANode(newNode, oldNode, oldNodeCount);
       }
+      if (oldNode < 0) {
+        Arrays.fill(mapping, newStart[newNode], newEnd, -1);
+        continue;
+      }
+      int oldFrom = oldStart[oldNode];
+      int oldEnd = oldStart[oldNode + 1];
       for (int i = newStart[newNode]; i < newEnd; i++) {
         int oldTarget = oldOf[newTargets[i]];
-        mapping[i] = SortedIntView.indexOfInRange(
-            oldTargets, oldStart[oldNode], oldStart[oldNode + 1], oldTarget);
+        mapping[i] = SortedIntView.indexOfInRange(oldTargets, oldFrom, oldEnd, oldTarget);
       }
     }
 
@@ -551,8 +556,9 @@ public final class Graphs {
    * given partition; only its node count is checked. The original graph is not a parameter: the
    * partition holds it, so a wrong one cannot be passed.
    * <p>
-   * <strong>Time:</strong> O(originalEdgeCount x log d̄) where d̄ is the average out-degree
-   * in the condensed graph (binary search per edge).<br>
+   * <strong>Time:</strong> O(originalNodeCount + originalEdgeCount + Σ log(condensedDegree)),
+   * summed over the cross-group edges, where condensedDegree is the out-degree of an edge's source
+   * group in the condensed graph: one binary search in that list per edge.<br>
    * <strong>Memory:</strong> O(originalEdgeCount + condensedEdgeCount) for the result.
    *
    * @param condensedGraph the condensation graph (from {@link NodePartition#condense()})
@@ -1061,11 +1067,11 @@ public final class Graphs {
    * where the undirected predicates here do not ignore self-loops: two-colorability is not a
    * connectivity question. An empty graph is bipartite.
    * <p>
-   * Terminates as soon as an edge closes an odd cycle. This is the only predicate here that holds
-   * two elements per node, and therefore the only one limited in graph size: it requires
-   * {@code nodeCount < 2^30}. That limit is reachable rather than theoretical - a graph of 10^9
-   * nodes fits in a large heap - so exceeding it is rejected outright instead of surfacing as a
-   * failure to allocate an array of negative length.
+   * Terminates as soon as an edge closes an odd cycle. Its double cover holds two elements per
+   * node in one array, so it requires {@code nodeCount <= 2^30 - 5} - the only predicate here that
+   * rejects a graph by its node count alone, before reading an edge. That limit is reachable
+   * rather than theoretical - a graph of 10^9 nodes fits in a large heap - so exceeding it is
+   * rejected outright instead of surfacing as a failure to allocate the array.
    * <p>
    * <strong>Time:</strong> O(nodeCount x α(nodeCount) + edgeCount), effectively
    * O(nodeCount + edgeCount), with early termination.<br>
@@ -1073,15 +1079,12 @@ public final class Graphs {
    *
    * @param graph the graph to check
    * @return {@code true} if the graph is bipartite
-   * @throws IllegalArgumentException if {@code graph.nodeCount() >= 2^30}
+   * @throws IllegalArgumentException if {@code graph.nodeCount() > 2^30 - 5}
    * @see #isUndirectedForest(Graph)
    */
   public static boolean isBipartite(Graph graph) {
     int n = graph.nodeCount();
-    if (n >= MAX_BIPARTITE_NODE_COUNT) {
-      throw new IllegalArgumentException(
-          "isBipartite holds two elements per node and so requires nodeCount < 2^30, but was " + n);
-    }
+    ArrayLimits.checkNodeCount(n, ArrayLimits.MAX_NODE_COUNT_TWO_INTS, "isBipartite");
 
     var targets = Csr.outAdjacency(graph);
     var start = Csr.outAdjacencyStart(graph);
@@ -1298,7 +1301,7 @@ public final class Graphs {
     int n = graph.nodeCount();
     int[] start = Csr.outAdjacencyStart(graph);
     int[] targets = Csr.outAdjacency(graph);
-    var sb = new StringBuilder((int) Math.min(Integer.MAX_VALUE - 8,
+    var sb = new StringBuilder((int) Math.min(ArrayLimits.MAX_ARRAY_LENGTH,
         (long) LIST_CHARS_PER_NODE * n + (long) LIST_CHARS_PER_EDGE * graph.edgeCount()));
     for (int v = 0; v < n; v++) {
       sb.append(v).append(" -> [");
@@ -1379,47 +1382,42 @@ public final class Graphs {
     int[] oldTargets = Csr.outAdjacency(before);
     int[] newStart = Csr.outAdjacencyStart(after);
     int[] newTargets = Csr.outAdjacency(after);
-    var added = new IntArrayList();
-    var removed = new IntArrayList();
+    // Parallel lists, so that none needs more entries than its graph has edges.
+    var addedSources = new IntArrayList();
+    var addedTargets = new IntArrayList();
+    var addedEdgeIndices = new IntArrayList();
+    var removedSources = new IntArrayList();
+    var removedTargets = new IntArrayList();
+    var removedEdgeIndices = new IntArrayList();
     for (int v = 0; v < n; v++) {
-      int o = oldStart[v];
-      int oEnd = oldStart[v + 1];
-      int a = newStart[v];
-      int aEnd = newStart[v + 1];
+      int oldPos = oldStart[v];
+      int oldEnd = oldStart[v + 1];
+      int newPos = newStart[v];
+      int newEnd = newStart[v + 1];
       // No target reaches Integer.MAX_VALUE - node IDs stay below it -, so it marks an exhausted
       // list.
-      while (o < oEnd || a < aEnd) {
-        int oldTarget = o < oEnd ? oldTargets[o] : Integer.MAX_VALUE;
-        int newTarget = a < aEnd ? newTargets[a] : Integer.MAX_VALUE;
+      while (oldPos < oldEnd || newPos < newEnd) {
+        int oldTarget = oldPos < oldEnd ? oldTargets[oldPos] : Integer.MAX_VALUE;
+        int newTarget = newPos < newEnd ? newTargets[newPos] : Integer.MAX_VALUE;
         if (oldTarget == newTarget) {
-          o++;
-          a++;
+          oldPos++;
+          newPos++;
         } else if (oldTarget < newTarget) {
-          removed.add(v);
-          removed.add(oldTarget);
-          removed.add(o++);
+          removedSources.add(v);
+          removedTargets.add(oldTarget);
+          removedEdgeIndices.add(oldPos++);
         } else {
-          added.add(v);
-          added.add(newTarget);
-          added.add(a++);
+          addedSources.add(v);
+          addedTargets.add(newTarget);
+          addedEdgeIndices.add(newPos++);
         }
       }
     }
-    return new GraphDiff(edgesOf(added), edgesOf(removed));
-  }
-
-  /** Edges from interleaved (source, target, edge index) triples, already in edge index order. */
-  private static Edges edgesOf(IntArrayList triples) {
-    int count = triples.size() / 3;
-    if (count == 0) return Edges.empty();
-    var sources = new int[count];
-    var targets = new int[count];
-    var edgeIndices = new int[count];
-    for (int p = 0; p < count; p++) {
-      sources[p] = triples.getInt(3 * p);
-      targets[p] = triples.getInt(3 * p + 1);
-      edgeIndices[p] = triples.getInt(3 * p + 2);
-    }
-    return Edges.wrap(sources, targets, edgeIndices);
+    // Both lists are in edge index order already, which sortedEdges detects and only copies.
+    return new GraphDiff(
+        Edges.sortedEdges(after, addedSources.elements(), addedTargets.elements(),
+            addedEdgeIndices.elements(), addedSources.size(), false),
+        Edges.sortedEdges(before, removedSources.elements(), removedTargets.elements(),
+            removedEdgeIndices.elements(), removedSources.size(), false));
   }
 }

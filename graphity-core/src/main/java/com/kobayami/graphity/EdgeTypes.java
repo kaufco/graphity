@@ -1,8 +1,5 @@
 package com.kobayami.graphity;
 
-import it.unimi.dsi.fastutil.ints.IntArrayList;
-import it.unimi.dsi.fastutil.ints.IntLists;
-
 import java.util.Objects;
 
 /**
@@ -79,34 +76,39 @@ public final class EdgeTypes {
     return EDGE_TYPE_VALUES[types[edgeIndex]];
   }
 
-  /** The body of {@link Edges#of(EdgeTypes, EdgeType)}: one scan over all edges. */
+  // The body of Edges.of(EdgeTypes, EdgeType). Counts the edges of the type first, so that the
+  // arrays of the result get their exact length, then fills them in one scan over all edges.
   Edges collect(EdgeType type) {
     byte ordinal = (byte) type.ordinal();
-    var sources = new IntArrayList();
-    var targets = new IntArrayList();
-    var edgeIndices = new IntArrayList();
+    int count = 0;
+    for (byte t : types) {
+      if (t == ordinal) count++;
+    }
+    if (count == 0) {
+      return Edges.empty();
+    }
+    var sources = new int[count];
+    var targets = new int[count];
+    var edgeIndices = new int[count];
 
     var adjacency = Csr.outAdjacency(graph);
     var adjacencyStart = Csr.outAdjacencyStart(graph);
     int n = graph.nodeCount();
+    int p = 0;
 
     for (int node = 0; node < n; node++) {
       int start = adjacencyStart[node];
       int end = adjacencyStart[node + 1];
       for (int e = start; e < end; e++) {
         if (types[e] == ordinal) {
-          sources.add(node);
-          targets.add(adjacency[e]);
-          edgeIndices.add(e);
+          sources[p] = node;
+          targets[p] = adjacency[e];
+          edgeIndices[p] = e;
+          p++;
         }
       }
     }
-
-    if (sources.isEmpty()) {
-      return Edges.empty();
-    }
-    return new Edges(IntLists.unmodifiable(sources), IntLists.unmodifiable(targets),
-        IntLists.unmodifiable(edgeIndices));
+    return Edges.wrap(sources, targets, edgeIndices);
   }
 
   /**

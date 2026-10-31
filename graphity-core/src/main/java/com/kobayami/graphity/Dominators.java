@@ -100,7 +100,7 @@ public final class Dominators {
    * @param entry the entry node ID in {@code 0..nodeCount()-1}
    * @return the dominators
    * @throws IndexOutOfBoundsException if {@code entry} is out of range
-   * @throws IllegalArgumentException if {@code graph.nodeCount() >= 2^30 - 2}
+   * @throws IllegalArgumentException if {@code graph.nodeCount() > 2^30 - 6}
    */
   public static Dominators of(BiAdjacentGraph graph, int entry) {
     return of(graph, IntLists.singleton(entry));
@@ -123,7 +123,7 @@ public final class Dominators {
    * @param entries the entry node IDs, each in {@code 0..nodeCount()-1}
    * @return the dominators
    * @throws IndexOutOfBoundsException if an entry is out of range
-   * @throws IllegalArgumentException if {@code graph.nodeCount() >= 2^30 - 2}
+   * @throws IllegalArgumentException if {@code graph.nodeCount() > 2^30 - 6}
    */
   public static Dominators of(BiAdjacentGraph graph, IntList entries) {
     int n = graph.nodeCount();
@@ -150,11 +150,10 @@ public final class Dominators {
    * strongly connected component, sink components first, satisfies this: each search stays inside
    * its component, so the blocks are the components and the edges between them are ignored.
    *
-   * @param analysis name of the calling analysis, for the exception message
-   * @throws IllegalArgumentException if {@code graph.nodeCount() >= 2^30 - 2}
+   * @throws IllegalArgumentException if {@code graph.nodeCount() > 2^30 - 6}
    */
-  static int[] withinBlocks(BiAdjacentGraph graph, IntList entries, String analysis) {
-    var dfs = DfsPreorder.of(graph, entries, analysis);
+  static int[] withinBlocks(BiAdjacentGraph graph, IntList entries) {
+    var dfs = DfsPreorder.of(graph, entries, "Dominators");
     int[] idom = lengauerTarjan(dfs, Csr.inAdjacencyStart(graph), Csr.inAdjacency(graph), true);
     int[] order = dfs.order;
     var immediateDominator = new int[graph.nodeCount()];

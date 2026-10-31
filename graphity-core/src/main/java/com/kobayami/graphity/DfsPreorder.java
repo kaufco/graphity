@@ -17,11 +17,11 @@ import java.util.Arrays;
 final class DfsPreorder {
 
   /**
-   * Largest supported node count. The control-flow analyses hold two {@code int}s per preorder
-   * number, the virtual root included, and HotSpot caps an {@code int[]} just below
-   * {@code Integer.MAX_VALUE} elements: {@code 2 x (MAX_NODE_COUNT + 1)} has to fit.
+   * Largest supported node count, 2^30 - 6. The control-flow analyses hold two {@code int}s per
+   * preorder number, the virtual root included, so {@code 2 x (MAX_NODE_COUNT + 1)} has to stay
+   * within the largest array, {@link ArrayLimits#MAX_ARRAY_LENGTH}.
    */
-  static final int MAX_NODE_COUNT = (1 << 30) - 3;
+  static final int MAX_NODE_COUNT = ArrayLimits.MAX_NODE_COUNT_TWO_INTS - 1;
 
   /** Number of nodes reachable from the entries. */
   final int reachedCount;
@@ -56,11 +56,7 @@ final class DfsPreorder {
    */
   static DfsPreorder of(Graph graph, IntList entries, String analysis) {
     int n = graph.nodeCount();
-    if (n > MAX_NODE_COUNT) {
-      throw new IllegalArgumentException(analysis
-          + " keeps two ints per node in its working arrays and so requires nodeCount < 2^30 - 2,"
-          + " but was " + n);
-    }
+    ArrayLimits.checkNodeCount(n, MAX_NODE_COUNT, analysis);
     Graphs.checkNodes(entries, n);
     int entryCount = entries.size();
     int[] out = Csr.outAdjacencyStart(graph);

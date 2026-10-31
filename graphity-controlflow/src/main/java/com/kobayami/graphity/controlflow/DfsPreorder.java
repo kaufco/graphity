@@ -20,11 +20,13 @@ import java.util.Objects;
 final class DfsPreorder {
 
   /**
-   * Largest supported node count. The control-flow analyses hold two {@code int}s per preorder
-   * number, the virtual root included, and HotSpot caps an {@code int[]} just below
-   * {@code Integer.MAX_VALUE} elements: {@code 2 x (MAX_NODE_COUNT + 1)} has to fit.
+   * Largest supported node count, 2^30 - 6. The control-flow analyses hold two {@code int}s per
+   * preorder number, the virtual root included, so {@code 2 x (MAX_NODE_COUNT + 1)} has to stay
+   * within the largest array, {@code ControlFlow.MAX_ARRAY_LENGTH}. Follows
+   * {@code DfsPreorder.MAX_NODE_COUNT} in the core, which derives it from the one array limit
+   * there.
    */
-  static final int MAX_NODE_COUNT = (1 << 30) - 3;
+  static final int MAX_NODE_COUNT = ControlFlow.MAX_ARRAY_LENGTH / 2 - 1;
 
   /** Number of nodes reachable from the entries. */
   final int reachedCount;
@@ -59,11 +61,7 @@ final class DfsPreorder {
    */
   static DfsPreorder of(Graph graph, IntList entries, String analysis) {
     int n = graph.nodeCount();
-    if (n > MAX_NODE_COUNT) {
-      throw new IllegalArgumentException(analysis
-          + " keeps two ints per node in its working arrays and so requires nodeCount < 2^30 - 2,"
-          + " but was " + n);
-    }
+    checkNodeCount(n, analysis);
     int entryCount = entries.size();
     for (int i = 0; i < entryCount; i++) {
       Objects.checkIndex(entries.getInt(i), n);
@@ -121,6 +119,15 @@ final class DfsPreorder {
       entryBits[number >> 6] |= 1L << number;
     }
     return new DfsPreorder(count, order, preorderNumber, parent, entryBits);
+  }
+
+  // The message names the reason of the limit, which lies in Dominators, not in the caller.
+  static void checkNodeCount(int nodeCount, String analysis) {
+    if (nodeCount > MAX_NODE_COUNT) {
+      throw new IllegalArgumentException(analysis + " takes the node limit of Dominators, which"
+          + " keeps two ints per node in one array, counting its virtual root: nodeCount must be"
+          + " <= " + MAX_NODE_COUNT + ", but was " + nodeCount);
+    }
   }
 
   /** Whether the node with this preorder number is one of the entries. */

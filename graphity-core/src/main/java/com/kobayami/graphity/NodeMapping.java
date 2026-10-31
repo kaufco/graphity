@@ -87,10 +87,10 @@ public final class NodeMapping extends IndexMapping {
    */
   public static NodeMapping of(int[] mapping) {
     int[] copy = Arrays.copyOf(mapping, mapping.length);
-    for (int source = 0; source < copy.length; source++) {
-      if (copy[source] < -1) {
+    for (int node = 0; node < copy.length; node++) {
+      if (copy[node] < -1) {
         throw new IndexOutOfBoundsException(
-            "mapping value must be -1 or a node ID, but source " + source + " maps to " + copy[source]);
+            "a mapping value must be -1 or a node ID, but node " + node + " maps to " + copy[node]);
       }
     }
     return new NodeMapping(copy, countValid(copy));
@@ -219,9 +219,10 @@ public final class NodeMapping extends IndexMapping {
    *
    * @param targetCount size of the target space, which becomes the source space of the inverse
    * @return the inverse mapping, with {@link #indexCount()} equal to {@code targetCount}
-   * @throws IllegalArgumentException  if {@code targetCount} is negative, or multiple source IDs
-   *                                   map to the same target (the mapping is not injective and
-   *                                   cannot be inverted)
+   * @throws IllegalArgumentException  if {@code targetCount} is negative or larger than
+   *                                   {@code Integer.MAX_VALUE - 8}, the largest array, or
+   *                                   multiple source IDs map to the same target (the mapping is
+   *                                   not injective and cannot be inverted)
    * @throws IndexOutOfBoundsException if a target is {@code targetCount} or more
    */
   public NodeMapping inverted(int targetCount) {

@@ -86,7 +86,8 @@ public sealed class NodePartition extends IndexPartition permits Sccs {
    *
    * @param graph      the graph whose nodes are partitioned
    * @param groupOf    group ID of each node, or {@code -1}; length {@code graph.nodeCount()}
-   * @param groupCount number of groups, in {@code 0..Integer.MAX_VALUE-1}
+   * @param groupCount number of groups, in {@code 0..Integer.MAX_VALUE-9}, as many as a graph
+   *                   can have nodes: each group becomes a node of {@link #condense()}
    * @return the partition
    * @throws IllegalArgumentException if {@code groupOf.length != graph.nodeCount()},
    *                                  {@code groupCount} is out of range, or an entry lies
@@ -95,7 +96,7 @@ public sealed class NodePartition extends IndexPartition permits Sccs {
   public static NodePartition of(Graph graph, int[] groupOf, int groupCount) {
     int n = graph.nodeCount();
     checkLength(groupOf.length, n, "groupOf");
-    if (groupCount < 0 || groupCount == Integer.MAX_VALUE) {
+    if (groupCount < 0 || groupCount > ArrayLimits.MAX_NODE_COUNT) {
       throw new IllegalArgumentException("groupCount out of range: " + groupCount);
     }
     var nodeToGroup = groupOf.clone();
@@ -105,7 +106,7 @@ public sealed class NodePartition extends IndexPartition permits Sccs {
     for (int node = 0; node < n; node++) {
       int group = nodeToGroup[node];
       if (group < -1 || group >= groupCount) {
-        throw new IllegalArgumentException("group of node " + node + " is " + group
+        throw new IndexOutOfBoundsException("group of node " + node + " is " + group
             + ", outside -1.." + (groupCount - 1));
       }
       if (group >= 0) memberStart[group]++;
@@ -154,8 +155,8 @@ public sealed class NodePartition extends IndexPartition permits Sccs {
    * and {@code nodesOf(condensationNode)} to retrieve all original nodes within a
    * condensation node.
    * <p>
-   * <strong>Time:</strong> O(nodeCount + edgeCount + condensationEdgeCount x log d̄) where d̄
-   * is the average out-degree in the condensation (per-group adjacency sort).<br>
+   * <strong>Time:</strong> O(nodeCount + groupCount + edgeCount + Σ d x log d), where d is the
+   * out-degree of each group in the condensation (one sort per group).<br>
    * <strong>Memory:</strong> O(groupCount + condensationEdgeCount) for the result;
    * O(groupCount) additional during computation.
    *

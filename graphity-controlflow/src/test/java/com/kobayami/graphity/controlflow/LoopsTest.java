@@ -169,6 +169,20 @@ class LoopsTest {
   }
 
   @Test
+  void theNodeLimitIsTheOneOfTheCore() {
+    // Loops.of documents nodeCount > 2^30 - 6 as rejected, the same limit as Dominators.of:
+    // two ints per preorder number, the virtual root included, within Integer.MAX_VALUE - 8.
+    assertThat(DfsPreorder.MAX_NODE_COUNT).isEqualTo((1 << 30) - 6);
+    assertThat(2L * (DfsPreorder.MAX_NODE_COUNT + 1)).isLessThanOrEqualTo(Integer.MAX_VALUE - 8);
+    DfsPreorder.checkNodeCount(DfsPreorder.MAX_NODE_COUNT, "Loops");
+    assertThatThrownBy(() -> DfsPreorder.checkNodeCount(DfsPreorder.MAX_NODE_COUNT + 1, "Loops"))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Loops takes the node limit of Dominators, which keeps two ints per node in one"
+            + " array, counting its virtual root: nodeCount must be <= 1073741818, but was"
+            + " 1073741819");
+  }
+
+  @Test
   void deepNestingDoesNotOverflowStack() {
     // deep / 2 loops nested inside each other: i -> i + 1 down the chain, and a back edge from
     // deep - 1 - i to i, so loop i encloses loop i + 1.

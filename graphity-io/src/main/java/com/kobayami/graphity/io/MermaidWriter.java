@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.IntFunction;
 import java.util.function.IntPredicate;
 import org.jspecify.annotations.Nullable;
@@ -32,12 +33,27 @@ import org.jspecify.annotations.Nullable;
  * text. Mermaid numbers links in the order they are written; the writer translates edge indices
  * to those numbers for {@code linkStyle}, also when a filter leaves edges out.
  * <p>
- * Labels are written as quoted strings: the writer turns quotes, {@code #}, {@code &},
- * {@code <}, {@code >} and backticks into Mermaid entity codes and line breaks into {@code <br>},
- * so no label reads as HTML or as a Markdown string. Class names must be identifiers - a letter
- * or underscore, then letters, digits or underscores - other than {@code end}; style definitions
- * are passed through as Mermaid reads them and must be non-empty, without line breaks or
- * semicolons. A hook that returns {@code null} adds nothing.
+ * Labels are written as quoted strings: the writer turns quotes, {@code #}, {@code %}, {@code &},
+ * {@code :}, {@code <}, {@code >} and backticks into Mermaid entity codes and line breaks into
+ * {@code <br>}, so no label reads as HTML, as a Markdown string or as a directive. For the same
+ * reason whitespace right after the word {@code direction} becomes an entity code, and an empty
+ * label, which Mermaid rejects, is written as one space.
+ * <p>
+ * Mermaid's renderer still changes some labels. Mermaid 11 applies Markdown emphasis and backslash
+ * escapes to every label, so {@code 2*3*4} loses its asterisks; Mermaid 12 shows a backslash
+ * before {@code n} as a line break. Both read <code>&para;&szlig;</code> and
+ * <code>&#xFB02;&deg;</code>, which Mermaid uses internally for entity codes, as {@code ;} and
+ * {@code &}, and turn {@code fa:fa-}<i>name</i> into an icon in a node label with a line break.
+ * With {@code htmlLabels} set to {@code false}, Mermaid shows some entity codes as written, such
+ * as {@code &#58;} for {@code :}.
+ * <p>
+ * Class names must be identifiers - a letter or underscore, then letters, digits or underscores
+ * - other than a Mermaid keyword: {@code style}, {@code linkStyle}, {@code interpolate},
+ * {@code classDef}, {@code class}, {@code href}, {@code click}, {@code call}, {@code graph},
+ * {@code flowchart}, {@code subgraph}, {@code end}, {@code _self}, {@code _blank},
+ * {@code _parent} and {@code _top}. Keywords are case-sensitive, so {@code End} is a valid class
+ * name. Style definitions are passed through as Mermaid reads them and must not be blank, nor
+ * contain line breaks or semicolons. A hook that returns {@code null} adds nothing.
  * <p>
  * Mermaid renders graphs of a few hundred nodes well; for larger ones, {@link DotWriter}. A
  * writer holds its configuration and may write any number of times. It is not safe for
@@ -94,6 +110,14 @@ public final class MermaidWriter {
       this.close = close;
     }
   }
+
+  /** The words Mermaid's flowchart lexer reads as keywords, never as a class name. */
+  private static final Set<String> KEYWORDS = Set.of("style", "linkStyle", "interpolate",
+      "classDef", "class", "href", "click", "call", "graph", "flowchart", "subgraph", "end",
+      "_self", "_blank", "_parent", "_top");
+
+  /** The word that starts a direction statement; whitespace after it is encoded in labels. */
+  private static final String DIRECTION_WORD = "direction";
 
   private final Selection selection;
   private Direction direction = Direction.TOP_DOWN;
@@ -180,11 +204,11 @@ public final class MermaidWriter {
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param name  the class name, an identifier other than {@code end}
+   * @param name  the class name, an identifier other than a Mermaid keyword
    * @param style the style definition, such as {@code fill:#f96,stroke:#333}
    * @return this writer
    * @throws IllegalArgumentException if {@code name} is not such an identifier, or {@code style}
-   *                                  is empty or contains a line break or semicolon
+   *                                  is blank or contains a line break or semicolon
    */
   public MermaidWriter classDef(String name, String style) {
     classDefs.put(checkClass(name), checkStyle(style));
@@ -196,7 +220,7 @@ public final class MermaidWriter {
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param className the class name of a node, an identifier
+   * @param className the class name of a node, an identifier other than a Mermaid keyword
    * @return this writer
    */
   public MermaidWriter nodeClass(IntFunction<@Nullable String> className) {
@@ -270,8 +294,8 @@ public final class MermaidWriter {
    * @param out where to write; not closed
    * @throws IOException if {@code out} throws
    * @throws IllegalArgumentException if a hook returns a class name that is not an identifier or
-   *                                  is {@code end}, or an empty edge style or one with a line
-   *                                  break or semicolon; what was written before stays in
+   *                                  is a Mermaid keyword, or an edge style that is blank or has
+   *                                  a line break or semicolon; what was written before stays in
    *                                  {@code out}
    */
   public void write(Appendable out) throws IOException {
@@ -377,7 +401,7 @@ public final class MermaidWriter {
   }
 
   private static String checkClass(String name) {
-    if (!Selection.isIdentifier(name) || name.equalsIgnoreCase("end")) {
+    if (!Selection.isIdentifier(name) || KEYWORDS.contains(name)) {
       throw new IllegalArgumentException("not a Mermaid class name: " + name);
     }
     return name;
@@ -386,21 +410,36 @@ public final class MermaidWriter {
   private static String checkStyle(String style) {
     if (style.isBlank() || style.indexOf('\n') >= 0 || style.indexOf('\r') >= 0
         || style.indexOf(';') >= 0) {
-      throw new IllegalArgumentException("a Mermaid style must be non-empty, without a line break "
-          + "or semicolon: " + style);
+      throw new IllegalArgumentException("a Mermaid style must not be blank, nor contain a line "
+          + "break or semicolon: " + style);
     }
     return style;
   }
 
-  /** Writes {@code text} as a Mermaid quoted string that shows exactly that text. */
-  static void quote(String text, Appendable out) throws IOException {
+  /**
+   * Writes {@code text} as a Mermaid quoted string.
+   * <p>
+   * Mermaid applies regular expressions to the whole text before parsing, strings included:
+   * {@code %%} starts a directive or a comment, and on a line with {@code style} and {@code :}
+   * the last {@code ;} is dropped, which ends an entity code. Its lexer takes any line with
+   * {@code direction}, whitespace and a direction code for a direction statement. So {@code %},
+   * {@code :} and whitespace right after {@code direction} are written as entity codes too, and
+   * an empty text, which Mermaid rejects, as one space.
+   */
+  private static void quote(String text, Appendable out) throws IOException {
+    if (text.isEmpty()) {
+      out.append("\" \"");
+      return;
+    }
     out.append('"');
     for (int i = 0; i < text.length(); i++) {
       char c = text.charAt(i);
       switch (c) {
         case '"' -> out.append("#quot;");
         case '#' -> out.append("#35;");
+        case '%' -> out.append("#37;");
         case '&' -> out.append("#38;");
+        case ':' -> out.append("#58;");
         case '`' -> out.append("#96;");
         case '<' -> out.append("#lt;");
         case '>' -> out.append("#gt;");
@@ -408,9 +447,20 @@ public final class MermaidWriter {
         case '\r' -> {
           if (i + 1 >= text.length() || text.charAt(i + 1) != '\n') out.append("<br>");
         }
-        default -> out.append(c);
+        default -> {
+          if (isSpace(c) && text.startsWith(DIRECTION_WORD, i - DIRECTION_WORD.length())) {
+            out.append('#').append(Integer.toString(c)).append(';');
+          } else {
+            out.append(c);
+          }
+        }
       }
     }
     out.append('"');
+  }
+
+  /** Whether {@code c} is whitespace, at least everything JavaScript's {@code \s} matches. */
+  private static boolean isSpace(char c) {
+    return Character.isWhitespace(c) || Character.isSpaceChar(c) || c == '\uFEFF';
   }
 }

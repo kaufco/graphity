@@ -253,21 +253,17 @@ public final class SortedIntView extends AbstractIntList implements RandomAccess
   }
 
   /**
-   * Returns a spliterator over this view's elements with ORDERED, SIZED, SUBSIZED,
+   * Returns a spliterator over this view's elements with ORDERED, SORTED, SIZED, SUBSIZED,
    * DISTINCT, IMMUTABLE and NONNULL characteristics. Supports efficient parallel splitting.
    * <p>
-   * The elements are in fact sorted ascending, but the {@link Spliterator#SORTED} flag is
-   * intentionally not advertised because fastutil's {@code IntSpliterator.getComparator()}
-   * default throws {@link IllegalStateException}, which would break {@link java.util.stream.IntStream}
-   * construction via {@link java.util.stream.StreamSupport#intStream}.
+   * The order is the natural one, so {@link Spliterator#getComparator()} returns {@code null}.
    * <p>
    * <strong>Time:</strong> O(1) to create.
    */
   @Override
   public IntSpliterator spliterator() {
-    return IntSpliterators.wrap(array, fromIndex, toIndex - fromIndex,
-        Spliterator.ORDERED | Spliterator.SIZED | Spliterator.SUBSIZED
-            | Spliterator.DISTINCT | Spliterator.IMMUTABLE | Spliterator.NONNULL);
+    return IntSpliterators.wrapPreSorted(
+        array, fromIndex, size(), Spliterator.DISTINCT | Spliterator.IMMUTABLE, null);
   }
 
   /**
@@ -369,6 +365,8 @@ public final class SortedIntView extends AbstractIntList implements RandomAccess
    *
    * @param other the other sorted view
    * @return the union; {@code this} or {@code other} itself if the other one is empty
+   * @throws IllegalArgumentException if the union has more than {@code Integer.MAX_VALUE - 8}
+   *                                  values, the largest array
    */
   public SortedIntView union(SortedIntView other) {
     if (other.isEmpty()) {
@@ -387,9 +385,11 @@ public final class SortedIntView extends AbstractIntList implements RandomAccess
    * <p>
    * <strong>Time:</strong> O(n + m) where n = aTo - aFrom, m = bTo - bFrom.<br>
    * <strong>Memory:</strong> up to 4 x (n + m) bytes.
+   *
+   * @throws IllegalArgumentException if the union has more values than the largest array holds
    */
   static int[] unionInRange(int[] a, int aFrom, int aTo, int[] b, int bFrom, int bTo) {
-    var out = new int[aTo - aFrom + bTo - bFrom];
+    var out = new int[unionCapacity(a, aFrom, aTo, b, bFrom, bTo, ArrayLimits.MAX_ARRAY_LENGTH)];
     int outPos = 0;
 
     int aPos = aFrom;
@@ -422,6 +422,36 @@ public final class SortedIntView extends AbstractIntList implements RandomAccess
 
     // Trim output to actual size in case `a` and `b` contain shared values.
     return outPos == out.length ? out : Arrays.copyOf(out, outPos);
+  }
+
+  /**
+   * The length to allocate for the union of two sorted, duplicate-free ranges: the sum of their
+   * sizes, or, if that exceeds {@code maxLength}, the size of the union itself, counted by a
+   * merge that writes nothing. {@code maxLength} is the largest array length; tests pass a small
+   * one.
+   *
+   * @throws IllegalArgumentException if the union has more than {@code maxLength} values
+   */
+  static int unionCapacity(
+      int[] a, int aFrom, int aTo, int[] b, int bFrom, int bTo, int maxLength) {
+    long sizeSum = (long) (aTo - aFrom) + (bTo - bFrom);
+    if (sizeSum <= maxLength) return (int) sizeSum;
+    int aPos = aFrom;
+    int bPos = bFrom;
+    long unionSize = 0;
+    while (aPos < aTo && bPos < bTo) {
+      int aValue = a[aPos];
+      int bValue = b[bPos];
+      if (aValue <= bValue) aPos++;
+      if (bValue <= aValue) bPos++;
+      unionSize++;
+    }
+    unionSize += (long) (aTo - aPos) + (bTo - bPos);
+    if (unionSize > maxLength) {
+      throw new IllegalArgumentException("the union has " + unionSize
+          + " values, more than the largest array length of " + maxLength);
+    }
+    return (int) unionSize;
   }
 
   private static int copyTail(int[] dest, int destFrom, int[] src, int srcFrom, int srcTo) {

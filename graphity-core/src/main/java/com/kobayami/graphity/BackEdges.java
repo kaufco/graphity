@@ -54,6 +54,11 @@ public final class BackEdges {
   public static Edges of(Graph graph) {
     var traverser = new BackEdgeCollector(graph);
     traverser.run();
+    // The search does not know the number of back edges in advance; trimming copies the lists to
+    // their exact length.
+    traverser.sources.trim();
+    traverser.targets.trim();
+    traverser.edgeIndices.trim();
     return new Edges(
         IntLists.unmodifiable(traverser.sources),
         IntLists.unmodifiable(traverser.targets),
