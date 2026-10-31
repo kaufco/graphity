@@ -18,7 +18,7 @@ final class ArrayLimits {
    * Largest node count of a graph, {@code Integer.MAX_VALUE - 9}: its {@code nodeCount + 1} node
    * offsets fill the largest array. The node limit of {@link GraphBuilder}, the group limit of
    * {@link NodePartition#of(Graph, int[], int)} and the bound on the node count that
-   * {@link GraphFormat#read(java.io.InputStream)} accepts from a header.
+   * {@link Graph#readFrom(java.io.InputStream)} accepts from a header.
    */
   static final int MAX_NODE_COUNT = MAX_ARRAY_LENGTH - 1;
 

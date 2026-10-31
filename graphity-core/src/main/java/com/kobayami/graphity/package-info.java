@@ -62,8 +62,9 @@
  * </ul>
  * <p>
  * Loops, dominance frontiers, control dependence and phi placement are in the module
- * {@code graphity-controlflow}, package {@code com.kobayami.graphity.controlflow}; writers for DOT
- * and Mermaid are in {@code graphity-io}, package {@code com.kobayami.graphity.io}.
+ * {@code graphity-controlflow}, package {@code com.kobayami.graphity.controlflow}; the writer for
+ * DOT is in {@code graphity-dot}, package {@code com.kobayami.graphity.dot}, and the writer for
+ * Mermaid in {@code graphity-mermaid}, package {@code com.kobayami.graphity.mermaid}.
  *
  * <h3>Transformations</h3>
  * <ul>
@@ -103,7 +104,9 @@
  *       {@code toString()} is bounded.</li>
  *   <li>{@link Csr} - read access to the CSR arrays themselves, for algorithm code that loops
  *       over all edges; the built-in algorithms use it too.</li>
- *   <li>{@link GraphFormat} - a versioned binary format for storing and loading the topology.</li>
+ *   <li>{@link Graph#writeTo(java.io.OutputStream)} and
+ *       {@link Graph#readFrom(java.io.InputStream)} - write the topology to a stream and read it
+ *       back, as plain little-endian arrays.</li>
  *   <li>{@link Graphs#topologyHash(Graph)} and {@link Graphs#diff(Graph, Graph)} - a 64-bit
  *       structural hash to keep, and the edges added and removed between two versions
  *       ({@link GraphDiff}).</li>

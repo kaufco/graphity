@@ -57,7 +57,7 @@ final class DfsPreorder {
   static DfsPreorder of(Graph graph, IntList entries, String analysis) {
     int n = graph.nodeCount();
     ArrayLimits.checkNodeCount(n, MAX_NODE_COUNT, analysis);
-    Graphs.checkNodes(entries, n);
+    Checks.checkNodes(entries, n);
     int entryCount = entries.size();
     int[] out = Csr.outAdjacencyStart(graph);
     int[] adj = Csr.outAdjacency(graph);

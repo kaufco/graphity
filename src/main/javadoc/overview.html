@@ -58,19 +58,21 @@ with a {@link com.kobayami.graphity.NodeMapping} from
 <td>{@link com.kobayami.graphity.GraphBuilder}, or
 {@link com.kobayami.graphity.Graph#of(int[], int[])} from CSR arrays</td></tr>
 <tr><td>How do I store and load a graph?</td>
-<td>{@link com.kobayami.graphity.GraphFormat}</td></tr>
-<tr><td>How do I look at a graph? (graphity-io)</td>
-<td>{@link com.kobayami.graphity.io.DotWriter},
-{@link com.kobayami.graphity.io.MermaidWriter}</td></tr>
+<td>{@link com.kobayami.graphity.Graph#writeTo(java.io.OutputStream)},
+{@link com.kobayami.graphity.Graph#readFrom(java.io.InputStream)}</td></tr>
+<tr><td>How do I look at a graph? (graphity-dot, graphity-mermaid)</td>
+<td>{@link com.kobayami.graphity.dot.DotWriter},
+{@link com.kobayami.graphity.mermaid.MermaidWriter}</td></tr>
 </tbody>
 </table>
 <p>
 The library comes as modules released together at the same version: {@code graphity-core} with
-the graph, the builder and every algorithm that applies to any directed graph, and
-{@code graphity-controlflow} with the analyses that need the concepts of control flow, and
-{@code graphity-io} with writers for DOT and Mermaid. The package documentation of
-{@link com.kobayami.graphity}, {@link com.kobayami.graphity.controlflow} and
-{@link com.kobayami.graphity.io} lists the main entry points by topic, each with a short
+the graph, the builder and every algorithm that applies to any directed graph,
+{@code graphity-controlflow} with the analyses that need the concepts of control flow,
+{@code graphity-dot} with a writer for DOT and {@code graphity-mermaid} with a writer for
+Mermaid. The package documentation of {@link com.kobayami.graphity},
+{@link com.kobayami.graphity.controlflow}, {@link com.kobayami.graphity.dot} and
+{@link com.kobayami.graphity.mermaid} lists the main entry points by topic, each with a short
 description.
 </p>
 </body>

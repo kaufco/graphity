@@ -5,7 +5,6 @@ import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.ints.IntLists;
 import it.unimi.dsi.fastutil.longs.LongArrays;
 import java.util.Arrays;
-import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -676,7 +675,7 @@ public final class Graphs {
    */
   public static SortedIntView reachableFrom(Graph graph, IntList sources) {
     int n = graph.nodeCount();
-    checkNodes(sources, n);
+    Checks.checkNodes(sources, n);
     int sourceCount = sources.size();
     int[] out = Csr.outAdjacencyStart(graph);
     int[] adj = Csr.outAdjacency(graph);
@@ -714,18 +713,6 @@ public final class Graphs {
       }
     }
     return new SortedIntView(queue, 0, tail);
-  }
-
-  /**
-   * Checks every node of a list of start nodes, sources or entries before any work begins - the
-   * check of each {@code IntList} form of a traversal or search in this package.
-   *
-   * @throws IndexOutOfBoundsException if a node is not in {@code 0..nodeCount-1}
-   */
-  static void checkNodes(IntList nodes, int nodeCount) {
-    for (int i = 0, size = nodes.size(); i < size; i++) {
-      Objects.checkIndex(nodes.getInt(i), nodeCount);
-    }
   }
 
   /**

@@ -248,7 +248,7 @@ public abstract class DfsTraverser {
    * @throws IllegalStateException if called from a hook, while a {@code run} call is in progress
    */
   public final void run(IntList startNodes) {
-    Graphs.checkNodes(startNodes, graph.nodeCount());
+    Checks.checkNodes(startNodes, graph.nodeCount());
     begin();
     try {
       for (int i = 0; i < startNodes.size(); i++) {

@@ -1,5 +1,8 @@
 package com.kobayami.graphity;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.stream.IntStream;
@@ -14,7 +17,8 @@ import org.jspecify.annotations.Nullable;
  * must be kept externally (e.g. in parallel arrays indexed by node/edge ID).
  * <p>
  * Build a graph with {@link GraphBuilder}, or with {@link #of(int[], int[])} from arrays that
- * are already in CSR form; {@link GraphFormat} stores and loads it.
+ * are already in CSR form. A graph can be written to a stream with {@link #writeTo(OutputStream)}
+ * and read back with {@link #readFrom(InputStream)}.
  * <p>
  * Use {@code Graph} for algorithms that only need out-edges.
  * For in-edge access, obtain a {@link BiAdjacentGraph} via {@link BiAdjacentGraph#of(Graph)};
@@ -31,7 +35,6 @@ import org.jspecify.annotations.Nullable;
  * @see BiAdjacentGraph#transposed()
  * @see Graphs#rootNodes(BiAdjacentGraph)
  * @see GraphBuilder
- * @see GraphFormat
  * @see Components
  */
 public sealed class Graph permits BiAdjacentGraph {
@@ -68,7 +71,7 @@ public sealed class Graph permits BiAdjacentGraph {
 
   /**
    * Returns a graph over arrays that are already in CSR form, as {@link Csr} returns them or
-   * {@link GraphFormat} stores them.
+   * {@link #writeTo(OutputStream)} writes them.
    * <p>
    * The out-nodes of node {@code v} are
    * {@code outAdjacency[outAdjacencyStart[v]..outAdjacencyStart[v + 1] - 1]}; the node count is
@@ -92,7 +95,7 @@ public sealed class Graph permits BiAdjacentGraph {
    *                                  strictly ascending, or the arrays describe more than
    *                                  {@code Integer.MAX_VALUE - 9} nodes or
    *                                  {@code Integer.MAX_VALUE - 8} edges, the limits that
-   *                                  {@link GraphFormat} also reads back
+   *                                  {@link #readFrom(InputStream)} also applies
    */
   public static Graph of(int[] outAdjacencyStart, int[] outAdjacency) {
     return ofOwned(outAdjacencyStart.clone(), outAdjacency.clone());
@@ -143,6 +146,95 @@ public sealed class Graph permits BiAdjacentGraph {
       }
     }
     return new Graph(outAdjacencyStart, outAdjacency);
+  }
+
+  /**
+   * Writes the topology of this graph to the stream: its two CSR arrays, as
+   * {@link #of(int[], int[])} takes them, after their lengths. {@link #readFrom(InputStream)}
+   * reads it back.
+   * <p>
+   * The layout, every field a signed little-endian 32-bit integer in two's complement:
+   * <pre>
+   * byte offset              size in bytes         field
+   * 0                        4                     nodeCount, 0 &lt;= nodeCount &lt;= 2^31 - 10
+   * 4                        4                     edgeCount, 0 &lt;= edgeCount &lt;= 2^31 - 9
+   * 8                        4 x (nodeCount + 1)   outAdjacencyStart
+   * 8 + 4 x (nodeCount + 1)  4 x edgeCount         outAdjacency
+   * </pre>
+   * A graph takes exactly {@code 8 + 4 x (nodeCount + 1 + edgeCount)} bytes, without padding or
+   * checksum. The bounds on the counts keep each array within the JDK's soft maximum array length,
+   * {@code 2^31 - 9}, the largest array the library allocates. The arrays follow the rules of
+   * {@link #of(int[], int[])}. The edge count repeats {@code outAdjacencyStart[nodeCount]}, so
+   * that a reader finds the second array without reading the first.
+   * <p>
+   * There is no magic number and no version, because the caller knows from its own data model what
+   * a stream holds, and {@link #readFrom(InputStream)} rejects data that does not form a graph.
+   * <p>
+   * The format is platform-independent: nothing but the arrays as 32-bit integers, no Java
+   * serialization. Little-endian, so that consumers on common hardware - a JavaScript
+   * {@code Int32Array} over the buffer, a NumPy array of type {@code <i4} - read the arrays without
+   * conversion; the header keeps them 4-byte aligned.
+   * <p>
+   * The format holds topology only. Node IDs are kept, and edge {@code e} of the read graph is
+   * edge {@code e} of the written one, so data per node or per edge stored separately in arrays
+   * indexed by those IDs stays aligned with the graph.
+   * <p>
+   * A {@link BiAdjacentGraph} writes only its out-adjacency.
+   * <p>
+   * Writes in blocks of 64 KiB, so a file stream needs a {@link java.io.BufferedOutputStream} only
+   * if other data shares it in small pieces.
+   *
+   * <pre>{@code
+   * try (var out = Files.newOutputStream(path)) {
+   *     graph.writeTo(out);
+   * }
+   * Graph loaded;
+   * try (var in = Files.newInputStream(path)) {
+   *     loaded = Graph.readFrom(in);
+   * }
+   * }</pre>
+   *
+   * <strong>Time:</strong> O(nodeCount + edgeCount).<br>
+   * <strong>Memory:</strong> a 64 KiB buffer.
+   *
+   * @param out the stream to write to; not closed
+   * @throws IOException if writing to the stream fails
+   */
+  public final void writeTo(OutputStream out) throws IOException {
+    CsrStreams.write(this, out);
+  }
+
+  /**
+   * Reads a graph that {@link #writeTo(OutputStream)} wrote, in the layout documented there.
+   * <p>
+   * Always returns a {@code Graph} without in-adjacency: also for a stream written from a
+   * {@link BiAdjacentGraph}, and also when called as {@code BiAdjacentGraph.readFrom(in)}, which
+   * compiles because a subclass inherits static methods. Derive the in-adjacency again with
+   * {@link BiAdjacentGraph#of(Graph)}.
+   * <p>
+   * Reads exactly the bytes of one graph and leaves the stream after them. The arrays are checked
+   * as by {@link #of(int[], int[])}, but the graph keeps the arrays read, without the copy
+   * {@code of} makes. Arrays grow with the data that actually arrives, so a header that
+   * announces more than the stream holds fails at the end of the stream, not with an allocation
+   * of the announced size.
+   * <p>
+   * Reads in blocks of up to 64 KiB, so a file stream needs a {@link java.io.BufferedInputStream}
+   * only if other data shares it in small pieces.
+   * <p>
+   * <strong>Time:</strong> O(nodeCount + edgeCount).<br>
+   * <strong>Memory:</strong> 4 x (nodeCount + 1 + edgeCount) bytes for the result, plus a
+   * 64 KiB buffer. While an array grows, the old and the new one coexist: the peak is up to
+   * twice the larger array, the price of not trusting the header.
+   *
+   * @param in the stream to read from; not closed
+   * @return the graph
+   * @throws java.io.EOFException if the stream ends before the graph does
+   * @throws IOException if reading fails, the header has a count outside the bounds of the
+   *                     layout, or the arrays do not form a valid graph; invalid arrays carry the
+   *                     exception of {@link #of(int[], int[])} as cause
+   */
+  public static Graph readFrom(InputStream in) throws IOException {
+    return CsrStreams.read(in);
   }
 
   /** The offset array, for {@link Csr}. */

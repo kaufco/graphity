@@ -79,7 +79,7 @@ public final class BfsDistances {
    */
   public static BfsDistances of(Graph graph, IntList sources) {
     int n = graph.nodeCount();
-    Graphs.checkNodes(sources, n);
+    Checks.checkNodes(sources, n);
     int sourceCount = sources.size();
     int[] out = Csr.outAdjacencyStart(graph);
     int[] adj = Csr.outAdjacency(graph);

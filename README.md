@@ -52,7 +52,7 @@ dependencies {
 }
 ```
 
-Two more artifacts are released together with the core, at the same version; add them the same way if you need them: `graphity-controlflow` with the control-flow analyses - loops, dominance frontiers, control dependence, phi placement (dominators stay in the core) - and `graphity-io` with writers for DOT and Mermaid.
+Three more artifacts are released together with the core, at the same version; add them the same way if you need them: `graphity-controlflow` with the control-flow analyses - loops, dominance frontiers, control dependence, phi placement (dominators stay in the core) - `graphity-dot` with a writer for DOT (Graphviz), and `graphity-mermaid` with a writer for Mermaid flowcharts.
 
 Requires JDK 17 or newer. The API declares its nullness with [JSpecify](https://jspecify.dev/): nothing is `null` unless its type is annotated `@Nullable`, which Kotlin and nullness checkers read from the signatures.
 
@@ -103,9 +103,9 @@ The result types are themselves graphs or partitions backed by CSR — they comp
 - **Control flow** (module `graphity-controlflow`): dominance frontiers and control dependence; iterated dominance frontiers for phi placement; the loop nesting forest, irreducible loops included (Havlak).
 - **Transformations:** quotient graph by a partition of your choosing, condensation of the strongly connected components, subgraph extraction, renumbering for cache locality, transpose — each with the mapping that carries your data along.
 - **Custom traversals:** iterative depth-first traversal with node or edge hooks, breadth-first traversal with levels, pruning and early stop — no stack limit.
-- **Storage:** graphs from CSR arrays you already have, checked and copied; a versioned little-endian binary format for files, caches and typed arrays in the browser.
+- **Storage:** graphs from CSR arrays you already have, checked and copied; `Graph.writeTo` and `Graph.readFrom` store and load them as plain little-endian arrays for files, caches and typed arrays in the browser.
 - **Comparison:** a 64-bit structural hash to key caches by, and the edges added and removed between two versions of a graph, with their edge indices.
-- **Export** (module `graphity-io`): DOT for Graphviz and Mermaid for Markdown, with labels, attributes, shapes and clusters from your own arrays, a node filter and the undirected reading.
+- **Export** (modules `graphity-dot` and `graphity-mermaid`): DOT for Graphviz and Mermaid for Markdown, with labels, attributes, shapes and clusters from your own arrays, a node filter and the undirected reading.
 
 Every entry point and its result type is listed in the [algorithm reference](docs/tutorial.md#algorithm-reference); the [Javadoc](https://kaufco.github.io/graphity/) states each method's contract and cost.
 
@@ -210,7 +210,7 @@ This README is the overview; the tutorial goes into depth, and the Javadoc is th
 
 Most users do not need to build from source — the published artifact (see [Installation](#installation)) is the recommended way to consume Graphity. The instructions below are for contributors who want to fork or extend the library.
 
-The project is a multi-module Maven build: `graphity-core`, `graphity-controlflow` and `graphity-io` are the library, published to Maven Central at the same version; `graphity-benchmarks` is a development module containing the JMH benchmark suite and is not part of the release.
+The project is a multi-module Maven build: `graphity-core`, `graphity-controlflow`, `graphity-dot` and `graphity-mermaid` are the library, published to Maven Central at the same version; `graphity-benchmarks` is a development module containing the JMH benchmark suite and is not part of the release.
 
 ### Build and test
 

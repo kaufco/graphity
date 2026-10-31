@@ -66,7 +66,8 @@
   <modules>
     <module>graphity-core</module>
     <module>graphity-controlflow</module>
-    <module>graphity-io</module>
+    <module>graphity-dot</module>
+    <module>graphity-mermaid</module>
     <module>graphity-benchmarks</module>
   </modules>
 
@@ -86,7 +87,7 @@
          artifactId (the Central pre-check), so the two must match; and since -am also builds
          and publishes the reactor dependencies of a listed module, each of those must be
          listed too. -->
-    <graphity.releaseModules>graphity-core,graphity-controlflow,graphity-io</graphity.releaseModules>
+    <graphity.releaseModules>graphity-core,graphity-controlflow,graphity-dot,graphity-mermaid</graphity.releaseModules>
 
     <fastutil.version>8.5.17</fastutil.version>
     <jspecify.version>1.0.0</jspecify.version>
@@ -141,7 +142,12 @@
       </dependency>
       <dependency>
         <groupId>com.kobayami</groupId>
-        <artifactId>graphity-io</artifactId>
+        <artifactId>graphity-dot</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.kobayami</groupId>
+        <artifactId>graphity-mermaid</artifactId>
         <version>${project.version}</version>
       </dependency>
 
@@ -361,12 +367,19 @@
                 <packages>com.kobayami.graphity.controlflow</packages>
               </group>
               <group>
-                <title>graphity-io</title>
-                <packages>com.kobayami.graphity.io</packages>
+                <title>graphity-dot</title>
+                <packages>com.kobayami.graphity.dot</packages>
+              </group>
+              <group>
+                <title>graphity-mermaid</title>
+                <packages>com.kobayami.graphity.mermaid</packages>
               </group>
             </groups>
             <bottom><![CDATA[Copyright &#169; {inceptionYear}&#x2013;{currentYear} Marco Kaufmann. Apache License 2.0.]]></bottom>
 
+            <!-- No links to the Javadoc of sibling modules: the plugin would point them at the
+                 project URL, where no per-module Javadoc is published. -->
+            <detectOfflineLinks>false</detectOfflineLinks>
             <links>
               <link>https://docs.oracle.com/en/java/javase/17/docs/api/</link>
             </links>

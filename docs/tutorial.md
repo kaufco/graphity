@@ -78,19 +78,19 @@ A graph whose adjacency lists are already sorted and free of duplicates - comput
 Graph graph = Graph.of(new int[] {0, 2, 2, 3}, new int[] {1, 2, 0});
 ```
 
-`GraphFormat` stores exactly these two arrays behind a 16-byte header with a magic number and a format version, as little-endian 32-bit integers - the layout a JavaScript `Int32Array` reads without parsing. Node IDs and edge indices survive the round trip, so arrays of node or edge data saved next to the graph stay aligned with it:
+`graph.writeTo(out)` writes exactly these two arrays after their lengths, the node count and the edge count, all as little-endian 32-bit integers - the layout a JavaScript `Int32Array` reads without parsing; `Graph.readFrom(in)` reads them back. Node IDs and edge indices survive the round trip, so arrays of node or edge data saved next to the graph stay aligned with it:
 
 ```java
 try (var out = Files.newOutputStream(path)) {
-    GraphFormat.write(graph, out);
+    graph.writeTo(out);
 }
 Graph loaded;
 try (var in = Files.newInputStream(path)) {
-    loaded = GraphFormat.read(in);
+    loaded = Graph.readFrom(in);
 }
 ```
 
-Both methods move the arrays in 64 KiB blocks, so a file stream needs no extra buffering, and neither closes the stream. A file written by a later format version is rejected with an `IOException` rather than misread.
+Both methods move the arrays in 64 KiB blocks, so a file stream needs no extra buffering, and neither closes the stream. There is no magic number and no version in the stream: what a file holds, you know from your own data model, and `readFrom` checks the arrays as `Graph.of` does, so data that does not form a graph fails with an `IOException`. A `BiAdjacentGraph` is written as its out-adjacency and read back as a `Graph`; `BiAdjacentGraph.of(loaded)` derives the in-adjacency again.
 
 ## Predecessors: `BiAdjacentGraph`
 
@@ -200,7 +200,7 @@ Edges removed = diff.removedEdges();   // edge indices of `before`
 
 ## Looking at a graph
 
-The module `graphity-io` writes a graph for Graphviz or Mermaid. Every hook takes a node ID or an edge index, so labels, colours and groups come straight from your arrays, and the writer escapes what they return:
+The module `graphity-dot` writes a graph for Graphviz, the module `graphity-mermaid` for Mermaid. Every hook takes a node ID or an edge index, so labels, colours and groups come straight from your arrays, and the writer escapes what they return:
 
 ```java
 DotWriter.of(graph)
@@ -268,7 +268,7 @@ Depth works the same way in the other direction, set when descending: `if (state
 
 ## Algorithm reference
 
-Graphity ships the following algorithms out of the box. All of them return typed result values; entry points live on the algorithm class itself, not on the graph. The rows marked *controlflow* are in the module `graphity-controlflow`, package `com.kobayami.graphity.controlflow`, the rows marked *export* in `graphity-io`, package `com.kobayami.graphity.io`; everything else is in `graphity-core`.
+Graphity ships the following algorithms out of the box. All of them return typed result values; entry points live on the algorithm class itself, not on the graph. The rows marked *controlflow* are in the module `graphity-controlflow`, package `com.kobayami.graphity.controlflow`, the rows marked *dot* in `graphity-dot`, package `com.kobayami.graphity.dot`, and the rows marked *mermaid* in `graphity-mermaid`, package `com.kobayami.graphity.mermaid`; everything else is in `graphity-core`.
 
 | Algorithm                                                       | Entry point                   |
 |-----------------------------------------------------------------|-------------------------------|
@@ -298,7 +298,8 @@ Graphity ships the following algorithms out of the box. All of them return typed
 | Shape predicates, undirected interpretation (`isBipartite`, `isUndirectedTree`, `isUndirectedForest`, `isWeaklyConnected`) | `Graphs.isBipartite(graph)` |
 | Condensation DAG                                                | `sccs.condense()`             |
 | Structural hash, edges added and removed between two versions   | `Graphs.topologyHash(graph)`, `Graphs.diff(before, after)` |
-| Graph from CSR arrays, versioned binary format                  | `Graph.of(offsets, targets)`, `GraphFormat.write(graph, out)`, `GraphFormat.read(in)` |
-| DOT and Mermaid export (*export*)                               | `DotWriter.of(graph)`, `MermaidWriter.of(graph)` |
+| Graph from CSR arrays, binary serialization                     | `Graph.of(offsets, targets)`, `graph.writeTo(out)`, `Graph.readFrom(in)` |
+| DOT export (*dot*)                                              | `DotWriter.of(graph)`         |
+| Mermaid export (*mermaid*)                                      | `MermaidWriter.of(graph)`     |
 | Quotient graph by a partition of your choosing                  | `NodePartition.of(graph, groupOf, groupCount).condense()` |
 | Subgraph extraction and node remapping                          | `Graphs.remapped(...)`        |

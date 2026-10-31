@@ -19,7 +19,7 @@ class ArrayLimitsTest {
 
   @Test
   void aGraphHoldsOneNodeFewerThanTheLargestArray() {
-    // GraphBuilder, NodePartition.of and the header of GraphFormat: nodeCount + 1 offsets.
+    // GraphBuilder, NodePartition.of and the header of Graph.readFrom: nodeCount + 1 offsets.
     int limit = ArrayLimits.MAX_NODE_COUNT;
     assertThat(limit).isEqualTo(Integer.MAX_VALUE - 9);
     assertThat(limit + 1).isEqualTo(ArrayLimits.MAX_ARRAY_LENGTH);
