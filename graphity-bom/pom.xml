@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <!-- No parent on purpose: importing a BOM imports its whole effective dependencyManagement,
+       and graphity-parent manages the versions of test and benchmark libraries (JUnit, Guava,
+       JGraphT, ...) that must not reach a consumer's build. The version therefore does not
+       inherit either and moves in lockstep with the parent POM by hand (release checklist). -->
+  <groupId>com.kobayami</groupId>
+  <artifactId>graphity-bom</artifactId>
+  <version>2.4.0</version>
+  <packaging>pom</packaging>
+
+  <name>graphity-bom</name>
+  <description>Bill of materials for Graphity: import it to keep graphity-core,
+    graphity-controlflow, graphity-dot, graphity-mermaid and graphity, which brings in all of
+    them, at one version.</description>
+  <url>https://github.com/kaufco/graphity</url>
+  <inceptionYear>2025</inceptionYear>
+
+  <licenses>
+    <license>
+      <name>Apache License, Version 2.0</name>
+      <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+
+  <organization>
+    <name>kaufco</name>
+    <url>https://github.com/kaufco</url>
+  </organization>
+
+  <developers>
+    <developer>
+      <id>kaufco</id>
+      <name>Marco Kaufmann</name>
+      <url>https://github.com/kaufco</url>
+      <roles>
+        <role>author</role>
+        <role>maintainer</role>
+      </roles>
+      <timezone>Europe/Berlin</timezone>
+    </developer>
+  </developers>
+
+  <scm>
+    <connection>scm:git:https://github.com/kaufco/graphity.git</connection>
+    <developerConnection>scm:git:git@github.com:kaufco/graphity.git</developerConnection>
+    <url>https://github.com/kaufco/graphity</url>
+    <tag>HEAD</tag>
+  </scm>
+
+  <issueManagement>
+    <system>GitHub Issues</system>
+    <url>https://github.com/kaufco/graphity/issues</url>
+  </issueManagement>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>com.kobayami</groupId>
+        <artifactId>graphity-core</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.kobayami</groupId>
+        <artifactId>graphity-controlflow</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.kobayami</groupId>
+        <artifactId>graphity-dot</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.kobayami</groupId>
+        <artifactId>graphity-mermaid</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.kobayami</groupId>
+        <artifactId>graphity</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <!-- The same signing and upload as the release profile of graphity-parent, which this POM
+       does not inherit; keep both in step. -->
+  <profiles>
+    <profile>
+      <id>release</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-gpg-plugin</artifactId>
+            <version>3.2.8</version>
+            <executions>
+              <execution>
+                <id>sign-artifacts</id>
+                <phase>verify</phase>
+                <goals><goal>sign</goal></goals>
+              </execution>
+            </executions>
+            <configuration>
+              <gpgArguments>
+                <arg>--pinentry-mode</arg>
+                <arg>loopback</arg>
+              </gpgArguments>
+            </configuration>
+          </plugin>
+          <plugin>
+            <groupId>org.sonatype.central</groupId>
+            <artifactId>central-publishing-maven-plugin</artifactId>
+            <version>0.11.0</version>
+            <extensions>true</extensions>
+            <configuration>
+              <publishingServerId>central</publishingServerId>
+              <autoPublish>false</autoPublish>
+              <deploymentName>graphity ${project.version}</deploymentName>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
+
+</project>

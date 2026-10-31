@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.kobayami</groupId>
+    <artifactId>graphity-parent</artifactId>
+    <version>2.4.0</version>
+  </parent>
+
+  <artifactId>graphity</artifactId>
+
+  <name>graphity</name>
+  <description>All of Graphity in one dependency: graphity-core, graphity-controlflow,
+    graphity-dot and graphity-mermaid, at the version of this artifact. It has no code of its
+    own.</description>
+
+  <!-- The library modules. Not graphity-bom, graphity-benchmarks or graphity-examples; and no
+       future adapter module that brings in another library: this dependency gives a user all of
+       Graphity, but no third-party library that Graphity itself does not need. The versions are
+       spelled out, although the parent manages them, so that the published POM states them. -->
+  <dependencies>
+    <dependency>
+      <groupId>com.kobayami</groupId>
+      <artifactId>graphity-core</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.kobayami</groupId>
+      <artifactId>graphity-controlflow</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.kobayami</groupId>
+      <artifactId>graphity-dot</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.kobayami</groupId>
+      <artifactId>graphity-mermaid</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <!-- A jar without classes rather than a pom artifact, so that Maven and Gradle users add
+             it like any other dependency, without <type>pom</type>; forceCreation keeps the
+             plugin from warning that the jar is empty. No Automatic-Module-Name: without a
+             package, a module name would name nothing, and on the module path the JDK derives a
+             valid one, graphity, from the file name.
+             Maven Central requires a sources jar and a Javadoc jar next to every jar; both hold
+             only an index.html that points to the modules and their Javadoc. -->
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <configuration>
+          <forceCreation>true</forceCreation>
+        </configuration>
+        <executions>
+          <execution>
+            <id>sources-jar</id>
+            <phase>package</phase>
+            <goals><goal>jar</goal></goals>
+            <configuration>
+              <classifier>sources</classifier>
+              <classesDirectory>${project.basedir}/src/main/readme</classesDirectory>
+            </configuration>
+          </execution>
+          <execution>
+            <id>javadoc-jar</id>
+            <phase>package</phase>
+            <goals><goal>jar</goal></goals>
+            <configuration>
+              <classifier>javadoc</classifier>
+              <classesDirectory>${project.basedir}/src/main/readme</classesDirectory>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+
+</project>

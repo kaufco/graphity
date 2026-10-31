@@ -68,6 +68,8 @@
     <module>graphity-controlflow</module>
     <module>graphity-dot</module>
     <module>graphity-mermaid</module>
+    <module>graphity</module>
+    <module>graphity-bom</module>
     <module>graphity-benchmarks</module>
     <module>graphity-examples</module>
   </modules>
@@ -88,7 +90,7 @@
          artifactId (the Central pre-check), so the two must match; and since -am also builds
          and publishes the reactor dependencies of a listed module, each of those must be
          listed too. -->
-    <graphity.releaseModules>graphity-core,graphity-controlflow,graphity-dot,graphity-mermaid</graphity.releaseModules>
+    <graphity.releaseModules>graphity-core,graphity-controlflow,graphity-dot,graphity-mermaid,graphity,graphity-bom</graphity.releaseModules>
 
     <fastutil.version>8.5.17</fastutil.version>
     <jspecify.version>1.0.0</jspecify.version>
@@ -150,6 +152,11 @@
       <dependency>
         <groupId>com.kobayami</groupId>
         <artifactId>graphity-mermaid</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.kobayami</groupId>
+        <artifactId>graphity</artifactId>
         <version>${project.version}</version>
       </dependency>
 
@@ -363,7 +370,7 @@
                 <location>${maven.multiModuleProjectDirectory}/src/javadoc-links/jspecify</location>
               </offlineLink>
             </offlineLinks>
-            <!-- One group per published module on the aggregated site. -->
+            <!-- One group per published module with code, on the aggregated site. -->
             <groups>
               <group>
                 <title>graphity-core</title>

@@ -52,7 +52,7 @@ dependencies {
 }
 ```
 
-Three more artifacts are released together with the core, at the same version; add them the same way if you need them: `graphity-controlflow` with the control-flow analyses - loops, dominance frontiers, control dependence, phi placement (dominators stay in the core) - `graphity-dot` with a writer for DOT (Graphviz), and `graphity-mermaid` with a writer for Mermaid flowcharts.
+Three more artifacts are released together with the core, at the same version; add them the same way if you need them: `graphity-controlflow` with the control-flow analyses - loops, dominance frontiers, control dependence, phi placement (dominators stay in the core) - `graphity-dot` with a writer for DOT (Graphviz), and `graphity-mermaid` with a writer for Mermaid flowcharts. Importing `graphity-bom` keeps them at one version.
 
 Requires JDK 17 or newer. The API declares its nullness with [JSpecify](https://jspecify.dev/): nothing is `null` unless its type is annotated `@Nullable`, which Kotlin and nullness checkers read from the signatures.
 
@@ -210,7 +210,7 @@ This README is the overview; the tutorial goes into depth, and the Javadoc is th
 
 Most users do not need to build from source — the published artifact (see [Installation](#installation)) is the recommended way to consume Graphity. The instructions below are for contributors who want to fork or extend the library.
 
-The project is a multi-module Maven build: `graphity-core`, `graphity-controlflow`, `graphity-dot` and `graphity-mermaid` are the library, published to Maven Central at the same version; `graphity-benchmarks` is a development module containing the JMH benchmark suite and is not part of the release.
+The project is a multi-module Maven build: `graphity-core`, `graphity-controlflow`, `graphity-dot` and `graphity-mermaid` are the library, published to Maven Central at the same version together with `graphity-bom`, which keeps them in step; `graphity-benchmarks` is a development module containing the JMH benchmark suite and is not part of the release.
 
 ### Build and test
 

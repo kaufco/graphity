@@ -20,7 +20,7 @@ Graphity adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - [Issue #53](../../issues/53) - Load graphs from CSR arrays, and add a binary CSR format
   - [Issue #54](../../issues/54) - Find one cycle
   - [Issue #55](../../issues/55) - Add transitive closure and transitive reduction
-  - [Issue #56](../../issues/56) - Export graphs to DOT and Mermaid
+- [Issue #65](../../issues/65) - graphity, one artifact for all modules
 
 ### Changed
 

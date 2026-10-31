@@ -1,7 +1,8 @@
 # Signs the published modules and uploads them to Maven Central via the Central
 # Publisher Portal. Which modules those are is the parent POM's
 # graphity.releaseModules list, all at the POM's version; today these are
-# graphity-core, graphity-controlflow, graphity-dot and graphity-mermaid.
+# graphity-core, graphity-controlflow, graphity-dot, graphity-mermaid,
+# graphity (which brings in the four) and graphity-bom.
 #
 # One trigger, workflow_dispatch, run before the GitHub Release is published:
 # the portal validates the bundle while the release is still private, so a
@@ -152,6 +153,23 @@ jobs:
           fi
           echo "list=$modules" >> "$GITHUB_OUTPUT"
           echo "Publishing modules: $modules"
+
+      - name: Check the version of every module
+        # Modules inherit the version from the parent POM - except graphity-bom, which has no
+        # parent so that importing it brings no foreign dependencyManagement. A bump that missed
+        # it would upload a BOM under the wrong version; this catches it before the build.
+        env:
+          EXPECTED: ${{ steps.target.outputs.version }}
+          MODULES: ${{ steps.modules.outputs.list }}
+        run: |
+          set -euo pipefail
+          for module in ${MODULES//,/ }; do
+            version="$(mvn -B -ntp -q -N -f "$module/pom.xml" help:evaluate -Dexpression=project.version -DforceStdout)"
+            if [[ "$version" != "$EXPECTED" ]]; then
+              echo "$module is at $version, but this run was started for $EXPECTED." >&2
+              exit 1
+            fi
+          done
 
       - name: Refuse a version that is already on Central
         # A second upload for a published version fails at the portal anyway,
