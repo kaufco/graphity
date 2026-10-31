@@ -147,7 +147,9 @@ class GraphDiffTest {
     for (long seed = 0; seed < 2000; seed++) {
       Graph graph = RandomGraphs.gnp(1 + (int) (seed % 12), 0.3, seed);
       if (graphs.add(graph)) {
-        assertThat(hashes.add(Graphs.topologyHash(graph))).as("collision at seed %d", seed).isTrue();
+        assertThat(hashes.add(Graphs.topologyHash(graph)))
+            .as("collision at seed %d", seed)
+            .isTrue();
       }
     }
     assertThat(graphs.size()).isGreaterThan(1000);
@@ -160,5 +162,17 @@ class GraphDiffTest {
         .isNotEqualTo(Graphs.topologyHash(TestGraphs.of(2, 0, 0, 1, 1)));
     assertThat(Graphs.topologyHash(TestGraphs.isolated(3)))
         .isNotEqualTo(Graphs.topologyHash(TestGraphs.isolated(4)));
+  }
+
+  @Test
+  void topologyHashKeepsItsValuesAcrossReleases() {
+    // Fixed values: only a release that announces a new hash in its changelog may change them.
+    long[] hashes = {
+        Graphs.topologyHash(TestGraphs.empty()),
+        Graphs.topologyHash(TestGraphs.isolated(1)),
+        Graphs.topologyHash(TestGraphs.of(3, 0, 1, 0, 2, 2, 0)),
+        Graphs.topologyHash(TestGraphs.of(4, 0, 1, 1, 2, 2, 3, 3, 0, 3, 3))};
+    assertThat(hashes).containsExactly(
+        -5442815153047339753L, 481960320753566714L, -2177113494002845099L, -7127685637304178848L);
   }
 }

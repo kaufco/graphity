@@ -2,7 +2,6 @@ package com.kobayami.graphity;
 
 import it.unimi.dsi.fastutil.ints.IntList;
 import java.util.Arrays;
-import java.util.Objects;
 
 /**
  * Depth-first preorder of the nodes reachable from a list of entries - the first step of
@@ -62,10 +61,8 @@ final class DfsPreorder {
           + " keeps two ints per node in its working arrays and so requires nodeCount < 2^30 - 2,"
           + " but was " + n);
     }
+    Graphs.checkNodes(entries, n);
     int entryCount = entries.size();
-    for (int i = 0; i < entryCount; i++) {
-      Objects.checkIndex(entries.getInt(i), n);
-    }
     int[] out = Csr.outAdjacencyStart(graph);
     int[] adj = Csr.outAdjacency(graph);
 
@@ -74,7 +71,7 @@ final class DfsPreorder {
     var parent = new int[n + 1];
     order[0] = -1;
     parent[0] = -1;
-    // Each frame is (node, resume cursor), interleaved, so a frame is one cache line.
+    // A frame is (node, resume cursor), interleaved, so both reads of a frame hit one cache line.
     var frames = new int[2 * Math.max(16, Math.min(n, 1024))];
     int count = 0;
 

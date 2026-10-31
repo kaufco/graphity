@@ -11,7 +11,7 @@ import java.util.function.IntPredicate;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Writes a graph as a Mermaid flowchart, with labels, shapes, classes and link styles taken from
+ * Writes a graph as a Mermaid flowchart, with labels, shapes, classes and edge styles taken from
  * the caller's data by node ID and edge index.
  *
  * <pre>{@code
@@ -21,7 +21,7 @@ import org.jspecify.annotations.Nullable;
  *     .nodeShape(node -> node == entry ? MermaidWriter.Shape.CIRCLE : MermaidWriter.Shape.RECTANGLE)
  *     .classDef("hot", "fill:#f96")
  *     .nodeClass(node -> isHot[node] ? "hot" : null)
- *     .linkStyle(edge -> isBackEdge[edge] ? "stroke:red" : null)
+ *     .edgeStyle(edge -> isBackEdge[edge] ? "stroke:red" : null)
  *     .clusters(sccs, scc -> "SCC " + scc)
  *     .write(out);
  * }</pre>
@@ -102,7 +102,7 @@ public final class MermaidWriter {
   private @Nullable IntFunction<@Nullable String> edgeLabel;
   private @Nullable IntFunction<@Nullable Shape> nodeShape;
   private @Nullable IntFunction<@Nullable String> nodeClass;
-  private @Nullable IntFunction<@Nullable String> linkStyle;
+  private @Nullable IntFunction<@Nullable String> edgeStyle;
 
   private MermaidWriter(Graph graph) {
     this.selection = new Selection(graph);
@@ -205,16 +205,16 @@ public final class MermaidWriter {
   }
 
   /**
-   * Sets the style of each link, by edge index, written as {@code linkStyle}; {@code null}
-   * leaves a link as it is.
+   * Sets the style of each edge, by edge index, written as Mermaid's {@code linkStyle} statement;
+   * {@code null} leaves an edge as it is.
    * <p>
    * <strong>Time:</strong> O(1).
    *
    * @param style the style of an edge, such as {@code stroke:red,stroke-width:2px}
    * @return this writer
    */
-  public MermaidWriter linkStyle(IntFunction<@Nullable String> style) {
-    this.linkStyle = style;
+  public MermaidWriter edgeStyle(IntFunction<@Nullable String> style) {
+    this.edgeStyle = style;
     return this;
   }
 
@@ -230,11 +230,7 @@ public final class MermaidWriter {
    * @throws IllegalArgumentException if the partition covers a different number of nodes
    */
   public MermaidWriter clusters(NodePartition partition, IntFunction<@Nullable String> label) {
-    if (partition.nodeCount() != selection.graph.nodeCount()) {
-      throw new IllegalArgumentException("the partition covers " + partition.nodeCount()
-          + " nodes, the graph has " + selection.graph.nodeCount());
-    }
-    selection.clusters = new Selection.Clusters(partition, label);
+    selection.clusters(partition, label);
     return this;
   }
 
@@ -274,7 +270,7 @@ public final class MermaidWriter {
    * @param out where to write; not closed
    * @throws IOException if {@code out} throws
    * @throws IllegalArgumentException if a hook returns a class name that is not an identifier or
-   *                                  is {@code end}, or an empty link style or one with a line
+   *                                  is {@code end}, or an empty edge style or one with a line
    *                                  break or semicolon; what was written before stays in
    *                                  {@code out}
    */
@@ -295,7 +291,7 @@ public final class MermaidWriter {
         boolean opened = false;
         for (int i = 0; i < nodes.size(); i++) {
           int node = nodes.getInt(i);
-          if (!selection.includes(node)) continue;
+          if (!selection.isIncluded(node)) continue;
           if (!opened) {
             out.append("  subgraph c").append(Integer.toString(group));
             String label = clusters.label().apply(group);
@@ -313,24 +309,22 @@ public final class MermaidWriter {
       }
     }
     for (int node = 0; node < n; node++) {
-      if (selection.includes(node) && selection.clusterOf(node) < 0) writeNode(node, "  ", out);
+      if (selection.isIncluded(node) && selection.clusterOf(node) < 0) writeNode(node, "  ", out);
     }
 
-    String link = selection.undirected ? " --- " : " --> ";
+    String link = selection.undirected ? " ---" : " -->";
     var styles = new StringBuilder();
     int[] ordinal = {0};
     selection.forEachWrittenEdge((source, target, edgeIndex) -> {
-      out.append("  n").append(Integer.toString(source));
+      out.append("  n").append(Integer.toString(source)).append(link);
       String label = edgeLabel == null ? null : edgeLabel.apply(edgeIndex);
-      if (label == null) {
-        out.append(link);
-      } else {
-        out.append(link, 0, link.length() - 1).append('|');
+      if (label != null) {
+        out.append('|');
         quote(label, out);
-        out.append("| ");
+        out.append('|');
       }
-      out.append('n').append(Integer.toString(target)).append('\n');
-      String style = linkStyle == null ? null : linkStyle.apply(edgeIndex);
+      out.append(" n").append(Integer.toString(target)).append('\n');
+      String style = edgeStyle == null ? null : edgeStyle.apply(edgeIndex);
       if (style != null) {
         styles.append("  linkStyle ").append(ordinal[0]).append(' ').append(checkStyle(style))
             .append('\n');
@@ -340,7 +334,7 @@ public final class MermaidWriter {
 
     if (nodeClass != null) {
       for (int node = 0; node < n; node++) {
-        if (!selection.includes(node)) continue;
+        if (!selection.isIncluded(node)) continue;
         String className = nodeClass.apply(node);
         if (className != null) {
           out.append("  class n").append(Integer.toString(node)).append(' ')

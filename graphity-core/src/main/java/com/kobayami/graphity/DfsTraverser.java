@@ -16,12 +16,12 @@ import java.util.Objects;
  * This covers the large majority of user traversals: pre/postorder processing, subtree pruning,
  * reachability, DFS ordering, cycle detection via {@link #isOnStack(int)}, and depth tracking.
  * It cannot express edge-centric algorithms that must inspect edges to already-visited nodes;
- * for those, use {@link IterativeDfsEdgeTraverser}, which reports every edge with the state of
+ * for those, use {@link DfsEdgeTraverser}, which reports every edge with the state of
  * its target, or the ready-made {@link Components}, {@link EdgeTypes} and {@link BackEdges}.
  *
  * <h2>Example: parenthesized DFS trace</h2>
  * <pre>{@code
- * class TraceDfs extends IterativeDfsTraverser {
+ * class TraceDfs extends DfsTraverser {
  *     TraceDfs(Graph graph) { super(graph); }
  *     @Override protected boolean enterNode(int node) {
  *         System.out.print("(" + node);
@@ -36,7 +36,7 @@ import java.util.Objects;
  *
  * <h2>Example: depth-limited DFS (cut)</h2>
  * <pre>{@code
- * class ShallowDfs extends IterativeDfsTraverser {
+ * class ShallowDfs extends DfsTraverser {
  *     final int maxDepth;
  *     int depth;
  *     ShallowDfs(Graph graph, int maxDepth) {
@@ -57,19 +57,24 @@ import java.util.Objects;
  * <p>Discovery order is that of a textbook recursive depth-first search: out-neighbors are scanned
  * in ascending adjacency order, descending immediately into the first unvisited child.
  * <p>{@code run} methods may be called <strong>multiple times</strong>, and freely combined
- * (e.g., {@code run(int); run(); runFromNodes(list)}). Already-visited nodes are never revisited -
+ * (e.g., {@code run(int); run(); run(list)}). Already-visited nodes are never revisited -
  * the visited set is cumulative across calls. {@link #leaveNode(int)} is invoked exactly once for
  * every visited node, including nodes whose subtree was pruned by {@link #enterNode(int)}, unless
  * the traversal is stopped before with {@link #stop()}.
+ * <p>A hook must not call a {@code run} method of the same instance; such a call throws
+ * {@link IllegalStateException}. The list passed to {@link #run(IntList)} must not be modified
+ * until that call returns. If a {@code run} call ends with an exception - thrown by a hook
+ * or by the traversal itself - the state of the instance is undefined (nodes of the interrupted
+ * path may still count as on the stack, for instance); use a new instance for further runs.
  * <p>
  * <strong>Memory:</strong> O(nodeCount) - visited/on-stack state is packed 2 bits per node into a
  * single {@code int[]}; the explicit stack grows on demand up to the longest DFS path.
  *
  * @see Graph
- * @see IterativeDfsEdgeTraverser
+ * @see DfsEdgeTraverser
  * @see Graphs#rootNodes(BiAdjacentGraph)
  */
-public abstract class IterativeDfsTraverser {
+public abstract class DfsTraverser {
 
   /** Bit 0 of a node's packed state: the node has been discovered. */
   private static final int VISITED = 0b01;
@@ -99,12 +104,15 @@ public abstract class IterativeDfsTraverser {
   /** Set by {@link #stop()}; cleared when a {@code run} call starts. */
   private boolean stopRequested;
 
+  /** Set while a {@code run} call is in progress, so that a hook cannot start another one. */
+  private boolean running;
+
   /**
    * Creates a traverser for the given graph.
    *
    * @param graph the graph to traverse
    */
-  protected IterativeDfsTraverser(Graph graph) {
+  protected DfsTraverser(Graph graph) {
     this.graph = graph;
     int n = graph.nodeCount();
     this.state = new int[(n >> 4) + 1];
@@ -184,14 +192,19 @@ public abstract class IterativeDfsTraverser {
    *
    * @throws IllegalArgumentException if a depth-first path is longer than 2^30 - 5 nodes, the most
    *     frames an array can hold
+   * @throws IllegalStateException if called from a hook, while a {@code run} call is in progress
    */
   public final void run() {
-    stopRequested = false;
-    int n = graph.nodeCount();
-    for (int root = 0; root < n; root++) {
-      if (!dfsIfUnvisited(root)) {
-        return;
+    begin();
+    try {
+      int n = graph.nodeCount();
+      for (int root = 0; root < n; root++) {
+        if (!dfsIfUnvisited(root)) {
+          return;
+        }
       }
+    } finally {
+      running = false;
     }
   }
 
@@ -207,11 +220,16 @@ public abstract class IterativeDfsTraverser {
    * @throws IndexOutOfBoundsException if {@code startNode} is out of range
    * @throws IllegalArgumentException if a depth-first path is longer than 2^30 - 5 nodes, the most
    *     frames an array can hold
+   * @throws IllegalStateException if called from a hook, while a {@code run} call is in progress
    */
   public final void run(int startNode) {
     Objects.checkIndex(startNode, graph.nodeCount());
-    stopRequested = false;
-    dfsIfUnvisited(startNode);
+    begin();
+    try {
+      dfsIfUnvisited(startNode);
+    } finally {
+      running = false;
+    }
   }
 
   /**
@@ -223,17 +241,36 @@ public abstract class IterativeDfsTraverser {
    * <p>
    * <strong>Time:</strong> O(reachable nodes + reachable edges).
    *
-   * @param startNodes the start nodes, visited in list order
+   * @param startNodes the start nodes, each in {@code 0..nodeCount()-1}, visited in list order
+   * @throws IndexOutOfBoundsException if a start node is out of range; then no node is visited
    * @throws IllegalArgumentException if a depth-first path is longer than 2^30 - 5 nodes, the most
    *     frames an array can hold
+   * @throws IllegalStateException if called from a hook, while a {@code run} call is in progress
    */
-  public final void runFromNodes(IntList startNodes) {
-    stopRequested = false;
-    for (int i = 0; i < startNodes.size(); i++) {
-      if (!dfsIfUnvisited(startNodes.getInt(i))) {
-        return;
+  public final void run(IntList startNodes) {
+    Graphs.checkNodes(startNodes, graph.nodeCount());
+    begin();
+    try {
+      for (int i = 0; i < startNodes.size(); i++) {
+        if (!dfsIfUnvisited(startNodes.getInt(i))) {
+          return;
+        }
       }
+    } finally {
+      running = false;
     }
+  }
+
+  /**
+   * Starts a {@code run} call after its argument checks: rejects a call from a hook and clears an
+   * earlier {@link #stop()}. The caller clears {@link #running} in a {@code finally}.
+   */
+  private void begin() {
+    if (running) {
+      throw new IllegalStateException("a run is in progress; a hook must not start another run");
+    }
+    running = true;
+    stopRequested = false;
   }
 
   /**
@@ -247,8 +284,7 @@ public abstract class IterativeDfsTraverser {
 
   /**
    * Iterative DFS from {@code root} (assumed unvisited). The tight inner scan keeps
-   * {@code i}/{@code end} in registers and touches the stack/cursor arrays only when
-   * actually descending.
+   * {@code i}/{@code end} in registers and touches the stack only when descending.
    *
    * @return {@code false} if the traversal was stopped
    */
@@ -266,7 +302,6 @@ public abstract class IterativeDfsTraverser {
       return false;
     }
     if (!descend) {
-      // Pruned root: no descent, immediate postorder.
       state[root >> 4] &= ~(ON_STACK << rShift);
       leaveNode(root);
       return !stopRequested;
@@ -292,7 +327,7 @@ public abstract class IterativeDfsTraverser {
             return false;
           }
           if (descend) {
-            frames[2 * top + 1] = i;  // save u's resume point before descending
+            frames[2 * top + 1] = i;
             if (++top == frames.length >> 1) {
               frames = DfsFrames.grow(frames, graph.nodeCount());
               this.frames = frames;  // keep the grown capacity for later run calls
@@ -301,8 +336,7 @@ public abstract class IterativeDfsTraverser {
             frames[2 * top + 1] = out[v];
             continue outer;
           }
-          // Pruned: no descent, immediate postorder. u's scan continues with the
-          // already-advanced local i (the frame's cursor is only updated when descending).
+          // The frame's cursor is saved only on descent; u's scan goes on from the local i.
           state[v >> 4] &= ~(ON_STACK << shift);
           leaveNode(v);
           if (stopRequested) {
@@ -311,7 +345,6 @@ public abstract class IterativeDfsTraverser {
           }
         }
       }
-      // Postorder u.
       state[u >> 4] &= ~(ON_STACK << ((u & 0xF) << 1));
       leaveNode(u);
       top--;

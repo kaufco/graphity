@@ -44,8 +44,16 @@ articulation points, biconnected components, strong bridges</td></tr>
 {@link com.kobayami.graphity.controlflow.ControlFlow}</td></tr>
 <tr><td>How do I contract, filter or renumber a graph?</td>
 <td>{@link com.kobayami.graphity.NodePartition},
-{@link com.kobayami.graphity.Graphs#remapped(com.kobayami.graphity.Graph, com.kobayami.graphity.NodeMapping)},
-{@link com.kobayami.graphity.NodeMapping}</td></tr>
+{@link com.kobayami.graphity.Graphs#remapped(com.kobayami.graphity.Graph, com.kobayami.graphity.NodeMapping)}
+with a {@link com.kobayami.graphity.NodeMapping} from
+{@link com.kobayami.graphity.NodeMapping#forSubgraph(java.util.BitSet)},
+{@link com.kobayami.graphity.NodeMapping#forPermutation(it.unimi.dsi.fastutil.ints.IntList)},
+{@link com.kobayami.graphity.NodeMapping#reindex(com.kobayami.graphity.Graph)} or
+{@link com.kobayami.graphity.NodeMapping#of(int[])}</td></tr>
+<tr><td>How does my edge data follow a transformation?</td>
+<td>{@link com.kobayami.graphity.Graphs#edgeMapping(com.kobayami.graphity.Graph, com.kobayami.graphity.Graph, com.kobayami.graphity.NodeMapping)},
+{@link com.kobayami.graphity.Graphs#transposedEdgeMapping(com.kobayami.graphity.Graph)},
+{@link com.kobayami.graphity.Graphs#edgePartition(com.kobayami.graphity.Graph, com.kobayami.graphity.NodePartition)}</td></tr>
 <tr><td>How do I build a graph?</td>
 <td>{@link com.kobayami.graphity.GraphBuilder}, or
 {@link com.kobayami.graphity.Graph#of(int[], int[])} from CSR arrays</td></tr>
@@ -62,7 +70,8 @@ the graph, the builder and every algorithm that applies to any directed graph, a
 {@code graphity-controlflow} with the analyses that need the concepts of control flow, and
 {@code graphity-io} with writers for DOT and Mermaid. The package documentation of
 {@link com.kobayami.graphity}, {@link com.kobayami.graphity.controlflow} and
-{@link com.kobayami.graphity.io} lists every entry point with a short description.
+{@link com.kobayami.graphity.io} lists the main entry points by topic, each with a short
+description.
 </p>
 </body>
 </html>

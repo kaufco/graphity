@@ -47,14 +47,6 @@ class GraphTest {
     assertThat(g.outDegree(3)).isZero();
   }
 
-  @Test
-  void degreeOnUniAdjacentGraphEqualsOutDegree() {
-    var g = TestGraphs.of(4, 0, 1, 0, 2, 1, 3, 2, 3);
-    for (int i = 0; i < g.nodeCount(); i++) {
-      assertThat(g.degree(i)).isEqualTo(g.outDegree(i));
-    }
-  }
-
   @ParameterizedTest
   @ValueSource(ints = {-1, 4, 1000})
   void outDegreeOutOfRangeThrows(int node) {
@@ -383,7 +375,7 @@ class GraphTest {
     for (int v = 0; v < 9; v++) {
       for (int t = 0; t < 7; t++) b.addEdge(v, t);
     }
-    b.addEdges(9, 0, 1);
+    b.addOutEdges(9, 0, 1);
     assertThat(b.build().toString()).endsWith("9 -> [0, ...]}");
   }
 

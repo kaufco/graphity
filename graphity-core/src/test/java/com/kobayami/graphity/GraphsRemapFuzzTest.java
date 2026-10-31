@@ -59,8 +59,8 @@ class GraphsRemapFuzzTest {
       var nm = NodeMapping.forSubgraph(selected);
       var sub = Graphs.remapped(g, nm);
 
-      int[] newToOld = new int[nm.size()];
-      for (int newId = 0; newId < nm.size(); newId++) newToOld[newId] = nm.get(newId);
+      int[] newToOld = new int[nm.mappedCount()];
+      for (int newId = 0; newId < nm.mappedCount(); newId++) newToOld[newId] = nm.get(newId);
 
       assertThat(translatedEdges(sub, newToOld))
           .as("induced edge set for %s", labeled.describe())

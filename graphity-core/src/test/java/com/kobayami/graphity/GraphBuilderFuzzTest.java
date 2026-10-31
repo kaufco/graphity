@@ -93,13 +93,13 @@ class GraphBuilderFuzzTest {
       var fanOutArray = new GraphBuilder();
       fanOutArray.addNodes(edges.nodeCount());
       for (int node = 0; node < edges.nodeCount(); node++) {
-        fanOutArray.addEdges(node, bySource[node].toIntArray());
+        fanOutArray.addOutEdges(node, bySource[node].toIntArray());
       }
 
       var fanOutList = new GraphBuilder();
       fanOutList.addNodes(edges.nodeCount());
       for (int node = 0; node < edges.nodeCount(); node++) {
-        fanOutList.addEdges(node, bySource[node]);
+        fanOutList.addOutEdges(node, bySource[node]);
       }
 
       var fanInArray = new GraphBuilder();
@@ -168,8 +168,8 @@ class GraphBuilderFuzzTest {
       var fanOutArray = new GraphBuilder();
       var fanOutList = new GraphBuilder();
       for (int node = 0; node < referenced; node++) {
-        fanOutArray.addEdgesAndNodes(node, bySource[node].toIntArray());
-        fanOutList.addEdgesAndNodes(node, bySource[node]);
+        fanOutArray.addOutEdgesAndNodes(node, bySource[node].toIntArray());
+        fanOutList.addOutEdgesAndNodes(node, bySource[node]);
       }
 
       var byTarget = group(edges, false, referenced);
@@ -186,9 +186,9 @@ class GraphBuilderFuzzTest {
           .isEqualTo(reference);
       assertThat(edgeList.build()).as("addEdgesAndNodes from Edges for %s", edges.describe())
           .isEqualTo(reference);
-      assertThat(fanOutArray.build()).as("addEdgesAndNodes from int[] for %s", edges.describe())
+      assertThat(fanOutArray.build()).as("addOutEdgesAndNodes from int[] for %s", edges.describe())
           .isEqualTo(reference);
-      assertThat(fanOutList.build()).as("addEdgesAndNodes from IntList for %s", edges.describe())
+      assertThat(fanOutList.build()).as("addOutEdgesAndNodes from IntList for %s", edges.describe())
           .isEqualTo(reference);
       assertThat(fanInArray.build()).as("addInEdgesAndNodes from int[] for %s", edges.describe())
           .isEqualTo(reference);

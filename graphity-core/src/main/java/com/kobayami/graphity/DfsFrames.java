@@ -20,7 +20,7 @@ final class DfsFrames {
 
   private DfsFrames() {}
 
-  /** Initial capacity: up to 1024 frames, never more than the node count needs. */
+  /** Initial capacity: one frame per node, but at least 16 and at most 1024 frames. */
   static int[] initial(int nodeCount) {
     return new int[2 * Math.max(16, Math.min(nodeCount, 1024))];
   }

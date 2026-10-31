@@ -330,7 +330,7 @@ public final class ControlFlowAlternatives {
       int[] parent = dominators.immediateDominator;
       var forest = ParentForest.childrenOf(parent);
       childStart = forest.start();
-      children = forest.nodes();
+      children = forest.members();
       int n = parent.length;
       depth = new int[n];
       Arrays.fill(depth, -1);

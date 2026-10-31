@@ -72,12 +72,22 @@ class FrontierTraverserTest {
         .isInstanceOf(IndexOutOfBoundsException.class);
   }
 
+  @ParameterizedTest
+  @ValueSource(ints = {-1, 4, 1000})
+  void runFromNodeListOutOfRangeThrowsBeforeAnySeed(int startNode) {
+    var t = new RecordingFrontierTraverser(TestGraphs.isolated(4));
+    assertThatThrownBy(() -> t.run(IntList.of(0, startNode)))
+        .isInstanceOf(IndexOutOfBoundsException.class);
+    assertThat(t.visitOrder.isEmpty()).isTrue();
+    assertThat(t.isVisited(0)).as("valid seed before the bad one").isFalse();
+  }
+
   @Test
-  void runFromNodesAllSeedsAtLevelZero() {
+  void runFromNodeListPutsAllSeedsAtLevelZero() {
     // Disjoint: 0->1, 2->3, 4->5.
     var g = TestGraphs.of(6, 0, 1, 2, 3, 4, 5);
     var t = new RecordingFrontierTraverser(g);
-    t.runFromNodes(IntList.of(4, 0, 2));
+    t.run(IntList.of(4, 0, 2));
     assertThat(t.visitOrder.toIntArray()).containsExactly(4, 0, 2, 5, 1, 3);
     assertThat(t.levelAtVisit.toIntArray()).containsExactly(0, 0, 0, 1, 1, 1);
     assertThat(t.completedLevels.toIntArray()).containsExactly(0, 1);
@@ -88,17 +98,17 @@ class FrontierTraverserTest {
     // Roots 0 and 3: 0 -> 1 -> 2, 3 -> 2.
     var g = BiAdjacentGraph.of(TestGraphs.of(4, 0, 1, 1, 2, 3, 2));
     var t = new RecordingFrontierTraverser(g);
-    t.runFromNodes(Graphs.rootNodes(g));
+    t.run(Graphs.rootNodes(g));
     assertThat(t.visitOrder.toIntArray()).containsExactly(0, 3, 1, 2);
     assertThat(t.levelAtVisit.toIntArray()).containsExactly(0, 0, 1, 1);
     assertThat(t.completedLevels.toIntArray()).containsExactly(0, 1);
   }
 
   @Test
-  void runFromNodesSkipsAlreadyVisited() {
+  void runFromNodeListSkipsAlreadyVisited() {
     var t = new RecordingFrontierTraverser(TestGraphs.path(4));
     t.run(0);
-    t.runFromNodes(IntList.of(1, 2));
+    t.run(IntList.of(1, 2));
     assertThat(t.visitOrder.toIntArray()).containsExactly(0, 1, 2, 3);
   }
 
@@ -108,7 +118,7 @@ class FrontierTraverserTest {
     var t = new RecordingFrontierTraverser(TestGraphs.of(4, 0, 1));
     t.run(0);
     t.run(1);
-    t.runFromNodes(IntList.of(0, 2, 2));
+    t.run(IntList.of(0, 2, 2));
     t.run();
     assertThat(t.visitOrder.toIntArray()).containsExactly(0, 1, 2, 3);
     assertThat(t.completedLevels.toIntArray()).containsExactly(0, 1, 0, 0);
@@ -117,7 +127,7 @@ class FrontierTraverserTest {
   @Test
   void runFromEmptyNodeListIsNoOp() {
     var t = new RecordingFrontierTraverser(TestGraphs.path(3));
-    t.runFromNodes(new IntArrayList());
+    t.run(new IntArrayList());
     assertThat(t.visitOrder.isEmpty()).isTrue();
   }
 
@@ -156,14 +166,14 @@ class FrontierTraverserTest {
   }
 
   @Test
-  void onLevelCompleteFiresForEachLevel() {
+  void leaveLevelFiresForEachLevel() {
     var t = new RecordingFrontierTraverser(TestGraphs.path(4));
     t.run(0);
     assertThat(t.completedLevels.toIntArray()).containsExactly(0, 1, 2, 3);
   }
 
   @Test
-  void onLevelCompleteFiresOncePerTreeInForest() {
+  void leaveLevelFiresOncePerTreeInForest() {
     // Two components: 0->1 (2 levels) and 2->3->4 (3 levels).
     var g = TestGraphs.of(5, 0, 1, 2, 3, 3, 4);
     var t = new RecordingFrontierTraverser(g);
@@ -173,7 +183,7 @@ class FrontierTraverserTest {
   }
 
   @Test
-  void onLevelCompleteNotFiredForEmptyGraph() {
+  void leaveLevelNotFiredForEmptyGraph() {
     var t = new RecordingFrontierTraverser(TestGraphs.empty());
     t.run();
     assertThat(t.completedLevels.isEmpty()).isTrue();
@@ -200,6 +210,13 @@ class FrontierTraverserTest {
     var t = new ExposedEnqueueFrontier(g);
     assertThat(t.callEnqueue(1)).isTrue();
     assertThat(t.callEnqueue(1)).isFalse();
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {-1, 3, 1000})
+  void enqueueOutOfRangeThrows(int node) {
+    var t = new ExposedEnqueueFrontier(TestGraphs.isolated(3));
+    assertThatThrownBy(() -> t.callEnqueue(node)).isInstanceOf(IndexOutOfBoundsException.class);
   }
 
   @Test
@@ -261,17 +278,23 @@ class FrontierTraverserTest {
   void stopAtTheFirstSeedDropsTheOtherSeedsOfTheSameLevel() {
     var t = new StoppingFrontier(TestGraphs.of(4, 0, 1, 2, 3));
     t.stopOnVisit = 0;
-    t.runFromNodes(IntList.of(0, 2));
+    t.run(IntList.of(0, 2));
     assertThat(t.visits.toIntArray()).containsExactly(0);
     assertThat(t.levels.toIntArray()).isEmpty();
   }
 
-  /** Records visits and completed levels; stops when visiting a node or completing a level. */
+  /**
+   * Records visits, their levels and completed levels; stops when visiting a node or completing a
+   * level, and enqueues a node when completing a level.
+   */
   private static class StoppingFrontier extends FrontierTraverser {
     final IntArrayList visits = new IntArrayList();
+    final IntArrayList visitLevels = new IntArrayList();
     final IntArrayList levels = new IntArrayList();
     int stopOnVisit = -1;
     int stopOnLevel = -1;
+    int enqueueOnLevel = -1;
+    int nodeToEnqueue = -1;
 
     StoppingFrontier(Graph graph) {
       super(graph);
@@ -279,14 +302,18 @@ class FrontierTraverserTest {
 
     @Override protected void visitNode(int node) {
       visits.add(node);
+      visitLevels.add(currentLevel());
       enqueueChildren(node);
       if (node == stopOnVisit) {
         stop();
       }
     }
 
-    @Override protected void onLevelComplete(int level) {
+    @Override protected void leaveLevel(int level) {
       levels.add(level);
+      if (level == enqueueOnLevel) {
+        enqueue(nodeToEnqueue);
+      }
       if (level == stopOnLevel) {
         stop();
       }
@@ -310,7 +337,7 @@ class FrontierTraverserTest {
   }
 
   @Test
-  void stopInOnLevelCompleteEndsTheRun() {
+  void stopInLeaveLevelEndsTheRun() {
     // Binary tree: 0 -> 1, 2; 1 -> 3, 4; 2 -> 5, 6.
     var t = new StoppingFrontier(TestGraphs.of(7, 0, 1, 0, 2, 1, 3, 1, 4, 2, 5, 2, 6));
     t.stopOnLevel = 1;
@@ -341,12 +368,67 @@ class FrontierTraverserTest {
   }
 
   @Test
-  void runFromNodesClearsAnEarlierStop() {
+  void runFromNodeListClearsAnEarlierStop() {
     var t = new StoppingFrontier(TestGraphs.of(3, 1, 2));
     t.stopOnVisit = 0;
     t.run(0);
     t.stopOnVisit = -1;
-    t.runFromNodes(IntList.of(1));
+    t.run(IntList.of(1));
     assertThat(t.visits.toIntArray()).containsExactly(0, 1, 2);
+  }
+
+  // ---- run from a hook ----
+
+  /**
+   * Calls the run method {@link #variant} of its own from the hook {@link #nestIn} while
+   * {@link #nest} is set.
+   */
+  private static final class NestingFrontier extends FrontierTraverser {
+    final IntArrayList visits = new IntArrayList();
+    int nestIn;  // 0: visitNode, 1: leaveLevel
+    int variant;  // 0: run(), 1: run(int), 2: run(IntList)
+    boolean nest = true;
+
+    NestingFrontier(Graph graph) {
+      super(graph);
+    }
+
+    @Override protected void visitNode(int node) {
+      visits.add(node);
+      enqueueChildren(node);
+      if (nestIn == 0 && nest) runVariant(3);
+    }
+
+    @Override protected void leaveLevel(int level) {
+      if (nestIn == 1 && nest) runVariant(3);
+    }
+
+    void runVariant(int node) {
+      switch (variant) {
+        case 0 -> run();
+        case 1 -> run(node);
+        default -> run(IntList.of(node));
+      }
+    }
+  }
+
+  @Test
+  void runFromAHookThrowsAndALaterRunStillStarts() {
+    // 0 -> 1, 2 -> 3: a nested run during a run from 0 is rejected, then run(2) works as usual.
+    for (int hook = 0; hook < 2; hook++) {
+      for (int variant = 0; variant < 3; variant++) {
+        var t = new NestingFrontier(TestGraphs.of(4, 0, 1, 2, 3));
+        t.nestIn = hook;
+        t.variant = variant;
+        assertThatThrownBy(() -> t.runVariant(0)).as("hook %d, variant %d", hook, variant)
+            .isInstanceOf(IllegalStateException.class);
+        assertThat(t.isVisited(3)).as("hook %d, variant %d", hook, variant).isFalse();
+
+        t.nest = false;
+        t.run(2);
+        assertThat(t.visits.toIntArray()).as("hook %d, variant %d", hook, variant)
+            .contains(2, 3);
+      }
+    }
   }
 }

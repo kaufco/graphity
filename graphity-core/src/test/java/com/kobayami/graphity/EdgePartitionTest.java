@@ -8,9 +8,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
- * EdgePartition's CSR/get/size/inverse logic is structurally identical to NodePartition.
+ * EdgePartition shares its CSR/get/sizeOf/reduce logic with NodePartition through IndexPartition.
  * Here we focus on EdgePartition-specific aspects: partial mapping (intra-group edges
- * map to -1), edgeCount()/edgesOf() delegation, and inverted() throwing.
+ * map to -1) and edgeCount()/edgesOf() delegation.
  * Integration with Graphs.edgePartition(...) is covered in GraphsTest.
  */
 class EdgePartitionTest {
@@ -28,7 +28,7 @@ class EdgePartitionTest {
     int[] mapping = {0, 0, -1, 1, -1, 2};
     int[] members = {0, 1, 3, 5};
     int[] memberStart = {0, 2, 3, 4};
-    return new EdgePartition(mapping, 4, true, members, memberStart);
+    return new EdgePartition(mapping, members, memberStart);
   }
 
   @Test
@@ -54,9 +54,19 @@ class EdgePartitionTest {
     assertThat(p.get(5)).isEqualTo(2);
   }
 
+  @ParameterizedTest
+  @ValueSource(ints = {-1, 6, 100})
+  void getOutOfRangeThrows(int edge) {
+    var p = sampleEdgePartition();
+    assertThatThrownBy(() -> p.get(edge)).isInstanceOf(IndexOutOfBoundsException.class);
+    assertThatThrownBy(() -> p.isMapped(edge)).isInstanceOf(IndexOutOfBoundsException.class);
+  }
+
   @Test
   void isPartialTrueWhenIntraGroupEdgesPresent() {
-    assertThat(sampleEdgePartition().isPartial()).isTrue();
+    var p = sampleEdgePartition();
+    assertThat(p.isPartial()).isTrue();
+    assertThat(p.mappedCount()).isEqualTo(4);
   }
 
   @Test
@@ -120,5 +130,15 @@ class EdgePartitionTest {
         .isInstanceOf(IllegalArgumentException.class);
     assertThatThrownBy(() -> p.reduce(new String[6], new String[2], String::concat))
         .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  void reduceRejectsTheSameArrayForValuesAndGroupValues() {
+    // Three edges in three singleton groups, so both arrays have the same length.
+    var p = new EdgePartition(new int[] {1, 0, 2}, new int[] {1, 0, 2}, new int[] {0, 1, 2, 3});
+    String[] values = {"a", "b", "c"};
+    assertThatThrownBy(() -> p.reduce(values, values, String::concat))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThat(values).containsExactly("a", "b", "c");
   }
 }

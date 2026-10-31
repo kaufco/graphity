@@ -60,7 +60,7 @@ class TopOrderTest {
   void ofGraphWithCycleThrows() {
     assertThatThrownBy(() -> TopOrder.of(TestGraphs.cycle(3)))
         .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("cycle");
+        .hasMessage("graph contains a cycle");
   }
 
   @Test

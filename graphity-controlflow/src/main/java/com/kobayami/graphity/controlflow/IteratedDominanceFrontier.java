@@ -90,10 +90,10 @@ public final class IteratedDominanceFrontier {
     var subtreeSize = new int[n];
     var depth = new int[n];
 
-    // Canonical preorder - roots ascending, children ascending. Every node is pushed exactly
-    // once, so the stack fits in n slots; the subtree-size array serves as the stack until it is
-    // filled below. Preorder visits every parent before its children, so depth follows on the
-    // way.
+    // Canonical preorder - roots ascending, children ascending - as ParentForest.preorder in the
+    // core computes it; change both together. Every node is pushed exactly once, so the stack fits
+    // in n slots; the subtree-size array serves as the stack until it is filled below. Preorder
+    // visits every parent before its children, so depth follows on the way.
     int[] stack = subtreeSize;
     int top = 0;
     for (int node = n - 1; node >= 0; node--) {
@@ -172,19 +172,18 @@ public final class IteratedDominanceFrontier {
       int rootDepth = heap[0];
       int root = heap[1];
       heapSize = pop(heap, heapSize);
-      walked.add(root);
       int position = preorderIndex[root];
       int end = position + subtreeSize[root];
       while (position < end) {
         int x = order[position];
-        if (x != root && !walked.add(x)) {
+        if (!walked.add(x)) {
           position += subtreeSize[x];
           continue;
         }
         for (int i = out[x], last = out[x + 1]; i < last; i++) {
           int y = adj[i];
-          // Edges into the dominator subtree of x are deeper than the root and fall out here,
-          // so only edges that leave the subtree remain.
+          // Targets deeper than the root lie strictly inside its subtree and fall out here; what
+          // remains - the root itself or a node beyond its subtree - is in its frontier.
           int yDepth = depth[y];
           if (yDepth > rootDepth || !inFrontier.add(y)) continue;
           result.add(y);

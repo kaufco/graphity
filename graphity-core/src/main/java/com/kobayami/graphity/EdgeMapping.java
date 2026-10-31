@@ -14,7 +14,7 @@ import org.jspecify.annotations.Nullable;
  * <p>
  * Instances are created via {@link Graphs#edgeMapping(Graph, Graph, NodeMapping)} and
  * {@link Graphs#transposedEdgeMapping(Graph)}.
- * Use {@link #inverted()} to obtain the reverse direction,
+ * Use {@link #inverted(int)} to obtain the reverse direction,
  * {@link #compose(EdgeMapping)} to chain multiple mappings, and {@link #gather(int[])} to carry
  * per-edge data along.
  *
@@ -46,25 +46,36 @@ public final class EdgeMapping extends IndexMapping {
    *
    * @param mapping    the mapping array (not copied - caller must not retain a reference)
    * @param validCount number of non-negative entries in {@code mapping}
-   * @param partial    whether the mapping contains unmapped entries ({@code -1})
    */
-  EdgeMapping(int[] mapping, int validCount, boolean partial) {
-    super(mapping, validCount, partial);
+  EdgeMapping(int[] mapping, int validCount) {
+    super(mapping, validCount);
   }
 
   /**
-   * Creates the inverse mapping (target → source).
+   * Creates the inverse mapping (target → source) over a target space of {@code targetCount}
+   * edge indices.
    * <p>
-   * <strong>Time:</strong> O(n).<br>
-   * <strong>Memory:</strong> O(max target index) for the inverse array.
+   * Each target value in this mapping becomes a source in the inverse, and vice versa. The
+   * inverse covers every index in {@code 0..targetCount-1}; an index that no source maps to maps
+   * to {@code -1}, and then the inverse is partial. For a mapping from new to old edge indices,
+   * as {@link Graphs#edgeMapping(Graph, Graph, NodeMapping)} produces it, {@code targetCount} is
+   * the edge count of the old graph:
    *
-   * @return the inverse edge mapping
-   * @throws IllegalArgumentException if multiple source indices map to the same target
+   * <pre>{@code
+   * EdgeMapping oldToNew = newToOld.inverted(oldGraph.edgeCount());
+   * }</pre>
+   *
+   * <strong>Time:</strong> O(n + targetCount) where n = source space size.<br>
+   * <strong>Memory:</strong> 4 x targetCount bytes for the inverse array.
+   *
+   * @param targetCount size of the target space, which becomes the source space of the inverse
+   * @return the inverse edge mapping, with {@link #indexCount()} equal to {@code targetCount}
+   * @throws IllegalArgumentException  if {@code targetCount} is negative, or multiple source
+   *                                   indices map to the same target
+   * @throws IndexOutOfBoundsException if a target is {@code targetCount} or more
    */
-  public EdgeMapping inverted() {
-    int[] inv = computeInverse(mapping);
-    int valid = countValid(inv);
-    return new EdgeMapping(inv, valid, valid < inv.length);
+  public EdgeMapping inverted(int targetCount) {
+    return new EdgeMapping(invertArray(mapping, targetCount), mappedCount());
   }
 
   /**
@@ -77,11 +88,12 @@ public final class EdgeMapping extends IndexMapping {
    *
    * @param inner the inner mapping to apply first
    * @return the composed mapping
+   * @throws IndexOutOfBoundsException if {@code inner} maps to a value outside this mapping's
+   *                                   source space
    */
   public EdgeMapping compose(EdgeMapping inner) {
-    int[] comp = computeCompose(this.mapping, inner.mapping);
-    int valid = countValid(comp);
-    return new EdgeMapping(comp, valid, valid < comp.length);
+    int[] composed = composeArrays(this.mapping, inner.mapping);
+    return new EdgeMapping(composed, countValid(composed));
   }
 
   /**
@@ -103,7 +115,7 @@ public final class EdgeMapping extends IndexMapping {
    * @throws IndexOutOfBoundsException if a mapped target lies outside {@code values}
    */
   public int[] gather(int[] values) {
-    return gather(mapping, values);
+    return gatherArray(mapping, values);
   }
 
   /**
@@ -118,7 +130,7 @@ public final class EdgeMapping extends IndexMapping {
    * @throws IndexOutOfBoundsException if a mapped target lies outside {@code values}
    */
   public long[] gather(long[] values) {
-    return gather(mapping, values);
+    return gatherArray(mapping, values);
   }
 
   /**
@@ -133,24 +145,26 @@ public final class EdgeMapping extends IndexMapping {
    * @throws IndexOutOfBoundsException if a mapped target lies outside {@code values}
    */
   public double[] gather(double[] values) {
-    return gather(mapping, values);
+    return gatherArray(mapping, values);
   }
 
   /**
    * Carries per-edge objects from the target space into an array the caller allocated for the
    * source space: {@code newValues[i] = values[get(i)]}, and {@code newValues[i]} untouched
-   * where {@code i} is unmapped. References are copied, not the objects. The two arrays must
-   * be distinct; if an exception is thrown, {@code newValues} may be partly written.
+   * where {@code i} is unmapped. References are copied, not the objects. If an exception is
+   * thrown, {@code newValues} may be partly written.
    * <p>
    * <strong>Time:</strong> O(n) where n = source space size.
    *
    * @param <T>       element type, nullable or not
    * @param values    values indexed by the target space; must cover every mapped target
-   * @param newValues receives the values indexed by the source space; length n
-   * @throws IllegalArgumentException if {@code newValues.length} is not the source space size
+   * @param newValues receives the values indexed by the source space; length
+   *                  {@link #indexCount()}, and a different array than {@code values}
+   * @throws IllegalArgumentException if {@code newValues.length != indexCount()}, or both are the
+   *                                  same array
    * @throws IndexOutOfBoundsException if a mapped target lies outside {@code values}
    */
   public <T extends @Nullable Object> void gather(T[] values, T[] newValues) {
-    gather(mapping, values, newValues);
+    gatherArray(mapping, values, newValues);
   }
 }

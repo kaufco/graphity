@@ -16,9 +16,9 @@ import java.util.Objects;
  * <p>
  * The input must be a forest of <strong>out-trees</strong> - edges point from parent to child.
  * For a forest of in-trees, pass the transpose:
- * {@code Ancestry.of(BiAdjacentGraph.of(inTreeForest).transposed())}. A graph that is not a forest is rejected;
- * in a general directed acyclic graph a node can have several parents, and then the common
- * ancestors of two nodes have no unique deepest element.
+ * {@code Ancestry.of(BiAdjacentGraph.of(inTreeForest).transposed())}. A graph that is not a
+ * forest is rejected; in a general directed acyclic graph a node can have several parents, and
+ * then the common ancestors of two nodes have no unique deepest element.
  *
  * <pre>{@code
  * var ancestry = Ancestry.of(ast);
@@ -71,6 +71,8 @@ public sealed class Ancestry permits PreorderAncestry {
    * @throws IllegalArgumentException if the graph is not a forest of out-trees
    */
   public static Ancestry of(Graph forest) {
+    // The forest check is that of Graphs.computeForestInfo, here with witnesses for the
+    // messages; a change to what counts as a forest belongs in both.
     int n = forest.nodeCount();
     var adjacency = Csr.outAdjacency(forest);
     var adjacencyStart = Csr.outAdjacencyStart(forest);
@@ -92,8 +94,8 @@ public sealed class Ancestry permits PreorderAncestry {
     }
 
     // BFS from all roots. With in-degree ≤ 1 every node is enqueued at most once, so the queue
-    // doubles as a topological order: parents before children. Unreached nodes lie on a cycle -
-    // including a self-loop, whose node is not a root and is reached by nothing else.
+    // doubles as a topological order: parents before children. A node it misses lies on a cycle, a
+    // self-loop included, or below one.
     var depth = new int[n];
     Arrays.fill(depth, -1);
     var order = new int[n];
@@ -148,7 +150,7 @@ public sealed class Ancestry permits PreorderAncestry {
     // The dominator tree is acyclic by construction, so no check is needed.
     var forest = ParentForest.childrenOf(parent);
     int[] childStart = forest.start();
-    int[] children = forest.nodes();
+    int[] children = forest.members();
 
     var depth = new int[n];
     var order = new int[n];

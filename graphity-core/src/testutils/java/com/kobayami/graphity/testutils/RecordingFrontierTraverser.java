@@ -28,7 +28,7 @@ public final class RecordingFrontierTraverser extends FrontierTraverser {
   }
 
   @Override
-  protected void onLevelComplete(int level) {
+  protected void leaveLevel(int level) {
     completedLevels.add(level);
   }
 

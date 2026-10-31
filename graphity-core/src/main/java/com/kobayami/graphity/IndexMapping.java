@@ -1,25 +1,24 @@
 package com.kobayami.graphity;
 
 import java.util.Arrays;
-import java.util.function.BinaryOperator;
-import java.util.function.DoubleBinaryOperator;
-import java.util.function.IntBinaryOperator;
-import java.util.function.LongBinaryOperator;
+import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
  * Abstract base for unidirectional index mappings between two ID spaces.
  * <p>
- * Maps source indices to target indices. A target value of {@code -1} indicates that
- * the source index has no mapping (partial mapping). Inversion is defined only on the
- * invertible subclasses ({@link NodeMapping#inverted()}, {@link EdgeMapping#inverted()}),
- * not on partitions, which are many-to-one.
+ * Maps source indices in {@code 0..indexCount()-1} to target indices. A target value of
+ * {@code -1} indicates that the source index has no mapping (partial mapping). Inversion is
+ * defined only on the invertible subclasses ({@link NodeMapping#inverted(int)},
+ * {@link EdgeMapping#inverted(int)}), not on partitions, which are many-to-one.
  * <p>
- * {@link NodeMapping} and {@link EdgeMapping} specialize this base with one-to-one,
- * invertible mapping semantics, for node ID spaces and edge index spaces respectively.
- * {@link NodePartition} and {@link EdgePartition} specialize it with many-to-one
- * partition semantics instead, and additionally implement {@link IndexPartition} for
- * reverse (group → indices) lookup.
+ * {@link NodeMapping} and {@link EdgeMapping} specialize this base for node ID spaces and edge
+ * index spaces respectively, with one-to-one, invertible mapping semantics. One-to-one is a
+ * contract, not a check: the factories that derive a mapping guarantee it, but for
+ * {@link NodeMapping#of(int[])} it is the caller's responsibility, and a mapping that breaks it
+ * is rejected only by {@code inverted} and {@link Graphs#remapped(Graph, NodeMapping)}.
+ * {@link IndexPartition} specializes this base with many-to-one partition semantics instead, and
+ * adds the reverse (group → indices) lookup.
  * <p>
  * <strong>Memory:</strong> 4 x (source space size) bytes for the backing {@link #mapping} array.
  *
@@ -27,39 +26,36 @@ import org.jspecify.annotations.Nullable;
  * @see EdgeMapping
  * @see IndexPartition
  */
-public abstract sealed class IndexMapping permits NodeMapping, EdgeMapping, NodePartition, EdgePartition {
+public abstract sealed class IndexMapping permits NodeMapping, EdgeMapping, IndexPartition {
 
   /** Source-to-target mapping. {@code mapping[sourceId] = targetId}, or {@code -1} if unmapped. */
   final int[] mapping;
 
+  /** Number of non-negative entries in {@link #mapping}. */
   private final int validCount;
-  private final boolean partial;
 
   /**
-   * Package-private constructor. Used by factory methods and subclasses.
+   * Package-private constructor. Used by the subclasses.
    *
    * @param mapping    the mapping array (not copied - caller must not retain a reference)
    * @param validCount number of non-negative entries in {@code mapping}
-   * @param partial    whether the mapping contains unmapped entries ({@code -1})
    */
-  IndexMapping(int[] mapping, int validCount, boolean partial) {
+  IndexMapping(int[] mapping, int validCount) {
     this.mapping = mapping;
     this.validCount = validCount;
-    this.partial = partial;
   }
 
   /**
-   * Returns the target index for the given source index, or {@code -1} if unmapped.
-   * <p>
-   * Returns {@code -1} for out-of-range source indices (negative or &ge; source space size).
+   * Returns the target index for the given source index, or {@code -1} if it is unmapped.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param id source index
-   * @return target index, or {@code -1} if unmapped or out of range
+   * @param id source index in {@code 0..indexCount()-1}
+   * @return target index, or {@code -1} if unmapped
+   * @throws IndexOutOfBoundsException if {@code id} is out of range
    */
-  public int get(int id) {
-    if (id < 0 || id >= mapping.length) return -1;
+  public final int get(int id) {
+    Objects.checkIndex(id, mapping.length);
     return mapping[id];
   }
 
@@ -68,10 +64,11 @@ public abstract sealed class IndexMapping permits NodeMapping, EdgeMapping, Node
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param id source index
+   * @param id source index in {@code 0..indexCount()-1}
    * @return {@code true} if mapped
+   * @throws IndexOutOfBoundsException if {@code id} is out of range
    */
-  public boolean contains(int id) {
+  public final boolean isMapped(int id) {
     return get(id) >= 0;
   }
 
@@ -82,8 +79,8 @@ public abstract sealed class IndexMapping permits NodeMapping, EdgeMapping, Node
    *
    * @return {@code true} if at least one source index maps to {@code -1}
    */
-  public boolean isPartial() {
-    return partial;
+  public final boolean isPartial() {
+    return validCount < mapping.length;
   }
 
   /**
@@ -93,183 +90,84 @@ public abstract sealed class IndexMapping permits NodeMapping, EdgeMapping, Node
    *
    * @return count of mapped source indices
    */
-  public int size() {
+  public final int mappedCount() {
     return validCount;
   }
 
   /**
-   * Computes the inverse of the given mapping array.
+   * Returns the size of the source index space, including unmapped indices. This is the length
+   * of the arrays that {@code gather} produces, and the length {@code reduce} expects.
+   * <p>
+   * <strong>Time:</strong> O(1).
    *
-   * @param mapping the mapping array to invert
-   * @return the inverse array, or empty array if input is empty or all-negative
-   * @throws IllegalArgumentException if multiple sources map to the same target
+   * @return size of the source index space
    */
-  static int[] computeInverse(int[] mapping) {
-    if (mapping.length == 0) {
-      return new int[0];
-    }
-
-    int maxTarget = -1;
-    for (int v : mapping) {
-      if (v > maxTarget) maxTarget = v;
-    }
-    if (maxTarget < 0) {
-      return new int[0];
-    }
-
-    int[] inv = new int[maxTarget + 1];
-    Arrays.fill(inv, -1);
-    for (int i = 0; i < mapping.length; i++) {
-      int target = mapping[i];
-      if (target >= 0) {
-        if (inv[target] != -1) {
-          throw new IllegalArgumentException(
-              "Cannot invert mapping: multiple source IDs map to target " + target);
-        }
-        inv[target] = i;
-      }
-    }
-    return inv;
+  public final int indexCount() {
+    return mapping.length;
   }
 
   /**
-   * Computes the composition of two mapping arrays: {@code result[i] = outer[inner[i]]}.
-   * Unmapped entries ({@code -1}) propagate.
+   * Inverts the given mapping array into a target space of {@code targetCount} indices.
+   *
+   * @throws IllegalArgumentException  if {@code targetCount} is negative, or multiple sources map
+   *                                   to the same target
+   * @throws IndexOutOfBoundsException if a target is {@code targetCount} or more
    */
-  static int[] computeCompose(int[] outer, int[] inner) {
+  static int[] invertArray(int[] mapping, int targetCount) {
+    if (targetCount < 0) {
+      throw new IllegalArgumentException("targetCount out of range: " + targetCount);
+    }
+    int[] inverse = new int[targetCount];
+    Arrays.fill(inverse, -1);
+    for (int source = 0; source < mapping.length; source++) {
+      int target = mapping[source];
+      if (target < 0) continue;
+      if (target >= targetCount) {
+        throw new IndexOutOfBoundsException("source " + source + " maps to " + target
+            + ", outside the target space 0.." + (targetCount - 1));
+      }
+      if (inverse[target] != -1) {
+        throw new IllegalArgumentException(
+            "cannot invert mapping: multiple source IDs map to target " + target);
+      }
+      inverse[target] = source;
+    }
+    return inverse;
+  }
+
+  /**
+   * Composes two mapping arrays: {@code result[i] = outer[inner[i]]}. Unmapped entries
+   * ({@code -1}) propagate.
+   *
+   * @throws IndexOutOfBoundsException if {@code inner} maps to a value outside {@code outer}
+   */
+  static int[] composeArrays(int[] outer, int[] inner) {
     int[] result = new int[inner.length];
     for (int i = 0; i < result.length; i++) {
       int mid = inner[i];
-      if (mid >= 0 && mid < outer.length) {
+      if (mid < 0) {
+        result[i] = -1;
+      } else if (mid < outer.length) {
         result[i] = outer[mid];
       } else {
-        result[i] = -1;
+        throw new IndexOutOfBoundsException("inner maps " + i + " to " + mid
+            + ", outside the outer mapping's source space 0.." + (outer.length - 1));
       }
     }
     return result;
   }
 
-  // --- gather: result[i] = values[mapping[i]], unmapped entries 0 or untouched ---
-
-  static int[] gather(int[] mapping, int[] values) {
-    var result = new int[mapping.length];
-    for (int i = 0; i < result.length; i++) {
-      int source = mapping[i];
-      if (source >= 0) result[i] = values[source];
-    }
-    return result;
-  }
-
-  static long[] gather(int[] mapping, long[] values) {
-    var result = new long[mapping.length];
-    for (int i = 0; i < result.length; i++) {
-      int source = mapping[i];
-      if (source >= 0) result[i] = values[source];
-    }
-    return result;
-  }
-
-  static double[] gather(int[] mapping, double[] values) {
-    var result = new double[mapping.length];
-    for (int i = 0; i < result.length; i++) {
-      int source = mapping[i];
-      if (source >= 0) result[i] = values[source];
-    }
-    return result;
-  }
-
-  static <T extends @Nullable Object> void gather(int[] mapping, T[] values, T[] result) {
-    checkLength(result, mapping.length, "newValues");
-    for (int i = 0; i < mapping.length; i++) {
-      int source = mapping[i];
-      if (source >= 0) result[i] = values[source];
-    }
-  }
-
-  // --- reduce over the member CSR of a partition, members ascending within each group ---
-
-  static int[] reduce(int[] members, int[] memberStart, int indexCount, int[] values,
-      int identity, IntBinaryOperator combine) {
-    checkLength(values, indexCount, "values");
-    int groups = memberStart.length - 1;
-    var result = new int[groups];
-    for (int g = 0; g < groups; g++) {
-      int acc = identity;
-      for (int i = memberStart[g], end = memberStart[g + 1]; i < end; i++) {
-        acc = combine.applyAsInt(acc, values[members[i]]);
-      }
-      result[g] = acc;
-    }
-    return result;
-  }
-
-  static long[] reduce(int[] members, int[] memberStart, int indexCount, long[] values,
-      long identity, LongBinaryOperator combine) {
-    checkLength(values, indexCount, "values");
-    int groups = memberStart.length - 1;
-    var result = new long[groups];
-    for (int g = 0; g < groups; g++) {
-      long acc = identity;
-      for (int i = memberStart[g], end = memberStart[g + 1]; i < end; i++) {
-        acc = combine.applyAsLong(acc, values[members[i]]);
-      }
-      result[g] = acc;
-    }
-    return result;
-  }
-
-  static double[] reduce(int[] members, int[] memberStart, int indexCount, double[] values,
-      double identity, DoubleBinaryOperator combine) {
-    checkLength(values, indexCount, "values");
-    int groups = memberStart.length - 1;
-    var result = new double[groups];
-    for (int g = 0; g < groups; g++) {
-      double acc = identity;
-      for (int i = memberStart[g], end = memberStart[g + 1]; i < end; i++) {
-        acc = combine.applyAsDouble(acc, values[members[i]]);
-      }
-      result[g] = acc;
-    }
-    return result;
-  }
-
-  static <T extends @Nullable Object> void reduce(int[] members, int[] memberStart,
-      int indexCount, T[] values, T[] groupValues, BinaryOperator<T> combine) {
-    checkLength(values, indexCount, "values");
-    int groups = memberStart.length - 1;
-    checkLength(groupValues, groups, "groupValues");
-    for (int g = 0; g < groups; g++) {
-      int i = memberStart[g];
-      int end = memberStart[g + 1];
-      if (i == end) continue;
-      T acc = values[members[i]];
-      for (i++; i < end; i++) {
-        acc = combine.apply(acc, values[members[i]]);
-      }
-      groupValues[g] = acc;
-    }
-  }
-
-  private static void checkLength(int[] array, int expected, String name) {
-    checkLength(array.length, expected, name);
-  }
-
-  private static void checkLength(long[] array, int expected, String name) {
-    checkLength(array.length, expected, name);
-  }
-
-  private static void checkLength(double[] array, int expected, String name) {
-    checkLength(array.length, expected, name);
-  }
-
-  private static void checkLength(@Nullable Object[] array, int expected, String name) {
-    checkLength(array.length, expected, name);
-  }
-
-  private static void checkLength(int length, int expected, String name) {
+  static void checkLength(int length, int expected, String name) {
     if (length != expected) {
       throw new IllegalArgumentException(
           name + " has length " + length + ", expected " + expected);
+    }
+  }
+
+  /** Rejects writing the result into the input array, which would overwrite unread values. */
+  static void checkDistinct(@Nullable Object[] values, @Nullable Object[] result, String name) {
+    if (values == result) {
+      throw new IllegalArgumentException("values and " + name + " must be distinct arrays");
     }
   }
 
@@ -282,5 +180,43 @@ public abstract sealed class IndexMapping permits NodeMapping, EdgeMapping, Node
       if (v >= 0) count++;
     }
     return count;
+  }
+
+  // --- gather: result[i] = values[mapping[i]], unmapped entries 0 or untouched ---
+
+  static int[] gatherArray(int[] mapping, int[] values) {
+    var result = new int[mapping.length];
+    for (int i = 0; i < result.length; i++) {
+      int source = mapping[i];
+      if (source >= 0) result[i] = values[source];
+    }
+    return result;
+  }
+
+  static long[] gatherArray(int[] mapping, long[] values) {
+    var result = new long[mapping.length];
+    for (int i = 0; i < result.length; i++) {
+      int source = mapping[i];
+      if (source >= 0) result[i] = values[source];
+    }
+    return result;
+  }
+
+  static double[] gatherArray(int[] mapping, double[] values) {
+    var result = new double[mapping.length];
+    for (int i = 0; i < result.length; i++) {
+      int source = mapping[i];
+      if (source >= 0) result[i] = values[source];
+    }
+    return result;
+  }
+
+  static <T extends @Nullable Object> void gatherArray(int[] mapping, T[] values, T[] result) {
+    checkDistinct(values, result, "newValues");
+    checkLength(result.length, mapping.length, "newValues");
+    for (int i = 0; i < mapping.length; i++) {
+      int source = mapping[i];
+      if (source >= 0) result[i] = values[source];
+    }
   }
 }

@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.kobayami.graphity.testutils.RandomGraphs;
+import com.kobayami.graphity.testutils.RecordingDfsTraverser;
 import com.kobayami.graphity.testutils.RecursiveDfsOrder;
-import com.kobayami.graphity.testutils.RecordingIterativeDfsTraverser;
 import com.kobayami.graphity.testutils.TestGraphs;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
@@ -14,13 +14,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-class IterativeDfsTraverserTest {
+class DfsTraverserTest {
 
   // ---- Basic order ----
 
   @Test
   void runVisitsSinglePathInPreOrder() {
-    var t = new RecordingIterativeDfsTraverser(TestGraphs.path(4));
+    var t = new RecordingDfsTraverser(TestGraphs.path(4));
     t.run();
     assertThat(t.preOrder.toIntArray()).containsExactly(0, 1, 2, 3);
     assertThat(t.postOrder.toIntArray()).containsExactly(3, 2, 1, 0);
@@ -30,7 +30,7 @@ class IterativeDfsTraverserTest {
   void runVisitsBinaryTreeInSortedPreOrder() {
     // Binary tree: 0 -> 1, 2; 1 -> 3, 4; 2 -> 5, 6.
     var g = TestGraphs.of(7, 0, 1, 0, 2, 1, 3, 1, 4, 2, 5, 2, 6);
-    var t = new RecordingIterativeDfsTraverser(g);
+    var t = new RecordingDfsTraverser(g);
     t.run();
     assertThat(t.preOrder.toIntArray()).containsExactly(0, 1, 3, 4, 2, 5, 6);
     assertThat(t.postOrder.toIntArray()).containsExactly(3, 4, 1, 5, 6, 2, 0);
@@ -38,7 +38,7 @@ class IterativeDfsTraverserTest {
 
   @Test
   void runOnEmptyGraphIsNoOp() {
-    var t = new RecordingIterativeDfsTraverser(TestGraphs.empty());
+    var t = new RecordingDfsTraverser(TestGraphs.empty());
     t.run();
     assertThat(t.preOrder.isEmpty()).isTrue();
     assertThat(t.postOrder.isEmpty()).isTrue();
@@ -46,7 +46,7 @@ class IterativeDfsTraverserTest {
 
   @Test
   void runTerminatesOnCycle() {
-    var t = new RecordingIterativeDfsTraverser(TestGraphs.cycle(5));
+    var t = new RecordingDfsTraverser(TestGraphs.cycle(5));
     t.run();
     assertThat(t.preOrder.toIntArray()).containsExactly(0, 1, 2, 3, 4);
     assertThat(t.postOrder.toIntArray()).containsExactly(4, 3, 2, 1, 0);
@@ -54,7 +54,7 @@ class IterativeDfsTraverserTest {
 
   @Test
   void runOnCliqueVisitsAllNodes() {
-    var t = new RecordingIterativeDfsTraverser(TestGraphs.clique(4));
+    var t = new RecordingDfsTraverser(TestGraphs.clique(4));
     t.run();
     assertThat(t.preOrder.toIntArray()).containsExactly(0, 1, 2, 3);
   }
@@ -64,7 +64,7 @@ class IterativeDfsTraverserTest {
   @Test
   void runFromSingleNodeVisitsReachableOnly() {
     var g = TestGraphs.of(5, 0, 1, 1, 2, 3, 4);
-    var t = new RecordingIterativeDfsTraverser(g);
+    var t = new RecordingDfsTraverser(g);
     t.run(0);
     assertThat(t.preOrder.toIntArray()).containsExactly(0, 1, 2);
   }
@@ -72,49 +72,60 @@ class IterativeDfsTraverserTest {
   @ParameterizedTest
   @ValueSource(ints = {-1, 4, 1000})
   void runFromNodeOutOfRangeThrows(int startNode) {
-    var t = new RecordingIterativeDfsTraverser(TestGraphs.isolated(4));
+    var t = new RecordingDfsTraverser(TestGraphs.isolated(4));
     assertThatThrownBy(() -> t.run(startNode)).isInstanceOf(IndexOutOfBoundsException.class);
   }
 
+  @ParameterizedTest
+  @ValueSource(ints = {-1, 4, 15, 16, 1000})
+  void runFromNodeListOutOfRangeThrowsBeforeAnyHook(int startNode) {
+    // 4 and 15 still fall into the packed state word of the valid nodes.
+    var t = new RecordingDfsTraverser(TestGraphs.isolated(4));
+    assertThatThrownBy(() -> t.run(IntList.of(0, startNode)))
+        .isInstanceOf(IndexOutOfBoundsException.class);
+    assertThat(t.preOrder.isEmpty()).isTrue();
+    assertThat(t.isVisited(0)).isFalse();
+  }
+
   @Test
-  void runFromNodesVisitsInListOrder() {
+  void runFromNodeListVisitsInListOrder() {
     // Disjoint: {0->1}, {2->3}, {4->5}.
     var g = TestGraphs.of(6, 0, 1, 2, 3, 4, 5);
-    var t = new RecordingIterativeDfsTraverser(g);
-    t.runFromNodes(IntList.of(4, 0, 2));
+    var t = new RecordingDfsTraverser(g);
+    t.run(IntList.of(4, 0, 2));
     assertThat(t.preOrder.toIntArray()).containsExactly(4, 5, 0, 1, 2, 3);
   }
 
   @Test
-  void runFromNodesSkipsAlreadyVisitedStartNodes() {
+  void runFromNodeListSkipsAlreadyVisitedStartNodes() {
     var g = TestGraphs.path(4);
-    var t = new RecordingIterativeDfsTraverser(g);
+    var t = new RecordingDfsTraverser(g);
     t.run(0);  // visits 0, 1, 2, 3
-    t.runFromNodes(IntList.of(1, 2));  // all already visited
+    t.run(IntList.of(1, 2));  // all already visited
     assertThat(t.preOrder.toIntArray()).containsExactly(0, 1, 2, 3);
   }
 
   @Test
   void everyEntryPointSkipsVisitedNodes() {
     // 0 -> 1, plus isolated 2 and 3; duplicates and repeated starts must not revisit.
-    var t = new RecordingIterativeDfsTraverser(TestGraphs.of(4, 0, 1));
+    var t = new RecordingDfsTraverser(TestGraphs.of(4, 0, 1));
     t.run(0);
     t.run(1);
-    t.runFromNodes(IntList.of(0, 2, 2));
+    t.run(IntList.of(0, 2, 2));
     t.run();
     assertThat(t.preOrder.toIntArray()).containsExactly(0, 1, 2, 3);
   }
 
   @Test
   void runFromEmptyNodeListIsNoOp() {
-    var t = new RecordingIterativeDfsTraverser(TestGraphs.path(3));
-    t.runFromNodes(new IntArrayList());
+    var t = new RecordingDfsTraverser(TestGraphs.path(3));
+    t.run(new IntArrayList());
     assertThat(t.preOrder.isEmpty()).isTrue();
   }
 
   @Test
   void multipleRunCallsDoNotRevisit() {
-    var t = new RecordingIterativeDfsTraverser(TestGraphs.path(4));
+    var t = new RecordingDfsTraverser(TestGraphs.path(4));
     t.run(0);
     t.run(0);
     t.run();
@@ -125,7 +136,7 @@ class IterativeDfsTraverserTest {
   void runThenRunCombinesTraversals() {
     // Two components.
     var g = TestGraphs.of(5, 0, 1, 2, 3, 3, 4);
-    var t = new RecordingIterativeDfsTraverser(g);
+    var t = new RecordingDfsTraverser(g);
     t.run(2);
     t.run();
     assertThat(t.preOrder.toIntArray()).containsExactly(2, 3, 4, 0, 1);
@@ -139,7 +150,7 @@ class IterativeDfsTraverserTest {
     var g = TestGraphs.of(7, 0, 1, 0, 2, 1, 3, 1, 4, 2, 5, 2, 6);
     var enter = new IntArrayList();
     var leave = new IntArrayList();
-    var t = new IterativeDfsTraverser(g) {
+    var t = new DfsTraverser(g) {
       @Override protected boolean enterNode(int node) {
         enter.add(node);
         return node != 1;  // cut subtree below node 1
@@ -159,7 +170,7 @@ class IterativeDfsTraverserTest {
   void pruningRootLeavesItImmediately() {
     var enter = new IntArrayList();
     var leave = new IntArrayList();
-    var t = new IterativeDfsTraverser(TestGraphs.path(3)) {
+    var t = new DfsTraverser(TestGraphs.path(3)) {
       @Override protected boolean enterNode(int node) {
         enter.add(node);
         return false;  // prune everything at the root
@@ -179,7 +190,7 @@ class IterativeDfsTraverserTest {
   void ancestorsAreOnStackDuringEnterNode() {
     // Path 0 -> 1 -> 2 -> 3: when node k is entered, exactly 0..k are on the stack.
     var g = TestGraphs.path(4);
-    var t = new IterativeDfsTraverser(g) {
+    var t = new DfsTraverser(g) {
       @Override protected boolean enterNode(int node) {
         for (int i = 0; i <= node; i++) {
           assertThat(isOnStack(i)).as("node %d on stack when entering %d", i, node).isTrue();
@@ -197,7 +208,7 @@ class IterativeDfsTraverserTest {
   void nodeIsOffStackAfterLeave() {
     // Diamond 0 -> 1, 2; 1 -> 3; 2 -> 3. After leaving 1, it must be off-stack before 2 is entered.
     var g = TestGraphs.of(4, 0, 1, 0, 2, 1, 3, 2, 3);
-    var t = new IterativeDfsTraverser(g) {
+    var t = new DfsTraverser(g) {
       @Override protected boolean enterNode(int node) {
         if (node == 2) {
           assertThat(isOnStack(1)).as("sibling 1 already left").isFalse();
@@ -240,7 +251,7 @@ class IterativeDfsTraverserTest {
   private static void assertSameOrderAsRecursive(Graph g, String desc) {
     var recursive = new RecursiveDfsOrder(g);
     recursive.run();
-    var iterative = new RecordingIterativeDfsTraverser(g);
+    var iterative = new RecordingDfsTraverser(g);
     iterative.run();
     assertThat(iterative.preOrder.toIntArray())
         .as("preorder parity (%s)", desc)
@@ -256,7 +267,7 @@ class IterativeDfsTraverserTest {
   void deepPathDoesNotOverflowStack() {
     int deep = 1_000_000;
     Graph path = TestGraphs.path(deep);
-    var counter = new IterativeDfsTraverser(path) {
+    var counter = new DfsTraverser(path) {
       int entered;
       int left;
       @Override protected boolean enterNode(int node) {
@@ -275,7 +286,7 @@ class IterativeDfsTraverserTest {
   // ---- stop() ----
 
   /** Records pre- and postorder and stops when entering or leaving the given node. */
-  private static class StoppingDfs extends IterativeDfsTraverser {
+  private static class StoppingDfs extends DfsTraverser {
     final IntArrayList enter = new IntArrayList();
     final IntArrayList leave = new IntArrayList();
     int stopOnEnter = -1;
@@ -349,10 +360,10 @@ class IterativeDfsTraverserTest {
   }
 
   @Test
-  void stopEndsTheWholeRunFromNodesCall() {
+  void stopEndsTheWholeRunFromANodeList() {
     var t = new StoppingDfs(TestGraphs.isolated(4));
     t.stopOnLeave = 3;
-    t.runFromNodes(IntList.of(3, 1, 2));
+    t.run(IntList.of(3, 1, 2));
     assertThat(t.enter.toIntArray()).containsExactly(3);
   }
 
@@ -388,13 +399,79 @@ class IterativeDfsTraverserTest {
   }
 
   @Test
-  void runFromNodesClearsAnEarlierStop() {
+  void runFromNodeListClearsAnEarlierStop() {
     var t = new StoppingDfs(TestGraphs.isolated(3));
     t.stopOnEnter = 0;
-    t.runFromNodes(IntList.of(0, 1));
+    t.run(IntList.of(0, 1));
     assertThat(t.enter.toIntArray()).containsExactly(0);
     t.stopOnEnter = -1;
-    t.runFromNodes(IntList.of(1, 2));
+    t.run(IntList.of(1, 2));
     assertThat(t.enter.toIntArray()).containsExactly(0, 1, 2);
+  }
+
+  // ---- run from a hook ----
+
+  /**
+   * Calls the run method {@link #variant} of its own from the hook {@link #nestIn} of node 1 while
+   * {@link #nest} is set.
+   */
+  private static final class NestingDfs extends DfsTraverser {
+    final IntArrayList enter = new IntArrayList();
+    int nestIn;  // 0: enterNode, 1: leaveNode
+    int variant;  // 0: run(), 1: run(int), 2: run(IntList)
+    boolean nest = true;
+
+    NestingDfs(Graph graph) {
+      super(graph);
+    }
+
+    @Override protected boolean enterNode(int node) {
+      enter.add(node);
+      if (nestIn == 0 && nest && node == 1) runVariant(3);
+      return true;
+    }
+
+    @Override protected void leaveNode(int node) {
+      if (nestIn == 1 && nest && node == 1) runVariant(3);
+    }
+
+    void runVariant(int node) {
+      switch (variant) {
+        case 0 -> run();
+        case 1 -> run(node);
+        default -> run(IntList.of(node));
+      }
+    }
+  }
+
+  @Test
+  void runFromAHookThrowsAndALaterRunStillStarts() {
+    // 0 -> 1, 2 -> 3: a nested run during a run from 0 is rejected, then run(2) works as usual.
+    for (int hook = 0; hook < 2; hook++) {
+      for (int variant = 0; variant < 3; variant++) {
+        var t = new NestingDfs(TestGraphs.of(4, 0, 1, 2, 3));
+        t.nestIn = hook;
+        t.variant = variant;
+        assertThatThrownBy(() -> t.runVariant(0)).as("hook %d, variant %d", hook, variant)
+            .isInstanceOf(IllegalStateException.class);
+        assertThat(t.isVisited(3)).as("hook %d, variant %d", hook, variant).isFalse();
+
+        t.nest = false;
+        t.run(2);
+        assertThat(t.enter.toIntArray()).as("hook %d, variant %d", hook, variant)
+            .containsExactly(0, 1, 2, 3);
+      }
+    }
+  }
+
+  @Test
+  void runFromEnterNodeOfTheRootThrows() {
+    var t = new DfsTraverser(TestGraphs.of(2, 0, 1)) {
+      @Override protected boolean enterNode(int node) {
+        if (node == 0) run(1);
+        return true;
+      }
+    };
+    assertThatThrownBy(() -> t.run(0)).isInstanceOf(IllegalStateException.class);
   }
 }

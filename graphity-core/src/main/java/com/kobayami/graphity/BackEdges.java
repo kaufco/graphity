@@ -38,6 +38,11 @@ public final class BackEdges {
    * Back-edges point from a node to an ancestor in the DFS tree (or to itself = self-loop).
    * Their removal yields a DAG.
    * <p>
+   * The edges come in the order the search finds them, not in edge index order like the other
+   * results that list edges. For that order, use
+   * {@link Edges#of(EdgeTypes, EdgeType) Edges.of(EdgeTypes.of(graph), EdgeType.BACK)}: the same
+   * edges, at the cost of classifying every edge first.
+   * <p>
    * <strong>Time:</strong> O(nodeCount + edgeCount).<br>
    * <strong>Memory:</strong> O(nodeCount) + O(backEdgeCount) for the result.
    *
@@ -47,9 +52,6 @@ public final class BackEdges {
    *     frames an array can hold
    */
   public static Edges of(Graph graph) {
-    if (graph.nodeCount() == 0) {
-      return Edges.empty();
-    }
     var traverser = new BackEdgeCollector(graph);
     traverser.run();
     return new Edges(

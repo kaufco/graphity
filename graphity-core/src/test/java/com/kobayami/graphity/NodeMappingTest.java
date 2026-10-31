@@ -16,7 +16,7 @@ class NodeMappingTest {
   @Test
   void ofFullMappingHasNoUnmappedEntries() {
     var nm = NodeMapping.of(new int[] {2, 0, 1});
-    assertThat(nm.size()).isEqualTo(3);
+    assertThat(nm.mappedCount()).isEqualTo(3);
     assertThat(nm.isPartial()).isFalse();
     assertThat(nm.get(0)).isEqualTo(2);
     assertThat(nm.get(1)).isZero();
@@ -26,26 +26,34 @@ class NodeMappingTest {
   @Test
   void ofPartialMappingMarksIsPartial() {
     var nm = NodeMapping.of(new int[] {2, -1, 0, -1});
-    assertThat(nm.size()).isEqualTo(2);
+    assertThat(nm.mappedCount()).isEqualTo(2);
     assertThat(nm.isPartial()).isTrue();
-    assertThat(nm.contains(0)).isTrue();
-    assertThat(nm.contains(1)).isFalse();
-    assertThat(nm.contains(2)).isTrue();
-    assertThat(nm.contains(3)).isFalse();
+    assertThat(nm.isMapped(0)).isTrue();
+    assertThat(nm.isMapped(1)).isFalse();
+    assertThat(nm.isMapped(2)).isTrue();
+    assertThat(nm.isMapped(3)).isFalse();
   }
 
   @Test
   void ofEmptyArrayCreatesEmptyMapping() {
     var nm = NodeMapping.of(new int[0]);
-    assertThat(nm.size()).isZero();
+    assertThat(nm.mappedCount()).isZero();
     assertThat(nm.isPartial()).isFalse();
   }
 
   @Test
   void ofRejectsValuesBelowMinusOne() {
     assertThatThrownBy(() -> NodeMapping.of(new int[] {0, -2, 1}))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(IndexOutOfBoundsException.class)
         .hasMessageContaining("-2");
+  }
+
+  @Test
+  void ofAcceptsRepeatsAsTheCallersContract() {
+    var nm = NodeMapping.of(new int[] {0, 0});
+    assertThat(nm.mappedCount()).isEqualTo(2);
+    assertThatThrownBy(() -> nm.inverted(1))
+        .isInstanceOf(IllegalArgumentException.class);
   }
 
   @Test
@@ -58,10 +66,18 @@ class NodeMappingTest {
 
   @ParameterizedTest
   @ValueSource(ints = {-1, -100, 3, 1000})
-  void getOutOfRangeReturnsMinusOne(int id) {
+  void getOutOfRangeThrows(int id) {
     var nm = NodeMapping.of(new int[] {10, 20, 30});
-    assertThat(nm.get(id)).isEqualTo(-1);
-    assertThat(nm.contains(id)).isFalse();
+    assertThatThrownBy(() -> nm.get(id)).isInstanceOf(IndexOutOfBoundsException.class);
+    assertThatThrownBy(() -> nm.isMapped(id)).isInstanceOf(IndexOutOfBoundsException.class);
+  }
+
+  @Test
+  void indexCountIsTheSourceSpaceSizeIncludingUnmappedIds() {
+    var nm = NodeMapping.of(new int[] {2, -1, 0, -1});
+    assertThat(nm.indexCount()).isEqualTo(4);
+    assertThat(nm.mappedCount()).isEqualTo(2);
+    assertThat(NodeMapping.of(new int[0]).indexCount()).isZero();
   }
 
   @Test
@@ -71,7 +87,7 @@ class NodeMappingTest {
     selected.set(5);
     selected.set(7);
     var nm = NodeMapping.forSubgraph(selected);
-    assertThat(nm.size()).isEqualTo(3);
+    assertThat(nm.mappedCount()).isEqualTo(3);
     assertThat(nm.isPartial()).isFalse();
     assertThat(nm.get(0)).isEqualTo(2);
     assertThat(nm.get(1)).isEqualTo(5);
@@ -81,7 +97,7 @@ class NodeMappingTest {
   @Test
   void forSubgraphFromEmptyBitSetCreatesEmptyMapping() {
     var nm = NodeMapping.forSubgraph(new BitSet());
-    assertThat(nm.size()).isZero();
+    assertThat(nm.mappedCount()).isZero();
     assertThat(nm.isPartial()).isFalse();
   }
 
@@ -89,7 +105,7 @@ class NodeMappingTest {
   void forSubgraphFromUnsortedIntListSortsIds() {
     IntList unsorted = new IntArrayList(new int[] {5, 2, 7});
     var nm = NodeMapping.forSubgraph(unsorted);
-    assertThat(nm.size()).isEqualTo(3);
+    assertThat(nm.mappedCount()).isEqualTo(3);
     assertThat(nm.get(0)).isEqualTo(2);
     assertThat(nm.get(1)).isEqualTo(5);
     assertThat(nm.get(2)).isEqualTo(7);
@@ -113,20 +129,10 @@ class NodeMappingTest {
   }
 
   @Test
-  void forSubgraphRejectsDuplicatesInSortedIntView() {
-    var withDupes = SortedIntView.viewOf(new int[] {1, 2, 2}, 0, 3);
-    assertThatThrownBy(() -> NodeMapping.forSubgraph(withDupes))
-        .isInstanceOf(IllegalArgumentException.class);
-  }
-
-  @Test
-  void forSubgraphRejectsAnUnsortedSortedIntView() {
-    for (int[] unsorted : new int[][] {{2, -1}, {1, 2, 1}, {1, 0}}) {
-      var view = SortedIntView.viewOf(unsorted, 0, unsorted.length);
-      assertThatThrownBy(() -> NodeMapping.forSubgraph(view))
-          .as("%s", java.util.Arrays.toString(unsorted))
-          .isInstanceOf(IllegalArgumentException.class);
-    }
+  void forSubgraphRejectsANegativeIdInSortedIntView() {
+    var withNegative = new SortedIntView(new int[] {-1, 2});
+    assertThatThrownBy(() -> NodeMapping.forSubgraph(withNegative))
+        .isInstanceOf(IndexOutOfBoundsException.class);
   }
 
   @Test
@@ -140,7 +146,7 @@ class NodeMappingTest {
   @Test
   void forSubgraphFromLooseArgumentsSortsIds() {
     var nm = NodeMapping.forSubgraph(5, 2, 7);
-    assertThat(nm.size()).isEqualTo(3);
+    assertThat(nm.mappedCount()).isEqualTo(3);
     assertThat(nm.isPartial()).isFalse();
     assertThat(nm.get(0)).isEqualTo(2);
     assertThat(nm.get(1)).isEqualTo(5);
@@ -150,7 +156,7 @@ class NodeMappingTest {
   @Test
   void forSubgraphFromNoArgumentsCreatesEmptyMapping() {
     var nm = NodeMapping.forSubgraph();
-    assertThat(nm.size()).isZero();
+    assertThat(nm.mappedCount()).isZero();
     assertThat(nm.isPartial()).isFalse();
   }
 
@@ -171,8 +177,8 @@ class NodeMappingTest {
     selected.set(7);
     var fromBitSet = NodeMapping.forSubgraph(selected);
     var fromArray = NodeMapping.forSubgraph(7, 2, 5);
-    assertThat(fromArray.size()).isEqualTo(fromBitSet.size());
-    for (int id = 0; id < fromBitSet.size(); id++) {
+    assertThat(fromArray.mappedCount()).isEqualTo(fromBitSet.mappedCount());
+    for (int id = 0; id < fromBitSet.mappedCount(); id++) {
       assertThat(fromArray.get(id)).isEqualTo(fromBitSet.get(id));
     }
   }
@@ -187,7 +193,7 @@ class NodeMappingTest {
   void forPermutationWrapsOrder() {
     IntList order = new IntArrayList(new int[] {2, 0, 1});
     var nm = NodeMapping.forPermutation(order);
-    assertThat(nm.size()).isEqualTo(3);
+    assertThat(nm.mappedCount()).isEqualTo(3);
     assertThat(nm.isPartial()).isFalse();
     assertThat(nm.get(0)).isEqualTo(2);
     assertThat(nm.get(1)).isZero();
@@ -220,30 +226,61 @@ class NodeMappingTest {
   @Test
   void inverseOfFullPermutationIsInjective() {
     var nm = NodeMapping.of(new int[] {2, 0, 1});
-    var inv = nm.inverted();
+    var inv = nm.inverted(3);
     assertThat(inv.get(0)).isEqualTo(1);
     assertThat(inv.get(1)).isEqualTo(2);
     assertThat(inv.get(2)).isZero();
     assertThat(inv.isPartial()).isFalse();
-    assertThat(inv.size()).isEqualTo(3);
+    assertThat(inv.mappedCount()).isEqualTo(3);
   }
 
   @Test
   void inverseOfPartialMappingIsPartial() {
     var nm = NodeMapping.of(new int[] {5, -1, 3});
-    var inv = nm.inverted();
-    assertThat(inv.size()).isEqualTo(2);
+    var inv = nm.inverted(7);
+    assertThat(inv.mappedCount()).isEqualTo(2);
+    assertThat(inv.indexCount()).isEqualTo(7);
     assertThat(inv.isPartial()).isTrue();
     assertThat(inv.get(3)).isEqualTo(2);
     assertThat(inv.get(5)).isZero();
     assertThat(inv.get(0)).isEqualTo(-1);
     assertThat(inv.get(4)).isEqualTo(-1);
+    assertThat(inv.get(6)).isEqualTo(-1);
+  }
+
+  @Test
+  void inverseOfSubgraphCoversTheWholeOldGraph() {
+    // Path with 5 nodes, subgraph {0, 1}: the inverse maps all 5 old nodes, 2..4 to -1.
+    var oldToNew = NodeMapping.forSubgraph(0, 1).inverted(5);
+    assertThat(oldToNew.isPartial()).isTrue();
+    assertThat(oldToNew.indexCount()).isEqualTo(5);
+    assertThat(oldToNew.get(4)).isEqualTo(-1);
+    assertThat(oldToNew.gather(new int[] {7, 8})).containsExactly(7, 8, 0, 0, 0);
+    String[] oldNames = new String[5];
+    oldToNew.gather(new String[] {"a", "b"}, oldNames);
+    assertThat(oldNames).containsExactly("a", "b", null, null, null);
+  }
+
+  @Test
+  void inverseRejectsATargetOutsideTheTargetSpace() {
+    var nm = NodeMapping.forSubgraph(0, 4);
+    assertThatThrownBy(() -> nm.inverted(4))
+        .isInstanceOf(IndexOutOfBoundsException.class)
+        .hasMessageContaining("4");
+    assertThat(nm.inverted(5).indexCount()).isEqualTo(5);
+  }
+
+  @Test
+  void inverseRejectsANegativeTargetCount() {
+    var nm = NodeMapping.of(new int[0]);
+    assertThatThrownBy(() -> nm.inverted(-1))
+        .isInstanceOf(IllegalArgumentException.class);
   }
 
   @Test
   void inverseOfNonInjectiveThrows() {
     var nm = NodeMapping.of(new int[] {1, 1, 2});
-    assertThatThrownBy(nm::inverted)
+    assertThatThrownBy(() -> nm.inverted(3))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("target 1");
   }
@@ -251,24 +288,35 @@ class NodeMappingTest {
   @Test
   void inverseOfEmptyIsEmpty() {
     var nm = NodeMapping.of(new int[0]);
-    var inv = nm.inverted();
-    assertThat(inv.size()).isZero();
+    var inv = nm.inverted(0);
+    assertThat(inv.mappedCount()).isZero();
+    assertThat(inv.indexCount()).isZero();
   }
 
   @Test
-  void inverseOfAllMinusOneIsEmpty() {
+  void inverseOfAllMinusOneMapsNothing() {
     var nm = NodeMapping.of(new int[] {-1, -1, -1});
-    var inv = nm.inverted();
-    assertThat(inv.size()).isZero();
+    var inv = nm.inverted(2);
+    assertThat(inv.mappedCount()).isZero();
+    assertThat(inv.indexCount()).isEqualTo(2);
+    assertThat(inv.isPartial()).isTrue();
   }
 
   @Test
   void inverseRoundTripRestoresOriginal() {
     var nm = NodeMapping.of(new int[] {2, 0, 1});
-    var roundtrip = nm.inverted().inverted();
+    var roundtrip = nm.inverted(3).inverted(3);
     assertThat(roundtrip.get(0)).isEqualTo(2);
     assertThat(roundtrip.get(1)).isZero();
     assertThat(roundtrip.get(2)).isEqualTo(1);
+  }
+
+  @Test
+  void doubleInversionKeepsTheSourceSpace() {
+    var nm = NodeMapping.of(new int[] {-1, 0, -1});
+    var roundtrip = nm.inverted(1).inverted(3);
+    assertThat(roundtrip.indexCount()).isEqualTo(3);
+    assertThat(roundtrip.gather(new int[] {5})).containsExactly(0, 5, 0);
   }
 
   @Test
@@ -305,13 +353,12 @@ class NodeMappingTest {
   }
 
   @Test
-  void composeHandlesInnerValueOutOfOuterRange() {
+  void composeRejectsInnerValueOutOfOuterRange() {
     var outer = NodeMapping.of(new int[] {10, 20});
     var inner = NodeMapping.of(new int[] {0, 5, 1});
-    var composed = outer.compose(inner);
-    assertThat(composed.get(0)).isEqualTo(10);
-    assertThat(composed.get(1)).isEqualTo(-1);
-    assertThat(composed.get(2)).isEqualTo(20);
+    assertThatThrownBy(() -> outer.compose(inner))
+        .isInstanceOf(IndexOutOfBoundsException.class)
+        .hasMessageContaining("5");
   }
 
   @Test
@@ -325,7 +372,7 @@ class NodeMappingTest {
   void reindexEmptyGraphReturnsEmptyMapping() {
     var graph = new GraphBuilder().build();
     var nm = NodeMapping.reindex(graph);
-    assertThat(nm.size()).isZero();
+    assertThat(nm.mappedCount()).isZero();
   }
 
   @Test
@@ -333,7 +380,7 @@ class NodeMappingTest {
     var builder = new GraphBuilder();
     builder.addNode();
     var nm = NodeMapping.reindex(builder.build());
-    assertThat(nm.size()).isEqualTo(1);
+    assertThat(nm.mappedCount()).isEqualTo(1);
     assertThat(nm.get(0)).isZero();
   }
 
@@ -346,7 +393,7 @@ class NodeMappingTest {
     builder.addEdge(1, 2);
     builder.addEdge(0, 3);
     var nm = NodeMapping.reindex(builder.build());
-    assertThat(nm.size()).isEqualTo(4);
+    assertThat(nm.mappedCount()).isEqualTo(4);
     assertThat(nm.isPartial()).isFalse();
     int[] targets = new int[4];
     for (int i = 0; i < 4; i++) targets[i] = nm.get(i);
@@ -395,5 +442,14 @@ class NodeMappingTest {
         .isInstanceOf(IndexOutOfBoundsException.class);
     assertThatThrownBy(() -> m.gather(new String[] {"a", "b", "c"}, new String[3]))
         .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  void gatherRejectsTheSameArrayForValuesAndNewValues() {
+    var swap = NodeMapping.forPermutation(new IntArrayList(new int[] {1, 0}));
+    String[] values = {"a", "b"};
+    assertThatThrownBy(() -> swap.gather(values, values))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThat(values).containsExactly("a", "b");
   }
 }

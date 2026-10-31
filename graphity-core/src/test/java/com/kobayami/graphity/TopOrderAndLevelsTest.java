@@ -95,7 +95,7 @@ class TopOrderAndLevelsTest {
   void ofGraphWithCycleThrows() {
     assertThatThrownBy(() -> TopOrderAndLevels.of(TestGraphs.cycle(3)))
         .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("cycle");
+        .hasMessage("graph contains a cycle");
   }
 
   @Test
@@ -131,7 +131,8 @@ class TopOrderAndLevelsTest {
   void levelOfOutOfRangeThrows(int node) {
     var tol = TopOrderAndLevels.of(TestGraphs.path(4));
     assertThatThrownBy(() -> tol.levelOf(node))
-        .isInstanceOf(IndexOutOfBoundsException.class);
+        .isExactlyInstanceOf(IndexOutOfBoundsException.class)
+        .hasMessage("Index %d out of bounds for length 4", node);
   }
 
   private static void assertInvariantSourceBeforeTarget(Graph graph, IntList order) {

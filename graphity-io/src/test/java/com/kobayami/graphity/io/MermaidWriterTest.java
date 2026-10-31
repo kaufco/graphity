@@ -25,7 +25,7 @@ class MermaidWriterTest {
   }
 
   @Test
-  void writesLabelsShapesClassesAndLinkStyles() {
+  void writesLabelsShapesClassesAndEdgeStyles() {
     String[] names = {"entry", "loop", "exit"};
     String text = MermaidWriter.of(TestGraphs.of(3, 0, 1, 1, 1, 1, 2))
         .direction(MermaidWriter.Direction.LEFT_RIGHT)
@@ -34,7 +34,7 @@ class MermaidWriterTest {
         .nodeShape(node -> node == 0 ? MermaidWriter.Shape.CIRCLE : null)
         .classDef("hot", "fill:#f96,stroke:#333")
         .nodeClass(node -> node == 1 ? "hot" : null)
-        .linkStyle(edge -> edge == 1 ? "stroke:red" : null)
+        .edgeStyle(edge -> edge == 1 ? "stroke:red" : null)
         .writeToString();
     assertThat(text).isEqualTo("""
         flowchart LR
@@ -51,11 +51,11 @@ class MermaidWriterTest {
   }
 
   @Test
-  void linkStylesFollowTheWrittenLinksWhenAFilterDropsEdges() {
+  void edgeStylesFollowTheWrittenLinksWhenAFilterDropsEdges() {
     // 0 -> 1, 0 -> 2, 1 -> 2; without node 1 only 0 -> 2 (edge 1) remains, Mermaid's link 0.
     String text = MermaidWriter.of(TestGraphs.of(3, 0, 1, 0, 2, 1, 2))
         .nodeFilter(node -> node != 1)
-        .linkStyle(edge -> "stroke-width:" + (edge + 1) + "px")
+        .edgeStyle(edge -> "stroke-width:" + (edge + 1) + "px")
         .writeToString();
     assertThat(text).isEqualTo("""
         flowchart TD
@@ -97,7 +97,7 @@ class MermaidWriterTest {
         .isInstanceOf(IllegalArgumentException.class);
     var badClass = MermaidWriter.of(TestGraphs.path(2)).nodeClass(node -> "a b");
     assertThatThrownBy(badClass::writeToString).isInstanceOf(IllegalArgumentException.class);
-    var badStyle = MermaidWriter.of(TestGraphs.path(2)).linkStyle(edge -> "a\nb");
+    var badStyle = MermaidWriter.of(TestGraphs.path(2)).edgeStyle(edge -> "a\nb");
     assertThatThrownBy(badStyle::writeToString).isInstanceOf(IllegalArgumentException.class);
   }
 
@@ -132,7 +132,7 @@ class MermaidWriterTest {
     String text = MermaidWriter.of(TestGraphs.of(3, 0, 1, 1, 0, 1, 2))
         .undirected()
         .edgeLabel(edge -> "e" + edge)
-        .linkStyle(edge -> edge == 2 ? "stroke:blue" : null)
+        .edgeStyle(edge -> edge == 2 ? "stroke:blue" : null)
         .writeToString();
     assertThat(text).endsWith("""
           n0 ---|"e0"| n1

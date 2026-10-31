@@ -104,7 +104,7 @@ class BiconnectivityFuzzTest {
               .isBetween(0, blocks.groupCount() - 1);
         }
       }
-      assertThat(blocks.size())
+      assertThat(blocks.mappedCount())
           .as("mapped edge count for %s", description)
           .isEqualTo(graph.edgeCount() - selfLoops);
       assertThat(blocks.isPartial())
@@ -115,7 +115,7 @@ class BiconnectivityFuzzTest {
       for (int block = 0; block < blocks.groupCount(); block++) {
         members += blocks.sizeOf(block);
       }
-      assertThat(members).as("block members sum for %s", description).isEqualTo(blocks.size());
+      assertThat(members).as("block members sum for %s", description).isEqualTo(blocks.mappedCount());
     });
   }
 

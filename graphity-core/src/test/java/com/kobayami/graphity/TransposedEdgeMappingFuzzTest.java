@@ -28,7 +28,7 @@ class TransposedEdgeMappingFuzzTest {
       assertThat(mapping.isPartial())
           .as("mapping is total for %s", labeled.describe())
           .isFalse();
-      assertThat(mapping.size())
+      assertThat(mapping.mappedCount())
           .as("mapping covers every edge for %s", labeled.describe())
           .isEqualTo(g.edgeCount());
 

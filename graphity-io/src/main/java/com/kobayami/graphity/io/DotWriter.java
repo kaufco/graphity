@@ -48,6 +48,9 @@ import org.jspecify.annotations.Nullable;
  */
 public final class DotWriter {
 
+  private static final Set<String> KEYWORDS =
+      Set.of("node", "edge", "graph", "digraph", "subgraph", "strict");
+
   private final Selection selection;
   private final Map<String, String> graphAttributes = new LinkedHashMap<>();
   private @Nullable IntFunction<@Nullable String> nodeLabel;
@@ -154,11 +157,7 @@ public final class DotWriter {
    * @throws IllegalArgumentException if the partition covers a different number of nodes
    */
   public DotWriter clusters(NodePartition partition, IntFunction<@Nullable String> label) {
-    if (partition.nodeCount() != selection.graph.nodeCount()) {
-      throw new IllegalArgumentException("the partition covers " + partition.nodeCount()
-          + " nodes, the graph has " + selection.graph.nodeCount());
-    }
-    selection.clusters = new Selection.Clusters(partition, label);
+    selection.clusters(partition, label);
     return this;
   }
 
@@ -227,7 +226,7 @@ public final class DotWriter {
         boolean opened = false;
         for (int i = 0; i < nodes.size(); i++) {
           int node = nodes.getInt(i);
-          if (!selection.includes(node)) continue;
+          if (!selection.isIncluded(node)) continue;
           if (!opened) {
             out.append("  subgraph cluster_").append(Integer.toString(group)).append(" {\n");
             String label = clusters.label().apply(group);
@@ -238,21 +237,21 @@ public final class DotWriter {
             }
             opened = true;
           }
-          nodeAttributesOf(node, attributes);
+          putNodeAttributes(node, attributes);
           writeNode(node, attributes, "    ", out);
         }
         if (opened) out.append("  }\n");
       }
     }
     for (int node = 0; node < n; node++) {
-      if (!selection.includes(node) || selection.clusterOf(node) >= 0) continue;
-      nodeAttributesOf(node, attributes);
+      if (!selection.isIncluded(node) || selection.clusterOf(node) >= 0) continue;
+      putNodeAttributes(node, attributes);
       if (!attributes.isEmpty() || !hasEdge[node]) writeNode(node, attributes, "  ", out);
     }
     selection.forEachWrittenEdge((source, target, edgeIndex) -> {
       out.append("  ").append(Integer.toString(source)).append(arrow)
           .append(Integer.toString(target));
-      edgeAttributesOf(edgeIndex, attributes);
+      putEdgeAttributes(edgeIndex, attributes);
       writeAttributes(attributes, out);
       out.append(";\n");
     });
@@ -284,14 +283,14 @@ public final class DotWriter {
     out.append(";\n");
   }
 
-  private void nodeAttributesOf(int node, Map<String, String> attributes) {
+  private void putNodeAttributes(int node, Map<String, String> attributes) {
     attributes.clear();
     String label = nodeLabel == null ? null : nodeLabel.apply(node);
     if (label != null) attributes.put("label", label);
     if (nodeAttributes != null) nodeAttributes.accept(node, attributes);
   }
 
-  private void edgeAttributesOf(int edgeIndex, Map<String, String> attributes) {
+  private void putEdgeAttributes(int edgeIndex, Map<String, String> attributes) {
     attributes.clear();
     String label = edgeLabel == null ? null : edgeLabel.apply(edgeIndex);
     if (label != null) attributes.put("label", label);
@@ -308,9 +307,6 @@ public final class DotWriter {
     }
     if (!first) out.append(']');
   }
-
-  private static final Set<String> KEYWORDS =
-      Set.of("node", "edge", "graph", "digraph", "subgraph", "strict");
 
   private static String checkName(String name) {
     if (!Selection.isIdentifier(name)

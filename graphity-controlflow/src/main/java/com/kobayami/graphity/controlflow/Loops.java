@@ -31,13 +31,14 @@ import java.util.Objects;
  * bytecode or generated state machines produce - appears as one loop with several
  * {@linkplain #entriesOf(int) entries}, and which of them is the header depends on the node
  * numbering. An entry of the graph that lies in a loop counts as an entry of that loop. A node
- * with a self-loop is a loop of its own; unreachable nodes are in no loop.
+ * with a self-loop lies in a loop even alone, and heads one of its own unless it heads a larger
+ * one; unreachable nodes are in no loop.
  * <p>
  * Loops have IDs in {@code 0..loopCount()-1}, numbered in preorder of the forest: an enclosing
  * loop has a smaller ID than the loops inside it, so iterating IDs downwards visits inner loops
  * first, and the loops nested in {@code L}, {@code L} included, occupy a contiguous ID range.
  * {@link #isInLoop(int, int)} is a range test on {@link #innermostLoopOf(int)}, and
- * {@link #nodesOf(int)} is a slice of one shared array.
+ * {@link #bodyOf(int)} is a slice of one shared array.
  * <p>
  * Like {@link Dominators}, the analysis reads predecessors and takes a {@link BiAdjacentGraph};
  * the same graph serves both.
@@ -46,7 +47,7 @@ import java.util.Objects;
  * var loops = Loops.of(cfg, entry);
  * for (int loop = loops.loopCount() - 1; loop >= 0; loop--) {   // inner loops first
  *     int header = loops.headerOf(loop);
- *     IntList body = loops.nodesOf(loop);                       // nested loops included
+ *     IntList body = loops.bodyOf(loop);                        // nested loops included
  * }
  * }</pre>
  *
@@ -180,7 +181,7 @@ public final class Loops {
     var stack = new int[size];
     var body = new int[size];
     var isHeader = new boolean[size];
-    int headerCount = 0;
+    int loopCount = 0;
 
     for (int w = size - 1; w >= 1; w--) {
       int lastW = last[w];
@@ -207,7 +208,7 @@ public final class Loops {
       if (top == 0 && !selfLoop) continue;
 
       isHeader[w] = true;
-      headerCount++;
+      loopCount++;
       int bodyCount = 0;
       while (top > 0) {
         int x = stack[--top];
@@ -236,32 +237,35 @@ public final class Loops {
     }
 
     // 3) Loop IDs in preorder of the forest; siblings by the preorder of their headers.
-    int loopCount = headerCount;
+    // The child lists and the walk are ParentForest.groupCounted and ParentForest.preorder of the
+    // core, which a module cannot call; change them together.
+    // mark and stack are free now: mark maps each header to its index, stack walks the forest.
     var loopIndex = mark;
     Arrays.fill(loopIndex, -1);
-    var headers = new int[loopCount];
+    var indexHeader = new int[loopCount];
     int k = 0;
     for (int v = 1; v < size; v++) {
       if (isHeader[v]) {
         loopIndex[v] = k;
-        headers[k++] = v;
+        indexHeader[k++] = v;
       }
     }
     var childStart = new int[loopCount + 1];
     var indexParent = new int[loopCount];
     for (int i = 0; i < loopCount; i++) {
-      int e = enclosing[headers[i]];
+      int e = enclosing[indexHeader[i]];
       indexParent[i] = e == 0 ? -1 : loopIndex[e];
       if (indexParent[i] >= 0) childStart[indexParent[i]]++;
     }
-    int next = 0;
+    int nextChildStart = 0;
     for (int i = 0; i < loopCount; i++) {
       int count = childStart[i];
-      childStart[i] = next;
-      next += count;
+      childStart[i] = nextChildStart;
+      nextChildStart += count;
     }
-    childStart[loopCount] = next;
-    var children = new int[next];
+    childStart[loopCount] = nextChildStart;
+    var children = new int[nextChildStart];
+    // childStart[p] doubles as write pointer and is shifted back afterwards.
     for (int i = 0; i < loopCount; i++) {
       if (indexParent[i] >= 0) children[childStart[indexParent[i]]++] = i;
     }
@@ -281,7 +285,7 @@ public final class Loops {
     while (top > 0) {
       int i = stack[--top];
       idOfIndex[i] = id;
-      header[id] = order[headers[i]];
+      header[id] = order[indexHeader[i]];
       parent[id] = indexParent[i] < 0 ? -1 : idOfIndex[indexParent[i]];
       depth[id] = parent[id] < 0 ? 1 : depth[parent[id]] + 1;
       id++;
@@ -308,19 +312,19 @@ public final class Loops {
     for (int node = 0; node < n; node++) {
       if (innermostLoop[node] >= 0) bodyStart[innermostLoop[node]]++;
     }
-    next = 0;
+    int nextBodyStart = 0;
     for (int l = 0; l < loopCount; l++) {
       int count = bodyStart[l];
-      bodyStart[l] = next;
-      next += count;
+      bodyStart[l] = nextBodyStart;
+      nextBodyStart += count;
     }
-    bodyStart[loopCount] = next;
-    var bodies = new int[next];
-    var write = Arrays.copyOf(bodyStart, loopCount);
-    for (int l = 0; l < loopCount; l++) bodies[write[l]++] = header[l];
+    bodyStart[loopCount] = nextBodyStart;
+    var bodies = new int[nextBodyStart];
+    var bodyWritePos = Arrays.copyOf(bodyStart, loopCount);
+    for (int l = 0; l < loopCount; l++) bodies[bodyWritePos[l]++] = header[l];
     for (int node = 0; node < n; node++) {
       int l = innermostLoop[node];
-      if (l >= 0 && header[l] != node) bodies[write[l]++] = node;
+      if (l >= 0 && header[l] != node) bodies[bodyWritePos[l]++] = node;
     }
 
     // 6) Entries: x enters every loop that contains x but not one of its predecessors - a chain
@@ -363,19 +367,19 @@ public final class Loops {
     }
     var entryStart = new int[loopCount + 1];
     for (int i = 0; i < entryLoops.size(); i++) entryStart[entryLoops.getInt(i)]++;
-    next = 0;
+    int nextEntryStart = 0;
     boolean reducible = true;
     for (int l = 0; l < loopCount; l++) {
       int count = entryStart[l];
       if (count != 1) reducible = false;
-      entryStart[l] = next;
-      next += count;
+      entryStart[l] = nextEntryStart;
+      nextEntryStart += count;
     }
-    entryStart[loopCount] = next;
-    var loopEntries = new int[next];
-    write = Arrays.copyOf(entryStart, loopCount);
+    entryStart[loopCount] = nextEntryStart;
+    var loopEntries = new int[nextEntryStart];
+    var entryWritePos = Arrays.copyOf(entryStart, loopCount);
     for (int i = 0; i < entryLoops.size(); i++) {
-      loopEntries[write[entryLoops.getInt(i)]++] = entryNodes.getInt(i);
+      loopEntries[entryWritePos[entryLoops.getInt(i)]++] = entryNodes.getInt(i);
     }
 
     return new Loops(innermostLoop, header, parent, subtreeEnd, depth, bodyStart, bodies,
@@ -497,7 +501,8 @@ public final class Loops {
    * <p>
    * The list is a zero-copy, read-only view.
    * <p>
-   * <strong>Time:</strong> O(1).
+   * <strong>Time:</strong> O(number of entries), for the order check of
+   * {@link SortedIntView#viewOf(int[], int, int)}.
    *
    * @param loop loop ID in {@code 0..loopCount()-1}
    * @return the entry nodes, sorted ascending
@@ -536,7 +541,7 @@ public final class Loops {
    * @return the nodes of the loop
    * @throws IndexOutOfBoundsException if {@code loop} is out of range
    */
-  public IntList nodesOf(int loop) {
+  public IntList bodyOf(int loop) {
     Objects.checkIndex(loop, header.length);
     return bodies.subList(bodyStart[loop], bodyStart[subtreeEnd[loop]]);
   }

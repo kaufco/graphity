@@ -95,6 +95,7 @@ public final class ControlFlow {
     start[n] = next;
     var frontier = new int[next];
     Arrays.fill(lastAdded, -1);
+    // start[runner] doubles as write pointer and is shifted back afterwards.
     for (int m = 0; m < n; m++) {
       if (!dominators.isReachable(m)) continue;
       int stop = idom[m];

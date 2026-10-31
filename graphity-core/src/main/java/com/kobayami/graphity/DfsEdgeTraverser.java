@@ -8,7 +8,7 @@ import java.util.Objects;
  * Abstract base class for <strong>stack-safe, edge-centric</strong> depth-first traversal of a
  * {@link Graph}.
  * <p>
- * The edge-centric sibling of {@link IterativeDfsTraverser}: besides {@link #enterNode(int)} and
+ * The edge-centric sibling of {@link DfsTraverser}: besides {@link #enterNode(int)} and
  * {@link #leaveNode(int)}, every edge leaving the current node is reported to
  * {@link #visitEdge(int, int, int, TargetState)}, together with the state of its target -
  * {@linkplain TargetState#UNVISITED unvisited}, {@linkplain TargetState#ON_STACK on the current
@@ -23,13 +23,13 @@ import java.util.Objects;
  * <p>
  * The decision stays in the traversal loop and the hook only returns an action, so the loop keeps
  * its cursor in local variables. A traversal that needs no per-edge logic is faster on
- * {@link IterativeDfsTraverser}, which calls no hook per edge.
+ * {@link DfsTraverser}, which calls no hook per edge.
  *
  * <h2>Example: stop at the first edge that closes a cycle</h2>
  * The cycle itself, as a list of nodes, comes from {@link Graphs#findCycle(Graph)}; a hook like
  * this one is for a traversal that needs the closing edge or does more on the way.
  * <pre>{@code
- * class CycleFinder extends IterativeDfsEdgeTraverser {
+ * class CycleFinder extends DfsEdgeTraverser {
  *     int closingEdge = -1;
  *     CycleFinder(Graph graph) { super(graph); }
  *     @Override protected EdgeAction visitEdge(int source, int target, int edgeIndex,
@@ -48,7 +48,7 @@ import java.util.Objects;
  *
  * <h2>Example: depth-first search from one node, confined to a subset of nodes</h2>
  * <pre>{@code
- * class ConfinedDfs extends IterativeDfsEdgeTraverser {
+ * class ConfinedDfs extends DfsEdgeTraverser {
  *     final BitSet allowed;
  *     ConfinedDfs(Graph graph, BitSet allowed) {
  *         super(graph);
@@ -64,7 +64,7 @@ import java.util.Objects;
  * }</pre>
  *
  * <p>With the default {@link #visitEdge}, discovery order is identical to
- * {@link IterativeDfsTraverser}: out-edges are reported in ascending adjacency order, and the
+ * {@link DfsTraverser}: out-edges are reported in ascending adjacency order, and the
  * traversal descends immediately into the first unvisited target.
  * <p>{@code run} methods may be called <strong>multiple times</strong>, and freely combined.
  * Already-visited nodes are never revisited - the visited set is cumulative across calls. A target
@@ -72,14 +72,19 @@ import java.util.Objects;
  * {@link #leaveNode(int)} is invoked exactly once for every visited node, including nodes whose
  * subtree was pruned by {@link #enterNode(int)}, unless the traversal is stopped before
  * ({@link EdgeAction#STOP} or {@link #stop()}).
+ * <p>A hook must not call a {@code run} method of the same instance; such a call throws
+ * {@link IllegalStateException}. The list passed to {@link #run(IntList)} must not be modified
+ * until that call returns. If a {@code run} call ends with an exception - thrown by a hook
+ * or by the traversal itself - the state of the instance is undefined (nodes of the interrupted
+ * path may still count as on the stack, for instance); use a new instance for further runs.
  * <p>
  * <strong>Memory:</strong> O(nodeCount) - visited/on-stack state is packed 2 bits per node into a
  * single {@code int[]}; the explicit stack grows on demand up to the longest DFS path.
  *
- * @see IterativeDfsTraverser
+ * @see DfsTraverser
  * @see EdgeTypes
  */
-public abstract class IterativeDfsEdgeTraverser {
+public abstract class DfsEdgeTraverser {
 
   /** The state of an edge's target when the edge is reported. */
   public enum TargetState {
@@ -116,9 +121,12 @@ public abstract class IterativeDfsEdgeTraverser {
   /** Bit 1 of a node's packed state: the node is currently on the DFS path (gray set). */
   private static final int ON_STACK = 0b10;
 
-  /** Target state by packed flags; on-stack without visited does not occur. */
+  /**
+   * Target state by packed flags. On-stack without visited (index 2) does not occur; it holds
+   * {@code ON_STACK} only so that the table contains no {@code null}.
+   */
   private static final TargetState[] TARGET_STATES = {
-      TargetState.UNVISITED, TargetState.FINISHED, null, TargetState.ON_STACK
+      TargetState.UNVISITED, TargetState.FINISHED, TargetState.ON_STACK, TargetState.ON_STACK
   };
 
   /** The graph being traversed. */
@@ -140,12 +148,15 @@ public abstract class IterativeDfsEdgeTraverser {
   /** Set by {@link #stop()}; cleared when a {@code run} call starts. */
   private boolean stopRequested;
 
+  /** Set while a {@code run} call is in progress, so that a hook cannot start another one. */
+  private boolean running;
+
   /**
    * Creates a traverser for the given graph.
    *
    * @param graph the graph to traverse
    */
-  protected IterativeDfsEdgeTraverser(Graph graph) {
+  protected DfsEdgeTraverser(Graph graph) {
     this.graph = graph;
     int n = graph.nodeCount();
     this.state = new int[(n >> 4) + 1];
@@ -245,14 +256,19 @@ public abstract class IterativeDfsEdgeTraverser {
    *
    * @throws IllegalArgumentException if a depth-first path is longer than 2^30 - 5 nodes, the most
    *     frames an array can hold
+   * @throws IllegalStateException if called from a hook, while a {@code run} call is in progress
    */
   public final void run() {
-    stopRequested = false;
-    int n = graph.nodeCount();
-    for (int root = 0; root < n; root++) {
-      if (!dfsIfUnvisited(root)) {
-        return;
+    begin();
+    try {
+      int n = graph.nodeCount();
+      for (int root = 0; root < n; root++) {
+        if (!dfsIfUnvisited(root)) {
+          return;
+        }
       }
+    } finally {
+      running = false;
     }
   }
 
@@ -268,11 +284,16 @@ public abstract class IterativeDfsEdgeTraverser {
    * @throws IndexOutOfBoundsException if {@code startNode} is out of range
    * @throws IllegalArgumentException if a depth-first path is longer than 2^30 - 5 nodes, the most
    *     frames an array can hold
+   * @throws IllegalStateException if called from a hook, while a {@code run} call is in progress
    */
   public final void run(int startNode) {
     Objects.checkIndex(startNode, graph.nodeCount());
-    stopRequested = false;
-    dfsIfUnvisited(startNode);
+    begin();
+    try {
+      dfsIfUnvisited(startNode);
+    } finally {
+      running = false;
+    }
   }
 
   /**
@@ -285,17 +306,36 @@ public abstract class IterativeDfsEdgeTraverser {
    * <p>
    * <strong>Time:</strong> O(reachable nodes + reachable edges) plus the hooks.
    *
-   * @param startNodes the start nodes, visited in list order
+   * @param startNodes the start nodes, each in {@code 0..nodeCount()-1}, visited in list order
+   * @throws IndexOutOfBoundsException if a start node is out of range; then no node is visited
    * @throws IllegalArgumentException if a depth-first path is longer than 2^30 - 5 nodes, the most
    *     frames an array can hold
+   * @throws IllegalStateException if called from a hook, while a {@code run} call is in progress
    */
-  public final void runFromNodes(IntList startNodes) {
-    stopRequested = false;
-    for (int i = 0; i < startNodes.size(); i++) {
-      if (!dfsIfUnvisited(startNodes.getInt(i))) {
-        return;
+  public final void run(IntList startNodes) {
+    Graphs.checkNodes(startNodes, graph.nodeCount());
+    begin();
+    try {
+      for (int i = 0; i < startNodes.size(); i++) {
+        if (!dfsIfUnvisited(startNodes.getInt(i))) {
+          return;
+        }
       }
+    } finally {
+      running = false;
     }
+  }
+
+  /**
+   * Starts a {@code run} call after its argument checks: rejects a call from a hook and clears an
+   * earlier {@link #stop()}. The caller clears {@link #running} in a {@code finally}.
+   */
+  private void begin() {
+    if (running) {
+      throw new IllegalStateException("a run is in progress; a hook must not start another run");
+    }
+    running = true;
+    stopRequested = false;
   }
 
   /**
@@ -341,11 +381,11 @@ public abstract class IterativeDfsEdgeTraverser {
       int end = out[u + 1];
       int i = frames[2 * top + 1];
       while (i < end) {
-        int c = i++;
-        int v = adj[c];
+        int edge = i++;
+        int v = adj[edge];
         int shift = (v & 0xF) << 1;
         int flags = (state[v >> 4] >>> shift) & (VISITED | ON_STACK);
-        EdgeAction action = visitEdge(u, v, c, TARGET_STATES[flags]);
+        EdgeAction action = visitEdge(u, v, edge, TARGET_STATES[flags]);
         if (stopRequested) {
           action = EdgeAction.STOP;
         }

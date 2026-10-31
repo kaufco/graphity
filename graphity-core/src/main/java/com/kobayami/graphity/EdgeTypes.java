@@ -55,11 +55,10 @@ public final class EdgeTypes {
    *     frames an array can hold
    */
   public static EdgeTypes of(Graph graph) {
-    int m = graph.edgeCount();
-    if (m == 0) {
+    if (graph.edgeCount() == 0) {
       return new EdgeTypes(graph, new byte[0]);
     }
-    var traverser = new EdgeClassifier(graph, m);
+    var traverser = new EdgeClassifier(graph);
     traverser.run();
     return new EdgeTypes(graph, traverser.types);
   }
@@ -94,11 +93,11 @@ public final class EdgeTypes {
     for (int node = 0; node < n; node++) {
       int start = adjacencyStart[node];
       int end = adjacencyStart[node + 1];
-      for (int ei = start; ei < end; ei++) {
-        if (types[ei] == ordinal) {
+      for (int e = start; e < end; e++) {
+        if (types[e] == ordinal) {
           sources.add(node);
-          targets.add(adjacency[ei]);
-          edgeIndices.add(ei);
+          targets.add(adjacency[e]);
+          edgeIndices.add(e);
         }
       }
     }
@@ -136,12 +135,12 @@ public final class EdgeTypes {
     private final int[] disc;
     final byte[] types;
 
-    EdgeClassifier(Graph graph, int edgeCount) {
+    EdgeClassifier(Graph graph) {
       int n = graph.nodeCount();
       this.graph = graph;
       this.state = new int[(n >> 4) + 1];
       this.disc = new int[n];
-      this.types = new byte[edgeCount];
+      this.types = new byte[graph.edgeCount()];
     }
 
     void run() {
@@ -179,12 +178,12 @@ public final class EdgeTypes {
           // touched only when we actually descend, not once per edge.
           int i = frames[2 * top + 1];
           while (i < end) {
-            int c = i++;
-            int v = adj[c];
+            int e = i++;
+            int v = adj[e];
             int shift = (v & 0xF) << 1;
             int flags = state[v >> 4] >>> shift;
             if ((flags & VISITED) == 0) {
-              types[c] = tree;
+              types[e] = tree;
               frames[2 * top + 1] = i;
               state[v >> 4] |= (VISITED | ON_STACK) << shift;
               disc[v] = ++time;
@@ -195,11 +194,11 @@ public final class EdgeTypes {
               frames[2 * top + 1] = out[v];
               continue outer;
             } else if ((flags & ON_STACK) != 0) {
-              types[c] = back;
+              types[e] = back;
             } else if (disc[u] < disc[v]) {
-              types[c] = forward;
+              types[e] = forward;
             } else {
-              types[c] = cross;
+              types[e] = cross;
             }
           }
           state[u >> 4] &= ~(ON_STACK << ((u & 0xF) << 1));

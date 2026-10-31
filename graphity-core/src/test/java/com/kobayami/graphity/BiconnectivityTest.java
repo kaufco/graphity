@@ -124,7 +124,7 @@ class BiconnectivityTest {
     var b = biconnectivityOf(g);
     assertThat(b.blocks().isPartial()).isTrue();
     assertThat(b.blocks().get(1)).isEqualTo(-1);
-    assertThat(b.blocks().size()).isEqualTo(3);
+    assertThat(b.blocks().mappedCount()).isEqualTo(3);
     assertThat(b.bridges().isEmpty()).isTrue();
     assertThat(b.articulationPoints().isEmpty()).isTrue();
   }
@@ -133,7 +133,7 @@ class BiconnectivityTest {
   void blocksAreTotalWithoutSelfLoops() {
     var b = biconnectivityOf(TestGraphs.cycle(5));
     assertThat(b.blocks().isPartial()).isFalse();
-    assertThat(b.blocks().size()).isEqualTo(5);
+    assertThat(b.blocks().mappedCount()).isEqualTo(5);
   }
 
   @Test
@@ -142,7 +142,7 @@ class BiconnectivityTest {
     assertThat(b.bridges().isEmpty()).isTrue();
     assertThat(b.articulationPoints().isEmpty()).isTrue();
     assertThat(b.blocks().groupCount()).isZero();
-    assertThat(b.blocks().size()).isZero();
+    assertThat(b.blocks().mappedCount()).isZero();
   }
 
   @Test

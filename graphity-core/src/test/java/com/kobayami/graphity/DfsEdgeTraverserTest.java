@@ -3,10 +3,10 @@ package com.kobayami.graphity;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.kobayami.graphity.IterativeDfsEdgeTraverser.EdgeAction;
-import com.kobayami.graphity.IterativeDfsEdgeTraverser.TargetState;
+import com.kobayami.graphity.DfsEdgeTraverser.EdgeAction;
+import com.kobayami.graphity.DfsEdgeTraverser.TargetState;
 import com.kobayami.graphity.testutils.RandomGraphs;
-import com.kobayami.graphity.testutils.RecordingIterativeDfsTraverser;
+import com.kobayami.graphity.testutils.RecordingDfsTraverser;
 import com.kobayami.graphity.testutils.TestGraphs;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
@@ -16,10 +16,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-class IterativeDfsEdgeTraverserTest {
+class DfsEdgeTraverserTest {
 
   /** Records every callback; descends by default, or answers from {@link #action}. */
-  private static class Recorder extends IterativeDfsEdgeTraverser {
+  private static class Recorder extends DfsEdgeTraverser {
     final IntArrayList preOrder = new IntArrayList();
     final IntArrayList postOrder = new IntArrayList();
     final IntArrayList edges = new IntArrayList();
@@ -60,7 +60,7 @@ class IterativeDfsEdgeTraverserTest {
     for (long seed = 0; seed < 300; seed++) {
       RandomGraphs.LabeledGraph lg = RandomGraphs.anyGraph(seed);
       Graph g = lg.graph();
-      var nodeCentric = new RecordingIterativeDfsTraverser(g);
+      var nodeCentric = new RecordingDfsTraverser(g);
       nodeCentric.run();
       var edgeCentric = new Recorder(g);
       edgeCentric.run();
@@ -104,7 +104,7 @@ class IterativeDfsEdgeTraverserTest {
   @Test
   void enterNodeDefaultsToDescending() {
     var left = new IntArrayList();
-    var t = new IterativeDfsEdgeTraverser(TestGraphs.path(3)) {
+    var t = new DfsEdgeTraverser(TestGraphs.path(3)) {
       @Override protected void leaveNode(int node) {
         left.add(node);
       }
@@ -192,14 +192,14 @@ class IterativeDfsEdgeTraverserTest {
   }
 
   @Test
-  void stopEndsTheWholeRunFromNodesCall() {
+  void stopEndsTheWholeRunFromANodeList() {
     var g = TestGraphs.of(4, 0, 1, 2, 3);
     var t = new Recorder(g) {
       @Override EdgeAction action(int source, int target, int edgeIndex, TargetState state) {
         return EdgeAction.STOP;
       }
     };
-    t.runFromNodes(IntList.of(0, 2));
+    t.run(IntList.of(0, 2));
     assertThat(t.preOrder.toIntArray()).containsExactly(0);
     t.run();
     assertThat(t.preOrder.toIntArray()).containsExactly(0, 1, 2);
@@ -248,12 +248,23 @@ class IterativeDfsEdgeTraverserTest {
     assertThatThrownBy(() -> t.run(startNode)).isInstanceOf(IndexOutOfBoundsException.class);
   }
 
+  @ParameterizedTest
+  @ValueSource(ints = {-1, 4, 15, 16, 1000})
+  void runFromNodeListOutOfRangeThrowsBeforeAnyHook(int startNode) {
+    // 4 and 15 still fall into the packed state word of the valid nodes.
+    var t = new Recorder(TestGraphs.isolated(4));
+    assertThatThrownBy(() -> t.run(IntList.of(0, startNode)))
+        .isInstanceOf(IndexOutOfBoundsException.class);
+    assertThat(t.preOrder.isEmpty()).isTrue();
+    assertThat(t.isVisited(0)).isFalse();
+  }
+
   @Test
   void everyEntryPointSkipsVisitedNodes() {
     var t = new Recorder(TestGraphs.of(4, 0, 1));
     t.run(0);
     t.run(1);
-    t.runFromNodes(IntList.of(0, 2, 2));
+    t.run(IntList.of(0, 2, 2));
     t.run();
     assertThat(t.preOrder.toIntArray()).containsExactly(0, 1, 2, 3);
   }
@@ -268,7 +279,7 @@ class IterativeDfsEdgeTraverserTest {
   @Test
   void deepPathDoesNotOverflowStack() {
     int deep = 1_000_000;
-    var counter = new IterativeDfsEdgeTraverser(TestGraphs.path(deep)) {
+    var counter = new DfsEdgeTraverser(TestGraphs.path(deep)) {
       int edges;
       int left;
       @Override protected EdgeAction visitEdge(int source, int target, int edgeIndex,
@@ -392,16 +403,76 @@ class IterativeDfsEdgeTraverserTest {
       t.stopOnEnter = -1;
       switch (variant) {
         case 0 -> t.run(1);
-        case 1 -> t.runFromNodes(IntList.of(1));
+        case 1 -> t.run(IntList.of(1));
         default -> t.run();
       }
       assertThat(t.preOrder.toIntArray()).as("variant %d", variant).containsExactly(0, 1, 2);
     }
   }
 
+  // ---- run from a hook ----
+
+  /**
+   * Calls the run method {@link #variant} of its own from the hook {@link #nestIn} at node 1 (for
+   * {@code visitEdge}: at its edge into node 1) while {@link #nest} is set.
+   */
+  private static final class NestingRecorder extends Recorder {
+    int nestIn;  // 0: enterNode, 1: leaveNode, 2: visitEdge
+    int variant;  // 0: run(), 1: run(int), 2: run(IntList)
+    boolean nest = true;
+
+    NestingRecorder(Graph graph) {
+      super(graph);
+    }
+
+    @Override protected boolean enterNode(int node) {
+      super.enterNode(node);
+      if (nestIn == 0 && nest && node == 1) runVariant(3);
+      return true;
+    }
+
+    @Override protected void leaveNode(int node) {
+      super.leaveNode(node);
+      if (nestIn == 1 && nest && node == 1) runVariant(3);
+    }
+
+    @Override EdgeAction action(int source, int target, int edgeIndex, TargetState state) {
+      if (nestIn == 2 && nest && target == 1) runVariant(3);
+      return super.action(source, target, edgeIndex, state);
+    }
+
+    void runVariant(int node) {
+      switch (variant) {
+        case 0 -> run();
+        case 1 -> run(node);
+        default -> run(IntList.of(node));
+      }
+    }
+  }
+
+  @Test
+  void runFromAHookThrowsAndALaterRunStillStarts() {
+    // 0 -> 1, 2 -> 3: a nested run during a run from 0 is rejected, then run(2) works as usual.
+    for (int hook = 0; hook < 3; hook++) {
+      for (int variant = 0; variant < 3; variant++) {
+        var t = new NestingRecorder(TestGraphs.of(4, 0, 1, 2, 3));
+        t.nestIn = hook;
+        t.variant = variant;
+        assertThatThrownBy(() -> t.runVariant(0)).as("hook %d, variant %d", hook, variant)
+            .isInstanceOf(IllegalStateException.class);
+        assertThat(t.isVisited(3)).as("hook %d, variant %d", hook, variant).isFalse();
+
+        t.nest = false;
+        t.run(2);
+        assertThat(t.preOrder.toIntArray()).as("hook %d, variant %d", hook, variant)
+            .endsWith(2, 3);
+      }
+    }
+  }
+
   // ---- Equivalent of the recursion-to-hooks example in docs/tutorial.md ----
 
-  static class SubtreeSizes extends IterativeDfsEdgeTraverser {
+  static class SubtreeSizes extends DfsEdgeTraverser {
     final int[] parent;
     final int[] size;
 

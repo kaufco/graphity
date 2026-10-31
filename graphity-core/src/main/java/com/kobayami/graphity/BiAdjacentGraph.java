@@ -33,8 +33,9 @@ public final class BiAdjacentGraph extends Graph {
   /* Flat array of all in-adjacency lists, indexed via inAdjacencyStart. */
   private final int[] inAdjacency;
 
-  // Package-private. Arrays are shared, not copied.
-  BiAdjacentGraph(int[] outAdjacencyStart, int[] outAdjacency, int[] inAdjacencyStart, int[] inAdjacency) {
+  // Takes the arrays as they are: neither copied nor checked.
+  BiAdjacentGraph(
+      int[] outAdjacencyStart, int[] outAdjacency, int[] inAdjacencyStart, int[] inAdjacency) {
     super(outAdjacencyStart, outAdjacency);
     this.inAdjacencyStart = inAdjacencyStart;
     this.inAdjacency = inAdjacency;
@@ -78,23 +79,7 @@ public final class BiAdjacentGraph extends Graph {
    */
   public final int inDegree(int node) {
     Objects.checkIndex(node, nodeCount());
-    return inAdjacencyEnd(node) - inAdjacencyStart[node];
-  }
-
-  /**
-   * Returns the total degree (inDegree + outDegree) of {@code node}.
-   * <p>
-   * A self-loop counts twice: once as an out-edge, once as an in-edge.
-   * <p>
-   * <strong>Time:</strong> O(1).
-   *
-   * @param node node ID in {@code 0..nodeCount()-1}
-   * @return total degree (in + out)
-   * @throws IndexOutOfBoundsException if {@code node} is out of range
-   */
-  @Override
-  public int degree(int node) {
-    return inDegree(node) + outDegree(node);
+    return inAdjacencyStart[node + 1] - inAdjacencyStart[node];
   }
 
   /**
@@ -109,11 +94,7 @@ public final class BiAdjacentGraph extends Graph {
    */
   public final SortedIntView inNodes(int node) {
     Objects.checkIndex(node, nodeCount());
-    return new SortedIntView(inAdjacency, inAdjacencyStart[node], inAdjacencyEnd(node));
-  }
-
-  private int inAdjacencyEnd(int node) {
-    return inAdjacencyStart[node + 1];
+    return new SortedIntView(inAdjacency, inAdjacencyStart[node], inAdjacencyStart[node + 1]);
   }
 
   /**
@@ -128,7 +109,8 @@ public final class BiAdjacentGraph extends Graph {
    */
   public final boolean hasInNode(int node, int inNode) {
     Objects.checkIndex(node, nodeCount());
-    return SortedIntView.containsInRange(inAdjacency, inAdjacencyStart[node], inAdjacencyEnd(node), inNode);
+    return SortedIntView.containsInRange(
+        inAdjacency, inAdjacencyStart[node], inAdjacencyStart[node + 1], inNode);
   }
 
   /**
@@ -194,7 +176,24 @@ public final class BiAdjacentGraph extends Graph {
     int source = edgeSource(edgeIndex);
     int target = outAdjacency()[edgeIndex];
     return SortedIntView.indexOfInRange(
-        inAdjacency, inAdjacencyStart[target], inAdjacencyEnd(target), source);
+        inAdjacency, inAdjacencyStart[target], inAdjacencyStart[target + 1], source);
+  }
+
+  /**
+   * Returns the total degree of {@code node}: its in-degree plus its out-degree.
+   * <p>
+   * This counts edges, not neighbors. A self-loop counts twice, once as an out-edge and once as an
+   * in-edge, and so does a reciprocal pair {@code node -> v}, {@code v -> node}, although {@code v}
+   * is a single one of the {@link #neighbors(int) neighbors}.
+   * <p>
+   * <strong>Time:</strong> O(1).
+   *
+   * @param node node ID in {@code 0..nodeCount()-1}
+   * @return total degree
+   * @throws IndexOutOfBoundsException if {@code node} is out of range
+   */
+  public final int degree(int node) {
+    return inDegree(node) + outDegree(node);
   }
 
   /**
@@ -210,16 +209,10 @@ public final class BiAdjacentGraph extends Graph {
    */
   public final SortedIntView neighbors(int node) {
     Objects.checkIndex(node, nodeCount());
-    return new SortedIntView(
-      SortedIntView.union(
-        outAdjacency(),
-        outAdjacencyStart()[node],
-        outAdjacencyEnd(node),
-        inAdjacency,
-        inAdjacencyStart[node],
-        inAdjacencyEnd(node)
-      )
-    );
+    int[] outAdjacencyStart = outAdjacencyStart();
+    return new SortedIntView(SortedIntView.unionInRange(
+        outAdjacency(), outAdjacencyStart[node], outAdjacencyStart[node + 1],
+        inAdjacency, inAdjacencyStart[node], inAdjacencyStart[node + 1]));
   }
 
   /**

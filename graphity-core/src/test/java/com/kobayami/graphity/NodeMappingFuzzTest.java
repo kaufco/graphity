@@ -25,8 +25,8 @@ class NodeMappingFuzzTest {
       recursive.run();
       var nm = NodeMapping.reindex(g);
 
-      int[] actual = new int[nm.size()];
-      for (int newId = 0; newId < nm.size(); newId++) actual[newId] = nm.get(newId);
+      int[] actual = new int[nm.mappedCount()];
+      for (int newId = 0; newId < nm.mappedCount(); newId++) actual[newId] = nm.get(newId);
 
       assertThat(actual)
           .as("reindex must equal recursive DFS preorder for %s", labeled.describe())

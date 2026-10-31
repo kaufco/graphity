@@ -45,7 +45,7 @@ import java.util.Objects;
  *
  * <h2>Level tracking</h2>
  * {@link #currentLevel()} returns the current BFS wave (0 = seed nodes,
- * 1 = nodes enqueued during level 0, …). Override {@link #onLevelComplete(int)}
+ * 1 = nodes enqueued during level 0, …). Override {@link #leaveLevel(int)}
  * to react to level boundaries:
  * <pre>{@code
  * class Levelizer extends FrontierTraverser {
@@ -54,7 +54,7 @@ import java.util.Objects;
  *         assignLevel(node, currentLevel());
  *         enqueueChildren(node);
  *     }
- *     @Override protected void onLevelComplete(int level) {
+ *     @Override protected void leaveLevel(int level) {
  *         System.out.println("Level " + level + " complete");
  *     }
  * }
@@ -63,12 +63,18 @@ import java.util.Objects;
  * <p><strong>Cut (pruning):</strong> omit the {@link #enqueueChildren(int)} call (or don't
  * {@link #enqueue(int)} any nodes) to prevent further expansion from a node.
  * <p>
- * <strong>Note on post-order:</strong> unlike {@link IterativeDfsTraverser}, there is no post-order
+ * <strong>Note on post-order:</strong> unlike {@link DfsTraverser}, there is no post-order
  * processing. When {@code visitNode} returns, the enqueued children have not yet been visited.
  * <p>
  * {@code run} methods may be called <strong>multiple times</strong>, and freely combined
- * (e.g., {@code run(int); run(); runFromNodes(list)}). Already-visited nodes are
+ * (e.g., {@code run(int); run(); run(list)}). Already-visited nodes are
  * never revisited - the visited set is cumulative across calls.
+ * <p>
+ * A hook must not call a {@code run} method of the same instance; such a call throws
+ * {@link IllegalStateException}. The list passed to {@link #run(IntList)} must not be modified
+ * until that call returns. If a {@code run} call ends with an exception - thrown by a hook
+ * or by the traversal itself - the state of the instance is undefined (a later run may visit the
+ * rest of the frontier, for instance); use a new instance for further runs.
  * <p>
  * Subclasses may pre-mark nodes in {@link #visited} before calling a {@code run} method
  * to exclude them from traversal. This is useful for multi-phase algorithms, subgraph
@@ -79,7 +85,7 @@ import java.util.Objects;
  * across the traverser's lifetime, not just the currently active wave, though its size
  * is still bounded by nodeCount since each node is enqueued at most once.
  *
- * @see IterativeDfsTraverser
+ * @see DfsTraverser
  * @see Graph
  * @see Graphs#rootNodes(BiAdjacentGraph)
  */
@@ -100,6 +106,9 @@ public abstract class FrontierTraverser {
 
   /** Set by {@link #stop()}; cleared when a {@code run} call starts. */
   private boolean stopRequested;
+
+  /** Set while a {@code run} call is in progress, so that a hook cannot start another one. */
+  private boolean running;
 
   /**
    * Creates a traverser for the given graph.
@@ -148,15 +157,22 @@ public abstract class FrontierTraverser {
 
   /**
    * Enqueues a single node into the frontier if not already visited.
-   * The node is marked as visited and appended to the frontier for later processing. Every
-   * {@code run} method seeds the frontier through here.
+   * The node is marked as visited and appended to the frontier for later processing. The
+   * {@code run} methods seed the frontier the same way.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param node the node to enqueue
+   * @param node node ID in {@code 0..nodeCount()-1}
    * @return {@code true} if the node was unvisited and is now enqueued
+   * @throws IndexOutOfBoundsException if {@code node} is out of range
    */
   protected final boolean enqueue(int node) {
+    Objects.checkIndex(node, graph.nodeCount());
+    return enqueueUnchecked(node);
+  }
+
+  /** {@link #enqueue(int)} without the range check, for the seeds of the {@code run} methods. */
+  private boolean enqueueUnchecked(int node) {
     if (visited.get(node)) return false;
     visited.set(node);
     frontier.add(node);
@@ -168,7 +184,7 @@ public abstract class FrontierTraverser {
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param node node ID
+   * @param node node ID in {@code 0..nodeCount()-1}
    * @return {@code true} if visited or enqueued
    */
   protected final boolean isVisited(int node) {
@@ -179,7 +195,7 @@ public abstract class FrontierTraverser {
    * Returns the current frontier level (BFS wave). Level 0 contains the seed nodes,
    * level 1 the nodes enqueued during level 0, and so on.
    * <p>
-   * Valid during {@link #visitNode(int)} and {@link #onLevelComplete(int)}.
+   * Valid during {@link #visitNode(int)} and {@link #leaveLevel(int)}.
    *
    * @return the current level (0-based)
    */
@@ -195,7 +211,7 @@ public abstract class FrontierTraverser {
    *
    * @param level the level that just completed (0-based)
    */
-  protected void onLevelComplete(int level) {
+  protected void leaveLevel(int level) {
   }
 
   /**
@@ -205,7 +221,7 @@ public abstract class FrontierTraverser {
    * {@code run} call visits them. The visited state is kept, so a later {@code run} call skips
    * everything visited or enqueued so far.
    * <p>
-   * Callable from {@link #visitNode(int)} and {@link #onLevelComplete(int)}; outside a
+   * Callable from {@link #visitNode(int)} and {@link #leaveLevel(int)}; outside a
    * {@code run} call it has no effect. To cancel from another thread, let a hook check a flag of
    * your own and call this method.
    * <p>
@@ -226,17 +242,23 @@ public abstract class FrontierTraverser {
    * Each call continues from the current visited state - already-visited nodes are never revisited.
    * <p>
    * <strong>Time:</strong> O(nodeCount + edgeCount).
+   *
+   * @throws IllegalStateException if called from a hook, while a {@code run} call is in progress
    */
   public final void run() {
-    stopRequested = false;
-    int n = graph.nodeCount();
-    int root = visited.nextClearBit(0);
-    while (root < n) {
-      enqueue(root);
-      if (!processFrontier()) {
-        return;
+    begin();
+    try {
+      int n = graph.nodeCount();
+      int root = visited.nextClearBit(0);
+      while (root < n) {
+        enqueueUnchecked(root);
+        if (!processFrontier()) {
+          return;
+        }
+        root = visited.nextClearBit(root + 1);
       }
-      root = visited.nextClearBit(root + 1);
+    } finally {
+      running = false;
     }
   }
 
@@ -250,12 +272,17 @@ public abstract class FrontierTraverser {
    *
    * @param startNode the start node
    * @throws IndexOutOfBoundsException if {@code startNode} is out of range
+   * @throws IllegalStateException if called from a hook, while a {@code run} call is in progress
    */
   public final void run(int startNode) {
     Objects.checkIndex(startNode, graph.nodeCount());
-    stopRequested = false;
-    if (enqueue(startNode)) {
-      processFrontier();
+    begin();
+    try {
+      if (enqueueUnchecked(startNode)) {
+        processFrontier();
+      }
+    } finally {
+      running = false;
     }
   }
 
@@ -270,19 +297,38 @@ public abstract class FrontierTraverser {
    * <p>
    * <strong>Time:</strong> O(reachable nodes + reachable edges).
    *
-   * @param startNodes the start nodes
+   * @param startNodes the start nodes, each in {@code 0..nodeCount()-1}
+   * @throws IndexOutOfBoundsException if a start node is out of range; then no node is visited
+   * @throws IllegalStateException if called from a hook, while a {@code run} call is in progress
    */
-  public final void runFromNodes(IntList startNodes) {
-    stopRequested = false;
-    for (int i = 0; i < startNodes.size(); i++) {
-      enqueue(startNodes.getInt(i));
+  public final void run(IntList startNodes) {
+    Graphs.checkNodes(startNodes, graph.nodeCount());
+    begin();
+    try {
+      for (int i = 0; i < startNodes.size(); i++) {
+        enqueueUnchecked(startNodes.getInt(i));
+      }
+      processFrontier();
+    } finally {
+      running = false;
     }
-    processFrontier();
+  }
+
+  /**
+   * Starts a {@code run} call after its argument checks: rejects a call from a hook and clears an
+   * earlier {@link #stop()}. The caller clears {@link #running} in a {@code finally}.
+   */
+  private void begin() {
+    if (running) {
+      throw new IllegalStateException("a run is in progress; a hook must not start another run");
+    }
+    running = true;
+    stopRequested = false;
   }
 
   /**
    * Processes all nodes in the frontier. Tracks level boundaries and fires
-   * {@link #onLevelComplete(int)} after each level.
+   * {@link #leaveLevel(int)} after each level.
    *
    * @return {@code false} if the traversal was stopped
    */
@@ -292,7 +338,7 @@ public abstract class FrontierTraverser {
     int levelEnd = frontier.size();
     while (cursor < frontier.size()) {
       if (cursor == levelEnd) {
-        onLevelComplete(level);
+        leaveLevel(level);
         if (stopRequested) {
           cursor = frontier.size();
           return false;
@@ -308,7 +354,7 @@ public abstract class FrontierTraverser {
       }
     }
     if (cursor > levelStart) {
-      onLevelComplete(level);
+      leaveLevel(level);
     }
     return !stopRequested;
   }

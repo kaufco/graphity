@@ -72,14 +72,14 @@ public final class StrongConnectivity {
 
     var bridgeTriples = new IntArrayList();
     var isArticulation = new boolean[n];
-    collect(forward, Csr.inAdjacencyStart(graph), Csr.inAdjacency(graph), sccOf, false, bridgeTriples,
-        isArticulation);
-    collect(backward, Csr.outAdjacencyStart(graph), Csr.outAdjacency(graph), sccOf, true, bridgeTriples,
-        isArticulation);
+    collect(forward, Csr.inAdjacencyStart(graph), Csr.inAdjacency(graph), sccOf, false,
+        bridgeTriples, isArticulation);
+    collect(backward, Csr.outAdjacencyStart(graph), Csr.outAdjacency(graph), sccOf, true,
+        bridgeTriples, isArticulation);
     markEntries(graph, sccOf, members, memberStart, isArticulation);
     return new StrongConnectivity(
         Edges.sortedEdges(graph, bridgeTriples.elements(), bridgeTriples.size() / 3, true),
-        articulationPoints(isArticulation));
+        Biconnectivity.flaggedNodes(isArticulation));
   }
 
   /**
@@ -95,21 +95,30 @@ public final class StrongConnectivity {
    */
   private static void collect(int[] idom, int[] inStart, int[] in, int[] sccOf,
       boolean transposed, IntArrayList bridgeTriples, boolean[] isArticulation) {
-    int[] interval = intervals(idom);
-    for (int v = 0; v < idom.length; v++) {
+    int n = idom.length;
+    var preorderIndex = new int[n];
+    var subtreeSize = new int[n];
+    ParentForest.preorder(idom, preorderIndex, new int[n], subtreeSize);
+    for (int v = 0; v < n; v++) {
       int u = idom[v];
       if (u < 0) continue;
       if (idom[u] >= 0) isArticulation[u] = true;
       int scc = sccOf[v];
+      int pre = preorderIndex[v];
+      int size = subtreeSize[v];
       int fromIdom = -1;
       boolean bridge = true;
       for (int i = inStart[v], end = inStart[v + 1]; i < end; i++) {
         int w = in[i];
         if (w == u) {
           fromIdom = i;
-        } else if (sccOf[w] == scc && !dominates(interval, v, w)) {
-          bridge = false;
-          break;
+        } else if (sccOf[w] == scc) {
+          // v dominates w exactly if w lies in v's subtree, as in PreorderAncestry.isAncestorOf.
+          int offset = preorderIndex[w] - pre;
+          if (offset < 0 || offset >= size) {
+            bridge = false;
+            break;
+          }
         }
       }
       if (bridge && fromIdom >= 0) {
@@ -121,62 +130,6 @@ public final class StrongConnectivity {
   }
 
   /**
-   * Preorder interval of every node in the dominator forest given by {@code idom}, two
-   * interleaved ints per node: its preorder number and the last preorder number in its subtree.
-   */
-  private static int[] intervals(int[] idom) {
-    int n = idom.length;
-    var childStart = new int[n + 1];
-    for (int v = 0; v < n; v++) {
-      if (idom[v] >= 0) childStart[idom[v] + 1]++;
-    }
-    for (int v = 0; v < n; v++) {
-      childStart[v + 1] += childStart[v];
-    }
-    var children = new int[childStart[n]];
-    var fill = java.util.Arrays.copyOf(childStart, n);
-    for (int v = 0; v < n; v++) {
-      if (idom[v] >= 0) children[fill[idom[v]]++] = v;
-    }
-    // A stack that pushes all children of the node it pops yields a preorder in which every
-    // subtree is contiguous; subtree sizes then follow in reverse preorder.
-    var preorder = fill;
-    var stack = new int[n];
-    int count = 0;
-    for (int root = 0; root < n; root++) {
-      if (idom[root] >= 0) continue;
-      int top = 0;
-      stack[0] = root;
-      while (top >= 0) {
-        int v = stack[top--];
-        preorder[count++] = v;
-        for (int i = childStart[v]; i < childStart[v + 1]; i++) {
-          stack[++top] = children[i];
-        }
-      }
-    }
-    var interval = new int[2 * n];
-    for (int k = 0; k < n; k++) {
-      interval[2 * preorder[k]] = k;
-      interval[2 * preorder[k] + 1] = 1;
-    }
-    for (int k = n - 1; k >= 0; k--) {
-      int v = preorder[k];
-      if (idom[v] >= 0) interval[2 * idom[v] + 1] += interval[2 * v + 1];
-    }
-    for (int v = 0; v < n; v++) {
-      interval[2 * v + 1] += interval[2 * v] - 1;
-    }
-    return interval;
-  }
-
-  /** Whether {@code a} dominates {@code b}, given the intervals of {@link #intervals}. */
-  private static boolean dominates(int[] interval, int a, int b) {
-    int pre = interval[2 * b];
-    return interval[2 * a] <= pre && pre <= interval[2 * a + 1];
-  }
-
-  /**
    * Marks the entry {@code r} of every component of three or more nodes if the rest of the
    * component is not strongly connected: a search from another member, avoiding {@code r} and
    * the edges leaving the component, misses a member forwards or backwards. Components of two
@@ -185,6 +138,10 @@ public final class StrongConnectivity {
   private static void markEntries(BiAdjacentGraph graph, int[] sccOf, int[] members,
       int[] memberStart, boolean[] isArticulation) {
     int n = graph.nodeCount();
+    int[] outStart = Csr.outAdjacencyStart(graph);
+    int[] out = Csr.outAdjacency(graph);
+    int[] inStart = Csr.inAdjacencyStart(graph);
+    int[] in = Csr.inAdjacency(graph);
     var stamp = new int[n];
     var queue = new int[n];
     for (int c = 0; c < memberStart.length - 1; c++) {
@@ -192,10 +149,10 @@ public final class StrongConnectivity {
       if (size < 3) continue;
       int entry = members[memberStart[c]];
       int start = members[memberStart[c] + 1];
-      if (reachedAvoiding(Csr.outAdjacencyStart(graph), Csr.outAdjacency(graph), sccOf, c, entry, start,
-              2 * c + 1, stamp, queue) < size - 1
-          || reachedAvoiding(Csr.inAdjacencyStart(graph), Csr.inAdjacency(graph), sccOf, c, entry, start,
-              2 * c + 2, stamp, queue) < size - 1) {
+      int rest = size - 1;
+      // A fresh mark per component and direction, so stamp is never cleared.
+      if (reachedAvoiding(outStart, out, sccOf, c, entry, start, 2 * c + 1, stamp, queue) < rest
+          || reachedAvoiding(inStart, in, sccOf, c, entry, start, 2 * c + 2, stamp, queue) < rest) {
         isArticulation[entry] = true;
       }
     }
@@ -220,20 +177,6 @@ public final class StrongConnectivity {
       }
     }
     return tail;
-  }
-
-  private static SortedIntView articulationPoints(boolean[] isArticulation) {
-    int count = 0;
-    for (boolean flag : isArticulation) {
-      if (flag) count++;
-    }
-    if (count == 0) return SortedIntView.EMPTY;
-    var points = new int[count];
-    int pos = 0;
-    for (int node = 0; node < isArticulation.length; node++) {
-      if (isArticulation[node]) points[pos++] = node;
-    }
-    return new SortedIntView(points);
   }
 
   /**

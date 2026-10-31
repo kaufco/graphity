@@ -3,7 +3,7 @@ package com.kobayami.graphity;
 /**
  * An action on one edge of a graph, given by its two end nodes and its edge index - the callback
  * of {@link Graph#forEachEdge(EdgeConsumer)}. The parameter order is that of
- * {@link IterativeDfsEdgeTraverser#visitEdge(int, int, int, IterativeDfsEdgeTraverser.TargetState)}
+ * {@link DfsEdgeTraverser#visitEdge(int, int, int, DfsEdgeTraverser.TargetState)}
  * and of the lists of {@link Edges}.
  *
  * @see Graph#forEachEdge(EdgeConsumer)

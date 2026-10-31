@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.kobayami.graphity.testutils.TestGraphs;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.ints.IntLists;
 import org.junit.jupiter.api.Test;
 
@@ -73,22 +74,22 @@ class GraphBuilderTest {
   }
 
   @Test
-  void addEdgesWithInvalidSourceThrows() {
+  void addOutEdgesWithInvalidSourceThrows() {
     var b = new GraphBuilder();
     b.addNodes(2);
-    assertThatThrownBy(() -> b.addEdges(5, new IntArrayList(new int[] {0})))
+    assertThatThrownBy(() -> b.addOutEdges(5, new IntArrayList(new int[] {0})))
         .isInstanceOf(IndexOutOfBoundsException.class);
-    assertThatThrownBy(() -> b.addEdges(-1, new IntArrayList(new int[] {0})))
+    assertThatThrownBy(() -> b.addOutEdges(-1, new IntArrayList(new int[] {0})))
         .isInstanceOf(IndexOutOfBoundsException.class);
   }
 
   @Test
-  void addEdgesWithInvalidTargetThrows() {
+  void addOutEdgesWithInvalidTargetThrows() {
     var b = new GraphBuilder();
     b.addNodes(2);
-    assertThatThrownBy(() -> b.addEdges(0, new IntArrayList(new int[] {0, 99})))
+    assertThatThrownBy(() -> b.addOutEdges(0, new IntArrayList(new int[] {0, 99})))
         .isInstanceOf(IndexOutOfBoundsException.class);
-    assertThatThrownBy(() -> b.addEdges(0, new IntArrayList(new int[] {0, -1})))
+    assertThatThrownBy(() -> b.addOutEdges(0, new IntArrayList(new int[] {0, -1})))
         .isInstanceOf(IndexOutOfBoundsException.class);
   }
 
@@ -178,21 +179,21 @@ class GraphBuilderTest {
   }
 
   @Test
-  void addEdgesAppendsAllTargets() {
+  void addOutEdgesAppendsAllTargets() {
     var b = new GraphBuilder();
     b.addNodes(4);
-    b.addEdges(0, new IntArrayList(new int[] {3, 1, 2}));
+    b.addOutEdges(0, new IntArrayList(new int[] {3, 1, 2}));
     var graph = b.build();
     assertThat(graph.outNodes(0).toIntArray()).containsExactly(1, 2, 3);
   }
 
   @Test
-  void addEdgesAcceptsSortedIntView() {
+  void addOutEdgesAcceptsSortedIntView() {
     var source = TestGraphs.path(4);
     var b = new GraphBuilder();
     b.addNodes(4);
     for (int n = 0; n < source.nodeCount(); n++) {
-      b.addEdges(n, source.outNodes(n));
+      b.addOutEdges(n, source.outNodes(n));
     }
     var copy = b.build();
     assertThat(copy).isEqualTo(source);
@@ -301,7 +302,7 @@ class GraphBuilderTest {
     assertThatThrownBy(() -> b.addEdge(2, 0)).isInstanceOf(IndexOutOfBoundsException.class);
     assertThatThrownBy(() -> b.addEdge(0, 2)).isInstanceOf(IndexOutOfBoundsException.class);
     assertThatThrownBy(() -> b.addEdge(-1, 0)).isInstanceOf(IndexOutOfBoundsException.class);
-    assertThatThrownBy(() -> b.addEdges(0, new int[] {5})).isInstanceOf(IndexOutOfBoundsException.class);
+    assertThatThrownBy(() -> b.addOutEdges(0, new int[] {5})).isInstanceOf(IndexOutOfBoundsException.class);
     assertThatThrownBy(() -> b.addInEdges(0, new int[] {5})).isInstanceOf(IndexOutOfBoundsException.class);
     assertThatThrownBy(() -> b.addPath(0, 5)).isInstanceOf(IndexOutOfBoundsException.class);
     assertThatThrownBy(() -> b.addEdgePairs(0, 5)).isInstanceOf(IndexOutOfBoundsException.class);
@@ -309,9 +310,9 @@ class GraphBuilderTest {
     assertThatThrownBy(() -> b.addChildren(5, 1)).isInstanceOf(IndexOutOfBoundsException.class);
     assertThatThrownBy(() -> b.addParent(5)).isInstanceOf(IndexOutOfBoundsException.class);
     assertThatThrownBy(() -> b.addParents(5, 1)).isInstanceOf(IndexOutOfBoundsException.class);
-    assertThatThrownBy(() -> b.addEdges(0, new IntArrayList(new int[] {5})))
+    assertThatThrownBy(() -> b.addOutEdges(0, new IntArrayList(new int[] {5})))
         .isInstanceOf(IndexOutOfBoundsException.class);
-    assertThatThrownBy(() -> b.addEdges(5, new int[] {0})).isInstanceOf(IndexOutOfBoundsException.class);
+    assertThatThrownBy(() -> b.addOutEdges(5, new int[] {0})).isInstanceOf(IndexOutOfBoundsException.class);
     assertThatThrownBy(() -> b.addInEdges(5, new int[] {0})).isInstanceOf(IndexOutOfBoundsException.class);
     assertThatThrownBy(() -> b.addInEdges(5, new IntArrayList(new int[] {0})))
         .isInstanceOf(IndexOutOfBoundsException.class);
@@ -323,8 +324,8 @@ class GraphBuilderTest {
   void rejectsNegativeIdsInEveryBatchForm() {
     var b = new GraphBuilder();
     b.addNodes(2);
-    assertThatThrownBy(() -> b.addEdges(0, new int[] {-1})).isInstanceOf(IndexOutOfBoundsException.class);
-    assertThatThrownBy(() -> b.addEdges(0, new IntArrayList(new int[] {-1})))
+    assertThatThrownBy(() -> b.addOutEdges(0, new int[] {-1})).isInstanceOf(IndexOutOfBoundsException.class);
+    assertThatThrownBy(() -> b.addOutEdges(0, new IntArrayList(new int[] {-1})))
         .isInstanceOf(IndexOutOfBoundsException.class);
     assertThatThrownBy(() -> b.addInEdges(0, new int[] {-1})).isInstanceOf(IndexOutOfBoundsException.class);
     assertThatThrownBy(() -> b.addPath(0, -1)).isInstanceOf(IndexOutOfBoundsException.class);
@@ -336,7 +337,7 @@ class GraphBuilderTest {
     var b = new GraphBuilder();
     b.addNodes(3);
     b.addEdge(0, 1);
-    assertThatThrownBy(() -> b.addEdges(0, new int[] {2, 99}))
+    assertThatThrownBy(() -> b.addOutEdges(0, new int[] {2, 99}))
         .isInstanceOf(IndexOutOfBoundsException.class);
     assertThatThrownBy(() -> b.addPath(0, 2, 99)).isInstanceOf(IndexOutOfBoundsException.class);
     assertThatThrownBy(() -> b.addEdgePairs(0, 2, 1, 99))
@@ -536,26 +537,26 @@ class GraphBuilderTest {
     assertThat(b.build()).isEqualTo(TestGraphs.of(2, 0, 1, 1, 0));
   }
 
-  // ---- addEdges(int[]) and addInEdges ----
+  // ---- addOutEdges(int[]) and addInEdges ----
 
   @Test
-  void addEdgesArrayMatchesIntListOverload() {
+  void addOutEdgesArrayMatchesIntListOverload() {
     var viaArray = new GraphBuilder();
     viaArray.addNodes(4);
-    viaArray.addEdges(0, new int[] {3, 1, 2});
+    viaArray.addOutEdges(0, new int[] {3, 1, 2});
 
     var viaList = new GraphBuilder();
     viaList.addNodes(4);
-    viaList.addEdges(0, new IntArrayList(new int[] {3, 1, 2}));
+    viaList.addOutEdges(0, new IntArrayList(new int[] {3, 1, 2}));
 
     assertThat(viaArray.build()).isEqualTo(viaList.build());
   }
 
   @Test
-  void addEdgesWithEmptyArrayAddsNothing() {
+  void addOutEdgesWithEmptyArrayAddsNothing() {
     var b = new GraphBuilder();
     b.addNodes(2);
-    b.addEdges(0, new int[0]);
+    b.addOutEdges(0, new int[0]);
     assertThat(b.build()).isEqualTo(TestGraphs.isolated(2));
   }
 
@@ -579,18 +580,18 @@ class GraphBuilderTest {
 
   @Test
   void theThreeParameterFormsAgreeForEveryBatchMethod() {
-    assertFormsAgree("addEdges",
-        (b, ids) -> b.addEdges(0, ids),
-        (b, ids) -> b.addEdges(0, ids[0], ids[1], ids[2]),
-        (b, ids) -> b.addEdges(0, new IntArrayList(ids)));
+    assertFormsAgree("addOutEdges",
+        (b, ids) -> b.addOutEdges(0, ids),
+        (b, ids) -> b.addOutEdges(0, ids[0], ids[1], ids[2]),
+        (b, ids) -> b.addOutEdges(0, new IntArrayList(ids)));
     assertFormsAgree("addInEdges",
         (b, ids) -> b.addInEdges(0, ids),
         (b, ids) -> b.addInEdges(0, ids[0], ids[1], ids[2]),
         (b, ids) -> b.addInEdges(0, new IntArrayList(ids)));
-    assertFormsAgree("addEdgesAndNodes",
-        (b, ids) -> b.addEdgesAndNodes(0, ids),
-        (b, ids) -> b.addEdgesAndNodes(0, ids[0], ids[1], ids[2]),
-        (b, ids) -> b.addEdgesAndNodes(0, new IntArrayList(ids)));
+    assertFormsAgree("addOutEdgesAndNodes",
+        (b, ids) -> b.addOutEdgesAndNodes(0, ids),
+        (b, ids) -> b.addOutEdgesAndNodes(0, ids[0], ids[1], ids[2]),
+        (b, ids) -> b.addOutEdgesAndNodes(0, new IntArrayList(ids)));
     assertFormsAgree("addInEdgesAndNodes",
         (b, ids) -> b.addInEdgesAndNodes(0, ids),
         (b, ids) -> b.addInEdgesAndNodes(0, ids[0], ids[1], ids[2]),
@@ -609,9 +610,9 @@ class GraphBuilderTest {
   void batchMethodsWithNoTargetsAddNothing() {
     var b = new GraphBuilder();
     b.addNodes(2);
-    b.addEdges(0);
+    b.addOutEdges(0);
     b.addInEdges(0);
-    b.addEdges(0, IntLists.emptyList());
+    b.addOutEdges(0, IntLists.emptyList());
     b.addInEdges(0, IntLists.emptyList());
     b.addPath(IntLists.emptyList());
     assertThat(b.build()).isEqualTo(TestGraphs.isolated(2));
@@ -620,7 +621,7 @@ class GraphBuilderTest {
   @Test
   void andNodesBatchMethodsWithNoTargetsStillCreateTheAnchor() {
     var b = new GraphBuilder();
-    b.addEdgesAndNodes(2);
+    b.addOutEdgesAndNodes(2);
     assertThat(b.build()).isEqualTo(TestGraphs.isolated(3));
 
     var fanIn = new GraphBuilder();
@@ -648,10 +649,10 @@ class GraphBuilderTest {
     var nodes = new IntArrayList(new int[] {1, 2});
     var b = new GraphBuilder();
     b.addNodes(4);
-    b.addEdges(0, nodes);
+    b.addOutEdges(0, nodes);
     b.addInEdges(0, nodes);
     b.addPath(nodes);
-    b.addEdgesAndNodes(3, nodes);
+    b.addOutEdgesAndNodes(3, nodes);
     b.addInEdgesAndNodes(3, nodes);
     b.addPathAndNodes(nodes);
     nodes.clear();
@@ -665,7 +666,7 @@ class GraphBuilderTest {
     var b = new GraphBuilder();
     b.addNodes(2);
     var invalid = new IntArrayList(new int[] {0, 5});
-    assertThatThrownBy(() -> b.addEdges(0, invalid))
+    assertThatThrownBy(() -> b.addOutEdges(0, invalid))
         .isInstanceOf(IndexOutOfBoundsException.class);
     assertThatThrownBy(() -> b.addInEdges(0, invalid))
         .isInstanceOf(IndexOutOfBoundsException.class);
@@ -678,7 +679,7 @@ class GraphBuilderTest {
     var b = new GraphBuilder();
     b.addEdgeAndNodes(0, 1);
     var invalid = new IntArrayList(new int[] {2, -1});
-    assertThatThrownBy(() -> b.addEdgesAndNodes(0, invalid))
+    assertThatThrownBy(() -> b.addOutEdgesAndNodes(0, invalid))
         .isInstanceOf(IndexOutOfBoundsException.class);
     assertThatThrownBy(() -> b.addInEdgesAndNodes(0, invalid))
         .isInstanceOf(IndexOutOfBoundsException.class);
@@ -691,7 +692,7 @@ class GraphBuilderTest {
   void andNodesIntListMethodsRejectTheHighestPossibleId() {
     var b = new GraphBuilder();
     var invalid = new IntArrayList(new int[] {Integer.MAX_VALUE});
-    assertThatThrownBy(() -> b.addEdgesAndNodes(0, invalid))
+    assertThatThrownBy(() -> b.addOutEdgesAndNodes(0, invalid))
         .isInstanceOf(IndexOutOfBoundsException.class);
     assertThatThrownBy(() -> b.addInEdgesAndNodes(0, invalid))
         .isInstanceOf(IndexOutOfBoundsException.class);
@@ -779,7 +780,7 @@ class GraphBuilderTest {
     var b = new GraphBuilder();
     b.addNodes(10);
     b.addEdgeAndNodes(0, 1);
-    b.addEdgesAndNodes(0, new int[] {2});
+    b.addOutEdgesAndNodes(0, new int[] {2});
     b.addInEdgesAndNodes(0, new int[] {3});
     b.addPathAndNodes(4, 5);
     b.addEdgePairsAndNodes(6, 7);
@@ -788,13 +789,13 @@ class GraphBuilderTest {
   }
 
   @Test
-  void addEdgesAndNodesMatchesPreallocatedVariant() {
+  void addOutEdgesAndNodesMatchesPreallocatedVariant() {
     var grown = new GraphBuilder();
-    grown.addEdgesAndNodes(4, new int[] {0, 9});
+    grown.addOutEdgesAndNodes(4, new int[] {0, 9});
 
     var preallocated = new GraphBuilder();
     preallocated.addNodes(10);
-    preallocated.addEdges(4, new int[] {0, 9});
+    preallocated.addOutEdges(4, new int[] {0, 9});
 
     assertThat(grown.build()).isEqualTo(preallocated.build());
   }
@@ -835,7 +836,7 @@ class GraphBuilderTest {
     var b = new GraphBuilder();
     assertThatThrownBy(() -> b.addEdgeAndNodes(-1, 0)).isInstanceOf(IndexOutOfBoundsException.class);
     assertThatThrownBy(() -> b.addEdgeAndNodes(0, -1)).isInstanceOf(IndexOutOfBoundsException.class);
-    assertThatThrownBy(() -> b.addEdgesAndNodes(0, new int[] {-1})).isInstanceOf(IndexOutOfBoundsException.class);
+    assertThatThrownBy(() -> b.addOutEdgesAndNodes(0, new int[] {-1})).isInstanceOf(IndexOutOfBoundsException.class);
     assertThatThrownBy(() -> b.addInEdgesAndNodes(0, new int[] {-1})).isInstanceOf(IndexOutOfBoundsException.class);
     assertThatThrownBy(() -> b.addPathAndNodes(0, -1)).isInstanceOf(IndexOutOfBoundsException.class);
     assertThatThrownBy(() -> b.addEdgePairsAndNodes(0, -1)).isInstanceOf(IndexOutOfBoundsException.class);
@@ -859,7 +860,7 @@ class GraphBuilderTest {
   void andNodesMethodsLeaveTheBuilderUnchangedWhenRejected() {
     var b = new GraphBuilder();
     b.addEdgeAndNodes(0, 1);
-    assertThatThrownBy(() -> b.addEdgesAndNodes(0, new int[] {2, -1}))
+    assertThatThrownBy(() -> b.addOutEdgesAndNodes(0, new int[] {2, -1}))
         .isInstanceOf(IndexOutOfBoundsException.class);
     assertThatThrownBy(() -> b.addPathAndNodes(0, 3, -1))
         .isInstanceOf(IndexOutOfBoundsException.class);

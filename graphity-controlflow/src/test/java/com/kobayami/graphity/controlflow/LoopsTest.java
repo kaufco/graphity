@@ -22,7 +22,7 @@ class LoopsTest {
     assertThat(loops.loopCount()).isEqualTo(1);
     assertThat(loops.isReducible()).isTrue();
     assertThat(loops.headerOf(0)).isEqualTo(1);
-    assertThat(loops.nodesOf(0).toIntArray()).containsExactly(1, 2);
+    assertThat(loops.bodyOf(0).toIntArray()).containsExactly(1, 2);
     assertThat(loops.entriesOf(0).toIntArray()).containsExactly(1);
     assertThat(loops.parentOf(0)).isEqualTo(-1);
     assertThat(loops.innermostLoopOf(0)).isEqualTo(-1);
@@ -40,8 +40,8 @@ class LoopsTest {
     assertThat(loops.headerOf(0)).isEqualTo(1);
     assertThat(loops.headerOf(1)).isEqualTo(2);
     assertThat(loops.parentOf(1)).isZero();
-    assertThat(loops.nodesOf(0).toIntArray()).containsExactly(1, 4, 2, 3);
-    assertThat(loops.nodesOf(1).toIntArray()).containsExactly(2, 3);
+    assertThat(loops.bodyOf(0).toIntArray()).containsExactly(1, 4, 2, 3);
+    assertThat(loops.bodyOf(1).toIntArray()).containsExactly(2, 3);
     assertThat(loops.isInLoop(3, 0)).isTrue();
     assertThat(loops.isInLoop(4, 1)).isFalse();
     assertThat(loops.loopDepthOf(3)).isEqualTo(2);
@@ -76,8 +76,22 @@ class LoopsTest {
     var loops = Loops.of(bi(3, 0, 1, 1, 1, 1, 2), 0);
     assertThat(loops.loopCount()).isEqualTo(1);
     assertThat(loops.headerOf(0)).isEqualTo(1);
-    assertThat(loops.nodesOf(0).toIntArray()).containsExactly(1);
+    assertThat(loops.bodyOf(0).toIntArray()).containsExactly(1);
     assertThat(loops.entriesOf(0).toIntArray()).containsExactly(1);
+  }
+
+  @Test
+  void aHeaderWithASelfLoopHeadsNoLoopOfItsOwn() {
+    // 0 -> 1, 1 -> 1, 1 <-> 2: the self-loop leads into the header 1 from inside its loop.
+    var loops = Loops.of(bi(3, 0, 1, 1, 1, 1, 2, 2, 1), 0);
+    assertThat(loops.loopCount()).isEqualTo(1);
+    assertThat(loops.headerOf(0)).isEqualTo(1);
+    assertThat(loops.bodyOf(0).toIntArray()).containsExactly(1, 2);
+    // On a node that heads no larger loop, the self-loop makes a nested loop.
+    var nested = Loops.of(bi(3, 0, 1, 1, 2, 2, 2, 2, 1), 0);
+    assertThat(nested.loopCount()).isEqualTo(2);
+    assertThat(nested.headerOf(1)).isEqualTo(2);
+    assertThat(nested.bodyOf(1).toIntArray()).containsExactly(2);
   }
 
   @Test
@@ -130,13 +144,13 @@ class LoopsTest {
     assertThat(loops.headerOf(0)).isEqualTo(1);
     assertThat(loops.parentOf(1)).isZero();
     assertThat(loops.parentOf(2)).isZero();
-    assertThat(loops.nodesOf(0).toIntArray()).containsExactly(1, 2, 3, 4, 5);
+    assertThat(loops.bodyOf(0).toIntArray()).containsExactly(1, 2, 3, 4, 5);
   }
 
   @Test
   void viewsAreReadOnly() {
     var loops = Loops.of(bi(3, 0, 1, 1, 2, 2, 1), 0);
-    assertThatThrownBy(() -> loops.nodesOf(0).set(0, 1))
+    assertThatThrownBy(() -> loops.bodyOf(0).set(0, 1))
         .isInstanceOf(UnsupportedOperationException.class);
   }
 
@@ -151,7 +165,7 @@ class LoopsTest {
     assertThatThrownBy(() -> loops.headerOf(-1)).isInstanceOf(IndexOutOfBoundsException.class);
     assertThatThrownBy(() -> loops.entriesOf(1)).isInstanceOf(IndexOutOfBoundsException.class);
     assertThatThrownBy(() -> loops.parentOf(1)).isInstanceOf(IndexOutOfBoundsException.class);
-    assertThatThrownBy(() -> loops.nodesOf(1)).isInstanceOf(IndexOutOfBoundsException.class);
+    assertThatThrownBy(() -> loops.bodyOf(1)).isInstanceOf(IndexOutOfBoundsException.class);
   }
 
   @Test

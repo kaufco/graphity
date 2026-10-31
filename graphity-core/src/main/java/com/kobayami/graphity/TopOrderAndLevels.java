@@ -3,6 +3,7 @@ package com.kobayami.graphity;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.ints.IntLists;
+import java.util.Objects;
 
 /**
  * Topological order and level assignment of a directed acyclic graph (DAG).
@@ -43,7 +44,8 @@ public final class TopOrderAndLevels {
    * Computes topological order and levels of the given graph via Kahn's algorithm.
    * <p>
    * <strong>Time:</strong> O(nodeCount + edgeCount).<br>
-   * <strong>Memory:</strong> O(nodeCount) for the result; O(nodeCount) additional during computation.
+   * <strong>Memory:</strong> O(nodeCount) for the result; O(nodeCount) additional during
+   * computation.
    *
    * @param graph the graph to analyze (must be a DAG)
    * @return topological order with level information
@@ -51,11 +53,8 @@ public final class TopOrderAndLevels {
    */
   public static TopOrderAndLevels of(Graph graph) {
     int n = graph.nodeCount();
-    if (n == 0) {
-      return new TopOrderAndLevels(new int[0], new int[0], 0);
-    }
 
-    // Compute in-degrees.
+    // 1) In-degrees; a BiAdjacentGraph has them in its offsets.
     var inDegree = new int[n];
     if (graph instanceof BiAdjacentGraph biGraph) {
       var inStart = Csr.inAdjacencyStart(biGraph);
@@ -69,7 +68,7 @@ public final class TopOrderAndLevels {
       }
     }
 
-    // Seed queue with roots (in-degree 0).
+    // 2) Roots.
     var queue = new int[n];
     int queueHead = 0;
     int queueTail = 0;
@@ -79,7 +78,7 @@ public final class TopOrderAndLevels {
       }
     }
 
-    // BFS level by level.
+    // 3) Kahn, one wave per level: a node joins the wave after that of its last predecessor.
     var order = new int[n];
     var levels = new int[n];
     int orderPos = 0;
@@ -107,7 +106,7 @@ public final class TopOrderAndLevels {
     }
 
     if (orderPos != n) {
-      throw new IllegalArgumentException("Graph contains a cycle");
+      throw new IllegalArgumentException("graph contains a cycle");
     }
 
     return new TopOrderAndLevels(order, levels, level);
@@ -148,6 +147,7 @@ public final class TopOrderAndLevels {
    * @throws IndexOutOfBoundsException if {@code node} is out of range
    */
   public int levelOf(int node) {
+    Objects.checkIndex(node, levels.size());
     return levels.getInt(node);
   }
 

@@ -39,17 +39,22 @@ int entry = b.addNode();
 int cond = b.addChild(entry);                       // adds a node, links entry -> it, returns its ID
 int firstBranch = b.addChildren(cond, 2);           // two successors at once, ID of the first
 b.addPath(firstBranch, firstBranch + 1);            // chains existing nodes
-b.addInEdges(entry, firstBranch + 1);               // fan-in, the counterpart of addEdges
+b.addInEdges(entry, firstBranch + 1);               // fan-in, the counterpart of addOutEdges
 ```
 
 The fan-out, fan-in and path methods take their node IDs in whichever form you already have them — loose arguments, an `int[]`, or an `IntList`. The last one matters because it is what Graphity itself returns, so a result can go straight back into a builder without a copy; a result that lists edges goes in whole:
 
 ```java
+var copy = new GraphBuilder();
+copy.addNodes(source.nodeCount());            // the edges below name nodes of source
 for (int n = 0; n < source.nodeCount(); n++) {
-    b.addEdges(n, source.outNodes(n));  // SortedIntView, no intermediate array
+    copy.addOutEdges(n, source.outNodes(n));  // SortedIntView, no intermediate array
 }
-b.addPath(TopOrder.of(source));         // any IntList works
-b.addEdges(BackEdges.of(source));       // the edges of a result, as listed
+
+var outline = new GraphBuilder();             // one shortest path of source and its back edges
+outline.addNodes(source.nodeCount());
+outline.addPath(BfsDistances.of(source, entry).pathTo(exit));  // any IntList works
+outline.addEdges(BackEdges.of(source));                         // the edges of a result, as listed
 ```
 
 Node IDs often come from somewhere else — block numbers in a control-flow graph, symbol IDs from a table — and then arrive in arbitrary order, frequently as a flat list of pairs. Every edge-adding method has an `AndNodes` twin that creates what it references, so no caller has to track the highest ID:
@@ -89,7 +94,7 @@ Both methods move the arrays in 64 KiB blocks, so a file stream needs no extra b
 
 ## Predecessors: `BiAdjacentGraph`
 
-**`BiAdjacentGraph` for O(1) bidirectional access.** Opt-in via `BiAdjacentGraph.of(graph)`. Doubles the storage to 8 B per (node + edge) and gives constant-time access in both directions — useful for Kahn's topological order, which then reads in-degrees in O(nodeCount) instead of scanning every edge, and for anything that walks predecessors, such as bidirectional BFS or ancestry queries. Connectivity is not among them: `Components.wccsOf` and `ccsOf` are Union-Find over the out-edges and need no in-adjacency. The control-flow analyses, which do walk predecessors, take a `BiAdjacentGraph` as input: the in-adjacency is built once, where the caller sees the cost, and shared by every analysis that needs it.
+**`BiAdjacentGraph` for O(1) bidirectional access.** Opt-in via `BiAdjacentGraph.of(graph)`. Doubles the storage to 8 B per (node + edge) and gives constant-time access in both directions — useful for Kahn's topological order, which then reads in-degrees in O(nodeCount) instead of scanning every edge, and for anything that walks predecessors, such as bidirectional BFS or ancestry queries. Weak connectivity is not among them: `Components.wccsOf` and `ccsOf` are Union-Find over the out-edges and need no in-adjacency. The control-flow analyses, which do walk predecessors, take a `BiAdjacentGraph` as input: the in-adjacency is built once, where the caller sees the cost, and shared by every analysis that needs it.
 
 ## Algorithm results and their follow-ups
 
@@ -106,11 +111,11 @@ Both methods move the arrays in 64 KiB blocks, so a file stream needs no extra b
 | `Ancestry.of(forest)`      | `Ancestry`      | `lowestCommonAncestorOf(a, b)`, `depthOf()`  |
 | `PreorderAncestry.of(ancestry)` | `PreorderAncestry` | `isAncestorOf()` in O(1), `subtreeOf(node)`, `subtreeSizeOf()` |
 | `Dominators.of(cfg, entry)` | `Dominators` | `immediateDominatorOf()`, `Graphs.dominatorTree()`, `ControlFlow.dominanceFrontiers()` (*controlflow*), `Ancestry.of(dominators)` |
-| `Loops.of(cfg, entry)` (*controlflow*) | `Loops`         | `innermostLoopOf()`, `nodesOf(loop)`, `entriesOf(loop)`, `isReducible()` |
+| `Loops.of(cfg, entry)` (*controlflow*) | `Loops`         | `innermostLoopOf()`, `bodyOf(loop)`, `entriesOf(loop)`, `isReducible()` |
 | `BfsDistances.of(graph, source)` | `BfsDistances` | `distanceOf()`, `pathTo(node)`, `maxDistance()` |
-| `NodeMapping.of(...)`      | `NodeMapping`   | `inverted()`, `compose(other)`, `gather(values)` |
+| `NodeMapping.of(...)`      | `NodeMapping`   | `inverted(targetCount)`, `compose(other)`, `gather(values)` |
 
-These types compose. `sccs.condense()` returns a `Graph` plus a `NodeMapping` from original nodes to SCC IDs that you can run further algorithms on; `nodeMapping.compose(other)` chains transformations and applies the result to your own metadata arrays in one step.
+These types compose. `sccs.condense()` returns the condensation as a `Graph`, and `sccs` itself is the partition from original nodes to SCC IDs - its `reduce` folds your arrays per SCC, and `Graphs.edgePartition` carries edge data onto the condensation; `nodeMapping.compose(other)` chains transformations, and `gather` then carries your arrays across the chain in one pass.
 
 ## Data on nodes and edges
 
@@ -122,7 +127,7 @@ EdgeMapping newToOld = Graphs.transposedEdgeMapping(graph);      // one linear p
 double[] transposedWeights = newToOld.gather(weights);           // transposedWeights[e] = weights[newToOld.get(e)]
 
 Graph condensed = partition.condense();                          // partition: e.g. Components.sccsOf(graph)
-EdgePartition provenance = Graphs.edgePartition(condensed, graph, partition);
+EdgePartition provenance = Graphs.edgePartition(condensed, partition);
 double[] weightPerCondensedEdge = provenance.reduce(weights, 0.0, Double::sum);
 ```
 
@@ -143,7 +148,7 @@ graph.forEachEdge((source, target, edgeIndex) -> total[0] += weights[edgeIndex])
 
 ```java
 Graph condensed = partition.condense();
-EdgePartition provenance = Graphs.edgePartition(condensed, graph, partition);
+EdgePartition provenance = Graphs.edgePartition(condensed, partition);
 double[] weightPerCondensedEdge = provenance.reduce(weights, 0.0, Double::sum);
 ```
 
@@ -177,7 +182,7 @@ keep.gather(names, subNames);
 
 **Zero-copy views.** Adjacency lists, partition members, edge lists — wherever the underlying CSR already holds the data in the right form, the API hands back a view, not a copy. No allocation on hot loops.
 
-**Immutable graphs, safe to share across threads.** Once built, a `Graph` never changes. The same instance can be passed to multiple algorithms or threads without locking or defensive copying. Mutation happens exclusively through transformations (`subgraph`, `remap`, `condense`) that produce new graphs. The immutability is what makes the zero-copy result types and shared-graph parallelism safe.
+**Immutable graphs, safe to share across threads.** Once built, a `Graph` never changes. The same instance can be passed to multiple algorithms or threads without locking or defensive copying. Mutation happens exclusively through transformations (`Graphs.remapped` with `NodeMapping.forSubgraph`, `condense`) that produce new graphs. The immutability is what makes the zero-copy result types and shared-graph parallelism safe.
 
 **Raw CSR access for algorithm code.** Algorithms of your own that loop over all edges can read the CSR arrays directly through `Csr` - `Csr.outAdjacencyStart(graph)`, `Csr.outAdjacency(graph)` and their in-adjacency counterparts return the graph's own arrays, the same access the built-in algorithms use. This is the one place where immutability rests on a contract: the arrays are read-only by contract, and writing to them breaks the graph for everyone who holds it.
 
@@ -213,9 +218,9 @@ A node filter writes part of a graph without renumbering it, and `undirected()` 
 
 ## Custom traversals
 
-For custom traversals, subclass `IterativeDfsTraverser` — it keeps its DFS stack on the heap, so it handles arbitrarily deep graphs without any `-Xss` tuning. Override `enterNode(int)` for preorder and `leaveNode(int)` for postorder; return `false` from `enterNode` to prune a subtree. `IterativeDfsTraverser`, `IterativeDfsEdgeTraverser` and `FrontierTraverser` also let any hook call `stop()` to end the whole traversal. For edge-centric algorithms that must look at every edge, such as collecting back edges with data of your own, subclass `IterativeDfsEdgeTraverser`: its `visitEdge` hook reports each edge with the state of its target (unvisited, on the current path, finished) and returns whether to descend, skip the edge or stop. Multiple `run()` calls accumulate visited state, so two-phase walks compose without external bookkeeping. One cycle as a list of nodes is ready-made: `Graphs.findCycle(graph)`.
+For custom traversals, subclass `DfsTraverser` — it keeps its DFS stack on the heap, so it handles arbitrarily deep graphs without any `-Xss` tuning. Override `enterNode(int)` for preorder and `leaveNode(int)` for postorder; return `false` from `enterNode` to prune a subtree. `DfsTraverser`, `DfsEdgeTraverser` and `FrontierTraverser` also let any hook call `stop()` to end the whole traversal. For edge-centric algorithms that must look at every edge, such as collecting back edges with data of your own, subclass `DfsEdgeTraverser`: its `visitEdge` hook reports each edge with the state of its target (unvisited, on the current path, finished) and returns whether to descend, skip the edge or stop. Multiple `run()` calls accumulate visited state, so two-phase walks compose without external bookkeeping. One cycle as a list of nodes is ready-made: `Graphs.findCycle(graph)`.
 
-To start from the root nodes of a `BiAdjacentGraph`, pass them in: `traverser.runFromNodes(Graphs.rootNodes(biAdjacentGraph))`. Inside any hook, the `BiAdjacentGraph` you hold gives access to predecessors.
+To start from the root nodes of a `BiAdjacentGraph`, pass them in: `traverser.run(Graphs.rootNodes(biAdjacentGraph))`. Inside any hook, the `BiAdjacentGraph` you hold gives access to predecessors.
 
 ### From recursion to hooks
 
@@ -233,7 +238,7 @@ A recursive depth-first search puts work before the children, after each child, 
 Subtree sizes, the classic example of combining child results, look like this:
 
 ```java
-class SubtreeSizes extends IterativeDfsEdgeTraverser {
+class SubtreeSizes extends DfsEdgeTraverser {
     final int[] parent;
     final int[] size;
 

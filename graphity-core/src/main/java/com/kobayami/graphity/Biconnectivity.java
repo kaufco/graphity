@@ -6,8 +6,8 @@ import java.util.Arrays;
 /**
  * Bridges, articulation points and biconnected components of a graph read as undirected.
  * <p>
- * Obtain via {@link Components#biconnectivityOf(BiAdjacentGraph)}. All three results come out of one
- * depth-first pass; there is no cheaper entry point that computes only one of them.
+ * Obtain via {@link Components#biconnectivityOf(BiAdjacentGraph)}. All three results come out of
+ * one depth-first pass; there is no cheaper entry point that computes only one of them.
  * <ul>
  *   <li>A <strong>bridge</strong> is an edge whose removal increases the number of connected
  *       components.</li>
@@ -99,6 +99,21 @@ public final class Biconnectivity {
     return blocks;
   }
 
+  /** The nodes whose flag is set, ascending; {@link StrongConnectivity} uses it as well. */
+  static SortedIntView flaggedNodes(boolean[] isFlagged) {
+    int count = 0;
+    for (boolean flag : isFlagged) {
+      if (flag) count++;
+    }
+    if (count == 0) return SortedIntView.EMPTY;
+    var nodes = new int[count];
+    int pos = 0;
+    for (int node = 0; node < isFlagged.length; node++) {
+      if (isFlagged[node]) nodes[pos++] = node;
+    }
+    return new SortedIntView(nodes);
+  }
+
   /**
    * Hopcroft-Tarjan biconnectivity on an explicit stack (no recursion, so deep graphs cannot
    * overflow the JVM call stack).
@@ -178,6 +193,7 @@ public final class Biconnectivity {
       this.outCursor = new int[n];
       this.inCursor = new int[n];
       this.dfsStack = new int[n];
+      // Sized like DfsFrames.initial: one slot per edge, but at least 16 and at most 1024.
       this.edgeStack = new int[Math.max(16, Math.min(m, 1024))];
       this.isArticulation = new boolean[n];
       this.blockOfEdge = new int[m];
@@ -337,40 +353,12 @@ public final class Biconnectivity {
     }
 
     SortedIntView articulationPoints() {
-      int count = 0;
-      for (boolean flag : isArticulation) {
-        if (flag) count++;
-      }
-      if (count == 0) return SortedIntView.EMPTY;
-      var points = new int[count];
-      int pos = 0;
-      for (int node = 0; node < isArticulation.length; node++) {
-        if (isArticulation[node]) points[pos++] = node;
-      }
-      return new SortedIntView(points);
+      return flaggedNodes(isArticulation);
     }
 
     EdgePartition blocks() {
-      int m = blockOfEdge.length;
-      var memberStart = new int[blockCount + 1];
-      for (int edgeIndex = 0; edgeIndex < m; edgeIndex++) {
-        int block = blockOfEdge[edgeIndex];
-        if (block >= 0) memberStart[block + 1]++;
-      }
-      for (int block = 0; block < blockCount; block++) {
-        memberStart[block + 1] += memberStart[block];
-      }
-
-      // Ascending edge scan keeps the members of every block sorted.
-      var members = new int[memberStart[blockCount]];
-      var writePos = Arrays.copyOf(memberStart, blockCount);
-      for (int edgeIndex = 0; edgeIndex < m; edgeIndex++) {
-        int block = blockOfEdge[edgeIndex];
-        if (block >= 0) members[writePos[block]++] = edgeIndex;
-      }
-
-      int valid = members.length;
-      return new EdgePartition(blockOfEdge, valid, valid < m, members, memberStart);
+      var groups = ParentForest.groupIndices(blockOfEdge, blockCount);
+      return new EdgePartition(blockOfEdge, groups.members(), groups.start());
     }
   }
 }

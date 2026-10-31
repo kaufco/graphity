@@ -42,6 +42,13 @@ public sealed class Graph permits BiAdjacentGraph {
   /** Most out-nodes {@link #toString()} lists, over all listed nodes together. */
   private static final int TO_STRING_TARGETS = 64;
 
+  /**
+   * Initial capacity of the {@link #toString()} builder. The longest listing the two limits above
+   * allow stays under 1000 characters, even with ten-digit counts and IDs, so the builder never
+   * grows.
+   */
+  private static final int TO_STRING_CAPACITY = 1024;
+
   /*
    * Per-node start offset into outAdjacency. Node i's out-nodes occupy
    * outAdjacency[outAdjacencyStart[i]..outAdjacencyStart[i+1]-1], sorted ascending. Length
@@ -53,7 +60,7 @@ public sealed class Graph permits BiAdjacentGraph {
   /* Flat array of all out-adjacency lists, indexed via outAdjacencyStart. */
   private final int[] outAdjacency;
 
-  // Package-private. Arrays are shared, not copied.
+  // Takes the arrays as they are: neither copied nor checked.
   Graph(int[] outAdjacencyStart, int[] outAdjacency) {
     this.outAdjacencyStart = outAdjacencyStart;
     this.outAdjacency = outAdjacency;
@@ -184,22 +191,7 @@ public sealed class Graph permits BiAdjacentGraph {
    */
   public final int outDegree(int node) {
     Objects.checkIndex(node, nodeCount());
-    return outAdjacencyEnd(node) - outAdjacencyStart[node];
-  }
-
-  /**
-   * Returns the degree of {@code node}.
-   * <p>
-   * On a uni-adjacent {@code Graph} this equals {@link #outDegree(int) outDegree(node)}.
-   * <p>
-   * <strong>Time:</strong> O(1).
-   *
-   * @param node node ID in {@code 0..nodeCount()-1}
-   * @return degree
-   * @throws IndexOutOfBoundsException if {@code node} is out of range
-   */
-  public int degree(int node) {
-    return outDegree(node);
+    return outAdjacencyStart[node + 1] - outAdjacencyStart[node];
   }
 
   /**
@@ -214,11 +206,7 @@ public sealed class Graph permits BiAdjacentGraph {
    */
   public final SortedIntView outNodes(int node) {
     Objects.checkIndex(node, nodeCount());
-    return new SortedIntView(outAdjacency, outAdjacencyStart[node], outAdjacencyEnd(node));
-  }
-
-  int outAdjacencyEnd(int node) {
-    return outAdjacencyStart[node + 1];
+    return new SortedIntView(outAdjacency, outAdjacencyStart[node], outAdjacencyStart[node + 1]);
   }
 
   /**
@@ -319,9 +307,10 @@ public sealed class Graph permits BiAdjacentGraph {
    * @return source node ID
    * @throws IndexOutOfBoundsException if {@code edgeIndex} is out of range
    */
-  public int edgeSource(int edgeIndex) {
+  public final int edgeSource(int edgeIndex) {
     Objects.checkIndex(edgeIndex, edgeCount());
-    // Binary search: find largest node where outAdjacencyStart[node] <= edgeIndex
+    // The largest node with outAdjacencyStart[node] <= edgeIndex: a node without out-edges shares
+    // its offset with the next one.
     int lo = 0, hi = nodeCount() - 1;
     while (lo < hi) {
       int mid = (lo + hi + 1) >>> 1;
@@ -346,7 +335,8 @@ public sealed class Graph permits BiAdjacentGraph {
    */
   public final boolean hasOutNode(int node, int outNode) {
     Objects.checkIndex(node, nodeCount());
-    return SortedIntView.containsInRange(outAdjacency, outAdjacencyStart[node], outAdjacencyEnd(node), outNode);
+    return SortedIntView.containsInRange(
+        outAdjacency, outAdjacencyStart[node], outAdjacencyStart[node + 1], outNode);
   }
 
   /**
@@ -395,36 +385,36 @@ public sealed class Graph permits BiAdjacentGraph {
    * graph that is not yet bi-adjacent.
    */
   final BiAdjacentGraph withInAdjacency() {
-    var totalNodes = nodeCount();
-    var totalEdges = edgeCount();
-    var inAdjacencyStart = new int[totalNodes + 1];
-    var inAdjacency = new int[totalEdges];
+    int n = nodeCount();
+    int m = edgeCount();
+    int[] inAdjacencyStart = new int[n + 1];
+    int[] inAdjacency = new int[m];
 
     // 1) Count in-degrees
-    for (var i = 0; i < totalEdges; i++) {
-      inAdjacencyStart[outAdjacency[i]]++;
+    for (int e = 0; e < m; e++) {
+      inAdjacencyStart[outAdjacency[e]]++;
     }
 
     // 2) Prefix-sum: convert in-degrees to start offsets
-    var nextStart = 0;
-    for (var i = 0; i < totalNodes; i++) {
-      var inDegree = inAdjacencyStart[i];
-      inAdjacencyStart[i] = nextStart;
+    int nextStart = 0;
+    for (int v = 0; v < n; v++) {
+      int inDegree = inAdjacencyStart[v];
+      inAdjacencyStart[v] = nextStart;
       nextStart += inDegree;
     }
-    inAdjacencyStart[totalNodes] = totalEdges; // sentinel
 
     // 3) Fill in-adjacency. inAdjacencyStart[target]++ doubles as write pointer.
     //    Ascending node scan ensures each in-list ends up sorted.
-    for (var node = 0; node < totalNodes; node++) {
-      for (int i = outAdjacencyStart[node]; i < outAdjacencyStart[node + 1]; i++) {
-        inAdjacency[inAdjacencyStart[outAdjacency[i]]++] = node;
+    for (int v = 0; v < n; v++) {
+      for (int e = outAdjacencyStart[v], end = outAdjacencyStart[v + 1]; e < end; e++) {
+        inAdjacency[inAdjacencyStart[outAdjacency[e]]++] = v;
       }
     }
 
-    // 4) Repair: step 3 shifted inAdjacencyStart left by one; right-shift restores it.
-    for (var i = totalNodes; i > 0; i--) {
-      inAdjacencyStart[i] = inAdjacencyStart[i - 1];
+    // 4) Repair: step 3 shifted inAdjacencyStart left by one; right-shift restores it, the
+    //    sentinel included.
+    for (int v = n; v > 0; v--) {
+      inAdjacencyStart[v] = inAdjacencyStart[v - 1];
     }
     inAdjacencyStart[0] = 0;
 
@@ -491,7 +481,7 @@ public sealed class Graph permits BiAdjacentGraph {
   @Override
   public final String toString() {
     int n = nodeCount();
-    var sb = new StringBuilder(1024);
+    var sb = new StringBuilder(TO_STRING_CAPACITY);
     sb.append(getClass().getSimpleName()).append("[nodes=").append(n)
         .append(", edges=").append(edgeCount()).append("] {");
     int budget = TO_STRING_TARGETS;

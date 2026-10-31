@@ -35,7 +35,7 @@ class EdgeDataRecipesTest {
     Sccs partition = Components.sccsOf(graph);
 
     Graph condensed = partition.condense();
-    EdgePartition provenance = Graphs.edgePartition(condensed, graph, partition);
+    EdgePartition provenance = Graphs.edgePartition(condensed, partition);
     double[] weightPerCondensedEdge = provenance.reduce(weights, 0.0, Double::sum);
 
     assertThat(partition.sccCount()).isGreaterThan(10);

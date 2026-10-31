@@ -79,7 +79,7 @@ public final class GraphFormat {
    * @throws IOException if writing to the stream fails
    */
   public static void write(Graph graph, OutputStream out) throws IOException {
-    var buffer = ByteBuffer.allocate(4 * CHUNK_INTS).order(ByteOrder.LITTLE_ENDIAN);
+    var buffer = ByteBuffer.allocate(Integer.BYTES * CHUNK_INTS).order(ByteOrder.LITTLE_ENDIAN);
     buffer.putInt(MAGIC).putInt(VERSION).putInt(graph.nodeCount()).putInt(graph.edgeCount());
     out.write(buffer.array(), 0, HEADER_BYTES);
     writeInts(Csr.outAdjacencyStart(graph), buffer, out);
@@ -109,12 +109,12 @@ public final class GraphFormat {
    *                     cause
    */
   public static Graph read(InputStream in) throws IOException {
-    var buffer = ByteBuffer.allocate(4 * CHUNK_INTS).order(ByteOrder.LITTLE_ENDIAN);
+    var buffer = ByteBuffer.allocate(Integer.BYTES * CHUNK_INTS).order(ByteOrder.LITTLE_ENDIAN);
     readFully(in, buffer.array(), HEADER_BYTES);
     int magic = buffer.getInt(0);
     if (magic != MAGIC) {
       throw new IOException("not a graph in Graphity's binary format: the magic number is "
-          + Arrays.toString(Arrays.copyOf(buffer.array(), 4)) + " instead of \"GPHY\"");
+          + Arrays.toString(Arrays.copyOf(buffer.array(), Integer.BYTES)) + " instead of \"GPHY\"");
     }
     int version = buffer.getInt(4);
     if (version != VERSION) {
@@ -143,7 +143,7 @@ public final class GraphFormat {
       int count = Math.min(CHUNK_INTS, values.length - from);
       ints.clear();
       ints.put(values, from, count);
-      out.write(buffer.array(), 0, 4 * count);
+      out.write(buffer.array(), 0, Integer.BYTES * count);
     }
   }
 
@@ -156,7 +156,7 @@ public final class GraphFormat {
     var ints = buffer.clear().asIntBuffer();
     for (int from = 0; from < count; from += CHUNK_INTS) {
       int chunk = Math.min(CHUNK_INTS, count - from);
-      readFully(in, buffer.array(), 4 * chunk);
+      readFully(in, buffer.array(), Integer.BYTES * chunk);
       if (from + chunk > values.length) {
         values = Arrays.copyOf(values, (int) Math.min(count, 2L * values.length));
       }

@@ -22,7 +22,7 @@ import org.jspecify.annotations.Nullable;
  *   <li>{@link #reindex(Graph)} - DFS-preorder reindexing for cache-friendly layouts</li>
  *   <li>{@link #of(int[])} - general-purpose, caller defines direction</li>
  * </ul>
- * Call {@link #inverted()} to obtain the reverse direction.
+ * Call {@link #inverted(int)} to obtain the reverse direction.
  * Use {@link Graphs#remapped(Graph, NodeMapping)} to apply a mapping to a graph.
  * Use {@link #compose(NodeMapping)} to chain multiple mappings, and {@link #gather(int[])} to
  * carry per-node data along.
@@ -48,8 +48,11 @@ import org.jspecify.annotations.Nullable;
  * }</pre>
  *
  * <p>The factories check their input at runtime: a negative or out-of-range node ID raises
- * {@link IndexOutOfBoundsException}, a repeated or otherwise invalid value
- * {@link IllegalArgumentException}.
+ * {@link IndexOutOfBoundsException}, and {@link #forSubgraph} and {@link #forPermutation} reject a
+ * repeated node ID with {@link IllegalArgumentException}. {@link #of(int[])} checks only that
+ * every value is {@code -1} or a node ID. That no two source IDs map to the same node is the
+ * caller's contract there; a repeat surfaces in {@link #inverted(int)} and
+ * {@link Graphs#remapped(Graph, NodeMapping)}, which reject it.
  * <p>
  * <strong>Memory:</strong> same as {@link IndexMapping} - no fields beyond the inherited mapping array.
  *
@@ -59,37 +62,38 @@ import org.jspecify.annotations.Nullable;
 public final class NodeMapping extends IndexMapping {
 
   /**
-   * Package-private constructor. Used by factory methods and subclasses.
+   * Package-private constructor. Used by the factory methods.
    *
    * @param mapping    the mapping array (not copied - caller must not retain a reference)
    * @param validCount number of non-negative entries in {@code mapping}
-   * @param partial    whether the mapping contains unmapped entries ({@code -1})
    */
-  NodeMapping(int[] mapping, int validCount, boolean partial) {
-    super(mapping, validCount, partial);
+  NodeMapping(int[] mapping, int validCount) {
+    super(mapping, validCount);
   }
 
   /**
    * Creates a mapping from the given array. The array is copied.
    * <p>
-   * {@code mapping[sourceId] = targetId}, or {@code -1} for unmapped source IDs.
+   * {@code mapping[sourceId] = targetId}, or {@code -1} for unmapped source IDs. Repeated
+   * targets are not rejected here: that no two source IDs map to the same node is the caller's
+   * contract, and a repeat surfaces in {@link #inverted(int)} and
+   * {@link Graphs#remapped(Graph, NodeMapping)}.
    * <p>
    * <strong>Time:</strong> O(n) where n = mapping.length.
    *
    * @param mapping source-to-target mapping
    * @return a new node mapping
-   * @throws IllegalArgumentException if a value is below {@code -1}
+   * @throws IndexOutOfBoundsException if a value is below {@code -1}
    */
   public static NodeMapping of(int[] mapping) {
     int[] copy = Arrays.copyOf(mapping, mapping.length);
     for (int source = 0; source < copy.length; source++) {
       if (copy[source] < -1) {
-        throw new IllegalArgumentException(
+        throw new IndexOutOfBoundsException(
             "mapping value must be -1 or a node ID, but source " + source + " maps to " + copy[source]);
       }
     }
-    int valid = countValid(copy);
-    return new NodeMapping(copy, valid, valid < copy.length);
+    return new NodeMapping(copy, countValid(copy));
   }
 
   /**
@@ -112,7 +116,7 @@ public final class NodeMapping extends IndexMapping {
     for (int bit = selected.nextSetBit(0); bit >= 0; bit = selected.nextSetBit(bit + 1)) {
       map[idx++] = bit;
     }
-    return new NodeMapping(map, k, false);
+    return new NodeMapping(map, k);
   }
 
   /**
@@ -127,8 +131,7 @@ public final class NodeMapping extends IndexMapping {
    * @param selected list of selected node IDs
    * @return mapping from dense IDs to original IDs
    * @throws IndexOutOfBoundsException if an ID is negative
-   * @throws IllegalArgumentException if an ID occurs more than once, or a {@link SortedIntView}
-   *                                  argument is not sorted ascending
+   * @throws IllegalArgumentException if an ID occurs more than once
    */
   public static NodeMapping forSubgraph(IntList selected) {
     int k = selected.size();
@@ -140,7 +143,7 @@ public final class NodeMapping extends IndexMapping {
       Arrays.sort(map);
     }
     checkSelection(map);
-    return new NodeMapping(map, k, false);
+    return new NodeMapping(map, k);
   }
 
   /**
@@ -163,7 +166,7 @@ public final class NodeMapping extends IndexMapping {
     int[] map = Arrays.copyOf(selected, selected.length);
     Arrays.sort(map);
     checkSelection(map);
-    return new NodeMapping(map, map.length, false);
+    return new NodeMapping(map, map.length);
   }
 
   /**
@@ -195,27 +198,34 @@ public final class NodeMapping extends IndexMapping {
       seen.set(old);
       map[i] = old;
     }
-    return new NodeMapping(map, n, false);
+    return new NodeMapping(map, n);
   }
 
   /**
-   * Creates the inverse mapping (target → source).
+   * Creates the inverse mapping (target → source) over a target space of {@code targetCount}
+   * node IDs.
    * <p>
-   * Each target value in this mapping becomes a source in the inverse, and vice versa.
-   * If the inverse is partial (not all target-space IDs are covered), unmapped IDs
-   * map to {@code -1}.
-   * <p>
-   * <strong>Time:</strong> O(n + max target ID).<br>
-   * <strong>Memory:</strong> O(max target ID) for the inverse array.
+   * Each target value in this mapping becomes a source in the inverse, and vice versa. The
+   * inverse covers every ID in {@code 0..targetCount-1}; an ID that no source maps to maps to
+   * {@code -1}, and then the inverse is partial. For a mapping from new to old IDs, as the
+   * factories produce it, {@code targetCount} is the node count of the old graph:
    *
-   * @return the inverse mapping
-   * @throws IllegalArgumentException if multiple source IDs map to the same target
-   *         (the mapping is not injective and cannot be inverted)
+   * <pre>{@code
+   * NodeMapping oldToNew = newToOld.inverted(graph.nodeCount());
+   * }</pre>
+   *
+   * <strong>Time:</strong> O(n + targetCount) where n = source space size.<br>
+   * <strong>Memory:</strong> 4 x targetCount bytes for the inverse array.
+   *
+   * @param targetCount size of the target space, which becomes the source space of the inverse
+   * @return the inverse mapping, with {@link #indexCount()} equal to {@code targetCount}
+   * @throws IllegalArgumentException  if {@code targetCount} is negative, or multiple source IDs
+   *                                   map to the same target (the mapping is not injective and
+   *                                   cannot be inverted)
+   * @throws IndexOutOfBoundsException if a target is {@code targetCount} or more
    */
-  public NodeMapping inverted() {
-    int[] inv = computeInverse(mapping);
-    int valid = countValid(inv);
-    return new NodeMapping(inv, valid, valid < inv.length);
+  public NodeMapping inverted(int targetCount) {
+    return new NodeMapping(invertArray(mapping, targetCount), mappedCount());
   }
 
   /**
@@ -229,11 +239,12 @@ public final class NodeMapping extends IndexMapping {
    *
    * @param inner the inner mapping to apply first
    * @return the composed mapping from inner's source space to this mapping's target space
+   * @throws IndexOutOfBoundsException if {@code inner} maps to a value outside this mapping's
+   *                                   source space
    */
   public NodeMapping compose(NodeMapping inner) {
-    int[] comp = computeCompose(this.mapping, inner.mapping);
-    int valid = countValid(comp);
-    return new NodeMapping(comp, valid, valid < comp.length);
+    int[] composed = composeArrays(this.mapping, inner.mapping);
+    return new NodeMapping(composed, countValid(composed));
   }
 
   /**
@@ -255,7 +266,7 @@ public final class NodeMapping extends IndexMapping {
    * @throws IndexOutOfBoundsException if a mapped target lies outside {@code values}
    */
   public int[] gather(int[] values) {
-    return gather(mapping, values);
+    return gatherArray(mapping, values);
   }
 
   /**
@@ -270,7 +281,7 @@ public final class NodeMapping extends IndexMapping {
    * @throws IndexOutOfBoundsException if a mapped target lies outside {@code values}
    */
   public long[] gather(long[] values) {
-    return gather(mapping, values);
+    return gatherArray(mapping, values);
   }
 
   /**
@@ -285,25 +296,27 @@ public final class NodeMapping extends IndexMapping {
    * @throws IndexOutOfBoundsException if a mapped target lies outside {@code values}
    */
   public double[] gather(double[] values) {
-    return gather(mapping, values);
+    return gatherArray(mapping, values);
   }
 
   /**
    * Carries per-node objects from the target space into an array the caller allocated for the
    * source space: {@code newValues[i] = values[get(i)]}, and {@code newValues[i]} untouched
-   * where {@code i} is unmapped. References are copied, not the objects. The two arrays must
-   * be distinct; if an exception is thrown, {@code newValues} may be partly written.
+   * where {@code i} is unmapped. References are copied, not the objects. If an exception is
+   * thrown, {@code newValues} may be partly written.
    * <p>
    * <strong>Time:</strong> O(n) where n = source space size.
    *
    * @param <T>       element type, nullable or not
    * @param values    values indexed by the target space; must cover every mapped target
-   * @param newValues receives the values indexed by the source space; length n
-   * @throws IllegalArgumentException if {@code newValues.length} is not the source space size
+   * @param newValues receives the values indexed by the source space; length
+   *                  {@link #indexCount()}, and a different array than {@code values}
+   * @throws IllegalArgumentException if {@code newValues.length != indexCount()}, or both are the
+   *                                  same array
    * @throws IndexOutOfBoundsException if a mapped target lies outside {@code values}
    */
   public <T extends @Nullable Object> void gather(T[] values, T[] newValues) {
-    gather(mapping, values, newValues);
+    gatherArray(mapping, values, newValues);
   }
 
   /**
@@ -328,13 +341,9 @@ public final class NodeMapping extends IndexMapping {
    *     frames an array can hold
    */
   public static NodeMapping reindex(Graph graph) {
-    int n = graph.nodeCount();
-    if (n == 0) {
-      return new NodeMapping(new int[0], 0, false);
-    }
     var traverser = new ReindexTraverser(graph);
     traverser.run();
-    return new NodeMapping(traverser.order, n, false);
+    return new NodeMapping(traverser.order, graph.nodeCount());
   }
 
   /**
@@ -388,7 +397,7 @@ public final class NodeMapping extends IndexMapping {
           while (i < end) {
             int v = adj[i++];
             int w = v >>> 6;
-            long bits = visited[w];          // one load serves both the test and the set
+            long bits = visited[w];
             long mask = 1L << v;
             if ((bits & mask) == 0) {
               visited[w] = bits | mask;
@@ -426,17 +435,13 @@ public final class NodeMapping extends IndexMapping {
   }
 
   /**
-   * Rejects a selection that is not strictly ascending - a repeated ID, or a {@link SortedIntView}
-   * that is not sorted - and then a negative first ID, the only place one can be.
+   * Rejects a repeated ID in a sorted selection, and then a negative first ID, the only place one
+   * can be.
    */
   private static void checkSelection(int[] sorted) {
     for (int i = 1; i < sorted.length; i++) {
       if (sorted[i] == sorted[i - 1]) {
         throw new IllegalArgumentException("selected contains node " + sorted[i] + " more than once");
-      }
-      if (sorted[i] < sorted[i - 1]) {
-        throw new IllegalArgumentException(
-            "selected view is not sorted ascending at position " + i + ": " + sorted[i]);
       }
     }
     if (sorted.length > 0 && sorted[0] < 0) {

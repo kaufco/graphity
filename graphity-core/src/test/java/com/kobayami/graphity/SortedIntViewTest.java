@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Spliterator;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -250,13 +251,6 @@ class SortedIntViewTest {
   }
 
   @Test
-  void forEachInRangeVisitsAllInOrder() {
-    var collected = new IntArrayList();
-    SortedIntView.forEachInRange(new int[] {1, 3, 5, 7, 9}, 1, 4, collected::add);
-    assertThat(collected.toIntArray()).containsExactly(3, 5, 7);
-  }
-
-  @Test
   void listIteratorForwardTraversal() {
     var view = new SortedIntView(new int[] {10, 20, 30});
     var it = view.listIterator(0);
@@ -388,9 +382,31 @@ class SortedIntViewTest {
   }
 
   @Test
-  void cloneReturnsSameInstance() {
-    var view = new SortedIntView(new int[] {1, 3, 5});
-    assertThatObject(view.clone()).isSameAs(view);
+  void viewOfUnsortedRangeThrows() {
+    assertThatThrownBy(() -> SortedIntView.viewOf(new int[] {5, 1, 3}, 0, 3))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("1 follows 5");
+  }
+
+  @Test
+  void viewOfRangeWithDuplicatesThrows() {
+    assertThatThrownBy(() -> SortedIntView.viewOf(new int[] {1, 2, 2, 3}, 0, 4))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("2 follows 2");
+  }
+
+  @Test
+  void viewOfChecksOnlyItsRange() {
+    var view = SortedIntView.viewOf(new int[] {9, 1, 3, 5, 0}, 1, 4);
+    assertThat(view.toIntArray()).containsExactly(1, 3, 5);
+  }
+
+  @Test
+  void viewOfSharesTheArray() {
+    int[] backing = {1, 3, 5};
+    var view = SortedIntView.viewOf(backing, 0, 3);
+    backing[1] = 4;
+    assertThat(view.toIntArray()).containsExactly(1, 4, 5);
   }
 
   @Test
@@ -455,34 +471,21 @@ class SortedIntViewTest {
   }
 
   @Test
-  void equalsWithObjectTypedNullFalse() {
-    // Statically typing the argument as Object forces dispatch to equals(Object) instead
-    // of the more specific equals(SortedIntView) overload, exercising the case-null arm.
-    var view = new SortedIntView(new int[] {1, 3, 5});
-    Object nullObj = null;
-    assertThat(view.equals(nullObj)).isFalse();
-  }
-
-  @Test
-  void equalsIntListOverloadWithSameReferenceTrue() {
-    // Cast to IntList to hit equals(IntList) directly and exercise its self-reference short-circuit.
-    var view = new SortedIntView(new int[] {1, 3, 5});
-    IntList asIntList = view;
-    assertThat(view.equals(asIntList)).isTrue();
-  }
-
-  @Test
-  void equalsIntListOverloadWithNullFalse() {
-    var view = new SortedIntView(new int[] {1, 3, 5});
-    IntList nullList = null;
-    assertThat(view.equals(nullList)).isFalse();
-  }
-
-  @Test
-  void equalsIntListOverloadWithDifferentSizeFalse() {
+  void equalsWithShorterIntListFalse() {
     var view = new SortedIntView(new int[] {1, 3, 5});
     IntList shorter = new IntArrayList(new int[] {1, 3});
-    assertThat(view.equals(shorter)).isFalse();
+    assertThatObject(view).isNotEqualTo(shorter);
+  }
+
+  @Test
+  void equalsIsSymmetricWithOtherLists() {
+    var view = new SortedIntView(new int[] {0, 1, 3, 5}, 1, 4);
+    IntList intList = new IntArrayList(new int[] {1, 3, 5});
+    List<Integer> boxed = List.of(1, 3, 5);
+    assertThatObject(view).isEqualTo(intList).isEqualTo(boxed);
+    assertThatObject(intList).isEqualTo(view);
+    assertThatObject(boxed).isEqualTo(view);
+    assertThatObject(view).isNotEqualTo(List.of(1, 3, 6));
   }
 
   @Test
@@ -557,10 +560,10 @@ class SortedIntViewTest {
   }
 
   @Test
-  void staticUnionWithOffsetRangesDeduplicates() {
+  void unionInRangeWithOffsetRangesDeduplicates() {
     int[] a = {0, 1, 3, 5, 9};
     int[] b = {0, 3, 4, 5, 9};
-    int[] result = SortedIntView.union(a, 1, 4, b, 1, 4);
+    int[] result = SortedIntView.unionInRange(a, 1, 4, b, 1, 4);
     assertThat(result).containsExactly(1, 3, 4, 5);
   }
 }

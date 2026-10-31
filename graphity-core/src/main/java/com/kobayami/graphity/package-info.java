@@ -116,9 +116,9 @@
  *
  * <h2>Custom traversals</h2>
  * <ul>
- *   <li>{@link IterativeDfsTraverser} - depth-first traversal for arbitrarily deep graphs, with
+ *   <li>{@link DfsTraverser} - depth-first traversal for arbitrarily deep graphs, with
  *       pre- and postorder hooks.</li>
- *   <li>{@link IterativeDfsEdgeTraverser} - the same with a hook per edge that reports the
+ *   <li>{@link DfsEdgeTraverser} - the same with a hook per edge that reports the
  *       target's state, for algorithms that must look at every edge.</li>
  *   <li>{@link FrontierTraverser} - breadth-first traversal with level tracking.</li>
  * </ul>

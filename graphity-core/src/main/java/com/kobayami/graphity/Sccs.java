@@ -45,8 +45,9 @@ public final class Sccs extends NodePartition {
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param node node ID
-   * @return SCC ID in {@code 0..sccCount()-1}, or {@code -1} if {@code node} is out of range
+   * @param node node ID in {@code 0..nodeCount()-1}
+   * @return SCC ID in {@code 0..sccCount()-1}
+   * @throws IndexOutOfBoundsException if {@code node} is out of range
    */
   public int sccOf(int node) {
     return get(node);

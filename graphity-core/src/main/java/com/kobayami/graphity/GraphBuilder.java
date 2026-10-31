@@ -15,7 +15,8 @@ import java.util.Arrays;
  * <p>
  * The builder is <strong>add-only</strong>: nodes and edges cannot be removed. For subgraph
  * extraction or node removal, build the graph first and use
- * {@link Graphs#remapped(Graph, NodeMapping)} with {@link NodeMapping#forSubgraph(java.util.BitSet)}.
+ * {@link Graphs#remapped(Graph, NodeMapping)} with
+ * {@link NodeMapping#forSubgraph(java.util.BitSet)}.
  * <p>
  * Calling {@link #build()} produces an immutable {@link Graph} with sorted, deduplicated
  * adjacency lists. The builder is <strong>not consumed</strong> - further modifications and
@@ -46,9 +47,9 @@ import java.util.Arrays;
  * back without copying it into an array first:
  *
  * <pre>{@code
- * builder.addEdges(source, 1, 2, 3);            // loose arguments
- * builder.addEdges(source, targetArray);        // int[]
- * builder.addEdges(source, graph.outNodes(n));  // IntList, no copy
+ * builder.addOutEdges(source, 1, 2, 3);            // loose arguments
+ * builder.addOutEdges(source, targetArray);        // int[]
+ * builder.addOutEdges(source, graph.outNodes(n));  // IntList, no copy
  * }</pre>
  *
  * A list is read during the call and never retained. {@link #addEdgePairs(int...)} has no
@@ -285,15 +286,10 @@ public final class GraphBuilder {
    * @param targets list of target node IDs
    * @throws IndexOutOfBoundsException if any node does not exist
    */
-  public void addEdges(int source, IntList targets) {
+  public void addOutEdges(int source, IntList targets) {
     checkNode(source, "source");
     checkNodes(targets, "target");
-    int count = targets.size();
-    reserve(count);
-    for (int i = 0; i < count; i++) {
-      edgeSources.add(source);
-      edgeTargets.add(targets.getInt(i));
-    }
+    writeFanOut(source, targets);
   }
 
   /**
@@ -306,15 +302,10 @@ public final class GraphBuilder {
    * @param targets list of target node IDs (each must be ≥ 0)
    * @throws IndexOutOfBoundsException if any ID is negative or {@code Integer.MAX_VALUE}
    */
-  public void addEdgesAndNodes(int source, IntList targets) {
+  public void addOutEdgesAndNodes(int source, IntList targets) {
     checkCreatable(source);
     raiseNodeCount(Math.max(source, highestCreatable(targets)));
-    int count = targets.size();
-    reserve(count);
-    for (int i = 0; i < count; i++) {
-      edgeSources.add(source);
-      edgeTargets.add(targets.getInt(i));
-    }
+    writeFanOut(source, targets);
   }
 
   /**
@@ -327,14 +318,10 @@ public final class GraphBuilder {
    * @param targets target node IDs
    * @throws IndexOutOfBoundsException if any node does not exist
    */
-  public void addEdges(int source, int... targets) {
+  public void addOutEdges(int source, int... targets) {
     checkNode(source, "source");
     checkNodes(targets, "target");
-    reserve(targets.length);
-    for (int target : targets) {
-      edgeSources.add(source);
-      edgeTargets.add(target);
-    }
+    writeFanOut(source, targets);
   }
 
   /**
@@ -347,21 +334,17 @@ public final class GraphBuilder {
    * @param targets target node IDs (each must be ≥ 0)
    * @throws IndexOutOfBoundsException if any ID is negative or {@code Integer.MAX_VALUE}
    */
-  public void addEdgesAndNodes(int source, int... targets) {
+  public void addOutEdgesAndNodes(int source, int... targets) {
     checkCreatable(source);
     raiseNodeCount(Math.max(source, highestCreatable(targets)));
-    reserve(targets.length);
-    for (int target : targets) {
-      edgeSources.add(source);
-      edgeTargets.add(target);
-    }
+    writeFanOut(source, targets);
   }
 
   /**
    * Adds directed edges from each source in the list to {@code target}.
    * All nodes must already exist.
    * <p>
-   * The fan-in counterpart of {@link #addEdges(int, IntList)}.
+   * The fan-in counterpart of {@link #addOutEdges(int, IntList)}.
    * <p>
    * <strong>Time:</strong> O(k) where k = {@code sources.size()}.
    *
@@ -372,12 +355,7 @@ public final class GraphBuilder {
   public void addInEdges(int target, IntList sources) {
     checkNode(target, "target");
     checkNodes(sources, "source");
-    int count = sources.size();
-    reserve(count);
-    for (int i = 0; i < count; i++) {
-      edgeSources.add(sources.getInt(i));
-      edgeTargets.add(target);
-    }
+    writeFanIn(target, sources);
   }
 
   /**
@@ -393,19 +371,14 @@ public final class GraphBuilder {
   public void addInEdgesAndNodes(int target, IntList sources) {
     checkCreatable(target);
     raiseNodeCount(Math.max(target, highestCreatable(sources)));
-    int count = sources.size();
-    reserve(count);
-    for (int i = 0; i < count; i++) {
-      edgeSources.add(sources.getInt(i));
-      edgeTargets.add(target);
-    }
+    writeFanIn(target, sources);
   }
 
   /**
    * Adds directed edges from each of the given sources to {@code target}.
    * All nodes must already exist.
    * <p>
-   * The fan-in counterpart of {@link #addEdges(int, int...)}.
+   * The fan-in counterpart of {@link #addOutEdges(int, int...)}.
    * <p>
    * <strong>Time:</strong> O(k) where k = {@code sources.length}.
    *
@@ -416,11 +389,7 @@ public final class GraphBuilder {
   public void addInEdges(int target, int... sources) {
     checkNode(target, "target");
     checkNodes(sources, "source");
-    reserve(sources.length);
-    for (int source : sources) {
-      edgeSources.add(source);
-      edgeTargets.add(target);
-    }
+    writeFanIn(target, sources);
   }
 
   /**
@@ -436,11 +405,7 @@ public final class GraphBuilder {
   public void addInEdgesAndNodes(int target, int... sources) {
     checkCreatable(target);
     raiseNodeCount(Math.max(target, highestCreatable(sources)));
-    reserve(sources.length);
-    for (int source : sources) {
-      edgeSources.add(source);
-      edgeTargets.add(target);
-    }
+    writeFanIn(target, sources);
   }
 
   /**
@@ -456,12 +421,7 @@ public final class GraphBuilder {
    */
   public void addPath(IntList nodes) {
     checkNodes(nodes, "path");
-    int count = nodes.size();
-    reserve(Math.max(count - 1, 0));
-    for (int i = 1; i < count; i++) {
-      edgeSources.add(nodes.getInt(i - 1));
-      edgeTargets.add(nodes.getInt(i));
-    }
+    writePath(nodes);
   }
 
   /**
@@ -476,12 +436,7 @@ public final class GraphBuilder {
    */
   public void addPathAndNodes(IntList nodes) {
     raiseNodeCount(highestCreatable(nodes));
-    int count = nodes.size();
-    reserve(Math.max(count - 1, 0));
-    for (int i = 1; i < count; i++) {
-      edgeSources.add(nodes.getInt(i - 1));
-      edgeTargets.add(nodes.getInt(i));
-    }
+    writePath(nodes);
   }
 
   /**
@@ -497,11 +452,7 @@ public final class GraphBuilder {
    */
   public void addPath(int... nodes) {
     checkNodes(nodes, "path");
-    reserve(Math.max(nodes.length - 1, 0));
-    for (int i = 1; i < nodes.length; i++) {
-      edgeSources.add(nodes[i - 1]);
-      edgeTargets.add(nodes[i]);
-    }
+    writePath(nodes);
   }
 
   /**
@@ -516,43 +467,39 @@ public final class GraphBuilder {
    */
   public void addPathAndNodes(int... nodes) {
     raiseNodeCount(highestCreatable(nodes));
-    reserve(Math.max(nodes.length - 1, 0));
-    for (int i = 1; i < nodes.length; i++) {
-      edgeSources.add(nodes[i - 1]);
-      edgeTargets.add(nodes[i]);
-    }
+    writePath(nodes);
   }
 
   /**
-   * Adds one edge per pair of consecutive arguments: {@code fromToPairs[0] → fromToPairs[1]},
-   * {@code fromToPairs[2] → fromToPairs[3]}, and so on.
+   * Adds one edge per pair of consecutive arguments: {@code endpoints[0] → endpoints[1]},
+   * {@code endpoints[2] → endpoints[3]}, and so on.
    * All nodes must already exist.
    * <p>
-   * <strong>Time:</strong> O(k) where k = {@code fromToPairs.length}.
+   * <strong>Time:</strong> O(k) where k = {@code endpoints.length}.
    *
-   * @param fromToPairs alternating source and target node IDs
+   * @param endpoints alternating source and target node IDs
    * @throws IllegalArgumentException  if the number of arguments is odd
    * @throws IndexOutOfBoundsException if any node does not exist
    */
-  public void addEdgePairs(int... fromToPairs) {
-    checkPairCount(fromToPairs.length);
-    checkNodes(fromToPairs, "endpoint");
-    addPairs(fromToPairs);
+  public void addEdgePairs(int... endpoints) {
+    checkPairCount(endpoints.length);
+    checkNodes(endpoints, "endpoint");
+    writePairs(endpoints);
   }
 
   /**
    * Adds one edge per pair of consecutive arguments, creating any node that does not exist yet.
    * <p>
-   * <strong>Time:</strong> O(k) where k = {@code fromToPairs.length}.
+   * <strong>Time:</strong> O(k) where k = {@code endpoints.length}.
    *
-   * @param fromToPairs alternating source and target node IDs (each must be ≥ 0)
+   * @param endpoints alternating source and target node IDs (each must be ≥ 0)
    * @throws IllegalArgumentException  if the number of arguments is odd
    * @throws IndexOutOfBoundsException if any ID is negative or {@code Integer.MAX_VALUE}
    */
-  public void addEdgePairsAndNodes(int... fromToPairs) {
-    checkPairCount(fromToPairs.length);
-    raiseNodeCount(highestCreatable(fromToPairs));
-    addPairs(fromToPairs);
+  public void addEdgePairsAndNodes(int... endpoints) {
+    checkPairCount(endpoints.length);
+    raiseNodeCount(highestCreatable(endpoints));
+    writePairs(endpoints);
   }
 
   /**
@@ -572,7 +519,7 @@ public final class GraphBuilder {
     IntList targets = edges.targetNodes();
     checkNodes(sources, "source");
     checkNodes(targets, "target");
-    addLists(sources, targets);
+    writeLists(sources, targets);
   }
 
   /**
@@ -590,7 +537,7 @@ public final class GraphBuilder {
     IntList sources = edges.sourceNodes();
     IntList targets = edges.targetNodes();
     raiseNodeCount(Math.max(highestCreatable(sources), highestCreatable(targets)));
-    addLists(sources, targets);
+    writeLists(sources, targets);
   }
 
   /**
@@ -600,7 +547,7 @@ public final class GraphBuilder {
    * The returned offset can be used to reference the imported nodes:
    * node {@code i} in the source graph becomes node {@code offset + i} in this builder.
    * <p>
-   * <strong>Time:</strong> O(sourceGraph.nodeCount() + sourceGraph.edgeCount()).
+   * <strong>Time:</strong> O(graph.nodeCount() + graph.edgeCount()).
    *
    * @param graph the graph to import
    * @return the offset (= ID of the first imported node)
@@ -641,34 +588,29 @@ public final class GraphBuilder {
    * @return an immutable graph
    */
   public Graph build() {
-    if (nodeCount == 0) {
-      return new Graph(new int[]{0}, new int[0]);
-    }
-
     int rawEdgeCount = edgeSources.size();
     int[] sources = edgeSources.elements();
     int[] targets = edgeTargets.elements();
 
-    // Pass 1: count out-degrees.
+    // 1) Count out-degrees
     var outStart = new int[nodeCount + 1];
     for (int i = 0; i < rawEdgeCount; i++) {
       outStart[sources[i] + 1]++;
     }
 
-    // Prefix sum: convert degrees to CSR start offsets.
+    // 2) Prefix sum: degrees to start offsets
     for (int n = 0; n < nodeCount; n++) {
       outStart[n + 1] += outStart[n];
     }
 
-    // Pass 2: distribute edge targets into per-node buckets.
+    // 3) Distribute targets into per-node buckets
     var outAdj = new int[outStart[nodeCount]];
     var writePos = Arrays.copyOf(outStart, nodeCount);
     for (int i = 0; i < rawEdgeCount; i++) {
       outAdj[writePos[sources[i]]++] = targets[i];
     }
 
-    // Pass 3: sort each adjacency list and deduplicate in a single compacting pass.
-    // Safe because compactEnd ≤ outStart[node] for all nodes (we only remove elements).
+    // 4) Sort and deduplicate each bucket, compacting left: writes never pass the read position
     int compactEnd = 0;
     for (int node = 0; node < nodeCount; node++) {
       int start = outStart[node];
@@ -687,7 +629,6 @@ public final class GraphBuilder {
     }
     outStart[nodeCount] = compactEnd;
 
-    // Trim adjacency array if deduplication removed edges.
     if (compactEnd < outAdj.length) {
       outAdj = Arrays.copyOf(outAdj, compactEnd);
     }
@@ -696,22 +637,73 @@ public final class GraphBuilder {
   }
 
   /**
-   * Current capacity of the internal edge storage. Exists so that tests can observe that
-   * {@link #ensureEdgeCapacity(int)} actually prevents reallocation.
+   * Current capacity of the internal edge storage. Exists so that tests can observe when the
+   * storage reallocates.
    */
   int edgeCapacity() {
     return Math.min(edgeSources.elements().length, edgeTargets.elements().length);
   }
 
-  private void addPairs(int[] fromToPairs) {
-    reserve(fromToPairs.length >> 1);
-    for (int i = 0; i < fromToPairs.length; i += 2) {
-      edgeSources.add(fromToPairs[i]);
-      edgeTargets.add(fromToPairs[i + 1]);
+  private void writeFanOut(int source, int[] targets) {
+    reserve(targets.length);
+    for (int target : targets) {
+      edgeSources.add(source);
+      edgeTargets.add(target);
     }
   }
 
-  private void addLists(IntList sources, IntList targets) {
+  private void writeFanOut(int source, IntList targets) {
+    int count = targets.size();
+    reserve(count);
+    for (int i = 0; i < count; i++) {
+      edgeSources.add(source);
+      edgeTargets.add(targets.getInt(i));
+    }
+  }
+
+  private void writeFanIn(int target, int[] sources) {
+    reserve(sources.length);
+    for (int source : sources) {
+      edgeSources.add(source);
+      edgeTargets.add(target);
+    }
+  }
+
+  private void writeFanIn(int target, IntList sources) {
+    int count = sources.size();
+    reserve(count);
+    for (int i = 0; i < count; i++) {
+      edgeSources.add(sources.getInt(i));
+      edgeTargets.add(target);
+    }
+  }
+
+  private void writePath(int[] nodes) {
+    reserve(Math.max(nodes.length - 1, 0));
+    for (int i = 1; i < nodes.length; i++) {
+      edgeSources.add(nodes[i - 1]);
+      edgeTargets.add(nodes[i]);
+    }
+  }
+
+  private void writePath(IntList nodes) {
+    int count = nodes.size();
+    reserve(Math.max(count - 1, 0));
+    for (int i = 1; i < count; i++) {
+      edgeSources.add(nodes.getInt(i - 1));
+      edgeTargets.add(nodes.getInt(i));
+    }
+  }
+
+  private void writePairs(int[] endpoints) {
+    reserve(endpoints.length >> 1);
+    for (int i = 0; i < endpoints.length; i += 2) {
+      edgeSources.add(endpoints[i]);
+      edgeTargets.add(endpoints[i + 1]);
+    }
+  }
+
+  private void writeLists(IntList sources, IntList targets) {
     int count = sources.size();
     reserve(count);
     for (int i = 0; i < count; i++) {
@@ -730,14 +722,13 @@ public final class GraphBuilder {
    */
   private void checkNodes(int[] nodes, String role) {
     for (int node : nodes) {
-      if (node < 0 || node >= nodeCount) throw notFound(role, node);
+      checkNode(node, role);
     }
   }
 
   private void checkNodes(IntList nodes, String role) {
     for (int i = 0; i < nodes.size(); i++) {
-      int node = nodes.getInt(i);
-      if (node < 0 || node >= nodeCount) throw notFound(role, node);
+      checkNode(nodes.getInt(i), role);
     }
   }
 

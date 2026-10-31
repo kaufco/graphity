@@ -2,7 +2,6 @@ package com.kobayami.graphity;
 
 import it.unimi.dsi.fastutil.ints.AbstractIntList;
 import it.unimi.dsi.fastutil.ints.IntArrays;
-import it.unimi.dsi.fastutil.ints.IntConsumer;
 import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.ints.IntListIterator;
 import it.unimi.dsi.fastutil.ints.IntSpliterator;
@@ -12,6 +11,7 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.RandomAccess;
 import java.util.Spliterator;
+import java.util.function.IntConsumer;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -29,7 +29,7 @@ import org.jspecify.annotations.Nullable;
  * <strong>Memory:</strong> O(1) - holds only a reference to the shared array plus the two
  * {@code int} bounds ({@link #fromIndex}, {@link #toIndex}).
  */
-public final class SortedIntView extends AbstractIntList implements IntList, RandomAccess, Cloneable {
+public final class SortedIntView extends AbstractIntList implements RandomAccess {
 
   /** Canonical empty view. Immutable and safely shared. */
   public static final SortedIntView EMPTY = new SortedIntView(new int[0], 0, 0);
@@ -132,8 +132,8 @@ public final class SortedIntView extends AbstractIntList implements IntList, Ran
    */
   @Override
   public int indexOf(int value) {
-    var index = Arrays.binarySearch(array, fromIndex, toIndex, value);
-    return index >= 0? index - fromIndex : -1;
+    int index = Arrays.binarySearch(array, fromIndex, toIndex, value);
+    return index >= 0 ? index - fromIndex : -1;
   }
 
   /**
@@ -153,8 +153,8 @@ public final class SortedIntView extends AbstractIntList implements IntList, Ran
    * <strong>Time:</strong> O(log n) via binary search.
    */
   static int indexOfInRange(int[] array, int fromIndex, int toIndex, int value) {
-    var index = Arrays.binarySearch(array, fromIndex, toIndex, value);
-    return index >= 0? index: -1;
+    int index = Arrays.binarySearch(array, fromIndex, toIndex, value);
+    return index >= 0 ? index : -1;
   }
 
   /**
@@ -164,16 +164,6 @@ public final class SortedIntView extends AbstractIntList implements IntList, Ran
    */
   static boolean containsInRange(int[] array, int fromIndex, int toIndex, int value) {
     return Arrays.binarySearch(array, fromIndex, toIndex, value) >= 0;
-  }
-
-  /**
-   * Returns {@code this} - the view is immutable and needs no copy.
-   * <p>
-   * <strong>Time:</strong> O(1).
-   */
-  @Override
-  public SortedIntView clone() {
-    return this;
   }
 
   /**
@@ -193,11 +183,12 @@ public final class SortedIntView extends AbstractIntList implements IntList, Ran
    * {@code dest} is {@code null} or too small.
    * <p>
    * <strong>Time:</strong> O(n).<br>
-   * <strong>Memory:</strong> 4 x n bytes if {@code dest} is {@code null} or too small; none otherwise.
+   * <strong>Memory:</strong> 4 x n bytes if {@code dest} is {@code null} or too small; none
+   * otherwise.
    */
   @Override
   public int[] toArray(int @Nullable [] dest) {
-    var size = size();
+    int size = size();
     if (dest == null || dest.length < size) {
       return toIntArray();
     }
@@ -225,19 +216,8 @@ public final class SortedIntView extends AbstractIntList implements IntList, Ran
    * <strong>Time:</strong> O(n).
    */
   @Override
-  public void forEach(java.util.function.IntConsumer action) {
+  public void forEach(IntConsumer action) {
     for (int i = fromIndex; i < toIndex; i++) {
-      action.accept(array[i]);
-    }
-  }
-
-  /**
-   * Applies {@code action} to each element in {@code array[fromIndex..toIndex)}.
-   * <p>
-   * <strong>Time:</strong> O(toIndex - fromIndex).
-   */
-  static void forEachInRange(int[] array, int fromIndex, int toIndex, IntConsumer action) {
-    for (int i = fromIndex; i < toIndex; ++i) {
       action.accept(array[i]);
     }
   }
@@ -308,64 +288,63 @@ public final class SortedIntView extends AbstractIntList implements IntList, Ran
   }
 
   /**
-   * Creates a zero-copy view over {@code array[fromIndex..toIndex)}.
-   * Returns {@link #EMPTY} if the range is empty.
-   * The caller must ensure the range is sorted ascending with no duplicates.
+   * Returns a view over {@code array[fromIndex..toIndex)}, after checking that the range is
+   * strictly ascending, or {@link #EMPTY} if the range is empty.
    * <p>
-   * <strong>Time:</strong> O(1).
+   * The view shares {@code array} instead of copying it: it stays sorted and unchanged only as
+   * long as nobody modifies that range of the array.
+   * <p>
+   * <strong>Time:</strong> O(toIndex - fromIndex) for the check.
    *
    * @param array     the backing array
    * @param fromIndex start index (inclusive)
    * @param toIndex   end index (exclusive)
    * @return a view over the range
    * @throws IndexOutOfBoundsException if the range is invalid
+   * @throws IllegalArgumentException if the range is not strictly ascending
    */
   public static SortedIntView viewOf(int[] array, int fromIndex, int toIndex) {
     Objects.checkFromToIndex(fromIndex, toIndex, array.length);
     if (fromIndex == toIndex) return EMPTY;
+    for (int i = fromIndex + 1; i < toIndex; i++) {
+      if (array[i] <= array[i - 1]) {
+        throw new IllegalArgumentException("array[" + fromIndex + ".." + toIndex
+            + ") must be strictly ascending, but " + array[i] + " follows " + array[i - 1]
+            + " at index " + i);
+      }
+    }
     return new SortedIntView(array, fromIndex, toIndex);
   }
 
   /**
-   * Tests equality with another {@code SortedIntView} via direct array comparison.
+   * Compares this view with {@code other} by the {@link java.util.List} contract: equal if
+   * {@code other} is a list with the same elements in the same order. Another
+   * {@code SortedIntView} is compared range against range.
    * <p>
    * <strong>Time:</strong> O(n).
    *
-   * @param other view to compare against, may be {@code null}
-   * @return {@code true} if both views have the same size and elements
+   * @param other the object to compare against
+   * @return {@code true} if {@code other} is a list with the same elements in the same order
    */
-  public boolean equals(@Nullable SortedIntView other) {
+  @Override
+  public boolean equals(@Nullable Object other) {
     if (other == this) return true;
-    if (other == null) return false;
-    if (size() != other.size()) return false;
+    if (other instanceof SortedIntView view) return equalsView(view);
+    if (other instanceof IntList list) return equalsIntList(list);
+    return super.equals(other);
+  }
+
+  private boolean equalsView(SortedIntView other) {
     return Arrays.equals(array, fromIndex, toIndex, other.array, other.fromIndex, other.toIndex);
   }
 
-  /**
-   * Tests equality with an arbitrary {@link IntList}, element by element.
-   * <p>
-   * <strong>Time:</strong> O(n).
-   *
-   * @param other list to compare against, may be {@code null}
-   * @return {@code true} if both have the same size and elements in order
-   */
-  public boolean equals(@Nullable IntList other) {
-    if (other == this) return true;
-    if (other == null) return false;
-    var size = size();
+  private boolean equalsIntList(IntList other) {
+    int size = size();
     if (size != other.size()) return false;
     for (int i = 0; i < size; i++) {
       if (array[fromIndex + i] != other.getInt(i)) return false;
     }
     return true;
-  }
-
-  @Override
-  public boolean equals(@Nullable Object other) {
-    if (other == null) return false;
-    if (other instanceof SortedIntView view) return equals(view);
-    if (other instanceof IntList intList) return equals(intList);
-    return super.equals(other);
   }
 
   /**
@@ -389,7 +368,7 @@ public final class SortedIntView extends AbstractIntList implements IntList, Ran
    * <strong>Memory:</strong> up to 4 x (n + m) bytes.
    *
    * @param other the other sorted view
-   * @return a new view containing every distinct value from both inputs in sorted order
+   * @return the union; {@code this} or {@code other} itself if the other one is empty
    */
   public SortedIntView union(SortedIntView other) {
     if (other.isEmpty()) {
@@ -398,8 +377,8 @@ public final class SortedIntView extends AbstractIntList implements IntList, Ran
     if (this.isEmpty()) {
       return other;
     }
-    var out = union(this.array, fromIndex, toIndex, other.array, other.fromIndex, other.toIndex);
-    return new SortedIntView(out, 0, out.length);
+    return new SortedIntView(
+        unionInRange(array, fromIndex, toIndex, other.array, other.fromIndex, other.toIndex));
   }
 
   /**
@@ -409,15 +388,15 @@ public final class SortedIntView extends AbstractIntList implements IntList, Ran
    * <strong>Time:</strong> O(n + m) where n = aTo - aFrom, m = bTo - bFrom.<br>
    * <strong>Memory:</strong> up to 4 x (n + m) bytes.
    */
-  static int[] union(int[] a, int aFrom, int aTo, int[] b, int bFrom, int bTo) {
+  static int[] unionInRange(int[] a, int aFrom, int aTo, int[] b, int bFrom, int bTo) {
     var out = new int[aTo - aFrom + bTo - bFrom];
-    var outPos = 0;
+    int outPos = 0;
 
-    var aPos = aFrom;
-    var bPos = bFrom;
+    int aPos = aFrom;
+    int bPos = bFrom;
 
     while (aPos < aTo && bPos < bTo) {
-      int aValue  = a[aPos];
+      int aValue = a[aPos];
       int bValue = b[bPos];
 
       int outValue;
@@ -428,7 +407,6 @@ public final class SortedIntView extends AbstractIntList implements IntList, Ran
         outValue = bValue;
         bPos++;
       } else {
-        // If value is contained in both `a` and `b`, keep it only once in the output set
         outValue = aValue;
         aPos++;
         bPos++;
@@ -443,11 +421,11 @@ public final class SortedIntView extends AbstractIntList implements IntList, Ran
     }
 
     // Trim output to actual size in case `a` and `b` contain shared values.
-    return outPos == out.length? out : Arrays.copyOf(out, outPos);
+    return outPos == out.length ? out : Arrays.copyOf(out, outPos);
   }
 
   private static int copyTail(int[] dest, int destFrom, int[] src, int srcFrom, int srcTo) {
-    var length = srcTo - srcFrom;
+    int length = srcTo - srcFrom;
     System.arraycopy(src, srcFrom, dest, destFrom, length);
     return length;
   }

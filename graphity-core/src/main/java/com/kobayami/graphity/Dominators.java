@@ -171,6 +171,9 @@ public final class Dominators {
    * (0 = unreachable). Kept apart from the caller so that the JIT compiles the hot loop on its
    * own.
    * <p>
+   * Step 1 settles a node once the search path from its semidominator down to it is linked: the
+   * node then gets its immediate dominator, or a node with the same one, which step 2 resolves.
+   * <p>
    * With {@code withinBlocks}, predecessors outside the block of the node are ignored, as
    * described at {@link #withinBlocks}. A block is a contiguous range of preorder numbers that
    * starts at its entry, and every predecessor in another block comes from a later one.
@@ -195,10 +198,7 @@ public final class Dominators {
       lanes[2 * v + 1] = v;
     }
 
-    // 1) Reverse preorder, Lengauer and Tarjan's simple version: the semidominator from the
-    //    predecessors, then link the node to its search parent and settle every node whose
-    //    semidominator is that parent, whose subtree is now complete. A settled node gets its
-    //    immediate dominator, or a node with the same one, resolved in step 2.
+    // 1) Reverse preorder: semidominator, link to the search parent, settle the parent's bucket.
     int blockEnd = size - 1;
     for (int v = size - 1; v >= 1; v--) {
       int best = v;

@@ -4,56 +4,86 @@ import java.util.Arrays;
 
 /**
  * Helpers for a forest given as a parent array, {@code -1} for a root - the form in which
- * {@link Ancestry} and {@link Dominators} hold their trees.
+ * {@link Ancestry} and {@link Dominators} hold their trees -, and the grouping by key that its
+ * child lists are one case of: the partitions build their member lists with it as well.
  */
 final class ParentForest {
 
   private ParentForest() {}
 
-  /** Children per node as CSR: those of {@code v} are {@code nodes[start[v]..start[v + 1])}. */
-  record Children(int[] start, int[] nodes) {}
+  /**
+   * Indices grouped by key as CSR: those with key {@code k} are
+   * {@code members[start[k]..start[k + 1])}, ascending.
+   */
+  record Groups(int[] start, int[] members) {}
 
   /**
-   * The child lists of the forest, each ascending.
+   * The child lists of the forest, each ascending: {@link #groupIndices} with the parent as key.
    * <p>
    * <strong>Memory:</strong> 4 x (nodeCount + 1 + childCount) bytes.
    */
-  static Children childrenOf(int[] parent) {
-    int n = parent.length;
-    var start = new int[n + 1];
-    for (int node = 0; node < n; node++) {
-      if (parent[node] >= 0) start[parent[node]]++;
+  static Groups childrenOf(int[] parent) {
+    return groupIndices(parent, parent.length);
+  }
+
+  /**
+   * Groups the indices {@code i} of {@code keyOf} by their key {@code keyOf[i]}, which lies in
+   * {@code 0..keyCount-1}; an index with a negative key is in no group.
+   * <p>
+   * <strong>Memory:</strong> 4 x (keyCount + 1 + groupedCount) bytes.
+   */
+  static Groups groupIndices(int[] keyOf, int keyCount) {
+    var start = new int[keyCount + 1];
+    for (int key : keyOf) {
+      if (key >= 0) start[key]++;
     }
+    return new Groups(start, groupCounted(keyOf, start));
+  }
+
+  /**
+   * The second half of {@link #groupIndices}, for a caller that counts the keys in a pass it
+   * makes anyway. On entry {@code start[k]} holds the number of indices with key {@code k} and
+   * {@code start[keyCount]} is {@code 0}; on return {@code start} holds the offsets of the groups.
+   *
+   * @return the members of all groups, grouped by key
+   */
+  static int[] groupCounted(int[] keyOf, int[] start) {
+    int keyCount = start.length - 1;
     int next = 0;
-    for (int node = 0; node < n; node++) {
-      int count = start[node];
-      start[node] = next;
+    for (int key = 0; key < keyCount; key++) {
+      int count = start[key];
+      start[key] = next;
       next += count;
     }
-    start[n] = next;
-    var nodes = new int[next];
-    // The ascending scan leaves every list sorted; start[p] doubles as write pointer and is
+    var members = new int[next];
+    // The ascending scan leaves every group sorted; start[k] doubles as write pointer and is
     // shifted back afterwards.
-    for (int node = 0; node < n; node++) {
-      int p = parent[node];
-      if (p >= 0) nodes[start[p]++] = node;
+    for (int i = 0; i < keyOf.length; i++) {
+      int key = keyOf[i];
+      if (key >= 0) members[start[key]++] = i;
     }
-    for (int node = n; node > 0; node--) {
-      start[node] = start[node - 1];
+    for (int key = keyCount; key > 0; key--) {
+      start[key] = start[key - 1];
     }
     start[0] = 0;
-    return new Children(start, nodes);
+    return members;
   }
 
   /**
    * The canonical preorder of the forest - roots ascending, children ascending - with the size
    * of every subtree. Fills the three given arrays, each of length nodeCount.
+   * <p>
+   * {@code IteratedDominanceFrontier.of} in {@code graphity-controlflow} keeps a copy, extended
+   * by the depth of every node, and {@code Loops.of} there copies this and
+   * {@link #groupCounted}; change them together.
+   * <p>
+   * <strong>Memory:</strong> 4 x (nodeCount + 1 + childCount) bytes for the child lists.
    */
-  static void preorder(
-      int[] parent, Children children, int[] preorderIndex, int[] order, int[] subtreeSize) {
+  static void preorder(int[] parent, int[] preorderIndex, int[] order, int[] subtreeSize) {
     int n = parent.length;
+    var children = childrenOf(parent);
     int[] start = children.start();
-    int[] nodes = children.nodes();
+    int[] nodes = children.members();
 
     // Every node is pushed exactly once, so the stack fits in n slots; the subtree-size array
     // serves as the stack until it is filled below.

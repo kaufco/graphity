@@ -48,6 +48,14 @@ class NodePartitionTest {
     assertThat(p.get(4)).isEqualTo(1);
   }
 
+  @ParameterizedTest
+  @ValueSource(ints = {-1, 5, 100})
+  void getOutOfRangeThrows(int node) {
+    var p = threeGroupPartition(emptyGraph());
+    assertThatThrownBy(() -> p.get(node)).isInstanceOf(IndexOutOfBoundsException.class);
+    assertThatThrownBy(() -> p.isMapped(node)).isInstanceOf(IndexOutOfBoundsException.class);
+  }
+
   @Test
   void isPartialIsFalseForPartition() {
     var p = threeGroupPartition(emptyGraph());
@@ -191,14 +199,14 @@ class NodePartitionTest {
     var graph = TestGraphs.of(3, 0, 1, 1, 2, 0, 2);
     var p = NodePartition.of(graph, new int[] {0, -1, 1}, 2);
     assertThat(p.isPartial()).isTrue();
-    assertThat(p.size()).isEqualTo(2);
+    assertThat(p.mappedCount()).isEqualTo(2);
     assertThat(p.get(1)).isEqualTo(-1);
-    assertThat(p.contains(1)).isFalse();
+    assertThat(p.isMapped(1)).isFalse();
     var condensed = p.condense();
     assertThat(condensed.edgeCount()).isEqualTo(1);
     assertThat(condensed.hasOutNode(0, 1)).isTrue();
     // Edge indices: 0 -> 1 is 0, 0 -> 2 is 1, 1 -> 2 is 2.
-    var provenance = Graphs.edgePartition(condensed, graph, p);
+    var provenance = Graphs.edgePartition(condensed, p);
     assertThat(provenance.edgesOf(0).toIntArray()).containsExactly(1);
     assertThat(provenance.get(0)).isEqualTo(-1);
     assertThat(provenance.get(2)).isEqualTo(-1);
@@ -242,6 +250,9 @@ class NodePartitionTest {
     assertThatThrownBy(() -> NodePartition.of(graph, new int[] {0, 1}, 1))
         .isInstanceOf(IllegalArgumentException.class);
     assertThatThrownBy(() -> NodePartition.of(graph, new int[] {0, -2}, 1))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("group of node 1 is -2, outside -1..0");
+    assertThatThrownBy(() -> NodePartition.of(graph, new int[] {Integer.MIN_VALUE, 0}, 1))
         .isInstanceOf(IllegalArgumentException.class);
     assertThatThrownBy(() -> NodePartition.of(graph, new int[] {-1, -1}, -1))
         .isInstanceOf(IllegalArgumentException.class);
@@ -268,6 +279,15 @@ class NodePartitionTest {
     String[] groupValues = {null, null, "untouched"};
     p.reduce(new String[] {"a", "x", "b", "c"}, groupValues, String::concat);
     assertThat(groupValues).containsExactly("c", "ab", "untouched");
+  }
+
+  @Test
+  void reduceRejectsTheSameArrayForValuesAndGroupValues() {
+    var p = NodePartition.of(TestGraphs.of(2), new int[] {1, 0}, 2);
+    String[] values = {"a", "b"};
+    assertThatThrownBy(() -> p.reduce(values, values, String::concat))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThat(values).containsExactly("a", "b");
   }
 
   @Test

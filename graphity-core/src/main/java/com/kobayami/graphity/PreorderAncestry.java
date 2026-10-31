@@ -67,8 +67,7 @@ public final class PreorderAncestry extends Ancestry {
     var preorderIndex = new int[n];
     var order = new int[n];
     var subtreeSize = new int[n];
-    ParentForest.preorder(
-        parent, ParentForest.childrenOf(parent), preorderIndex, order, subtreeSize);
+    ParentForest.preorder(parent, preorderIndex, order, subtreeSize);
     return new PreorderAncestry(ancestry, preorderIndex, subtreeSize, order);
   }
 

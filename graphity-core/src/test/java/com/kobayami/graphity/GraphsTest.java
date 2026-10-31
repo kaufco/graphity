@@ -91,6 +91,11 @@ class GraphsTest {
   }
 
   @Test
+  void isTreeTrueForEmptyGraph() {
+    assertThat(Graphs.isTree(TestGraphs.empty())).isTrue();
+  }
+
+  @Test
   void isTreeTrueForSingleNode() {
     assertThat(Graphs.isTree(TestGraphs.isolated(1))).isTrue();
   }
@@ -575,9 +580,9 @@ class GraphsTest {
     var nm = NodeMapping.forPermutation(perm);
     var newGraph = Graphs.remapped(g, nm);
     var em = Graphs.edgeMapping(newGraph, g, nm);
-    assertThat(em.size()).isEqualTo(newGraph.edgeCount());
+    assertThat(em.mappedCount()).isEqualTo(newGraph.edgeCount());
     // Every new edge index must map to a valid old edge index.
-    for (int i = 0; i < em.size(); i++) {
+    for (int i = 0; i < em.mappedCount(); i++) {
       assertThat(em.get(i)).isBetween(0, g.edgeCount() - 1);
     }
   }
@@ -586,22 +591,58 @@ class GraphsTest {
   void edgeMappingRecordsHolesForEdgesNotInOldGraph() {
     // newGraph has a self-loop 0->0 that does not exist in oldGraph (a 2-node path).
     // With the identity node mapping, edgeMapping must record -1 for the missing edge
-    // and set isPartial = true. size() returns the count of valid entries (0 here).
+    // and set isPartial = true. mappedCount() returns the count of valid entries (0 here).
     var oldGraph = TestGraphs.path(2);
     var newGraph = TestGraphs.of(2, 0, 0);
     IntList identity = new IntArrayList(new int[] {0, 1});
     var em = Graphs.edgeMapping(newGraph, oldGraph, NodeMapping.forPermutation(identity));
     assertThat(em.get(0)).isEqualTo(-1);
-    assertThat(em.size()).isZero();
+    assertThat(em.mappedCount()).isZero();
     assertThat(em.isPartial()).isTrue();
   }
 
   @Test
-  void edgeMappingEmptyGraphHasZeroSize() {
+  void edgeMappingOfEmptyGraphHasZeroMappedCount() {
     var g = TestGraphs.empty();
     var nm = NodeMapping.of(new int[0]);
     var em = Graphs.edgeMapping(g, g, nm);
-    assertThat(em.size()).isZero();
+    assertThat(em.mappedCount()).isZero();
+  }
+
+  @Test
+  void edgeMappingRejectsAMappingToANodeOutsideTheOldGraph() {
+    var oldGraph = TestGraphs.path(2);
+    // As the source of an edge.
+    assertThatThrownBy(() -> Graphs.edgeMapping(
+            TestGraphs.of(3, 2, 0), oldGraph, NodeMapping.of(new int[] {0, 1, 5})))
+        .isInstanceOf(IndexOutOfBoundsException.class)
+        .hasMessageContaining("new node 2 maps to 5");
+    // As the target of an edge only: 2 is oldGraph.nodeCount().
+    assertThatThrownBy(() -> Graphs.edgeMapping(
+            TestGraphs.of(3, 0, 2), oldGraph, NodeMapping.of(new int[] {0, 1, 2})))
+        .isInstanceOf(IndexOutOfBoundsException.class)
+        .hasMessageContaining("new node 2 maps to 2");
+  }
+
+  @Test
+  void edgeMappingRejectsAMappingShorterThanTheNewGraph() {
+    var g = TestGraphs.path(3);
+    assertThatThrownBy(() -> Graphs.edgeMapping(g, g, NodeMapping.of(new int[] {0, 1})))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("3 nodes");
+  }
+
+  @Test
+  void edgeMappingRejectsAMappingLongerThanTheNewGraph() {
+    // Graph and subgraph swapped: the inverse of keep is over the 4 nodes of graph, not over the
+    // 3 of sub, and would otherwise give a plausible but wrong mapping.
+    var graph = TestGraphs.of(4, 0, 1, 1, 2, 2, 3, 3, 0);
+    var keep = NodeMapping.forSubgraph(1, 2, 3);
+    var sub = Graphs.remapped(graph, keep);
+    assertThatThrownBy(() -> Graphs.edgeMapping(sub, graph, keep.inverted(graph.nodeCount())))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("index count of 4")
+        .hasMessageContaining("3 nodes");
   }
 
   // ---- transposedEdgeMapping ----
@@ -619,7 +660,7 @@ class GraphsTest {
   void transposedEdgeMappingIsTotal() {
     var g = TestGraphs.of(4, 0, 1, 0, 2, 1, 3, 2, 3, 3, 3);
     var em = Graphs.transposedEdgeMapping(g);
-    assertThat(em.size()).isEqualTo(g.edgeCount());
+    assertThat(em.mappedCount()).isEqualTo(g.edgeCount());
     assertThat(em.isPartial()).isFalse();
   }
 
@@ -638,7 +679,7 @@ class GraphsTest {
   @Test
   void transposedEdgeMappingInverseEqualsTransposedEdgeIndex() {
     var g = TestGraphs.of(4, 0, 1, 0, 2, 1, 3, 2, 3, 0, 0);
-    var inverse = Graphs.transposedEdgeMapping(g).inverted();
+    var inverse = Graphs.transposedEdgeMapping(g).inverted(g.edgeCount());
     var biAdjacent = BiAdjacentGraph.of(g);
     for (int p = 0; p < g.edgeCount(); p++) {
       assertThat(inverse.get(p)).isEqualTo(biAdjacent.transposedEdgeIndex(p));
@@ -656,15 +697,15 @@ class GraphsTest {
   }
 
   @Test
-  void transposedEdgeMappingOfEmptyGraphHasZeroSize() {
+  void transposedEdgeMappingOfEmptyGraphHasZeroMappedCount() {
     var em = Graphs.transposedEdgeMapping(TestGraphs.empty());
-    assertThat(em.size()).isZero();
+    assertThat(em.mappedCount()).isZero();
     assertThat(em.isPartial()).isFalse();
   }
 
   @Test
-  void transposedEdgeMappingOfIsolatedNodesHasZeroSize() {
-    assertThat(Graphs.transposedEdgeMapping(TestGraphs.isolated(5)).size()).isZero();
+  void transposedEdgeMappingOfIsolatedNodesHasZeroMappedCount() {
+    assertThat(Graphs.transposedEdgeMapping(TestGraphs.isolated(5)).mappedCount()).isZero();
   }
 
   // ---- edgePartition ----
@@ -679,7 +720,7 @@ class GraphsTest {
         new int[] {0, 1, 2},
         new int[] {0, 2, 3});
     var condensed = partition.condense();
-    var ep = Graphs.edgePartition(condensed, g, partition);
+    var ep = Graphs.edgePartition(condensed, partition);
     assertThat(ep.edgeCount()).isEqualTo(g.edgeCount());
     assertThat(ep.get(0)).isEqualTo(-1);
     assertThat(ep.get(1)).isZero();
@@ -696,11 +737,21 @@ class GraphsTest {
         new int[] {0, 1, 2, 3},
         new int[] {0, 2, 3, 4});
     var condensed = partition.condense();
-    var ep = Graphs.edgePartition(condensed, g, partition);
+    var ep = Graphs.edgePartition(condensed, partition);
     // Condensed edge to group 1 ({2}) collects original edges 0->2 (index 0 in g) and 1->2 (index 2 in g).
     // Edge order in g depends on node ordering: node 0's outs sorted = [2, 3] (edge indices 0 and 1), node 1's outs = [2] (edge 2).
     assertThat(ep.edgesOf(0).toIntArray()).containsExactly(0, 2);
     assertThat(ep.edgesOf(1).toIntArray()).containsExactly(1);
+  }
+
+  @Test
+  void edgePartitionRejectsACondensedGraphWithAnotherNodeCountThanGroups() {
+    var sccs = Components.sccsOf(TestGraphs.path(4));
+    assertThatThrownBy(() -> Graphs.edgePartition(TestGraphs.isolated(1), sccs))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("4 groups");
+    assertThatThrownBy(() -> Graphs.edgePartition(TestGraphs.isolated(5), sccs))
+        .isInstanceOf(IllegalArgumentException.class);
   }
 
   @Test
@@ -913,7 +964,7 @@ class GraphsTest {
     // One cycle through 46341 nodes: every node reaches every node, 46341^2 > 2^31 - 9 edges.
     assertThatThrownBy(() -> Graphs.transitiveClosure(TestGraphs.cycle(46_341)))
         .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("transitive closure");
+        .hasMessage("the transitive closure has more than " + (Integer.MAX_VALUE - 8) + " edges");
   }
 
   @Test

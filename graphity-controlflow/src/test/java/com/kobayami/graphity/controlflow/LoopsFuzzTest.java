@@ -75,7 +75,7 @@ class LoopsFuzzTest {
               .as("%d in loop of %d, %s", x, h, describe)
               .isEqualTo(loop.body()[x]);
         }
-        var nodes = loops.nodesOf(id).toIntArray();
+        var nodes = loops.bodyOf(id).toIntArray();
         assertThat(nodes[0]).as("body of %d starts with its header, %s", h, describe).isEqualTo(h);
         Arrays.sort(nodes);
         assertThat(nodes).as("body of %d, %s", h, describe).isEqualTo(body.toIntArray());
@@ -188,7 +188,7 @@ class LoopsFuzzTest {
         for (int x = 0; x < n; x++) {
           if (natural[x]) expected.add(x);
         }
-        var body = loops.nodesOf(id).toIntArray();
+        var body = loops.bodyOf(id).toIntArray();
         Arrays.sort(body);
         assertThat(body).as("natural loop of %d, seed %d", header, seed)
             .isEqualTo(expected.toIntArray());

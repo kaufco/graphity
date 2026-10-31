@@ -41,7 +41,7 @@ public final class TopOrder {
     var traverser = new TopOrderTraverser(graph);
     traverser.run();
     if (traverser.hasCycle) {
-      throw new IllegalArgumentException("Graph contains a cycle");
+      throw new IllegalArgumentException("graph contains a cycle");
     }
     return IntLists.unmodifiable(IntArrayList.wrap(traverser.order));
   }

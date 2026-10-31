@@ -76,7 +76,7 @@ final class DfsPreorder {
     var parent = new int[n + 1];
     order[0] = -1;
     parent[0] = -1;
-    // Each frame is (node, resume cursor), interleaved, so a frame is one cache line.
+    // A frame is (node, resume cursor), interleaved, so both reads of a frame hit one cache line.
     var frames = new int[2 * Math.max(16, Math.min(n, 1024))];
     int count = 0;
 

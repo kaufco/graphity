@@ -21,7 +21,8 @@ import java.util.Arrays;
  * var sccs = Components.sccsOf(graph);   // directed: SCCs via Tarjan
  * var wccs = Components.wccsOf(graph);   // directed: WCCs via Union-Find
  * var ccs  = Components.ccsOf(graph);    // undirected interpretation: same as wccsOf
- * var bcc  = Components.biconnectivityOf(BiAdjacentGraph.of(graph));  // undirected: bridges, cut vertices, blocks
+ * // undirected: bridges, cut vertices, blocks
+ * var bcc  = Components.biconnectivityOf(BiAdjacentGraph.of(graph));
  * }</pre>
  *
  * <h2>Directed vs. undirected interpretation</h2>
@@ -55,7 +56,8 @@ public final class Components {
    * Computes the strongly connected components of the given graph using Tarjan's algorithm.
    * <p>
    * <strong>Time:</strong> O(nodeCount + edgeCount).<br>
-   * <strong>Memory:</strong> O(nodeCount) for the result; O(nodeCount) additional during computation.
+   * <strong>Memory:</strong> O(nodeCount) for the result; O(nodeCount) additional during
+   * computation.
    *
    * @param graph the graph to analyze
    * @return the SCCs as an {@link Sccs} instance
@@ -74,7 +76,8 @@ public final class Components {
    * Two nodes are in the same WCC if they are connected by any path, ignoring edge direction.
    * Uses Union-Find (disjoint-set) - only requires out-edges, no {@link BiAdjacentGraph} needed.
    * <p>
-   * <strong>Time:</strong> O(nodeCount x α(nodeCount) + edgeCount), effectively O(nodeCount + edgeCount).<br>
+   * <strong>Time:</strong> O(nodeCount x α(nodeCount) + edgeCount), effectively
+   * O(nodeCount + edgeCount).<br>
    * <strong>Memory:</strong> O(nodeCount).
    *
    * @param graph the graph to analyze
@@ -82,16 +85,10 @@ public final class Components {
    */
   public static NodePartition wccsOf(Graph graph) {
     int n = graph.nodeCount();
-    if (n == 0) {
-      return new NodePartition(graph, new int[0], new int[0], new int[]{0});
-    }
 
-    // Union-Find with path compression and union by rank.
-    int[] parent = new int[n];
-    int[] rank = new int[n];
-    for (int i = 0; i < n; i++) {
-      parent[i] = i;
-    }
+    // 1) Union the endpoints of every edge; self-loops are no-ops.
+    int[] parent = UnionFind.singletons(n);
+    byte[] rank = new byte[n];
 
     var adjacency = Csr.outAdjacency(graph);
     var adjacencyStart = Csr.outAdjacencyStart(graph);
@@ -99,41 +96,27 @@ public final class Components {
     for (int u = 0; u < n; u++) {
       int end = adjacencyStart[u + 1];
       for (int ei = adjacencyStart[u]; ei < end; ei++) {
-        union(parent, rank, u, adjacency[ei]);
+        UnionFind.union(parent, rank, u, adjacency[ei]);
       }
     }
 
-    // Build partition: assign dense component IDs.
+    // 2) Dense component IDs, in order of each component's smallest node.
     int[] nodeToGroup = new int[n];
-    int[] compId = new int[n];
-    Arrays.fill(compId, -1);
+    int[] groupOfRoot = new int[n];
+    Arrays.fill(groupOfRoot, -1);
     int groupCount = 0;
 
     for (int i = 0; i < n; i++) {
-      int root = find(parent, i);
-      if (compId[root] < 0) {
-        compId[root] = groupCount++;
+      int root = UnionFind.find(parent, i);
+      if (groupOfRoot[root] < 0) {
+        groupOfRoot[root] = groupCount++;
       }
-      nodeToGroup[i] = compId[root];
+      nodeToGroup[i] = groupOfRoot[root];
     }
 
-    // Build CSR: count members per group, then fill.
-    int[] memberStart = new int[groupCount + 1];
-    for (int i = 0; i < n; i++) {
-      memberStart[nodeToGroup[i] + 1]++;
-    }
-    for (int g = 0; g < groupCount; g++) {
-      memberStart[g + 1] += memberStart[g];
-    }
-
-    int[] members = new int[n];
-    int[] writePos = Arrays.copyOf(memberStart, groupCount);
-    for (int i = 0; i < n; i++) {
-      members[writePos[nodeToGroup[i]]++] = i;
-    }
-    // members within each group are already sorted (ascending scan of i).
-
-    return new NodePartition(graph, nodeToGroup, members, memberStart);
+    // 3) Members as CSR.
+    var groups = ParentForest.groupIndices(nodeToGroup, groupCount);
+    return new NodePartition(graph, nodeToGroup, groups.members(), groups.start());
   }
 
   /**
@@ -221,28 +204,6 @@ public final class Components {
     return StrongConnectivity.of(graph);
   }
 
-  private static int find(int[] parent, int x) {
-    while (parent[x] != x) {
-      parent[x] = parent[parent[x]]; // path halving
-      x = parent[x];
-    }
-    return x;
-  }
-
-  private static void union(int[] parent, int[] rank, int a, int b) {
-    int ra = find(parent, a);
-    int rb = find(parent, b);
-    if (ra == rb) return;
-    if (rank[ra] < rank[rb]) {
-      parent[ra] = rb;
-    } else if (rank[ra] > rank[rb]) {
-      parent[rb] = ra;
-    } else {
-      parent[rb] = ra;
-      rank[ra]++;
-    }
-  }
-
   /**
    * Iterative Tarjan SCC. Performs a single-pass DFS with an explicit stack (no recursion,
    * so deep graphs cannot overflow the JVM call stack), identifying all strongly connected
@@ -267,7 +228,7 @@ public final class Components {
     private static final int FLAG = Integer.MIN_VALUE;
 
     private final Graph graph;
-    private final int[] node;   // per node: index | visited << 31, lowlink | onStack << 31
+    private final int[] lanes;   // per node: index | visited << 31, lowlink | onStack << 31
     private final int[] sccStack;
     private int nextIndex;
     private int sccTop;
@@ -285,7 +246,7 @@ public final class Components {
         throw new IllegalArgumentException("Tarjan's algorithm keeps two ints per node and so"
             + " requires nodeCount < 2^30 - 2, but was " + n);
       }
-      this.node = new int[2 * n];
+      this.lanes = new int[2 * n];
       this.sccStack = new int[n];
       this.nodeToScc = new int[n];
       this.sccNodes = new int[n];
@@ -296,16 +257,14 @@ public final class Components {
       int n = graph.nodeCount();
       int[] out = Csr.outAdjacencyStart(graph);
       int[] adj = Csr.outAdjacency(graph);
-      int[] node = this.node;
+      int[] lanes = this.lanes;
 
-      // DFS frames grow on demand: depth is data-dependent and usually far below n, so
-      // pre-sizing to n would needlessly zero a huge array for shallow graphs. Each frame is
-      // two interleaved ints, the node and its resume position in the adjacency
-      // array, sharing a cache line.
+      // Each frame is two interleaved ints, the node and its resume position in the
+      // adjacency array: both share a cache line, and the array grows on demand.
       int[] frames = DfsFrames.initial(n);
 
       for (int root = 0; root < n; root++) {
-        if ((node[2 * root] & FLAG) != 0) {
+        if ((lanes[2 * root] & FLAG) != 0) {
           continue;
         }
         preorder(root);
@@ -322,7 +281,7 @@ public final class Components {
           int i = frames[2 * top + 1];
           while (i < end) {
             int v = adj[i++];
-            if ((node[2 * v] & FLAG) == 0) {
+            if ((lanes[2 * v] & FLAG) == 0) {
               frames[2 * top + 1] = i;  // resume here after v's subtree finishes
               preorder(v);
               if (++top == frames.length >> 1) {
@@ -331,26 +290,26 @@ public final class Components {
               frames[2 * top] = v;
               frames[2 * top + 1] = out[v];
               continue outer;
-            } else if ((node[2 * v + 1] & FLAG) != 0) {   // same cache line as v's lane 0
+            } else if ((lanes[2 * v + 1] & FLAG) != 0) {   // same cache line as v's lane 0
               // lowlink[u] = min(lowlink[u], index[v])
-              int idxV = node[2 * v] & VALUE;
-              int lowLane = node[2 * u + 1];
+              int idxV = lanes[2 * v] & VALUE;
+              int lowLane = lanes[2 * u + 1];
               if (idxV < (lowLane & VALUE)) {
-                node[2 * u + 1] = (lowLane & FLAG) | idxV;
+                lanes[2 * u + 1] = (lowLane & FLAG) | idxV;
               }
             }
           }
 
           // Postorder: u is finished. Close its SCC if it is a root, then propagate its
           // lowlink to the parent (the node beneath it on the DFS stack).
-          int lowU = node[2 * u + 1] & VALUE;
-          if (lowU == (node[2 * u] & VALUE)) {
+          int lowU = lanes[2 * u + 1] & VALUE;
+          if (lowU == (lanes[2 * u] & VALUE)) {
             int start = sccNodesPos;
             sccStart[sccCount] = start;
             int w;
             do {
               w = sccStack[--sccTop];
-              node[2 * w + 1] &= VALUE;
+              lanes[2 * w + 1] &= VALUE;
               nodeToScc[w] = sccCount;
               sccNodes[sccNodesPos++] = w;
             } while (w != u);
@@ -359,9 +318,9 @@ public final class Components {
           }
           if (--top >= 0) {
             int parent = frames[2 * top];
-            int lowLane = node[2 * parent + 1];
+            int lowLane = lanes[2 * parent + 1];
             if (lowU < (lowLane & VALUE)) {
-              node[2 * parent + 1] = (lowLane & FLAG) | lowU;
+              lanes[2 * parent + 1] = (lowLane & FLAG) | lowU;
             }
           }
         }
@@ -370,8 +329,8 @@ public final class Components {
 
     private void preorder(int v) {
       int idx = nextIndex++;
-      node[2 * v] = idx | FLAG;
-      node[2 * v + 1] = idx | FLAG;
+      lanes[2 * v] = idx | FLAG;
+      lanes[2 * v + 1] = idx | FLAG;
       sccStack[sccTop++] = v;
     }
 

@@ -97,7 +97,7 @@ class CondenseFuzzTest {
             .containsExactly(expected.get(group).stream().mapToInt(Integer::intValue).toArray());
       }
 
-      var provenance = Graphs.edgePartition(condensed, g, partition);
+      var provenance = Graphs.edgePartition(condensed, partition);
       for (int u = 0; u < n; u++) {
         for (int e = g.outEdgeStart(u); e < g.outEdgeEnd(u); e++) {
           int su = groupOf[u];

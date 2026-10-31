@@ -51,6 +51,22 @@ class BiAdjacentGraphTest {
   }
 
   @Test
+  void degreeCountsReciprocalPairTwice() {
+    // 0->1 and 1->0: node 1 is both out- and in-node of 0, but a single neighbor.
+    var g = BiAdjacentGraph.of(TestGraphs.of(2, 0, 1, 1, 0));
+    assertThat(g.degree(0)).isEqualTo(2);
+    assertThat(g.neighbors(0).toIntArray()).containsExactly(1);
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {-1, 4, 1000})
+  void degreeOutOfRangeThrows(int node) {
+    var g = diamond();
+    assertThatThrownBy(() -> g.degree(node))
+        .isInstanceOf(IndexOutOfBoundsException.class);
+  }
+
+  @Test
   void inNodesReturnsSortedView() {
     // Node 3 is the sink of all three others; in-list must come out sorted [1, 2].
     var g = diamond();
