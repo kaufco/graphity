@@ -40,6 +40,7 @@ Graphity adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - [Issue #58](../../issues/58) - Make the README and the Javadoc show what the library offers at a glance
   - [Issue #63](../../issues/63) - Graphity code examples
   - [Issue #64](../../issues/64) - Rewritten Javadoc for the whole API
+  - [Issue #66](../../issues/66) - Links from the Javadoc to the guide
 
 ### Removed
 

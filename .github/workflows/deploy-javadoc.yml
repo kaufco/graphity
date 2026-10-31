@@ -17,6 +17,13 @@
 #     https://kaufco.github.io/graphity/ from main HEAD so the page is
 #     not blank, and as the fallback when a release already exists.
 #
+# Under each class and method that a page of the guide uses, the deployed Javadoc
+# links those pages. The guide (kaufco/graphity-doc) publishes the list as
+# api-pages.json, and .github/scripts/add-guide-links.mjs adds the links to the
+# generated pages: only the deployed site depends on the guide, not the sources
+# or the Javadoc jar. The links are those of the guide at the time of the run;
+# if the list cannot be read, the Javadoc goes out without them.
+#
 # The published Javadoc is the release's snapshot at Pages root; a versioned
 # layout (/javadoc/<version>/, /javadoc/latest/) can be introduced later
 # without changing the trigger model.
@@ -87,6 +94,19 @@ jobs:
             exit 1
           fi
           mvn -B -ntp -T 1 -pl "$modules" -am javadoc:aggregate
+
+      - name: Add the sidebar of the start page
+        run: node .github/scripts/add-start-page-contents.mjs target/reports/apidocs
+
+      - name: Link the classes and methods to the guide
+        run: |
+          set -euo pipefail
+          list=https://kaufco.github.io/graphity-doc/api-pages.json
+          if curl -fsSL --retry 3 --max-time 30 -o "$RUNNER_TEMP/api-pages.json" "$list"; then
+            node .github/scripts/add-guide-links.mjs target/reports/apidocs "$RUNNER_TEMP/api-pages.json"
+          else
+            echo "::warning::$list could not be read; the Javadoc has no links to the guide."
+          fi
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
