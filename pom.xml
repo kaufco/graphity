@@ -69,6 +69,7 @@
     <module>graphity-dot</module>
     <module>graphity-mermaid</module>
     <module>graphity-benchmarks</module>
+    <module>graphity-examples</module>
   </modules>
 
   <properties>
@@ -82,8 +83,8 @@
          release.yml and deploy-javadoc.yml read this list and build it with -pl <list> -am
          (plus this parent POM, which consumers need to resolve the modules): the Central
          bundle and the aggregated Javadoc site cover these modules. A module that is not
-         listed is built and tested by CI but not deployed - the benchmarks, and any future
-         module without a consumer yet. Each entry is both a directory (-pl) and an
+         listed is built and tested by CI but not deployed - the benchmarks, the examples, and
+         any future module without a consumer yet. Each entry is both a directory (-pl) and an
          artifactId (the Central pre-check), so the two must match; and since -am also builds
          and publishes the reactor dependencies of a listed module, each of those must be
          listed too. -->

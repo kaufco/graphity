@@ -38,6 +38,7 @@ Graphity adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Documentation
   - [Issue #57](../../issues/57) - Document how to aggregate edge data
   - [Issue #58](../../issues/58) - Make the README and the Javadoc show what the library offers at a glance
+  - [Issue #63](../../issues/63) - Graphity code examples
 
 ### Removed
 

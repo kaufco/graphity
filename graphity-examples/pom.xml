@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.kobayami</groupId>
+    <artifactId>graphity-parent</artifactId>
+    <version>2.4.0</version>
+  </parent>
+
+  <artifactId>graphity-examples</artifactId>
+
+  <name>graphity-examples</name>
+  <description>
+    The examples of the Graphity Javadoc, which embeds regions of these sources with {@snippet}.
+    The build compiles them and its tests check what their comments claim.
+    Not part of the released library.
+  </description>
+
+  <properties>
+    <!-- User property of central-publishing-maven-plugin, as in graphity-benchmarks: the
+         examples are not a library, so they must never end up in a Maven Central bundle, not
+         even if someone runs the release build over the full reactor. maven.deploy.skip would
+         have no effect here: the publishing plugin replaces maven-deploy-plugin rather than
+         delegating to it. -->
+    <skipPublishing>true</skipPublishing>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.kobayami</groupId>
+      <artifactId>graphity-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.kobayami</groupId>
+      <artifactId>graphity-controlflow</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.kobayami</groupId>
+      <artifactId>graphity-dot</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.kobayami</groupId>
+      <artifactId>graphity-mermaid</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.jspecify</groupId>
+      <artifactId>jspecify</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.assertj</groupId>
+      <artifactId>assertj-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <testResources>
+      <testResource>
+        <directory>src/test/resources</directory>
+      </testResource>
+      <!-- The README and the sources of the examples, for ReadmeExamplesTest and LineLengthTest:
+           the CI runs the tests from the built classes, without a checkout. -->
+      <testResource>
+        <directory>${project.basedir}/..</directory>
+        <includes>
+          <include>README.md</include>
+        </includes>
+      </testResource>
+      <testResource>
+        <directory>src/main/java</directory>
+        <targetPath>example-sources</targetPath>
+        <includes>
+          <include>**/*.java</include>
+        </includes>
+      </testResource>
+    </testResources>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <!-- Not for the coverage of the examples: the parent's surefire configuration passes
+             @{argLine}, which the JaCoCo agent defines. -->
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+
+</project>
