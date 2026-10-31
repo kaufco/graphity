@@ -3,37 +3,33 @@ package com.kobayami.graphity;
 import java.util.Objects;
 
 /**
- * A read-only directed graph with both in- and out-adjacency, enabling constant-time access
- * to incoming and outgoing nodes.
+ * A {@link Graph} that also holds the in-nodes of every node, for algorithms that follow edges
+ * against their direction.
  * <p>
- * Extends {@link Graph} with in-adjacency lists in the same flat-array layout,
- * each node's in-nodes sorted ascending.
- * Obtain via {@link #of(Graph)}; convert back via {@link #uniAdjacentGraph()}.
+ * {@link #of(Graph)} builds the in-adjacency of a graph - the in-nodes of every node. The result
+ * has the node IDs and edge indices of the graph and shares the out-nodes of every node, called
+ * its out-adjacency. Algorithms that need in-nodes, such as {@link Dominators}, take a
+ * {@code BiAdjacentGraph}, so that the in-adjacency is built once and serves all of them.
+ * {@link #transposed()} reverses every edge without copying, and {@link #uniAdjacentGraph()} drops
+ * the in-adjacency again.
  * <p>
- * The analyses that walk predecessors take a {@code BiAdjacentGraph}, so that the in-adjacency is
- * built once and shared: {@link Dominators},
- * {@link Components#biconnectivityOf(BiAdjacentGraph)},
- * {@link Components#strongConnectivityOf(BiAdjacentGraph)} and the loop nesting forest of the
- * {@code graphity-controlflow} module.
+ * The in-nodes of a node are in ascending order, like its out-nodes. A {@code BiAdjacentGraph}
+ * equals a {@code Graph} with the same nodes and edges. Instances are immutable and safe to share
+ * between threads.
  * <p>
- * <strong>Memory:</strong> 8 x (nodeCount + edgeCount) bytes (2x {@link Graph}).
- *
- * @see Graph
- * @see Graphs#rootNodes(BiAdjacentGraph)
- * @see Dominators
+ * <strong>Memory:</strong> 8 x (nodeCount + edgeCount) bytes, half of it for the out-adjacency,
+ * which is shared with the graph it was built from.
  */
 public final class BiAdjacentGraph extends Graph {
 
-  /*
-   * Per-node start offset into inAdjacency. Same layout as the out-adjacency offsets but for
-   * incoming edges, including the sentinel at index nodeCount.
-   */
+  // The in-adjacency in the layout of the out-adjacency: the in-nodes of node v are
+  // inAdjacency[inAdjacencyStart[v]..inAdjacencyStart[v + 1] - 1], sorted ascending, with the
+  // sentinel inAdjacencyStart[nodeCount] == edgeCount. A position in inAdjacency is not an edge
+  // index.
   private final int[] inAdjacencyStart;
-
-  /* Flat array of all in-adjacency lists, indexed via inAdjacencyStart. */
   private final int[] inAdjacency;
 
-  // Takes the arrays as they are: neither copied nor checked.
+  // Takes the arrays as they are, neither copied nor checked: the caller guarantees the layout.
   BiAdjacentGraph(
       int[] outAdjacencyStart, int[] outAdjacency, int[] inAdjacencyStart, int[] inAdjacency) {
     super(outAdjacencyStart, outAdjacency);
@@ -41,35 +37,35 @@ public final class BiAdjacentGraph extends Graph {
     this.inAdjacency = inAdjacency;
   }
 
-  /** The in-adjacency offset array, for {@link Csr}. */
+  // For Csr, which hands the arrays to the algorithms of the core and of other modules.
   final int[] inAdjacencyStart() {
     return inAdjacencyStart;
   }
 
-  /** The in-adjacency source array, for {@link Csr}. */
   final int[] inAdjacency() {
     return inAdjacency;
   }
 
   /**
-   * Returns the given graph with in-adjacency added, for constant-time access to the
-   * predecessors of every node. The result shares the out-adjacency data; only the in-adjacency
-   * is newly computed, and it is not cached - hold on to the result to use it more than once.
+   * Returns a {@code BiAdjacentGraph} with the nodes and edges of {@code graph}, building its
+   * in-adjacency.
    * <p>
-   * If {@code graph} already is a {@code BiAdjacentGraph}, returns it unchanged in O(1).
+   * Node IDs and edge indices stay the same, and the out-adjacency is shared with {@code graph},
+   * not copied. The in-adjacency is built anew on every call, not cached: keep the result to use
+   * it more than once. If {@code graph} already is a {@code BiAdjacentGraph}, returns it.
    * <p>
    * <strong>Time:</strong> O(nodeCount + edgeCount), or O(1) if already bi-adjacent.<br>
    * <strong>Memory:</strong> +4 x (nodeCount + edgeCount) bytes, or none if already bi-adjacent.
    *
-   * @param graph the graph to add the in-adjacency to
-   * @return a bi-adjacent graph with the same nodes and edges
+   * @param graph the graph to build the in-adjacency for
+   * @return the graph with in-adjacency
    */
   public static BiAdjacentGraph of(Graph graph) {
     return graph instanceof BiAdjacentGraph biAdjacent ? biAdjacent : graph.withInAdjacency();
   }
 
   /**
-   * Returns the in-degree (number of incoming edges) of {@code node}.
+   * Returns the in-degree of {@code node}. That is the number of edges with {@code node} as target.
    * <p>
    * <strong>Time:</strong> O(1).
    *
@@ -83,13 +79,15 @@ public final class BiAdjacentGraph extends Graph {
   }
 
   /**
-   * Returns a zero-copy view of {@code node}'s in-nodes, sorted ascending.
-   * In-nodes are the predecessors of {@code node} (sources of its incoming edges).
+   * Returns the in-nodes of {@code node} in ascending order. These are the sources of the edges
+   * with {@code node} as target.
+   * <p>
+   * The result is a view of this graph's own array, not a copy.
    * <p>
    * <strong>Time:</strong> O(1).
    *
    * @param node node ID in {@code 0..nodeCount()-1}
-   * @return in-nodes as a read-only sorted view
+   * @return in-nodes
    * @throws IndexOutOfBoundsException if {@code node} is out of range
    */
   public final SortedIntView inNodes(int node) {
@@ -98,12 +96,12 @@ public final class BiAdjacentGraph extends Graph {
   }
 
   /**
-   * Tests whether the edge {@code inNode → node} exists.
+   * Returns whether the edge {@code inNode -> node} exists.
    * <p>
-   * <strong>Time:</strong> O(log inDegree) via binary search.
+   * <strong>Time:</strong> O(log inDegree(node)).
    *
    * @param node   node ID in {@code 0..nodeCount()-1}
-   * @param inNode potential in-node ID
+   * @param inNode node ID; a value out of range yields {@code false}
    * @return {@code true} if the edge exists
    * @throws IndexOutOfBoundsException if {@code node} is out of range
    */
@@ -114,11 +112,14 @@ public final class BiAdjacentGraph extends Graph {
   }
 
   /**
-   * Returns a {@link Graph} view with only out-adjacency, sharing the underlying arrays.
+   * Returns a {@code Graph} with the same nodes and edges, without the in-adjacency.
+   * <p>
+   * The result shares the out-adjacency of this graph; nothing is copied. Once only the result is
+   * kept, the in-adjacency can be garbage-collected.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @return a uni-adjacent graph over this graph's out-adjacency data
+   * @return a graph over the out-adjacency of this graph
    */
   @Override
   public final Graph uniAdjacentGraph() {
@@ -126,50 +127,41 @@ public final class BiAdjacentGraph extends Graph {
   }
 
   /**
-   * Returns a zero-copy view with in- and out-adjacency swapped (graph transpose).
+   * Returns the transposed graph as a view of this graph's arrays. The transposed graph has every
+   * edge reversed.
    * <p>
-   * Node IDs are preserved, <strong>edge indices are not</strong>: the edge at index {@code i}
-   * of the transpose is a different edge from the one at index {@code i} here. To address
-   * external edge metadata across the transpose, translate the index with
-   * {@link #transposedEdgeIndex(int)} or {@link Graphs#transposedEdgeMapping(Graph)}.
+   * Node IDs stay the same, edge indices do not: edge {@code e} of the transposed graph is in
+   * general not the reverse of edge {@code e} of this graph. {@link #transposedEdgeIndex(int)}
+   * translates one edge index, and {@link Graphs#transposedEdgeMapping(Graph)} translates all of
+   * them.
    * <p>
-   * A plain {@link Graph} has no transpose of its own: building one costs the in-adjacency, so
-   * a caller writes {@code BiAdjacentGraph.of(graph).transposed()}, which shows that cost and
-   * keeps the {@code BiAdjacentGraph} for further use.
+   * A plain {@link Graph} needs its in-adjacency first:
+   * {@code BiAdjacentGraph.of(graph).transposed()}. Here, the packages of a program that depend on
+   * {@code model}, directly or indirectly, are the ones reachable from it against the direction of
+   * the dependencies:
+   * {@snippet file="com/kobayami/graphity/examples/Transposing.java" region="transposed"}
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @return a bi-adjacent view with all edge directions reversed
-   * @see #transposedEdgeIndex(int)
-   * @see Graphs#transposedEdgeMapping(Graph)
+   * @return the transposed graph
    */
   public final BiAdjacentGraph transposed() {
     return new BiAdjacentGraph(inAdjacencyStart, inAdjacency, outAdjacencyStart(), outAdjacency());
   }
 
   /**
-   * Returns the index of the same edge in {@link #transposed()}.
+   * Returns the edge index that edge {@code edgeIndex} has in the transposed graph.
    * <p>
-   * The edge at {@code edgeIndex} runs {@code source → target}; in the transpose the same
-   * edge runs {@code target → source} and sits at the returned index. This is the inverse
-   * direction of {@link Graphs#transposedEdgeMapping(Graph)} and its own inverse across the
-   * two graphs:
-   * <pre>{@code
-   * BiAdjacentGraph transpose = graph.transposed();
-   * int back = transpose.transposedEdgeIndex(graph.transposedEdgeIndex(edgeIndex));
-   * assert back == edgeIndex;
-   * }</pre>
-   * The result is never {@code -1} - the edge being translated exists by definition. Use
-   * {@link Graphs#transposedEdgeMapping(Graph)} instead when translating every edge, which
-   * costs one linear pass rather than a binary search per edge.
+   * Called on {@link #transposed()}, it translates back:
+   * {@code transposed().transposedEdgeIndex(transposedEdgeIndex(e)) == e}. To translate every
+   * edge, {@link Graphs#transposedEdgeMapping(Graph)} needs one pass instead of a search per edge;
+   * it maps from the transposed graph to this one.
    * <p>
-   * <strong>Time:</strong> O(log nodeCount + log inDegree) via binary search.
+   * <strong>Time:</strong> O(log nodeCount).
    *
    * @param edgeIndex edge index in {@code 0..edgeCount()-1}
-   * @return the index of the same edge in {@link #transposed()}
+   * @return edge index in the transposed graph
    * @throws IndexOutOfBoundsException if {@code edgeIndex} is out of range
-   * @see #transposed()
-   * @see Graphs#transposedEdgeMapping(Graph)
    */
   public final int transposedEdgeIndex(int edgeIndex) {
     Objects.checkIndex(edgeIndex, edgeCount());
@@ -180,16 +172,15 @@ public final class BiAdjacentGraph extends Graph {
   }
 
   /**
-   * Returns the total degree of {@code node}: its in-degree plus its out-degree.
+   * Returns the degree of {@code node}. Equivalent to {@code inDegree(node) + outDegree(node)}.
    * <p>
-   * This counts edges, not neighbors. A self-loop counts twice, once as an out-edge and once as an
-   * in-edge, and so does a reciprocal pair {@code node -> v}, {@code v -> node}, although {@code v}
-   * is a single one of the {@link #neighbors(int) neighbors}.
+   * It counts edges, not neighbors: a self-loop counts twice, and so do the edges
+   * {@code node -> v} and {@code v -> node}, although {@code v} is one neighbor.
    * <p>
    * <strong>Time:</strong> O(1).
    *
    * @param node node ID in {@code 0..nodeCount()-1}
-   * @return total degree
+   * @return degree
    * @throws IndexOutOfBoundsException if {@code node} is out of range
    */
   public final int degree(int node) {
@@ -197,14 +188,18 @@ public final class BiAdjacentGraph extends Graph {
   }
 
   /**
-   * Returns a merged, duplicate-free view of {@code node}'s in- and out-nodes (neighbors),
-   * sorted ascending.
+   * Returns the neighbors of {@code node} in ascending order and without duplicates. These are its
+   * in-nodes and out-nodes.
    * <p>
-   * <strong>Time:</strong> O(inDegree + outDegree).<br>
-   * <strong>Memory:</strong> allocates a merged array.
+   * Unlike {@link #inNodes(int)} and {@link #outNodes(int)}, which are views, the result is a copy,
+   * merged on every call.
+   * <p>
+   * <strong>Time:</strong> O(inDegree(node) + outDegree(node)).<br>
+   * <strong>Memory:</strong> up to 4 x (inDegree(node) + outDegree(node)) bytes for the result;
+   * while it runs, up to as much again if a neighbor is both an in-node and an out-node.
    *
    * @param node node ID in {@code 0..nodeCount()-1}
-   * @return neighbors as a sorted, duplicate-free view
+   * @return neighbors
    * @throws IndexOutOfBoundsException if {@code node} is out of range
    */
   public final SortedIntView neighbors(int node) {
@@ -216,13 +211,14 @@ public final class BiAdjacentGraph extends Graph {
   }
 
   /**
-   * Tests whether {@code neighbor} is connected to {@code node} via any edge direction.
+   * Returns whether {@code neighbor} is a neighbor of {@code node}. Equivalent to
+   * {@code hasOutNode(node, neighbor) || hasInNode(node, neighbor)}.
    * <p>
-   * <strong>Time:</strong> O(log outDegree + log inDegree) via binary search.
+   * <strong>Time:</strong> O(log outDegree(node) + log inDegree(node)).
    *
    * @param node     node ID in {@code 0..nodeCount()-1}
-   * @param neighbor potential neighbor ID
-   * @return {@code true} if {@code neighbor} is an in- or out-node of {@code node}
+   * @param neighbor node ID; a value out of range yields {@code false}
+   * @return {@code true} if {@code neighbor} is an in-node or an out-node of {@code node}
    * @throws IndexOutOfBoundsException if {@code node} is out of range
    */
   public final boolean hasNeighbor(int node, int neighbor) {
@@ -230,16 +226,15 @@ public final class BiAdjacentGraph extends Graph {
   }
 
   /**
-   * Tests whether {@code node} is a root node (in-degree 0, no incoming edges).
-   * A root node is a natural entry point for traversal; this is distinct from an edge's
-   * source node (see {@link #edgeSource(int)}).
+   * Returns whether {@code node} is a root node. Equivalent to {@code inDegree(node) == 0}.
+   * <p>
+   * {@link Graphs#rootNodes(BiAdjacentGraph)} returns all root nodes.
    * <p>
    * <strong>Time:</strong> O(1).
    *
    * @param node node ID in {@code 0..nodeCount()-1}
-   * @return {@code true} if {@code node} has in-degree 0
+   * @return {@code true} if no edge has {@code node} as target
    * @throws IndexOutOfBoundsException if {@code node} is out of range
-   * @see Graphs#rootNodes(BiAdjacentGraph)
    */
   public final boolean isRootNode(int node) {
     return inDegree(node) == 0;

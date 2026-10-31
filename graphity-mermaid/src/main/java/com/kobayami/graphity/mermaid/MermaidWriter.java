@@ -12,53 +12,49 @@ import java.util.function.IntPredicate;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Writes a graph as a Mermaid flowchart, with labels, shapes, classes and edge styles taken from
- * the caller's data by node ID and edge index.
- *
- * <pre>{@code
- * MermaidWriter.of(graph)
- *     .direction(MermaidWriter.Direction.LEFT_RIGHT)
- *     .nodeLabel(node -> names[node])
- *     .nodeShape(node -> node == entry ? MermaidWriter.Shape.CIRCLE : MermaidWriter.Shape.RECTANGLE)
- *     .classDef("hot", "fill:#f96")
- *     .nodeClass(node -> isHot[node] ? "hot" : null)
- *     .edgeStyle(edge -> isBackEdge[edge] ? "stroke:red" : null)
- *     .clusters(sccs, scc -> "SCC " + scc)
- *     .write(out);
- * }</pre>
- *
- * Node {@code v} is named {@code n}<i>v</i>. The output lists the class definitions, the
- * clusters in group order with their nodes, then the nodes in no cluster, then the links in edge
- * index order, the classes and the link styles, so the same graph and hooks always give the same
- * text. Mermaid numbers links in the order they are written; the writer translates edge indices
- * to those numbers for {@code linkStyle}, also when a filter leaves edges out.
+ * A writer of Mermaid flowcharts that labels and styles a graph with the caller's data by node ID
+ * and edge index. Mermaid flowcharts render in Markdown.
+ * <p>
+ * {@link #of(Graph)} returns a writer for a graph, the methods that configure it return the writer
+ * again, and {@link #write(Appendable)} or {@link #writeToString()} write the text. The graph holds
+ * no data, so labels, shapes, classes and styles come from hooks that receive a node ID or an edge
+ * index and read the caller's arrays. Here, the packages of a small program get their names from
+ * {@code names}. The strongly connected components {@code sccs} tell which packages are in a
+ * cycle, and these are drawn in red:
+ * {@snippet file="com/kobayami/graphity/examples/WritingMermaid.java" region="nodeClass"}
+ * Nodes are named by their node IDs after an {@code n}, such as {@code n4}. The text lists the
+ * class definitions, the clusters in group order with their nodes, then the nodes in no cluster,
+ * then the edges in edge index order, the classes of the nodes and the edge styles, so the same
+ * graph and hooks always give the same text. Mermaid numbers the edges in the order they are
+ * written; the writer translates edge indices into these numbers for {@code linkStyle}, also when
+ * a filter leaves edges out.
  * <p>
  * Labels are written as quoted strings: the writer turns quotes, {@code #}, {@code %}, {@code &},
  * {@code :}, {@code <}, {@code >} and backticks into Mermaid entity codes and line breaks into
- * {@code <br>}, so no label reads as HTML, as a Markdown string or as a directive. For the same
- * reason whitespace right after the word {@code direction} becomes an entity code, and an empty
- * label, which Mermaid rejects, is written as one space.
+ * {@code <br>}, so that no label reads as HTML, as a Markdown string or as a directive. For the
+ * same reason, whitespace right after the word {@code direction} becomes an entity code, and an
+ * empty label, which Mermaid rejects, is written as one space.
  * <p>
- * Mermaid's renderer still changes some labels. Mermaid 11 applies Markdown emphasis and backslash
- * escapes to every label, so {@code 2*3*4} loses its asterisks; Mermaid 12 shows a backslash
- * before {@code n} as a line break. Both read <code>&para;&szlig;</code> and
+ * Mermaid's renderer still changes some labels. Mermaid 11 applies Markdown emphasis and
+ * backslash escapes to every label, so {@code 2*3*4} loses its asterisks; Mermaid 12 shows a
+ * backslash before {@code n} as a line break. Both read <code>&para;&szlig;</code> and
  * <code>&#xFB02;&deg;</code>, which Mermaid uses internally for entity codes, as {@code ;} and
- * {@code &}, and turn {@code fa:fa-}<i>name</i> into an icon in a node label with a line break.
- * With {@code htmlLabels} set to {@code false}, Mermaid shows some entity codes as written, such
- * as {@code &#58;} for {@code :}.
+ * {@code &}. Both also turn {@code fa:fa-}<i>name</i> into an icon in a node label with a line
+ * break. With {@code htmlLabels} set to {@code false}, Mermaid shows some entity codes as written,
+ * such as {@code &#58;} for {@code :}.
  * <p>
- * Class names must be identifiers - a letter or underscore, then letters, digits or underscores
- * - other than a Mermaid keyword: {@code style}, {@code linkStyle}, {@code interpolate},
- * {@code classDef}, {@code class}, {@code href}, {@code click}, {@code call}, {@code graph},
- * {@code flowchart}, {@code subgraph}, {@code end}, {@code _self}, {@code _blank},
+ * Class names must be identifiers - an ASCII letter or underscore, then ASCII letters, digits or
+ * underscores - other than a Mermaid keyword: {@code style}, {@code linkStyle},
+ * {@code interpolate}, {@code classDef}, {@code class}, {@code href}, {@code click}, {@code call},
+ * {@code graph}, {@code flowchart}, {@code subgraph}, {@code end}, {@code _self}, {@code _blank},
  * {@code _parent} and {@code _top}. Keywords are case-sensitive, so {@code End} is a valid class
- * name. Style definitions are passed through as Mermaid reads them and must not be blank, nor
- * contain line breaks or semicolons. A hook that returns {@code null} adds nothing.
+ * name. Styles are written as given and must not be blank or contain a line break or a semicolon.
  * <p>
- * Mermaid renders graphs of a few hundred nodes well; for larger ones, DOT, which
- * {@code DotWriter} in the module {@code graphity-dot} writes. A writer holds its configuration
- * and may write any number of times. It is not safe for concurrent configuration; the graph
- * itself is only read.
+ * Mermaid renders graphs of a few hundred nodes well; for larger ones, {@code DotWriter} in the
+ * module {@code graphity-dot} writes DOT (the language of Graphviz). A writer keeps its
+ * configuration and can write any number of times.
+ * <p>
+ * Instances are mutable and not safe to share between threads.
  */
 public final class MermaidWriter {
 
@@ -110,12 +106,12 @@ public final class MermaidWriter {
     }
   }
 
-  /** The words Mermaid's flowchart lexer reads as keywords, never as a class name. */
+  // The words Mermaid's flowchart lexer reads as keywords, never as a class name.
   private static final Set<String> KEYWORDS = Set.of("style", "linkStyle", "interpolate",
       "classDef", "class", "href", "click", "call", "graph", "flowchart", "subgraph", "end",
       "_self", "_blank", "_parent", "_top");
 
-  /** The word that starts a direction statement; whitespace after it is encoded in labels. */
+  // The word that starts a direction statement; whitespace after it is encoded in labels.
   private static final String DIRECTION_WORD = "direction";
 
   private final Selection selection;
@@ -132,20 +128,20 @@ public final class MermaidWriter {
   }
 
   /**
-   * Returns a writer for the graph, top down, with no labels, shapes, classes, clusters or filter
-   * yet.
+   * Returns a writer for {@code graph}, top down, with no labels, shapes, classes, clusters or
+   * filter yet.
    * <p>
    * <strong>Time:</strong> O(1).
    *
    * @param graph the graph to write
-   * @return a new writer
+   * @return the writer
    */
   public static MermaidWriter of(Graph graph) {
     return new MermaidWriter(graph);
   }
 
   /**
-   * Sets the direction of the flowchart.
+   * Sets the direction of the flowchart; without a call, it is {@link Direction#TOP_DOWN}.
    * <p>
    * <strong>Time:</strong> O(1).
    *
@@ -158,12 +154,12 @@ public final class MermaidWriter {
   }
 
   /**
-   * Sets the label of each node, by node ID; {@code null} shows the node's name
-   * {@code n}<i>v</i>.
+   * Sets the label of each node, by node ID; {@code null} shows the name of the node, such as
+   * {@code n4}.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param label the label of a node
+   * @param label called with a node ID, returns the label of the node or {@code null}
    * @return this writer
    */
   public MermaidWriter nodeLabel(IntFunction<@Nullable String> label) {
@@ -172,11 +168,11 @@ public final class MermaidWriter {
   }
 
   /**
-   * Sets the label of each link, by edge index; {@code null} leaves a link unlabeled.
+   * Sets the label of each edge, by edge index; {@code null} leaves an edge unlabeled.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param label the label of an edge
+   * @param label called with an edge index, returns the label of the edge or {@code null}
    * @return this writer
    */
   public MermaidWriter edgeLabel(IntFunction<@Nullable String> label) {
@@ -185,11 +181,11 @@ public final class MermaidWriter {
   }
 
   /**
-   * Sets the shape of each node, by node ID; {@code null} is a rectangle.
+   * Sets the shape of each node, by node ID; {@code null} draws a rectangle.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param shape the shape of a node
+   * @param shape called with a node ID, returns the shape of the node or {@code null}
    * @return this writer
    */
   public MermaidWriter nodeShape(IntFunction<@Nullable Shape> shape) {
@@ -198,16 +194,17 @@ public final class MermaidWriter {
   }
 
   /**
-   * Defines a class that {@link #nodeClass(IntFunction)} can assign, written as
+   * Defines a class for {@link #nodeClass(IntFunction)} to assign, written as
    * {@code classDef name style}.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param name  the class name, an identifier other than a Mermaid keyword
-   * @param style the style definition, such as {@code fill:#f96,stroke:#333}
+   * @param name  class name, an identifier other than a Mermaid keyword
+   * @param style style of the class, such as {@code fill:#f96,stroke:#333}
    * @return this writer
-   * @throws IllegalArgumentException if {@code name} is not such an identifier, or {@code style}
-   *                                  is blank or contains a line break or semicolon
+   * @throws IllegalArgumentException if {@code name} is not an identifier or is a Mermaid keyword,
+   *                                  or {@code style} is blank or contains a line break or a
+   *                                  semicolon
    */
   public MermaidWriter classDef(String name, String style) {
     classDefs.put(checkClass(name), checkStyle(style));
@@ -219,7 +216,8 @@ public final class MermaidWriter {
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param className the class name of a node, an identifier other than a Mermaid keyword
+   * @param className called with a node ID, returns the name of the class of the node, an
+   *                  identifier other than a Mermaid keyword, or {@code null}
    * @return this writer
    */
   public MermaidWriter nodeClass(IntFunction<@Nullable String> className) {
@@ -228,12 +226,13 @@ public final class MermaidWriter {
   }
 
   /**
-   * Sets the style of each edge, by edge index, written as Mermaid's {@code linkStyle} statement;
-   * {@code null} leaves an edge as it is.
+   * Sets the style of each edge, by edge index, written as a {@code linkStyle} statement;
+   * {@code null} leaves an edge in the default style.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param style the style of an edge, such as {@code stroke:red,stroke-width:2px}
+   * @param style called with an edge index, returns the style of the edge, such as
+   *              {@code stroke:red,stroke-width:2px}, or {@code null}
    * @return this writer
    */
   public MermaidWriter edgeStyle(IntFunction<@Nullable String> style) {
@@ -242,15 +241,21 @@ public final class MermaidWriter {
   }
 
   /**
-   * Draws each group of the partition as a subgraph, labeled by group ID; {@code null} shows the
-   * subgraph's name {@code c}<i>group</i>. Nodes in no group stay outside every subgraph.
+   * Draws each group of {@code partition} as a cluster (a Mermaid {@code subgraph}), with a label
+   * by group ID.
+   * <p>
+   * Nodes in no group stay outside every cluster, and a group without a node to write has no
+   * cluster. A label of {@code null} shows the name of the cluster: {@code c} and the group ID,
+   * such as {@code c2}.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param partition the groups, over the nodes of this writer's graph - {@code Sccs} among them
-   * @param label     the label of a subgraph
+   * @param partition the groups, over the nodes of the graph, such as an
+   *                  {@link com.kobayami.graphity.Sccs}
+   * @param label     called with a group ID, returns the label of its cluster or {@code null}
    * @return this writer
-   * @throws IllegalArgumentException if the partition covers a different number of nodes
+   * @throws IllegalArgumentException if {@code partition} has a different node count than the
+   *                                  graph
    */
   public MermaidWriter clusters(NodePartition partition, IntFunction<@Nullable String> label) {
     selection.clusters(partition, label);
@@ -258,12 +263,13 @@ public final class MermaidWriter {
   }
 
   /**
-   * Writes only the nodes the filter accepts, and only the edges between them. Node IDs stay
-   * those of the graph, so the hooks keep reading the same data.
+   * Restricts the text to the nodes that {@code include} accepts and the edges between them.
+   * <p>
+   * Node IDs stay those of the graph, so the hooks keep reading the same arrays.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param include whether to write a node
+   * @param include called with a node ID, returns whether to write the node
    * @return this writer
    */
   public MermaidWriter nodeFilter(IntPredicate include) {
@@ -272,8 +278,10 @@ public final class MermaidWriter {
   }
 
   /**
-   * Writes the undirected reading: links without arrowheads, each reciprocal pair once, as its
-   * edge from the lower node ID, whose index the edge hooks receive.
+   * Switches to the undirected reading of the graph: edges without arrowheads.
+   * <p>
+   * The edges {@code a -> b} and {@code b -> a} become one, written as the edge from the lower
+   * node ID; the edge hooks receive its edge index.
    * <p>
    * <strong>Time:</strong> O(1).
    *
@@ -285,17 +293,20 @@ public final class MermaidWriter {
   }
 
   /**
-   * Writes the flowchart to {@code out}.
+   * Writes the graph to {@code out}, as the text of a Mermaid flowchart.
    * <p>
-   * <strong>Time:</strong> O(nodeCount + edgeCount) plus the hooks; in the undirected reading,
-   * O(log outDegree) more per edge to find reciprocal pairs.
+   * <strong>Time:</strong> O(nodeCount + edgeCount + groupCount), plus the hooks, with groupCount
+   * the number of groups of the partition drawn as clusters; in the undirected reading,
+   * O(log outDegree(target)) more per edge.<br>
+   * <strong>Memory:</strong> up to twice the size of the {@code linkStyle} lines while it runs, as
+   * they are written last.
    *
-   * @param out where to write; not closed
-   * @throws IOException if {@code out} throws
+   * @param out where the text goes; not closed
+   * @throws IOException if writing to {@code out} fails
    * @throws IllegalArgumentException if a hook returns a class name that is not an identifier or
-   *                                  is a Mermaid keyword, or an edge style that is blank or has
-   *                                  a line break or semicolon; what was written before stays in
-   *                                  {@code out}
+   *                                  is a Mermaid keyword, or an edge style that is blank or
+   *                                  contains a line break or a semicolon; what was written before
+   *                                  stays in {@code out}
    */
   public void write(Appendable out) throws IOException {
     Graph graph = selection.graph;
@@ -369,9 +380,11 @@ public final class MermaidWriter {
   }
 
   /**
-   * Returns the Mermaid text of the graph, as {@link #write(Appendable)} writes it.
+   * Returns the text of the Mermaid flowchart, as {@link #write(Appendable)} writes it.
    * <p>
-   * <strong>Time:</strong> as for {@link #write(Appendable)}.
+   * <strong>Time:</strong> as for {@link #write(Appendable)}.<br>
+   * <strong>Memory:</strong> the text for the result; while it runs, up to twice as much again,
+   * and the {@code linkStyle} lines as for {@link #write(Appendable)}.
    *
    * @return the Mermaid text
    * @throws IllegalArgumentException as for {@link #write(Appendable)}
@@ -415,16 +428,13 @@ public final class MermaidWriter {
     return style;
   }
 
-  /**
-   * Writes {@code text} as a Mermaid quoted string.
-   * <p>
-   * Mermaid applies regular expressions to the whole text before parsing, strings included:
-   * {@code %%} starts a directive or a comment, and on a line with {@code style} and {@code :}
-   * the last {@code ;} is dropped, which ends an entity code. Its lexer takes any line with
-   * {@code direction}, whitespace and a direction code for a direction statement. So {@code %},
-   * {@code :} and whitespace right after {@code direction} are written as entity codes too, and
-   * an empty text, which Mermaid rejects, as one space.
-   */
+  // Writes text as a Mermaid quoted string.
+  //
+  // Mermaid applies regular expressions to the whole text before parsing, strings included: %%
+  // starts a directive or a comment, and on a line with style and : the last ; is dropped, which
+  // ends an entity code. Its lexer takes any line with direction, whitespace and a direction code
+  // for a direction statement. So %, : and whitespace right after direction are written as entity
+  // codes too, and an empty text, which Mermaid rejects, as one space.
   private static void quote(String text, Appendable out) throws IOException {
     if (text.isEmpty()) {
       out.append("\" \"");
@@ -458,7 +468,7 @@ public final class MermaidWriter {
     out.append('"');
   }
 
-  /** Whether {@code c} is whitespace, at least everything JavaScript's {@code \s} matches. */
+  // Whether c is whitespace, at least everything JavaScript's \s matches.
   private static boolean isSpace(char c) {
     return Character.isWhitespace(c) || Character.isSpaceChar(c) || c == '\uFEFF';
   }

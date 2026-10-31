@@ -6,28 +6,24 @@ import it.unimi.dsi.fastutil.ints.IntLists;
 import java.util.Arrays;
 
 /**
- * A lightweight, immutable list of edges of a graph, as an algorithm returns them.
+ * A list of edges of a graph, each with its source, target and edge index. Algorithms such as
+ * {@link BackEdges#of(Graph)} and {@link Biconnectivity#bridges()} return it.
  * <p>
- * The edge at position {@code p} in {@code 0..count()-1} goes from
- * {@code sourceNodes().getInt(p)} to {@code targetNodes().getInt(p)}, and
- * {@code edgeIndices().getInt(p)} is its edge index in the graph the algorithm ran on - the key
- * of arrays of edge data, so a result reaches that data without looking the edge up. Each
- * result documents the order of its positions.
+ * The edge at position {@code p}, in {@code 0..count()-1}, is
+ * {@code sourceNodes().getInt(p) -> targetNodes().getInt(p)}, and {@code edgeIndices().getInt(p)}
+ * is its edge index in the graph the algorithm ran on. The edge index finds the data of the edge
+ * in the caller's arrays indexed by edge index, without a search. Here, the back edges of the
+ * calls between the methods of a program are its recursive calls. {@code names} holds the names
+ * of the methods, and {@code siteCount} holds the number of call sites of each call, by edge
+ * index:
+ * {@snippet file="com/kobayami/graphity/examples/BuildingAndReading.java" region="edges"}
+ * Each method that returns {@code Edges} says in which order the edges come.
+ * {@link GraphBuilder#addEdges(Edges)} adds them to a graph under construction.
  * <p>
- * The three lists are unmodifiable {@link IntList} instances - use their standard API for
- * iteration, streaming, and element access. No Collection API is replicated on this class.
- *
- * <pre>{@code
- * Edges edges = BackEdges.of(graph);
- * for (int p = 0; p < edges.count(); p++) {
- *     int source = edges.sourceNodes().getInt(p);
- *     int target = edges.targetNodes().getInt(p);
- *     double weight = weights[edges.edgeIndices().getInt(p)];   // weights[edgeIndex]
- * }
- * }</pre>
- *
- * @see BackEdges
- * @see EdgeTypes
+ * Each of the three lists is an unmodifiable {@link IntList} of the fastutil library. Instances
+ * are immutable and safe to share between threads.
+ * <p>
+ * <strong>Memory:</strong> 12 bytes per edge.
  */
 public final class Edges {
 
@@ -38,14 +34,14 @@ public final class Edges {
   private final IntList targetNodes;
   private final IntList edgeIndices;
 
-  /** The three lists must have the same size and be unmodifiable. */
+  // The three lists have the same size and are unmodifiable; nobody else may modify them.
   Edges(IntList sourceNodes, IntList targetNodes, IntList edgeIndices) {
     this.sourceNodes = sourceNodes;
     this.targetNodes = targetNodes;
     this.edgeIndices = edgeIndices;
   }
 
-  /** Edges over three lists of equal length that nobody else holds. */
+  // For three arrays of the same length that nobody else holds.
   static Edges wrap(int[] sourceNodes, int[] targetNodes, int[] edgeIndices) {
     return new Edges(IntLists.unmodifiable(IntArrayList.wrap(sourceNodes)),
         IntLists.unmodifiable(IntArrayList.wrap(targetNodes)),
@@ -53,111 +49,96 @@ public final class Edges {
   }
 
   /**
-   * Collects the edges of one type from an edge classification, in edge index order. Each call
-   * scans every edge, however few match; to collect several types, call it once per type and
-   * keep the results.
+   * Returns the edges of one type from an edge classification, in edge index order.
+   * <p>
+   * Each call goes through every edge, however few have the type: call it once per type and keep
+   * the result.
    * <p>
    * <strong>Time:</strong> O(nodeCount + edgeCount).<br>
-   * <strong>Memory:</strong> O(matchingEdgeCount).
+   * <strong>Memory:</strong> 12 bytes per edge of the result.
    *
-   * @param edgeTypes the classification to collect from
-   * @param type the edge type to collect
-   * @return the edges of the given type
+   * @param edgeTypes the classification of the edges of a graph
+   * @param type      the edge type to collect
+   * @return the edges of type {@code type}
    */
   public static Edges of(EdgeTypes edgeTypes, EdgeType type) {
     return edgeTypes.collect(type);
   }
 
   /**
-   * Returns the source node IDs, one per position.
-   * {@code sourceNodes().getInt(p)} is the source of the edge at position {@code p}.
+   * Returns the source of each edge, by position.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @return unmodifiable list of source node IDs
+   * @return source node IDs
    */
   public IntList sourceNodes() {
     return sourceNodes;
   }
 
   /**
-   * Returns the target node IDs, one per position.
-   * {@code targetNodes().getInt(p)} is the target of the edge at position {@code p}.
+   * Returns the target of each edge, by position.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @return unmodifiable list of target node IDs
+   * @return target node IDs
    */
   public IntList targetNodes() {
     return targetNodes;
   }
 
   /**
-   * Returns the edge indices in the analyzed graph, one per position.
-   * {@code edgeIndices().getInt(p)} is the index of the edge at position {@code p}: in that
-   * graph, {@code edgeTarget(edgeIndices().getInt(p)) == targetNodes().getInt(p)}, and the edge
-   * starts at {@code sourceNodes().getInt(p)}.
+   * Returns the edge index of each edge in the graph the algorithm ran on, by position.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @return unmodifiable list of edge indices
+   * @return edge indices
    */
   public IntList edgeIndices() {
     return edgeIndices;
   }
 
   /**
-   * Returns the number of edges in this collection.
+   * Returns the number of edges.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @return number of edges
+   * @return edge count
    */
   public int count() {
     return sourceNodes.size();
   }
 
   /**
-   * Returns {@code true} if this collection contains no edges.
+   * Returns whether there are no edges. Equivalent to {@code count() == 0}.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @return {@code true} if {@code count() == 0}
+   * @return {@code true} if there are no edges
    */
   public boolean isEmpty() {
     return count() == 0;
   }
 
-  /**
-   * Returns an empty edge collection.
-   */
   static Edges empty() {
     return EMPTY;
   }
 
-  /**
-   * Orders {@code count} edges of {@code graph}, given as three parallel arrays in their direction
-   * in the graph, by source and then target - which is edge index order -, optionally dropping
-   * repeated edges. An edge index of {@code -1} is looked up with one binary search in the
-   * source's adjacency; callers pass the index wherever they know it. Two stable counting passes,
-   * first by target, then by source: O(nodeCount + count) without comparisons. Input that is
-   * already in order, or in exactly reverse order - the bridges of a path arrive that way - is
-   * copied instead; the check stops at the first edge out of line.
-   * <p>
-   * The arrays are parallel so that none of them needs more than {@code count} entries.
-   * Interleaved in one array, the strong bridges of a graph with a third of the supported node
-   * count would already exceed the largest array.
-   * <p>
-   * <strong>Memory:</strong> 4 x nodeCount bytes for the counts and 24 x count bytes for the
-   * intermediate and final lists.
-   *
-   * @param sources source of each edge, at least {@code count} entries; read only
-   * @param targets target of each edge, at least {@code count} entries; read only
-   * @param edgeIndices edge index of each edge or {@code -1}, at least {@code count} entries;
-   *     read only
-   * @param count number of edges
-   * @param dropDuplicates whether to keep only the first of equal edges
-   */
+  // Returns count edges of graph, given as parallel arrays in their direction in the graph, in
+  // edge index order - by source, then target - and drops repeated edges if dropDuplicates is
+  // set, keeping the first. The arrays are read, not kept, and may be longer than count. An edge
+  // index of -1 is looked up with one binary search in the adjacency of the source; callers pass
+  // the index wherever they know it.
+  //
+  // Two stable counting passes, first by target, then by source, sort in O(nodeCount + count)
+  // without comparisons. Input already in order, or in exactly reverse order - the bridges of a
+  // path arrive that way - is copied instead; the check stops at the first edge out of line. It
+  // takes 4 x nodeCount bytes for the counts and 24 x count bytes for the intermediate and final
+  // lists.
+  //
+  // The arrays are parallel so that none of them needs more than count entries. Interleaved in
+  // one array, the strong bridges of a graph with a third of the supported node count would
+  // already exceed the largest array.
   static Edges sortedEdges(Graph graph, int[] sources, int[] targets, int[] edgeIndices,
       int count, boolean dropDuplicates) {
     if (count == 0) return EMPTY;
@@ -209,7 +190,7 @@ public final class Edges {
     return wrap(sortedSources, sortedTargets, sortedEdgeIndices);
   }
 
-  /** {@code 1} if the edges are in order, {@code -1} if exactly reversed, else {@code 0}. */
+  // 1 if the edges are in order, -1 if exactly reversed, otherwise 0.
   private static int direction(int[] sources, int[] targets, int count) {
     int direction = 0;
     for (int i = 1; i < count; i++) {
@@ -226,7 +207,7 @@ public final class Edges {
     return direction == 0 ? 1 : direction;
   }
 
-  /** Two stable counting passes, by target and then by source, into the given arrays. */
+  // Two stable counting passes, by target and then by source, into the sorted arrays.
   private static void countingSort(int[] sources, int[] targets, int[] edgeIndices, int count,
       int nodeCount, int[] sortedSources, int[] sortedTargets, int[] sortedEdgeIndices) {
     var start = new int[nodeCount + 1];

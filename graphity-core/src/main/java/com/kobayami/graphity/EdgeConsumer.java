@@ -1,22 +1,22 @@
 package com.kobayami.graphity;
 
 /**
- * An action on one edge of a graph, given by its two end nodes and its edge index - the callback
- * of {@link Graph#forEachEdge(EdgeConsumer)}. The parameter order is that of
- * {@link DfsEdgeTraverser#visitEdge(int, int, int, DfsEdgeTraverser.TargetState)}
- * and of the lists of {@link Edges}.
- *
- * @see Graph#forEachEdge(EdgeConsumer)
+ * An action on an edge, given its source, target and edge index: the callback of
+ * {@link Graph#forEachEdge(EdgeConsumer)}.
+ * <p>
+ * The parameters come in the order that
+ * {@link DfsEdgeTraverser#visitEdge(int, int, int, DfsEdgeTraverser.TargetState)} and the lists
+ * of {@link Edges} use as well.
  */
 @FunctionalInterface
 public interface EdgeConsumer {
 
   /**
-   * Performs the action on one edge.
+   * Performs this action on edge {@code edgeIndex}, which is {@code source -> target}.
    *
-   * @param source    source node ID in {@code 0..nodeCount()-1} of the graph
-   * @param target    target node ID in {@code 0..nodeCount()-1} of the graph
-   * @param edgeIndex edge index in {@code 0..edgeCount()-1} of the graph
+   * @param source    node ID of the source, in {@code 0..nodeCount-1}
+   * @param target    node ID of the target, in {@code 0..nodeCount-1}
+   * @param edgeIndex edge index in {@code 0..edgeCount-1}
    */
   void accept(int source, int target, int edgeIndex);
 }

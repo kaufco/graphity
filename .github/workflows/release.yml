@@ -100,11 +100,11 @@ jobs:
           # bundle must be built from the release commit.
           ref: ${{ steps.target.outputs.ref }}
 
-      - name: Set up JDK 21 (Temurin)
+      - name: Set up JDK 25 (Temurin)
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: '25'
           cache: maven
           # Writes a settings.xml containing <server id="central"> whose
           # credentials are read from the environment variables named here, and

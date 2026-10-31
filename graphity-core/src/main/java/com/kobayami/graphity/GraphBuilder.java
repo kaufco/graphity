@@ -6,94 +6,53 @@ import it.unimi.dsi.fastutil.ints.IntList;
 import java.util.Arrays;
 
 /**
- * Mutable, add-only builder for constructing immutable {@link Graph} instances.
+ * A builder for a {@link Graph}, from nodes and edges added in any order.
  * <p>
- * Nodes are added explicitly via {@link #addNode()} or {@link #addNodes(int)}, returning
- * sequential IDs (0, 1, 2, …). Edges are added via {@link #addEdge(int, int)} or one of the
- * batch methods, referencing existing node IDs. An entire existing graph can be imported via
- * {@link #addGraph(Graph)}.
+ * The nodes added so far have the node IDs {@code 0..nodeCount-1}, in the order they were added;
+ * {@link #addNode()} and {@link #addNodes(int)} return the IDs of new ones. Edges name their
+ * source and target by node ID, in any order and as often as the input has them. Here, the calls
+ * between the methods of a program are built from its call sites, one edge per call site;
+ * {@code names} holds the names of the methods:
+ * {@snippet file="com/kobayami/graphity/examples/BuildingAndReading.java" region="build"}
+ * {@link #build()} sorts the edges into edge index order and merges duplicates. The builder stays
+ * usable afterwards: more nodes and edges can be added, and {@code build()} called again.
  * <p>
- * The builder is <strong>add-only</strong>: nodes and edges cannot be removed. For subgraph
- * extraction or node removal, build the graph first and use
- * {@link Graphs#remapped(Graph, NodeMapping)} with
+ * Besides single edges, the builder takes edges in batches: the out-edges or in-edges of one node
+ * ({@link #addOutEdges(int, int...)}, {@link #addInEdges(int, int...)}), a path
+ * ({@link #addPath(int...)}), pairs of node IDs ({@link #addEdgePairs(int...)}), the edges of an
+ * algorithm result ({@link #addEdges(Edges)}) or a whole graph ({@link #addGraph(Graph)}).
+ * {@link #addChild(int)}, {@link #addParent(int)} and their plural forms add new nodes together
+ * with their edges. The out-edges, in-edges and paths take their node IDs as {@code int...} or as
+ * an {@link IntList}, such as the {@link SortedIntView} that {@link Graph#outNodes(int)} returns.
+ * So a result of this library goes in without being copied into an array first. A list is read
+ * during the call and not kept.
+ * <p>
+ * A method that takes the node ID of an existing node throws {@link IndexOutOfBoundsException}
+ * if it is not in {@code 0..nodeCount-1}, so that an edge to a missing node fails at the call. A
+ * batch method that throws adds nothing. The methods that add edges between given nodes each
+ * have a twin with the suffix {@code AndNodes}, such as {@link #addEdgeAndNodes(int, int)}, which
+ * adds missing nodes instead. A twin raises the node count to one more than the highest node ID
+ * it is given, and the nodes in between are added too, without edges. So a graph can be built
+ * from input numbered elsewhere without counting its nodes first. However, a node ID that is too
+ * high adds nodes instead of failing.
+ * <p>
+ * Nodes and edges cannot be removed. To leave nodes out, build the graph and take a subgraph
+ * with {@link Graphs#remapped(Graph, NodeMapping)} and
  * {@link NodeMapping#forSubgraph(java.util.BitSet)}.
  * <p>
- * Calling {@link #build()} produces an immutable {@link Graph} with sorted, deduplicated
- * adjacency lists. The builder is <strong>not consumed</strong> - further modifications and
- * subsequent builds are allowed.
- *
- * <pre>{@code
- * // Build from scratch
- * var builder = new GraphBuilder();
- * builder.addNodes(4);
- * builder.addEdge(0, 1);
- * builder.addEdge(0, 2);
- * builder.addEdge(1, 3);
- * Graph graph = builder.build();
- *
- * // Merge two graphs with bridge edges
- * var merger = new GraphBuilder();
- * int off1 = merger.addGraph(graph1);
- * int off2 = merger.addGraph(graph2);
- * merger.addEdge(off1 + nodeA, off2 + nodeB);
- * Graph merged = merger.build();
- * }</pre>
- *
- * <h2>Passing node IDs</h2>
- *
- * The fan-out, fan-in and path methods accept their node IDs as loose arguments, as an
- * {@code int[]}, or as an {@link IntList} - including the {@link SortedIntView} that
- * {@link Graph#outNodes(int)} and its relatives return, so a result of this library can be fed
- * back without copying it into an array first:
- *
- * <pre>{@code
- * builder.addOutEdges(source, 1, 2, 3);            // loose arguments
- * builder.addOutEdges(source, targetArray);        // int[]
- * builder.addOutEdges(source, graph.outNodes(n));  // IntList, no copy
- * }</pre>
- *
- * A list is read during the call and never retained. {@link #addEdgePairs(int...)} has no
- * {@link IntList} form: no result of this library is a flat sequence of alternating endpoints.
- * The results that list edges, {@link Edges}, go in whole through {@link #addEdges(Edges)}.
- * {@link #addEdge(int, int)}, {@link #addChild(int)} and {@link #addParent(int)} are
- * fixed-arity: they take single IDs and are meant to run per node, where a varargs array per
- * call would dominate the cost.
- *
- * <h2>Creating nodes on reference</h2>
- *
- * Every edge-adding method that only references node IDs - as opposed to
- * {@link #addChild(int)} and its relatives, which allocate them - has a twin with an
- * {@code AndNodes} suffix that raises the node count to cover the highest ID it references,
- * instead of requiring the nodes to exist. Since node IDs are contiguous, referencing ID
- * {@code k} creates every ID up to {@code k}; the ones in between become isolated nodes. This
- * is what makes externally numbered input work:
- *
- * <pre>{@code
- * var builder = new GraphBuilder();
- * builder.addEdgeAndNodes(7, 3);   // 8 nodes, one edge
- * }</pre>
- *
- * <h2>Validation</h2>
- *
- * Every method that consumes a node ID checks it and throws {@link IndexOutOfBoundsException}
- * for an ID outside {@code 0..nodeCount-1}, so an edge to a node that does not exist is an error
- * at the call, not a wrong graph later. The check costs two predictable branches per consumed
- * ID. A batch method that rejects an ID adds none of its edges. The {@code AndNodes} twins
- * create the nodes they reference instead of requiring them to exist.
+ * Instances are mutable and not safe to share between threads.
  * <p>
- * A builder holds at most {@code Integer.MAX_VALUE - 9} nodes, the <em>node limit</em>: the most
- * for which {@link #build()} can allocate the {@code nodeCount + 1} node offsets within the JDK's
- * soft maximum array length. A method that would create nodes beyond it throws before it changes
- * anything. Likewise it holds at most {@code Integer.MAX_VALUE - 8} added edges, duplicates
- * included, the <em>edge limit</em>: that array length itself. A batch method that would add
- * edges beyond it throws {@link IllegalArgumentException} before it changes anything. The
- * single-edge methods {@link #addEdge(int, int)}, {@link #addEdgeAndNodes(int, int)},
- * {@link #addChild(int)} and {@link #addParent(int)} do not check it, so that an edge costs no
- * more than its ID checks; past it, they fail with {@link OutOfMemoryError} once the edge storage
- * can grow no further.
- *
- * @see Graph
- * @see Graphs#remapped(Graph, NodeMapping)
+ * <strong>Memory:</strong> 8 bytes per added edge, duplicates included, plus room to grow.
+ * <p>
+ * A builder holds at most {@code Integer.MAX_VALUE - 9} nodes, as many as a graph can have. This
+ * number is the <em>node limit</em>. A method that would add more throws before it changes
+ * anything. A builder builds a graph from at most {@code Integer.MAX_VALUE - 8} added edges,
+ * duplicates included. This number is the <em>edge limit</em>. A batch method that would add more
+ * throws {@link IllegalArgumentException} and adds nothing. The single-edge methods
+ * {@link #addEdge(int, int)}, {@link #addEdgeAndNodes(int, int)}, {@link #addChild(int)} and
+ * {@link #addParent(int)} do not check the edge limit: beyond it, {@link #build()} throws
+ * {@link IllegalArgumentException}, and the single-edge methods throw {@link OutOfMemoryError}
+ * once the edge storage cannot grow any further.
  */
 public final class GraphBuilder {
 
@@ -102,7 +61,7 @@ public final class GraphBuilder {
   private final IntArrayList edgeTargets;
 
   /**
-   * Creates an empty builder with no nodes or edges.
+   * Creates an empty builder, without nodes or edges.
    */
   public GraphBuilder() {
     this.edgeSources = new IntArrayList();
@@ -110,19 +69,18 @@ public final class GraphBuilder {
   }
 
   /**
-   * Grows the internal edge storage so that at least {@code totalEdges} edges fit without
-   * further reallocation.
+   * Makes room for {@code totalEdges} edges in total, so that adding up to that many allocates
+   * nothing more.
    * <p>
-   * The argument is the total number of edges this builder will hold, not an increment. Can be
-   * called at any point, including part-way through construction, and has no effect on the
-   * graph that {@link #build()} produces.
+   * The argument counts all edges the builder will hold, duplicates included, not the ones still
+   * to come. It can be called at any time and does not change the graph that {@link #build()}
+   * returns.
    * <p>
-   * <strong>Time:</strong> O(totalEdges) if it reallocates, O(1) if the capacity already
-   * suffices.<br>
-   * <strong>Memory:</strong> two int arrays of {@code totalEdges} elements if it reallocates,
-   * none otherwise.
+   * <strong>Time:</strong> O(totalEdges) if the room does not suffice yet, otherwise O(1).<br>
+   * <strong>Memory:</strong> 8 x totalEdges bytes if the room does not suffice yet, otherwise
+   * none.
    *
-   * @param totalEdges expected total number of edges (must be ≥ 0 and at most the edge limit)
+   * @param totalEdges the number of edges to make room for, duplicates included
    * @throws IllegalArgumentException if {@code totalEdges} is negative or above the edge limit
    */
   public void ensureEdgeCapacity(int totalEdges) {
@@ -138,12 +96,11 @@ public final class GraphBuilder {
   }
 
   /**
-   * Adds a single node and returns its ID.
-   * Node IDs are assigned sequentially starting from 0.
+   * Adds a node and returns its node ID, which is the next in order.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @return new node ID
+   * @return node ID of the new node
    * @throws IllegalStateException if the node count has reached the node limit
    */
   public int addNode() {
@@ -152,15 +109,14 @@ public final class GraphBuilder {
   }
 
   /**
-   * Adds {@code count} nodes and returns the ID of the first added node.
-   * The added nodes have IDs {@code firstId..firstId+count-1}.
+   * Adds {@code count} nodes and returns the node ID of the first; the others follow in order.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param count number of nodes to add (must be ≥ 0)
-   * @return first added node ID
-   * @throws IllegalArgumentException if {@code count} is negative or would raise the node count
-   *     above the node limit
+   * @param count number of nodes to add
+   * @return node ID of the first new node
+   * @throws IllegalArgumentException if {@code count} is negative or the nodes would exceed the
+   *                                  node limit
    */
   public int addNodes(int count) {
     checkNewNodeCount(count);
@@ -170,14 +126,14 @@ public final class GraphBuilder {
   }
 
   /**
-   * Adds a node and an edge from {@code parent} to it.
+   * Adds a node with an edge from {@code parent} to it, and returns its node ID.
    * <p>
    * <strong>Time:</strong> O(1) amortized.
    *
-   * @param parent parent node ID, must already exist
-   * @return new node ID
+   * @param parent node ID in {@code 0..nodeCount-1}
+   * @return node ID of the new node
    * @throws IllegalStateException     if the node count has reached the node limit
-   * @throws IndexOutOfBoundsException if {@code parent} does not exist
+   * @throws IndexOutOfBoundsException if {@code parent} is out of range
    */
   public int addChild(int parent) {
     checkRoomForNode();
@@ -189,17 +145,17 @@ public final class GraphBuilder {
   }
 
   /**
-   * Adds {@code count} nodes and an edge from {@code parent} to each of them.
-   * The added nodes have IDs {@code firstId..firstId+count-1}.
+   * Adds {@code count} nodes, each with an edge from {@code parent} to it, and returns the node ID
+   * of the first; the others follow in order.
    * <p>
    * <strong>Time:</strong> O(count) amortized.
    *
-   * @param parent parent node ID, must already exist
-   * @param count  number of children to add (must be ≥ 0)
-   * @return first added node ID
-   * @throws IllegalArgumentException  if {@code count} is negative or would raise the node
-   *     count above the node limit, or the edges would exceed the edge limit
-   * @throws IndexOutOfBoundsException if {@code parent} does not exist
+   * @param parent node ID in {@code 0..nodeCount-1}
+   * @param count  number of nodes to add
+   * @return node ID of the first new node
+   * @throws IllegalArgumentException  if {@code count} is negative, or the nodes or edges would
+   *                                   exceed their limit
+   * @throws IndexOutOfBoundsException if {@code parent} is out of range
    */
   public int addChildren(int parent, int count) {
     checkNewNodeCount(count);
@@ -215,14 +171,14 @@ public final class GraphBuilder {
   }
 
   /**
-   * Adds a node and an edge from it to {@code child}.
+   * Adds a node with an edge from it to {@code child}, and returns its node ID.
    * <p>
    * <strong>Time:</strong> O(1) amortized.
    *
-   * @param child child node ID, must already exist
-   * @return new node ID
+   * @param child node ID in {@code 0..nodeCount-1}
+   * @return node ID of the new node
    * @throws IllegalStateException     if the node count has reached the node limit
-   * @throws IndexOutOfBoundsException if {@code child} does not exist
+   * @throws IndexOutOfBoundsException if {@code child} is out of range
    */
   public int addParent(int child) {
     checkRoomForNode();
@@ -234,17 +190,17 @@ public final class GraphBuilder {
   }
 
   /**
-   * Adds {@code count} nodes and an edge from each of them to {@code child}.
-   * The added nodes have IDs {@code firstId..firstId+count-1}.
+   * Adds {@code count} nodes, each with an edge from it to {@code child}, and returns the node ID
+   * of the first; the others follow in order.
    * <p>
    * <strong>Time:</strong> O(count) amortized.
    *
-   * @param child child node ID, must already exist
-   * @param count number of parents to add (must be ≥ 0)
-   * @return first added node ID
-   * @throws IllegalArgumentException  if {@code count} is negative or would raise the node
-   *     count above the node limit, or the edges would exceed the edge limit
-   * @throws IndexOutOfBoundsException if {@code child} does not exist
+   * @param child node ID in {@code 0..nodeCount-1}
+   * @param count number of nodes to add
+   * @return node ID of the first new node
+   * @throws IllegalArgumentException  if {@code count} is negative, or the nodes or edges would
+   *                                   exceed their limit
+   * @throws IndexOutOfBoundsException if {@code child} is out of range
    */
   public int addParents(int child, int count) {
     checkNewNodeCount(count);
@@ -260,17 +216,16 @@ public final class GraphBuilder {
   }
 
   /**
-   * Adds a directed edge from {@code source} to {@code target}.
-   * Both nodes must already exist.
+   * Adds the edge {@code source -> target}.
    * <p>
-   * Duplicate edges are allowed during building - they are deduplicated when
-   * {@link #build()} is called.
+   * An edge added more than once is still one edge in the graph: {@link #build()} merges
+   * duplicates.
    * <p>
    * <strong>Time:</strong> O(1) amortized.
    *
-   * @param source source node ID
-   * @param target target node ID
-   * @throws IndexOutOfBoundsException if either node does not exist
+   * @param source node ID in {@code 0..nodeCount-1}
+   * @param target node ID in {@code 0..nodeCount-1}
+   * @throws IndexOutOfBoundsException if {@code source} or {@code target} is out of range
    */
   public void addEdge(int source, int target) {
     checkNode(source, "source");
@@ -280,14 +235,15 @@ public final class GraphBuilder {
   }
 
   /**
-   * Adds a directed edge from {@code source} to {@code target}, creating both nodes if they do
-   * not exist yet.
+   * Adds the edge {@code source -> target}, and the missing nodes up to the higher of the two
+   * node IDs.
    * <p>
    * <strong>Time:</strong> O(1) amortized.
    *
-   * @param source source node ID (must be ≥ 0)
-   * @param target target node ID (must be ≥ 0)
-   * @throws IndexOutOfBoundsException if either ID is negative or at least the node limit
+   * @param source node ID, {@code 0} or more
+   * @param target node ID, {@code 0} or more
+   * @throws IndexOutOfBoundsException if {@code source} or {@code target} is negative or not below
+   *                                   the node limit
    */
   public void addEdgeAndNodes(int source, int target) {
     checkCreatable(source);
@@ -298,18 +254,15 @@ public final class GraphBuilder {
   }
 
   /**
-   * Adds directed edges from {@code source} to each target in the list.
-   * All nodes must already exist.
+   * Adds an edge from {@code source} to each node of {@code targets}.
    * <p>
-   * Accepts any {@link IntList}, including {@link SortedIntView} from
-   * {@link Graph#outNodes(int)} - enabling zero-copy edge transfer from existing graphs.
-   * <p>
-   * <strong>Time:</strong> O(k) amortized, where k = {@code targets.size()}.
+   * <strong>Time:</strong> O(targets.size()) amortized.
    *
-   * @param source  source node ID
-   * @param targets list of target node IDs
+   * @param source  node ID in {@code 0..nodeCount-1}
+   * @param targets node IDs in {@code 0..nodeCount-1}
    * @throws IllegalArgumentException  if the edges would exceed the edge limit
-   * @throws IndexOutOfBoundsException if any node does not exist
+   * @throws IndexOutOfBoundsException if {@code source} or a node of {@code targets} is out of
+   *                                   range
    */
   public void addOutEdges(int source, IntList targets) {
     checkNode(source, "source");
@@ -318,15 +271,15 @@ public final class GraphBuilder {
   }
 
   /**
-   * Adds directed edges from {@code source} to each target in the list, creating any node that
-   * does not exist yet.
+   * Adds an edge from {@code source} to each node of {@code targets}, and the missing nodes up to
+   * the highest of these node IDs.
    * <p>
-   * <strong>Time:</strong> O(k) amortized, where k = {@code targets.size()}.
+   * <strong>Time:</strong> O(targets.size()) amortized.
    *
-   * @param source  source node ID (must be ≥ 0)
-   * @param targets list of target node IDs (each must be ≥ 0)
+   * @param source  node ID, {@code 0} or more
+   * @param targets node IDs, {@code 0} or more
    * @throws IllegalArgumentException  if the edges would exceed the edge limit
-   * @throws IndexOutOfBoundsException if any ID is negative or at least the node limit
+   * @throws IndexOutOfBoundsException if a node ID is negative or not below the node limit
    */
   public void addOutEdgesAndNodes(int source, IntList targets) {
     checkCreatable(source);
@@ -336,15 +289,15 @@ public final class GraphBuilder {
   }
 
   /**
-   * Adds directed edges from {@code source} to each of the given targets.
-   * All nodes must already exist.
+   * Adds an edge from {@code source} to each node of {@code targets}.
    * <p>
-   * <strong>Time:</strong> O(k) amortized, where k = {@code targets.length}.
+   * <strong>Time:</strong> O(targets.length) amortized.
    *
-   * @param source  source node ID
-   * @param targets target node IDs
+   * @param source  node ID in {@code 0..nodeCount-1}
+   * @param targets node IDs in {@code 0..nodeCount-1}
    * @throws IllegalArgumentException  if the edges would exceed the edge limit
-   * @throws IndexOutOfBoundsException if any node does not exist
+   * @throws IndexOutOfBoundsException if {@code source} or a node of {@code targets} is out of
+   *                                   range
    */
   public void addOutEdges(int source, int... targets) {
     checkNode(source, "source");
@@ -353,15 +306,15 @@ public final class GraphBuilder {
   }
 
   /**
-   * Adds directed edges from {@code source} to each of the given targets, creating any node
-   * that does not exist yet.
+   * Adds an edge from {@code source} to each node of {@code targets}, and the missing nodes up to
+   * the highest of these node IDs.
    * <p>
-   * <strong>Time:</strong> O(k) amortized, where k = {@code targets.length}.
+   * <strong>Time:</strong> O(targets.length) amortized.
    *
-   * @param source  source node ID (must be ≥ 0)
-   * @param targets target node IDs (each must be ≥ 0)
+   * @param source  node ID, {@code 0} or more
+   * @param targets node IDs, {@code 0} or more
    * @throws IllegalArgumentException  if the edges would exceed the edge limit
-   * @throws IndexOutOfBoundsException if any ID is negative or at least the node limit
+   * @throws IndexOutOfBoundsException if a node ID is negative or not below the node limit
    */
   public void addOutEdgesAndNodes(int source, int... targets) {
     checkCreatable(source);
@@ -371,17 +324,15 @@ public final class GraphBuilder {
   }
 
   /**
-   * Adds directed edges from each source in the list to {@code target}.
-   * All nodes must already exist.
+   * Adds an edge from each node of {@code sources} to {@code target}.
    * <p>
-   * The fan-in counterpart of {@link #addOutEdges(int, IntList)}.
-   * <p>
-   * <strong>Time:</strong> O(k) amortized, where k = {@code sources.size()}.
+   * <strong>Time:</strong> O(sources.size()) amortized.
    *
-   * @param target  target node ID
-   * @param sources list of source node IDs
+   * @param target  node ID in {@code 0..nodeCount-1}
+   * @param sources node IDs in {@code 0..nodeCount-1}
    * @throws IllegalArgumentException  if the edges would exceed the edge limit
-   * @throws IndexOutOfBoundsException if any node does not exist
+   * @throws IndexOutOfBoundsException if {@code target} or a node of {@code sources} is out of
+   *                                   range
    */
   public void addInEdges(int target, IntList sources) {
     checkNode(target, "target");
@@ -390,15 +341,15 @@ public final class GraphBuilder {
   }
 
   /**
-   * Adds directed edges from each source in the list to {@code target}, creating any node that
-   * does not exist yet.
+   * Adds an edge from each node of {@code sources} to {@code target}, and the missing nodes up to
+   * the highest of these node IDs.
    * <p>
-   * <strong>Time:</strong> O(k) amortized, where k = {@code sources.size()}.
+   * <strong>Time:</strong> O(sources.size()) amortized.
    *
-   * @param target  target node ID (must be ≥ 0)
-   * @param sources list of source node IDs (each must be ≥ 0)
+   * @param target  node ID, {@code 0} or more
+   * @param sources node IDs, {@code 0} or more
    * @throws IllegalArgumentException  if the edges would exceed the edge limit
-   * @throws IndexOutOfBoundsException if any ID is negative or at least the node limit
+   * @throws IndexOutOfBoundsException if a node ID is negative or not below the node limit
    */
   public void addInEdgesAndNodes(int target, IntList sources) {
     checkCreatable(target);
@@ -408,17 +359,15 @@ public final class GraphBuilder {
   }
 
   /**
-   * Adds directed edges from each of the given sources to {@code target}.
-   * All nodes must already exist.
+   * Adds an edge from each node of {@code sources} to {@code target}.
    * <p>
-   * The fan-in counterpart of {@link #addOutEdges(int, int...)}.
-   * <p>
-   * <strong>Time:</strong> O(k) amortized, where k = {@code sources.length}.
+   * <strong>Time:</strong> O(sources.length) amortized.
    *
-   * @param target  target node ID
-   * @param sources source node IDs
+   * @param target  node ID in {@code 0..nodeCount-1}
+   * @param sources node IDs in {@code 0..nodeCount-1}
    * @throws IllegalArgumentException  if the edges would exceed the edge limit
-   * @throws IndexOutOfBoundsException if any node does not exist
+   * @throws IndexOutOfBoundsException if {@code target} or a node of {@code sources} is out of
+   *                                   range
    */
   public void addInEdges(int target, int... sources) {
     checkNode(target, "target");
@@ -427,15 +376,15 @@ public final class GraphBuilder {
   }
 
   /**
-   * Adds directed edges from each of the given sources to {@code target}, creating any node
-   * that does not exist yet.
+   * Adds an edge from each node of {@code sources} to {@code target}, and the missing nodes up to
+   * the highest of these node IDs.
    * <p>
-   * <strong>Time:</strong> O(k) amortized, where k = {@code sources.length}.
+   * <strong>Time:</strong> O(sources.length) amortized.
    *
-   * @param target  target node ID (must be ≥ 0)
-   * @param sources source node IDs (each must be ≥ 0)
+   * @param target  node ID, {@code 0} or more
+   * @param sources node IDs, {@code 0} or more
    * @throws IllegalArgumentException  if the edges would exceed the edge limit
-   * @throws IndexOutOfBoundsException if any ID is negative or at least the node limit
+   * @throws IndexOutOfBoundsException if a node ID is negative or not below the node limit
    */
   public void addInEdgesAndNodes(int target, int... sources) {
     checkCreatable(target);
@@ -445,16 +394,15 @@ public final class GraphBuilder {
   }
 
   /**
-   * Chains the nodes in the list with edges: {@code nodes[0] → nodes[1] → … → nodes[n-1]}.
-   * All nodes must already exist.
+   * Adds a path through {@code nodes}: an edge from each node of the list to the next.
    * <p>
    * Fewer than two nodes add no edge.
    * <p>
-   * <strong>Time:</strong> O(k) amortized, where k = {@code nodes.size()}.
+   * <strong>Time:</strong> O(nodes.size()) amortized.
    *
-   * @param nodes list of node IDs to chain, in order
+   * @param nodes node IDs in {@code 0..nodeCount-1}, in the order of the path
    * @throws IllegalArgumentException  if the edges would exceed the edge limit
-   * @throws IndexOutOfBoundsException if any node does not exist
+   * @throws IndexOutOfBoundsException if a node of {@code nodes} is out of range
    */
   public void addPath(IntList nodes) {
     checkNodes(nodes, "path");
@@ -462,15 +410,16 @@ public final class GraphBuilder {
   }
 
   /**
-   * Chains the nodes in the list with edges, creating any node that does not exist yet.
+   * Adds a path through {@code nodes}, and the missing nodes up to the highest of these node IDs.
+   * The path has an edge from each node of the list to the next.
    * <p>
-   * Fewer than two nodes add no edge, but every ID passed is still created.
+   * Fewer than two nodes add no edge, but still add the nodes.
    * <p>
-   * <strong>Time:</strong> O(k) amortized, where k = {@code nodes.size()}.
+   * <strong>Time:</strong> O(nodes.size()) amortized.
    *
-   * @param nodes list of node IDs to chain, in order (each must be ≥ 0)
+   * @param nodes node IDs, {@code 0} or more, in the order of the path
    * @throws IllegalArgumentException  if the edges would exceed the edge limit
-   * @throws IndexOutOfBoundsException if any ID is negative or at least the node limit
+   * @throws IndexOutOfBoundsException if a node ID is negative or not below the node limit
    */
   public void addPathAndNodes(IntList nodes) {
     int highest = highestCreatable(nodes);
@@ -479,16 +428,15 @@ public final class GraphBuilder {
   }
 
   /**
-   * Chains the given nodes with edges: {@code nodes[0] → nodes[1] → … → nodes[n-1]}.
-   * All nodes must already exist.
+   * Adds a path through {@code nodes}: an edge from each node of the array to the next.
    * <p>
    * Fewer than two nodes add no edge.
    * <p>
-   * <strong>Time:</strong> O(k) amortized, where k = {@code nodes.length}.
+   * <strong>Time:</strong> O(nodes.length) amortized.
    *
-   * @param nodes node IDs to chain, in order
+   * @param nodes node IDs in {@code 0..nodeCount-1}, in the order of the path
    * @throws IllegalArgumentException  if the edges would exceed the edge limit
-   * @throws IndexOutOfBoundsException if any node does not exist
+   * @throws IndexOutOfBoundsException if a node of {@code nodes} is out of range
    */
   public void addPath(int... nodes) {
     checkNodes(nodes, "path");
@@ -496,15 +444,16 @@ public final class GraphBuilder {
   }
 
   /**
-   * Chains the given nodes with edges, creating any node that does not exist yet.
+   * Adds a path through {@code nodes}, and the missing nodes up to the highest of these node IDs.
+   * The path has an edge from each node of the array to the next.
    * <p>
-   * Fewer than two nodes add no edge, but every ID passed is still created.
+   * Fewer than two nodes add no edge, but still add the nodes.
    * <p>
-   * <strong>Time:</strong> O(k) amortized, where k = {@code nodes.length}.
+   * <strong>Time:</strong> O(nodes.length) amortized.
    *
-   * @param nodes node IDs to chain, in order (each must be ≥ 0)
+   * @param nodes node IDs, {@code 0} or more, in the order of the path
    * @throws IllegalArgumentException  if the edges would exceed the edge limit
-   * @throws IndexOutOfBoundsException if any ID is negative or at least the node limit
+   * @throws IndexOutOfBoundsException if a node ID is negative or not below the node limit
    */
   public void addPathAndNodes(int... nodes) {
     int highest = highestCreatable(nodes);
@@ -513,16 +462,15 @@ public final class GraphBuilder {
   }
 
   /**
-   * Adds one edge per pair of consecutive arguments: {@code endpoints[0] → endpoints[1]},
-   * {@code endpoints[2] → endpoints[3]}, and so on.
-   * All nodes must already exist.
+   * Adds an edge for each pair of node IDs in {@code endpoints}: {@code endpoints[0] ->
+   * endpoints[1]}, {@code endpoints[2] -> endpoints[3]}, and so on.
    * <p>
-   * <strong>Time:</strong> O(k) amortized, where k = {@code endpoints.length}.
+   * <strong>Time:</strong> O(endpoints.length) amortized.
    *
-   * @param endpoints alternating source and target node IDs
-   * @throws IllegalArgumentException  if the number of arguments is odd, or the edges would
-   *     exceed the edge limit
-   * @throws IndexOutOfBoundsException if any node does not exist
+   * @param endpoints node IDs in {@code 0..nodeCount-1}, source and target of each edge in turn
+   * @throws IllegalArgumentException  if {@code endpoints} has an odd length, or the edges would
+   *                                   exceed the edge limit
+   * @throws IndexOutOfBoundsException if a node of {@code endpoints} is out of range
    */
   public void addEdgePairs(int... endpoints) {
     checkPairCount(endpoints.length);
@@ -531,14 +479,15 @@ public final class GraphBuilder {
   }
 
   /**
-   * Adds one edge per pair of consecutive arguments, creating any node that does not exist yet.
+   * Adds an edge for each pair of node IDs in {@code endpoints}, as
+   * {@link #addEdgePairs(int...)} does, and the missing nodes up to the highest of these node IDs.
    * <p>
-   * <strong>Time:</strong> O(k) amortized, where k = {@code endpoints.length}.
+   * <strong>Time:</strong> O(endpoints.length) amortized.
    *
-   * @param endpoints alternating source and target node IDs (each must be ≥ 0)
-   * @throws IllegalArgumentException  if the number of arguments is odd, or the edges would
-   *     exceed the edge limit
-   * @throws IndexOutOfBoundsException if any ID is negative or at least the node limit
+   * @param endpoints node IDs, {@code 0} or more, source and target of each edge in turn
+   * @throws IllegalArgumentException  if {@code endpoints} has an odd length, or the edges would
+   *                                   exceed the edge limit
+   * @throws IndexOutOfBoundsException if a node ID is negative or not below the node limit
    */
   public void addEdgePairsAndNodes(int... endpoints) {
     checkPairCount(endpoints.length);
@@ -549,16 +498,16 @@ public final class GraphBuilder {
 
   /**
    * Adds the edges of an algorithm result, such as {@link BackEdges#of(Graph)} or
-   * {@link Biconnectivity#bridges()}, in their order.
-   * All nodes must already exist.
+   * {@link Biconnectivity#bridges()}.
    * <p>
-   * Reads sources and targets; the edge indices refer to the analyzed graph and are ignored.
+   * Only the sources and targets are read: the edge indices of {@code edges} belong to the graph
+   * the algorithm ran on.
    * <p>
-   * <strong>Time:</strong> O(k) amortized, where k = {@code edges.count()}.
+   * <strong>Time:</strong> O(edges.count()) amortized.
    *
-   * @param edges the edges to add
+   * @param edges the edges to add, between nodes in {@code 0..nodeCount-1}
    * @throws IllegalArgumentException  if the edges would exceed the edge limit
-   * @throws IndexOutOfBoundsException if any node does not exist
+   * @throws IndexOutOfBoundsException if a source or target is out of range
    */
   public void addEdges(Edges edges) {
     IntList sources = edges.sourceNodes();
@@ -569,16 +518,14 @@ public final class GraphBuilder {
   }
 
   /**
-   * Adds the edges of an algorithm result in their order, creating any node that does not exist
-   * yet.
+   * Adds the edges of an algorithm result, as {@link #addEdges(Edges)} does, and the missing nodes
+   * up to the highest of their node IDs.
    * <p>
-   * Reads sources and targets; the edge indices refer to the analyzed graph and are ignored.
-   * <p>
-   * <strong>Time:</strong> O(k) amortized, where k = {@code edges.count()}.
+   * <strong>Time:</strong> O(edges.count()) amortized.
    *
    * @param edges the edges to add
    * @throws IllegalArgumentException  if the edges would exceed the edge limit
-   * @throws IndexOutOfBoundsException if any ID is negative or at least the node limit
+   * @throws IndexOutOfBoundsException if a source or target is not below the node limit
    */
   public void addEdgesAndNodes(Edges edges) {
     IntList sources = edges.sourceNodes();
@@ -589,18 +536,22 @@ public final class GraphBuilder {
   }
 
   /**
-   * Adds all nodes and edges of the given graph to this builder.
+   * Adds the nodes and edges of {@code graph} after the nodes already added, and returns the
+   * offset of its node IDs.
    * <p>
-   * Node IDs from the source graph are shifted by the current node count (offset).
-   * The returned offset can be used to reference the imported nodes:
-   * node {@code i} in the source graph becomes node {@code offset + i} in this builder.
+   * Node {@code v} of {@code graph} becomes node {@code offset + v} of this builder, where the
+   * offset is the node count before the call. Into an empty builder, the node IDs stay the same,
+   * which makes this the way to extend a graph: a {@link Graph} is immutable, but a builder that
+   * starts with it can add to it and build a new one. Here, the dependencies between the packages
+   * of a program are extended to a next version, in which {@code ui} also uses {@code storage}:
+   * {@snippet file="com/kobayami/graphity/examples/BuildingAndReading.java" region="addGraph"}
    * <p>
    * <strong>Time:</strong> O(graph.nodeCount() + graph.edgeCount()) amortized.
    *
-   * @param graph the graph to import
-   * @return the offset (= ID of the first imported node)
-   * @throws IllegalArgumentException if the nodes of {@code graph} would raise the node count
-   *     above the node limit, or its edges would exceed the edge limit
+   * @param graph the graph to add
+   * @return the offset: node ID of node {@code 0} of {@code graph} in this builder
+   * @throws IllegalArgumentException if the nodes or edges of {@code graph} would exceed their
+   *                                  limit
    */
   public int addGraph(Graph graph) {
     int srcNodeCount = graph.nodeCount();
@@ -626,19 +577,19 @@ public final class GraphBuilder {
   }
 
   /**
-   * Builds an immutable {@link Graph} from the current state.
+   * Returns a graph with the nodes and edges added so far.
    * <p>
-   * Adjacency lists are sorted ascending and deduplicated (duplicate edges are silently
-   * removed), so an added edge does not keep the position at which it was added;
-   * {@link Graph#edgeIndexOf(int, int)} finds its final edge index. The builder is not
-   * consumed - further modifications and subsequent builds are allowed.
+   * The edges are sorted into edge index order (by source and then by target), and duplicates are
+   * merged, so an edge does not keep the position at which it was added;
+   * {@link Graph#edgeIndexOf(int, int)} finds where it went. The builder does not change: more
+   * nodes and edges can be added and built into another graph.
    * <p>
-   * <strong>Time:</strong> O(nodeCount + k + Σ d x log d), where k is the number of edges
-   * added, duplicates included, and d the number of them leaving each node (one sort per
-   * node).<br>
-   * <strong>Memory:</strong> O(nodeCount + edgeCount) for the result.
+   * <strong>Time:</strong> O(nodeCount + k log d), where k is the number of added edges,
+   * duplicates included, and d the most of them with the same source.<br>
+   * <strong>Memory:</strong> 4 x (nodeCount + edgeCount) bytes for the result; while it runs,
+   * briefly up to 4 x (nodeCount + k) bytes more.
    *
-   * @return an immutable graph
+   * @return the graph
    * @throws IllegalArgumentException if the edges added exceed the edge limit
    */
   public Graph build() {
@@ -691,10 +642,7 @@ public final class GraphBuilder {
     return new Graph(outStart, outAdj);
   }
 
-  /**
-   * Current capacity of the internal edge storage. Exists so that tests can observe when the
-   * storage reallocates.
-   */
+  // For the tests, which observe when the edge storage grows.
   int edgeCapacity() {
     return Math.min(edgeSources.elements().length, edgeTargets.elements().length);
   }
@@ -771,10 +719,8 @@ public final class GraphBuilder {
     if (node < 0 || node >= nodeCount) throw notFound(role, node);
   }
 
-  /**
-   * Validates every consumed node ID before any of them is written, so that a rejected batch
-   * leaves the builder unchanged.
-   */
+  // Checks every node ID before any edge is written, so that a rejected batch leaves the builder
+  // unchanged.
   private void checkNodes(int[] nodes, String role) {
     for (int node : nodes) {
       checkNode(node, role);
@@ -792,10 +738,8 @@ public final class GraphBuilder {
         role + " node does not exist: " + node + " (nodeCount=" + nodeCount + ")");
   }
 
-  /**
-   * Rejects IDs that cannot be created: negative ones, and those whose node count would exceed
-   * {@link ArrayLimits#MAX_NODE_COUNT}.
-   */
+  // Node ID k needs a node count of k + 1, so the highest node ID that can be created is one below
+  // the node limit.
   private static void checkCreatable(int node) {
     if (node < 0) {
       throw new IndexOutOfBoundsException("node ID must be non-negative: " + node);
@@ -806,9 +750,6 @@ public final class GraphBuilder {
     }
   }
 
-  /**
-   * Rejects a negative {@code count} and one that would exceed {@link ArrayLimits#MAX_NODE_COUNT}.
-   */
   private void checkNewNodeCount(int count) {
     if (count < 0) throw new IllegalArgumentException("count must be non-negative: " + count);
     // Cannot overflow: the node count never exceeds the limit.
@@ -827,9 +768,8 @@ public final class GraphBuilder {
         + ArrayLimits.MAX_NODE_COUNT + " (nodeCount=" + nodeCount + ")");
   }
 
-  /**
-   * Validates every ID before any node is created, and returns the highest, or -1 if empty.
-   */
+  // Checks every node ID before any node is created, and returns the highest, or -1 if there is
+  // none.
   private static int highestCreatable(int[] nodes) {
     int highest = -1;
     for (int node : nodes) {
@@ -849,14 +789,10 @@ public final class GraphBuilder {
     return highest;
   }
 
-  /**
-   * Raises the node count so that {@code node} exists. Every ID below it is created too,
-   * because node IDs are contiguous. A negative argument leaves the count untouched.
-   * <p>
-   * The batch twins call it after writing their edges, because the write can still reject the
-   * batch at the edge limit and must then leave the node count as it was. The writers do not
-   * read the node count.
-   */
+  // Node IDs are contiguous, so the nodes below node are created too; -1 creates none. The
+  // AndNodes batch methods call it after writing their edges, because the write can still reject
+  // the batch at the edge limit and must then leave the node count as it was. The writers do not
+  // read the node count.
   private void raiseNodeCount(int node) {
     if (node >= nodeCount) {
       nodeCount = node + 1;
@@ -879,14 +815,12 @@ public final class GraphBuilder {
     }
   }
 
-  /**
-   * Reserves room for {@code count} additional edges in both edge lists, or rejects them before
-   * any is written if they would exceed the edge limit. Grows by at least half the capacity, like
-   * {@link IntArrayList#add(int)}, so that batch calls in a loop cost amortized O(1) per edge;
-   * {@link IntArrayList#ensureCapacity(int)} alone grows to the exact size, which would make such
-   * a loop quadratic. The half step stops at the edge limit, and a batch larger than the step
-   * gets exactly the room it needs, one allocation per list.
-   */
+  // Reserves room for count more edges in both lists, or rejects them before any is written if
+  // they would exceed the edge limit. Grows by at least half the capacity, like
+  // IntArrayList.add(int), so that batch calls in a loop cost amortized O(1) per edge;
+  // IntArrayList.ensureCapacity(int) alone grows to the exact size, which would make such a loop
+  // quadratic. The half step stops at the edge limit, and a batch larger than the step gets
+  // exactly the room it needs, one allocation per list.
   private void reserve(int count) {
     int size = edgeSources.size();
     long required = (long) size + count;

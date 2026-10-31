@@ -6,7 +6,7 @@ import com.kobayami.graphity.testutils.RandomGraphs;
 import java.util.BitSet;
 import org.junit.jupiter.api.Test;
 
-/** The recipes for edge data in the tutorial, run as written and checked independently. */
+/** Recipes for edge data - visiting, summing, collecting and carrying it along - checked independently. */
 class EdgeDataRecipesTest {
 
   private static double[] weightsOf(Graph graph) {

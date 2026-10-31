@@ -1,32 +1,28 @@
 /**
- * Control-flow analyses on Graphity graphs: loops, dominance frontiers, control dependence and
- * phi placement.
+ * Analyses of control flow: loops, dominance frontiers, control dependence and the placement of
+ * phi-nodes.
  * <p>
- * The module {@code graphity-controlflow} builds on {@code graphity-core}: it takes a
- * {@link com.kobayami.graphity.BiAdjacentGraph} for the control-flow graph and
- * {@link com.kobayami.graphity.Dominators} from the core, and reads the graph through
- * {@link com.kobayami.graphity.Csr} like the core's own algorithms. It is released together with
- * the core, at the same version, and follows the core's null contract: nothing is {@code null}
- * unless its type is annotated {@code @Nullable}.
- *
- * <h2>Algorithms</h2>
+ * This package is the module {@code graphity-controlflow}, released with {@code graphity-core} at
+ * the same version. Its analyses work on a control-flow graph, with the basic blocks of a method
+ * as nodes and an edge wherever control can pass from one block to another:
  * <ul>
- *   <li>{@link Loops#of(com.kobayami.graphity.BiAdjacentGraph, int)} - the loop nesting forest,
- *       irreducible loops included (Havlak), with headers, entries, bodies and nesting
- *       depth.</li>
- *   <li>{@link ControlFlow#dominanceFrontiers(com.kobayami.graphity.Dominators)} - the dominance
- *       frontiers as a graph; on the post-dominators, transposed, control dependence.</li>
- *   <li>{@link IteratedDominanceFrontier#of(com.kobayami.graphity.Dominators)} - iterated
- *       dominance frontiers of node sets, where SSA construction places phi-nodes.</li>
+ *   <li>{@link Loops} - the loop nesting forest: every loop with its header, its body and its
+ *       entries, and how the loops nest, irreducible loops included.</li>
+ *   <li>{@link IteratedDominanceFrontier} - the blocks where SSA (static single assignment) form
+ *       places the phi-nodes of a variable.</li>
+ *   <li>{@link ControlFlow} - the dominance frontiers as a graph, and from them control
+ *       dependence: which block decides whether another one runs.</li>
  * </ul>
- *
- * <pre>{@code
- * BiAdjacentGraph cfg = BiAdjacentGraph.of(graph);
- * var loops = Loops.of(cfg, entry);
- * var dominators = Dominators.of(cfg, entry);
- * var phis = IteratedDominanceFrontier.of(dominators);
- * SortedIntView phiBlocks = phis.frontierOf(definitionBlocks);
- * }</pre>
+ * <p>
+ * The analyses follow edges against their direction, so they take a
+ * {@link com.kobayami.graphity.BiAdjacentGraph}, or the {@link com.kobayami.graphity.Dominators}
+ * computed on one; build it once and pass it to all of them. Here, the loop of a method
+ * {@code load} around its block {@code then}, from its control flow {@code cfg} and its entry
+ * block {@code entry}:
+ * {@snippet file="com/kobayami/graphity/examples/AnalyzingControlFlow.java" region="loops"}
+ * <p>
+ * No parameter, return value or element in this package is {@code null} unless its type is
+ * annotated {@code @Nullable}.
  */
 @NullMarked
 package com.kobayami.graphity.controlflow;

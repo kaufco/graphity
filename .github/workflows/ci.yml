@@ -1,5 +1,6 @@
-# Continuous integration: build + tests on every push to main and on every
-# pull request.
+# Continuous integration on every push to main and on every pull request: one build on
+# JDK 25, the JDK releases are built with, then the tests of exactly that build on every
+# Java version users may run it on (17, 21, 25).
 
 name: CI
 
@@ -19,28 +20,84 @@ permissions:
 
 jobs:
   build:
-    name: Build & test (JDK ${{ matrix.java }})
+    name: Build (JDK 25)
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        # 17 is the baseline the library targets; 21 and 25 are the later LTS releases.
-        java: ['17', '21', '25']
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up JDK ${{ matrix.java }} (Temurin)
+      - name: Set up JDK 25 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: Build
+        # Compiles (Error Prone, NullAway), builds the Javadoc and packages every module; the
+        # tests run in the next job. copy-dependencies puts each module's test classpath next
+        # to its classes, and the JUnit console launcher runs them without Maven.
+        run: |
+          set -euo pipefail
+          mvn -B -ntp -DskipTests verify dependency:copy-dependencies \
+              -DincludeScope=test -DoutputDirectory=target/test-deps
+          junit="$(mvn -B -ntp -q -N help:evaluate -Dexpression=junit.version -DforceStdout)"
+          mvn -B -ntp -N dependency:copy \
+              -Dartifact="org.junit.platform:junit-platform-console-standalone:1.${junit#5.}" \
+              -DoutputDirectory=target/ci
+
+      - name: Keep the build for the tests
+        uses: actions/upload-artifact@v4
+        with:
+          name: build
+          retention-days: 1
+          path: |
+            target/ci/*.jar
+            graphity-*/target/*.jar
+            graphity-*/target/test-classes/
+            graphity-*/target/test-deps/
+            !graphity-benchmarks/**
+
+  test:
+    name: Test (Java ${{ matrix.java }})
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        java: ['17', '21', '25']
+
+    steps:
+      - name: Get the build
+        uses: actions/download-artifact@v4
+        with:
+          name: build
+
+      - name: Set up Java ${{ matrix.java }} (Temurin)
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: ${{ matrix.java }}
-          cache: maven
 
-      - name: Build and test
-        # -B: batch mode (no interactive prompts, terse output)
-        # -ntp: suppress transfer progress logs (cleaner CI output)
-        # verify runs the full reactor: compile, test, package, javadoc-jar.
-        run: mvn -B -ntp verify
+      - name: Test
+        # Per module: its jar, its compiled tests and its test dependencies, with assertions
+        # enabled as in the Maven build.
+        run: |
+          set -euo pipefail
+          launcher="$(ls target/ci/junit-platform-console-standalone-*.jar)"
+          for module in graphity-*/; do
+            module="${module%/}"
+            [ -d "$module/target/test-classes" ] || continue
+            jar="$(ls "$module"/target/"$module"-*.jar | grep -v -e '-sources' -e '-javadoc' -e '-tests')"
+            # JUnit itself comes from the launcher; a second copy would register its engine twice.
+            deps="$(ls "$module"/target/test-deps/*.jar | grep -v -e '/junit-' -e '/opentest4j-' -e '/apiguardian-')"
+            classpath="$module/target/test-classes:$jar$(printf ':%s' $deps)"
+            echo "::group::$module"
+            java -ea -jar "$launcher" execute --disable-banner --details=summary \
+                --fail-if-no-tests --class-path "$classpath" \
+                --scan-class-path "$module/target/test-classes"
+            echo "::endgroup::"
+          done

@@ -5,53 +5,48 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Abstract base for unidirectional index mappings between two ID spaces.
+ * A mapping from the indices {@code 0..indexCount()-1} to the indices of another numbering. It is
+ * the common base of the node and edge mappings and of the partitions.
  * <p>
- * Maps source indices in {@code 0..indexCount()-1} to target indices. A target value of
- * {@code -1} indicates that the source index has no mapping (partial mapping). Inversion is
- * defined only on the invertible subclasses ({@link NodeMapping#inverted(int)},
- * {@link EdgeMapping#inverted(int)}), not on partitions, which are many-to-one.
+ * The indices are node IDs or edge indices. {@link #get(int) get(i)} is the index that {@code i}
+ * maps to, or {@code -1} if {@code i} is not mapped; a mapping with unmapped indices is partial.
+ * A {@link NodeMapping} maps the node IDs of one graph to those of another, and an
+ * {@link EdgeMapping} does the same for edge indices. Neither maps two indices to the same index,
+ * so both can be inverted. An {@link IndexPartition} maps indices to groups and lists the indices
+ * of each group. Several indices can map to the same group.
  * <p>
- * {@link NodeMapping} and {@link EdgeMapping} specialize this base for node ID spaces and edge
- * index spaces respectively, with one-to-one, invertible mapping semantics. One-to-one is a
- * contract, not a check: the factories that derive a mapping guarantee it, but for
- * {@link NodeMapping#of(int[])} it is the caller's responsibility, and a mapping that breaks it
- * is rejected only by {@code inverted} and {@link Graphs#remapped(Graph, NodeMapping)}.
- * {@link IndexPartition} specializes this base with many-to-one partition semantics instead, and
- * adds the reverse (group → indices) lookup.
+ * That a node or edge mapping maps no two indices to the same index is a contract, not a check:
+ * {@link NodeMapping#of(int[])} accepts an array that breaks it, and only {@code inverted} and
+ * {@link Graphs#remapped(Graph, NodeMapping)} reject such a mapping.
  * <p>
- * <strong>Memory:</strong> 4 x (source space size) bytes for the backing {@link #mapping} array.
- *
- * @see NodeMapping
- * @see EdgeMapping
- * @see IndexPartition
+ * Instances are immutable and safe to share between threads.
+ * <p>
+ * <strong>Memory:</strong> 4 x indexCount bytes; a partition holds more.
  */
 public abstract sealed class IndexMapping permits NodeMapping, EdgeMapping, IndexPartition {
 
-  /** Source-to-target mapping. {@code mapping[sourceId] = targetId}, or {@code -1} if unmapped. */
+  // mapping[i] is the index that i maps to, or -1. Graphs and Biconnectivity read it directly.
   final int[] mapping;
 
-  /** Number of non-negative entries in {@link #mapping}. */
+  // The number of entries other than -1, counted once so that isPartial and mappedCount are O(1).
   private final int validCount;
 
-  /**
-   * Package-private constructor. Used by the subclasses.
-   *
-   * @param mapping    the mapping array (not copied - caller must not retain a reference)
-   * @param validCount number of non-negative entries in {@code mapping}
-   */
+  // Takes the array as it is, not copied: the caller hands over an array that nobody else holds,
+  // and validCount matches it.
   IndexMapping(int[] mapping, int validCount) {
     this.mapping = mapping;
     this.validCount = validCount;
   }
 
   /**
-   * Returns the target index for the given source index, or {@code -1} if it is unmapped.
+   * Returns the index that {@code id} maps to, or {@code -1} if {@code id} is not mapped.
+   * <p>
+   * In a partition, it is the group of {@code id}.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param id source index in {@code 0..indexCount()-1}
-   * @return target index, or {@code -1} if unmapped
+   * @param id index in {@code 0..indexCount()-1}
+   * @return index that {@code id} maps to, or {@code -1}
    * @throws IndexOutOfBoundsException if {@code id} is out of range
    */
   public final int get(int id) {
@@ -60,12 +55,12 @@ public abstract sealed class IndexMapping permits NodeMapping, EdgeMapping, Inde
   }
 
   /**
-   * Returns whether the given source index has a mapping (target &ge; 0).
+   * Returns whether {@code id} is mapped. Equivalent to {@code get(id) != -1}.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param id source index in {@code 0..indexCount()-1}
-   * @return {@code true} if mapped
+   * @param id index in {@code 0..indexCount()-1}
+   * @return {@code true} if {@code id} is mapped
    * @throws IndexOutOfBoundsException if {@code id} is out of range
    */
   public final boolean isMapped(int id) {
@@ -73,46 +68,44 @@ public abstract sealed class IndexMapping permits NodeMapping, EdgeMapping, Inde
   }
 
   /**
-   * Returns whether this mapping is partial (some source indices have no target).
+   * Returns whether some index is not mapped. Equivalent to
+   * {@code mappedCount() < indexCount()}.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @return {@code true} if at least one source index maps to {@code -1}
+   * @return {@code true} if at least one index is not mapped
    */
   public final boolean isPartial() {
     return validCount < mapping.length;
   }
 
   /**
-   * Returns the number of valid (non-{@code -1}) mappings.
+   * Returns the number of indices that are mapped; in a partition, the number of indices that
+   * belong to a group.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @return count of mapped source indices
+   * @return mapped count
    */
   public final int mappedCount() {
     return validCount;
   }
 
   /**
-   * Returns the size of the source index space, including unmapped indices. This is the length
-   * of the arrays that {@code gather} produces, and the length {@code reduce} expects.
+   * Returns the number of indices this mapping maps from, mapped or not.
+   * <p>
+   * It is the length of the arrays that {@code gather} returns and that {@code reduce} takes.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @return size of the source index space
+   * @return index count
    */
   public final int indexCount() {
     return mapping.length;
   }
 
-  /**
-   * Inverts the given mapping array into a target space of {@code targetCount} indices.
-   *
-   * @throws IllegalArgumentException  if {@code targetCount} is negative or larger than the
-   *                                   largest array, or multiple sources map to the same target
-   * @throws IndexOutOfBoundsException if a target is {@code targetCount} or more
-   */
+  // The inverse of mapping over targetCount indices, -1 where nothing maps to an index. Rejects an
+  // index outside the inverse and two indices that map to the same one, which have no inverse.
   static int[] invertArray(int[] mapping, int targetCount) {
     if (targetCount < 0 || targetCount > ArrayLimits.MAX_ARRAY_LENGTH) {
       throw new IllegalArgumentException("targetCount out of range: " + targetCount);
@@ -135,12 +128,7 @@ public abstract sealed class IndexMapping permits NodeMapping, EdgeMapping, Inde
     return inverse;
   }
 
-  /**
-   * Composes two mapping arrays: {@code result[i] = outer[inner[i]]}. Unmapped entries
-   * ({@code -1}) propagate.
-   *
-   * @throws IndexOutOfBoundsException if {@code inner} maps to a value outside {@code outer}
-   */
+  // result[i] = outer[inner[i]], and -1 where inner[i] is -1.
   static int[] composeArrays(int[] outer, int[] inner) {
     int[] result = new int[inner.length];
     for (int i = 0; i < result.length; i++) {
@@ -164,16 +152,13 @@ public abstract sealed class IndexMapping permits NodeMapping, EdgeMapping, Inde
     }
   }
 
-  /** Rejects writing the result into the input array, which would overwrite unread values. */
+  // Rejects writing the result into the input array, which would overwrite values not yet read.
   static void checkDistinct(@Nullable Object[] values, @Nullable Object[] result, String name) {
     if (values == result) {
       throw new IllegalArgumentException("values and " + name + " must be distinct arrays");
     }
   }
 
-  /**
-   * Counts non-negative entries in the given array.
-   */
   static int countValid(int[] mapping) {
     int count = 0;
     for (int v : mapping) {

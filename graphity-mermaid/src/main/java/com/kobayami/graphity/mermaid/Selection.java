@@ -8,11 +8,9 @@ import java.util.function.IntFunction;
 import java.util.function.IntPredicate;
 import org.jspecify.annotations.Nullable;
 
-/**
- * The graph, the node filter, the undirected reading and the clusters of a {@link MermaidWriter},
- * and the order in which edges are written. {@code graphity-dot} keeps its own copy for
- * {@code DotWriter}: a module has no access to the package-private classes of another.
- */
+// The graph, the node filter, the undirected reading and the clusters of a MermaidWriter, and the
+// order in which edges are written. graphity-dot keeps its own copy for DotWriter: a module has no
+// access to the package-private classes of another. Change both together.
 final class Selection {
 
   final Graph graph;
@@ -28,11 +26,7 @@ final class Selection {
     this.outAdjacency = Csr.outAdjacency(graph);
   }
 
-  /**
-   * Sets the groups drawn as clusters.
-   *
-   * @throws IllegalArgumentException if the partition covers a different number of nodes
-   */
+  // Checks the node count here, so that a wrong partition fails where it is passed.
   void clusters(NodePartition partition, IntFunction<@Nullable String> label) {
     if (partition.nodeCount() != graph.nodeCount()) {
       throw new IllegalArgumentException("the partition covers " + partition.nodeCount()
@@ -45,22 +39,20 @@ final class Selection {
     return nodeFilter == null || nodeFilter.test(node);
   }
 
-  /** The cluster of a node, {@code -1} for none. */
+  // The cluster of a node, -1 for none.
   int clusterOf(int node) {
     return clusters == null ? -1 : clusters.partition().get(node);
   }
 
-  /**
-   * Whether the edge {@code source -> target} of an included source is written: its target
-   * included, and in the undirected reading only one edge per reciprocal pair, the one from the
-   * lower node ID.
-   */
+  // Whether the edge source -> target of an included source is written: its target included,
+  // and in the undirected reading only one edge per reciprocal pair, the one from the lower node
+  // ID.
   private boolean isWritten(int source, int target) {
     if (!isIncluded(target)) return false;
     return !undirected || source <= target || !graph.hasOutNode(target, source);
   }
 
-  /** Calls {@code action} for every written edge, in edge index order. */
+  // Calls action for every written edge, in edge index order.
   void forEachWrittenEdge(EdgeAction action) throws IOException {
     int n = graph.nodeCount();
     for (int source = 0; source < n; source++) {
@@ -77,10 +69,10 @@ final class Selection {
     void accept(int source, int target, int edgeIndex) throws IOException;
   }
 
-  /** The groups drawn as clusters, with the label of each; set together, so held together. */
+  // The groups drawn as clusters, with the label of each; set together, so held together.
   record Clusters(NodePartition partition, IntFunction<@Nullable String> label) {}
 
-  /** Whether {@code name} is a plain identifier: a letter or underscore, then also digits. */
+  // Whether name is a plain identifier: a letter or underscore, then also digits.
   static boolean isIdentifier(String name) {
     if (name.isEmpty()) return false;
     for (int i = 0; i < name.length(); i++) {

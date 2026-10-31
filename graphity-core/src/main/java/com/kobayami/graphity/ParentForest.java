@@ -2,36 +2,24 @@ package com.kobayami.graphity;
 
 import java.util.Arrays;
 
-/**
- * Helpers for a forest given as a parent array, {@code -1} for a root - the form in which
- * {@link Ancestry} and {@link Dominators} hold their trees -, and the grouping by key that its
- * child lists are one case of: the partitions build their member lists with it as well.
- */
+// Helpers for a forest given as a parent array, -1 for a root - the form in which Ancestry and
+// Dominators hold their trees - and for the grouping by key that its child lists are one case
+// of: the partitions build their member lists with it as well.
 final class ParentForest {
 
   private ParentForest() {}
 
-  /**
-   * Indices grouped by key as CSR: those with key {@code k} are
-   * {@code members[start[k]..start[k + 1])}, ascending.
-   */
+  // Indices grouped by key, in the layout of the out-adjacency of a Graph: those with key k are
+  // members[start[k]..start[k + 1] - 1], ascending.
   record Groups(int[] start, int[] members) {}
 
-  /**
-   * The child lists of the forest, each ascending: {@link #groupIndices} with the parent as key.
-   * <p>
-   * <strong>Memory:</strong> 4 x (nodeCount + 1 + childCount) bytes.
-   */
+  // The child lists of the forest, each ascending: groupIndices with the parent as key.
   static Groups childrenOf(int[] parent) {
     return groupIndices(parent, parent.length);
   }
 
-  /**
-   * Groups the indices {@code i} of {@code keyOf} by their key {@code keyOf[i]}, which lies in
-   * {@code 0..keyCount-1}; an index with a negative key is in no group.
-   * <p>
-   * <strong>Memory:</strong> 4 x (keyCount + 1 + groupedCount) bytes.
-   */
+  // Groups the indices i of keyOf by their key keyOf[i], which lies in 0..keyCount-1; an index
+  // with a negative key is in no group.
   static Groups groupIndices(int[] keyOf, int keyCount) {
     var start = new int[keyCount + 1];
     for (int key : keyOf) {
@@ -40,13 +28,9 @@ final class ParentForest {
     return new Groups(start, groupCounted(keyOf, start));
   }
 
-  /**
-   * The second half of {@link #groupIndices}, for a caller that counts the keys in a pass it
-   * makes anyway. On entry {@code start[k]} holds the number of indices with key {@code k} and
-   * {@code start[keyCount]} is {@code 0}; on return {@code start} holds the offsets of the groups.
-   *
-   * @return the members of all groups, grouped by key
-   */
+  // The second half of groupIndices, for a caller that counts the keys in a pass it makes
+  // anyway. On entry start[k] holds the number of indices with key k and start[keyCount] is 0;
+  // on return start holds the offsets of the groups, and the result their members.
   static int[] groupCounted(int[] keyOf, int[] start) {
     int keyCount = start.length - 1;
     int next = 0;
@@ -69,16 +53,11 @@ final class ParentForest {
     return members;
   }
 
-  /**
-   * The canonical preorder of the forest - roots ascending, children ascending - with the size
-   * of every subtree. Fills the three given arrays, each of length nodeCount.
-   * <p>
-   * {@code IteratedDominanceFrontier.of} in {@code graphity-controlflow} keeps a copy, extended
-   * by the depth of every node, and {@code Loops.of} there copies this and
-   * {@link #groupCounted}; change them together.
-   * <p>
-   * <strong>Memory:</strong> 4 x (nodeCount + 1 + childCount) bytes for the child lists.
-   */
+  // The canonical preorder of the forest - roots ascending, children ascending - with the size
+  // of every subtree. Fills the three given arrays, each of length nodeCount.
+  //
+  // IteratedDominanceFrontier.of in graphity-controlflow keeps a copy, extended by the depth of
+  // every node, and Loops.of there copies this and groupCounted; change them together.
   static void preorder(int[] parent, int[] preorderIndex, int[] order, int[] subtreeSize) {
     int n = parent.length;
     var children = childrenOf(parent);

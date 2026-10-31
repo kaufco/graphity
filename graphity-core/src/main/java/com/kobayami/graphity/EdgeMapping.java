@@ -3,94 +3,72 @@ package com.kobayami.graphity;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Unidirectional mapping between two edge index spaces.
+ * A mapping from the edge indices of one graph to those of another, to carry data on edges over
+ * to a subgraph, a renumbered graph or the transposed graph.
  * <p>
- * Maps source edge indices to target edge indices. A target value of {@code -1} indicates
- * that the source edge has no mapping (e.g. an edge that exists in the new graph but not
- * in the old graph).
+ * {@link #get(int) get(e)} is the edge index that edge {@code e} maps to, or {@code -1} if edge
+ * {@code e} is not mapped. The factories return mappings from a new graph to an old one. These map
+ * each new edge to the edge it comes from. {@link Graphs#edgeMapping(Graph, Graph, NodeMapping)}
+ * derives one from the {@link NodeMapping} of a subgraph or a renumbering, and leaves a new edge
+ * without a counterpart in the old graph unmapped. {@link Graphs#transposedEdgeMapping(Graph)} maps
+ * each edge of the transposed graph to the edge it reverses.
  * <p>
- * Edge indices correspond to positions in the CSR adjacency array of a {@link Graph}:
- * edge 0 is the first out-edge of node 0, edge 1 the second, etc.
+ * {@code gather} carries data on the old edges over to the new ones. Here, {@code siteCount}
+ * holds the number of call sites of each call by edge index of {@code calls}, and the subgraph
+ * {@code loading} from the example at {@link NodeMapping} takes these counts along:
+ * {@snippet file="com/kobayami/graphity/examples/Mappings.java" region="edgeMapping"}
+ * {@link #inverted(int)} returns the mapping from old to new, and {@link #compose(EdgeMapping)}
+ * chains two mappings.
  * <p>
- * Instances are created via {@link Graphs#edgeMapping(Graph, Graph, NodeMapping)} and
- * {@link Graphs#transposedEdgeMapping(Graph)}.
- * Use {@link #inverted(int)} to obtain the reverse direction,
- * {@link #compose(EdgeMapping)} to chain multiple mappings, and {@link #gather(int[])} to carry
- * per-edge data along.
- *
- * <pre>{@code
- * // Derive edge mapping from node mapping
- * EdgeMapping em = Graphs.edgeMapping(newGraph, oldGraph, nodeMapping);
- *
- * // Translate edge metadata; edges with no correspondence in the old graph get 0
- * double[] newWeights = em.gather(oldWeights);
- *
- * // A subgraph keeps the edges between selected nodes, and their data with them
- * NodeMapping keep = NodeMapping.forSubgraph(selected);
- * Graph sub = Graphs.remapped(graph, keep);
- * double[] subWeights = Graphs.edgeMapping(sub, graph, keep).gather(weights);
- * }</pre>
- *
- * A transpose keeps node IDs but swaps the roles of source and target; its mapping comes from
- * {@link Graphs#transposedEdgeMapping(Graph)} instead.
- *
- * @see IndexMapping
- * @see EdgePartition
- * @see Graphs#edgeMapping(Graph, Graph, NodeMapping)
- * @see Graphs#transposedEdgeMapping(Graph)
+ * Instances are immutable and safe to share between threads.
+ * <p>
+ * <strong>Memory:</strong> 4 x indexCount bytes.
  */
 public final class EdgeMapping extends IndexMapping {
 
-  /**
-   * Package-private constructor.
-   *
-   * @param mapping    the mapping array (not copied - caller must not retain a reference)
-   * @param validCount number of non-negative entries in {@code mapping}
-   */
+  // Takes the array as it is, not copied: the caller hands over an array that nobody else holds,
+  // and validCount matches it.
   EdgeMapping(int[] mapping, int validCount) {
     super(mapping, validCount);
   }
 
   /**
-   * Creates the inverse mapping (target → source) over a target space of {@code targetCount}
-   * edge indices.
+   * Returns the inverse mapping, which maps {@code get(e)} back to {@code e}.
    * <p>
-   * Each target value in this mapping becomes a source in the inverse, and vice versa. The
-   * inverse covers every index in {@code 0..targetCount-1}; an index that no source maps to maps
-   * to {@code -1}, and then the inverse is partial. For a mapping from new to old edge indices,
-   * as {@link Graphs#edgeMapping(Graph, Graph, NodeMapping)} produces it, {@code targetCount} is
-   * the edge count of the old graph:
+   * The inverse maps the {@code targetCount} edges of the graph that this mapping maps to; an edge
+   * that no edge maps to is not mapped, and the inverse is then partial. For a mapping from new
+   * to old edge indices, as the factories return it, {@code targetCount} is the edge count of the
+   * old graph, and the inverse gives the new edge index of an old edge:
+   * {@code newToOld.inverted(oldGraph.edgeCount()).get(oldEdge)}.
+   * <p>
+   * <strong>Time:</strong> O(indexCount + targetCount).<br>
+   * <strong>Memory:</strong> 4 x targetCount bytes for the result.
    *
-   * <pre>{@code
-   * EdgeMapping oldToNew = newToOld.inverted(oldGraph.edgeCount());
-   * }</pre>
-   *
-   * <strong>Time:</strong> O(n + targetCount) where n = source space size.<br>
-   * <strong>Memory:</strong> 4 x targetCount bytes for the inverse array.
-   *
-   * @param targetCount size of the target space, which becomes the source space of the inverse
-   * @return the inverse edge mapping, with {@link #indexCount()} equal to {@code targetCount}
-   * @throws IllegalArgumentException  if {@code targetCount} is negative or larger than
-   *                                   {@code Integer.MAX_VALUE - 8}, the largest array, or
-   *                                   multiple source indices map to the same target
-   * @throws IndexOutOfBoundsException if a target is {@code targetCount} or more
+   * @param targetCount the edge count of the graph that this mapping maps to
+   * @return the inverse mapping, with an index count of {@code targetCount}
+   * @throws IllegalArgumentException if {@code targetCount} is negative or larger than
+   *                                  {@code Integer.MAX_VALUE - 8}, or two edges map to the same
+   *                                  edge
+   * @throws IndexOutOfBoundsException if an edge maps to {@code targetCount} or more
    */
   public EdgeMapping inverted(int targetCount) {
     return new EdgeMapping(invertArray(mapping, targetCount), mappedCount());
   }
 
   /**
-   * Composes this mapping with an inner mapping: {@code result(x) = this(inner(x))}.
+   * Returns the mapping that applies {@code inner} first and then this mapping.
    * <p>
-   * If {@code this} maps B → C and {@code inner} maps A → B, the result maps A → C.
-   * Unmapped entries ({@code -1}) propagate.
+   * If {@code inner} maps the edges of a graph A to those of B, and this mapping maps B to C, the
+   * result maps A to C. An edge is not mapped in the result if {@code inner} does not map it, or
+   * if this mapping does not map the edge that {@code inner} maps it to.
    * <p>
-   * <strong>Time:</strong> O(n) where n = inner source space size.
+   * <strong>Time:</strong> O(inner.indexCount()).<br>
+   * <strong>Memory:</strong> 4 x inner.indexCount() bytes for the result.
    *
-   * @param inner the inner mapping to apply first
+   * @param inner the mapping to apply first
    * @return the composed mapping
-   * @throws IndexOutOfBoundsException if {@code inner} maps to a value outside this mapping's
-   *                                   source space
+   * @throws IndexOutOfBoundsException if {@code inner} maps an edge to an edge index outside
+   *                                   {@code 0..indexCount()-1}
    */
   public EdgeMapping compose(EdgeMapping inner) {
     int[] composed = composeArrays(this.mapping, inner.mapping);
@@ -98,72 +76,68 @@ public final class EdgeMapping extends IndexMapping {
   }
 
   /**
-   * Carries per-edge data from the target space of this mapping into its source space:
-   * {@code result[i] = values[get(i)]}, and {@code 0} where {@code i} is unmapped.
+   * Returns {@code values} renumbered by this mapping: the value at position {@code i} of the
+   * result is {@code values[get(i)]}, or {@code 0} if edge {@code i} is not mapped.
    * <p>
-   * For a mapping from new to old indices, as the factories produce it, this moves an array
-   * indexed by old edges to the new numbering:
+   * For a mapping from new to old edge indices, as the factories return it, this carries data on
+   * the edges of the old graph over to the new graph. {@link #gather(Object[], Object[])} does the
+   * same for objects.
+   * <p>
+   * <strong>Time:</strong> O(indexCount).<br>
+   * <strong>Memory:</strong> 4 x indexCount bytes for the result.
    *
-   * <pre>{@code
-   * int[] newValues = newToOld.gather(oldValues);
-   * }</pre>
-   *
-   * <strong>Time:</strong> O(n) where n = source space size.<br>
-   * <strong>Memory:</strong> 4 x n bytes for the result.
-   *
-   * @param values values indexed by the target space; must cover every mapped target
-   * @return values indexed by the source space, of length n
-   * @throws IndexOutOfBoundsException if a mapped target lies outside {@code values}
+   * @param values the value of each edge of the graph that this mapping maps to
+   * @return the renumbered values, of length {@link #indexCount()}
+   * @throws IndexOutOfBoundsException if an edge maps to an edge index outside {@code values}
    */
   public int[] gather(int[] values) {
     return gatherArray(mapping, values);
   }
 
   /**
-   * Carries per-edge data from the target space into the source space, as
-   * {@link #gather(int[])} does.
+   * Returns {@code values} renumbered by this mapping, as {@link #gather(int[])} does.
    * <p>
-   * <strong>Time:</strong> O(n) where n = source space size.<br>
-   * <strong>Memory:</strong> 8 x n bytes for the result.
+   * <strong>Time:</strong> O(indexCount).<br>
+   * <strong>Memory:</strong> 8 x indexCount bytes for the result.
    *
-   * @param values values indexed by the target space; must cover every mapped target
-   * @return values indexed by the source space, {@code 0} where unmapped
-   * @throws IndexOutOfBoundsException if a mapped target lies outside {@code values}
+   * @param values the value of each edge of the graph that this mapping maps to
+   * @return the renumbered values, of length {@link #indexCount()}
+   * @throws IndexOutOfBoundsException if an edge maps to an edge index outside {@code values}
    */
   public long[] gather(long[] values) {
     return gatherArray(mapping, values);
   }
 
   /**
-   * Carries per-edge data from the target space into the source space, as
-   * {@link #gather(int[])} does.
+   * Returns {@code values} renumbered by this mapping, as {@link #gather(int[])} does.
    * <p>
-   * <strong>Time:</strong> O(n) where n = source space size.<br>
-   * <strong>Memory:</strong> 8 x n bytes for the result.
+   * <strong>Time:</strong> O(indexCount).<br>
+   * <strong>Memory:</strong> 8 x indexCount bytes for the result.
    *
-   * @param values values indexed by the target space; must cover every mapped target
-   * @return values indexed by the source space, {@code 0} where unmapped
-   * @throws IndexOutOfBoundsException if a mapped target lies outside {@code values}
+   * @param values the value of each edge of the graph that this mapping maps to
+   * @return the renumbered values, of length {@link #indexCount()}
+   * @throws IndexOutOfBoundsException if an edge maps to an edge index outside {@code values}
    */
   public double[] gather(double[] values) {
     return gatherArray(mapping, values);
   }
 
   /**
-   * Carries per-edge objects from the target space into an array the caller allocated for the
-   * source space: {@code newValues[i] = values[get(i)]}, and {@code newValues[i]} untouched
-   * where {@code i} is unmapped. References are copied, not the objects. If an exception is
-   * thrown, {@code newValues} may be partly written.
+   * Writes {@code values} renumbered by this mapping into {@code newValues}, for objects.
    * <p>
-   * <strong>Time:</strong> O(n) where n = source space size.
+   * {@code newValues[i]} becomes {@code values[get(i)]}, and stays as it is if edge {@code i} is
+   * not mapped. References are copied, not the objects. If an exception is thrown,
+   * {@code newValues} may be partly written.
+   * <p>
+   * <strong>Time:</strong> O(indexCount).
    *
-   * @param <T>       element type, nullable or not
-   * @param values    values indexed by the target space; must cover every mapped target
-   * @param newValues receives the values indexed by the source space; length
-   *                  {@link #indexCount()}, and a different array than {@code values}
+   * @param <T>       the element type, nullable or not
+   * @param values    the value of each edge of the graph that this mapping maps to
+   * @param newValues receives the renumbered values; length {@link #indexCount()}, and not the
+   *                  same array as {@code values}
    * @throws IllegalArgumentException if {@code newValues.length != indexCount()}, or both are the
    *                                  same array
-   * @throws IndexOutOfBoundsException if a mapped target lies outside {@code values}
+   * @throws IndexOutOfBoundsException if an edge maps to an edge index outside {@code values}
    */
   public <T extends @Nullable Object> void gather(T[] values, T[] newValues) {
     gatherArray(mapping, values, newValues);

@@ -8,43 +8,34 @@ import java.util.function.LongBinaryOperator;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A partition of indices into disjoint groups, with efficient reverse lookup.
+ * A partition of indices into groups: the common base of {@link NodePartition} and
+ * {@link EdgePartition}.
  * <p>
- * Each index (node ID or edge index) belongs to at most one group, identified by a group ID in
- * {@code 0..groupCount()-1}. The forward direction (index → group) is {@link #get(int)}, with
- * {@code -1} for an index in no group. The reverse direction (group → indices) is
- * {@link #indicesOf(int)}, a zero-copy view into a CSR (Compressed Sparse Row) layout that lists
- * each group's indices in ascending order.
+ * The indices are node IDs or edge indices. Each index is in at most one group, and the groups
+ * are numbered by group ID {@code 0..groupCount()-1}. {@link #get(int) get(i)} returns the group
+ * of index {@code i}, or {@code -1} if it is in no group, and {@link #indicesOf(int)} the indices
+ * of a group in ascending order. {@code reduce} combines data on the indices into one value per
+ * group. The data is an array indexed by node ID or edge index.
  * <p>
- * The concrete partitions add domain-specific aliases:
- * <ul>
- *   <li>{@link NodePartition} - partitions nodes, with {@code nodesOf()}, {@code nodeCount()}</li>
- *   <li>{@link EdgePartition} - partitions edges, with {@code edgesOf()}, {@code edgeCount()}</li>
- * </ul>
+ * A partition is a mapping from indices to groups that maps several indices to the same group,
+ * so unlike a {@link NodeMapping} or an {@link EdgeMapping}, it cannot be inverted.
  * <p>
- * <strong>Memory:</strong> 4 x (indexCount + mappedCount + groupCount + 1) bytes for the backing
- * arrays ({@code mapping}, {@link #members}, {@link #memberStart}), where
- * {@link #mappedCount()} is the number of indices in a group.
- *
- * @see NodePartition
- * @see EdgePartition
+ * Instances are immutable and safe to share between threads.
+ * <p>
+ * <strong>Memory:</strong> 4 x (indexCount + mappedCount + groupCount) bytes, where mappedCount
+ * is the number of indices that belong to a group.
  */
 public abstract sealed class IndexPartition extends IndexMapping
     permits NodePartition, EdgePartition {
 
-  /** CSR values: the indices of all groups, grouped by group ID, ascending within each group. */
+  // The indices of each group in the layout of the out-adjacency of a Graph: the indices of group
+  // g are members[memberStart[g]..memberStart[g + 1] - 1], sorted ascending, with the sentinel
+  // memberStart[groupCount] == members.length.
   final int[] members;
-
-  /** CSR offsets: group {@code g}'s members span {@code members[memberStart[g]..memberStart[g+1]-1]}. */
   final int[] memberStart;
 
-  /**
-   * Package-private constructor. Used by the subclasses.
-   *
-   * @param mapping     forward mapping: index → group ID, or {@code -1} for an index in no group
-   * @param members     CSR values: the indices of each group, ascending within the group
-   * @param memberStart CSR offsets: per-group start indices into {@code members}
-   */
+  // Takes the arrays as they are, neither copied nor checked: the caller guarantees the layout,
+  // and that mapping and members describe the same groups.
   IndexPartition(int[] mapping, int[] members, int[] memberStart) {
     super(mapping, members.length);
     this.members = members;
@@ -63,12 +54,14 @@ public abstract sealed class IndexPartition extends IndexMapping
   }
 
   /**
-   * Returns the indices in the given group as a sorted, zero-copy view.
+   * Returns the indices in group {@code groupId}, in ascending order.
+   * <p>
+   * The result is a view of this partition's own array, not a copy.
    * <p>
    * <strong>Time:</strong> O(1).
    *
    * @param groupId group ID in {@code 0..groupCount()-1}
-   * @return indices in this group, sorted ascending
+   * @return indices in the group
    * @throws IndexOutOfBoundsException if {@code groupId} is out of range
    */
   public final SortedIntView indicesOf(int groupId) {
@@ -77,12 +70,12 @@ public abstract sealed class IndexPartition extends IndexMapping
   }
 
   /**
-   * Returns the number of indices in the given group.
+   * Returns the number of indices in group {@code groupId}.
    * <p>
    * <strong>Time:</strong> O(1).
    *
    * @param groupId group ID in {@code 0..groupCount()-1}
-   * @return number of indices in this group
+   * @return size of the group
    * @throws IndexOutOfBoundsException if {@code groupId} is out of range
    */
   public final int sizeOf(int groupId) {
@@ -91,21 +84,24 @@ public abstract sealed class IndexPartition extends IndexMapping
   }
 
   /**
-   * Folds per-index values into one value per group: for each group, starting from
-   * {@code identity}, {@code combine} is applied to the values of its members in ascending
-   * member order. A group without members gets {@code identity}; indices in no group are ignored.
-   *
-   * <pre>{@code
-   * int[] perGroup = partition.reduce(values, 0, Integer::sum);
-   * }</pre>
-   *
+   * Returns one value per group, combined from the values of its indices.
+   * <p>
+   * For each group, starts from {@code identity} and combines the result so far with the value of
+   * each index in the group, in ascending order of the indices. A group without indices gets
+   * {@code identity}, and the values of indices in no group are left out. Here,
+   * {@code byPackageCall} groups the calls between the methods of a program by the call between
+   * packages that each belongs to (see {@link EdgePartition}), and the call sites in
+   * {@code siteCount} are summed per call between packages:
+   * {@snippet file="com/kobayami/graphity/examples/Partitions.java" region="reduce"}
+   * <p>
    * <strong>Time:</strong> O(indexCount + groupCount).<br>
    * <strong>Memory:</strong> 4 x groupCount bytes for the result.
    *
-   * @param values   values indexed by node or edge, of length {@link #indexCount()}
-   * @param identity start value of every group
-   * @param combine  folds the accumulated value with the next member's value
-   * @return one value per group, of length {@link #groupCount()}
+   * @param values   the value of each index; length {@link #indexCount()}
+   * @param identity the start value of each group
+   * @param combine  called with the result so far and the value of the next index, returns
+   *                 the two combined
+   * @return one value per group, by group ID
    * @throws IllegalArgumentException if {@code values.length != indexCount()}
    */
   public final int[] reduce(int[] values, int identity, IntBinaryOperator combine) {
@@ -125,16 +121,17 @@ public abstract sealed class IndexPartition extends IndexMapping
   }
 
   /**
-   * Folds per-index values into one value per group, as {@link #reduce(int[], int,
-   * IntBinaryOperator)} does.
+   * Returns one value per group, combined from the values of its indices, as
+   * {@link #reduce(int[], int, IntBinaryOperator)} does.
    * <p>
    * <strong>Time:</strong> O(indexCount + groupCount).<br>
    * <strong>Memory:</strong> 8 x groupCount bytes for the result.
    *
-   * @param values   values indexed by node or edge, of length {@link #indexCount()}
-   * @param identity start value of every group
-   * @param combine  folds the accumulated value with the next member's value
-   * @return one value per group, of length {@link #groupCount()}
+   * @param values   the value of each index; length {@link #indexCount()}
+   * @param identity the start value of each group
+   * @param combine  called with the result so far and the value of the next index, returns
+   *                 the two combined
+   * @return one value per group, by group ID
    * @throws IllegalArgumentException if {@code values.length != indexCount()}
    */
   public final long[] reduce(long[] values, long identity, LongBinaryOperator combine) {
@@ -154,16 +151,17 @@ public abstract sealed class IndexPartition extends IndexMapping
   }
 
   /**
-   * Folds per-index values into one value per group, as {@link #reduce(int[], int,
-   * IntBinaryOperator)} does.
+   * Returns one value per group, combined from the values of its indices, as
+   * {@link #reduce(int[], int, IntBinaryOperator)} does.
    * <p>
    * <strong>Time:</strong> O(indexCount + groupCount).<br>
    * <strong>Memory:</strong> 8 x groupCount bytes for the result.
    *
-   * @param values   values indexed by node or edge, of length {@link #indexCount()}
-   * @param identity start value of every group
-   * @param combine  folds the accumulated value with the next member's value
-   * @return one value per group, of length {@link #groupCount()}
+   * @param values   the value of each index; length {@link #indexCount()}
+   * @param identity the start value of each group
+   * @param combine  called with the result so far and the value of the next index, returns
+   *                 the two combined
+   * @return one value per group, by group ID
    * @throws IllegalArgumentException if {@code values.length != indexCount()}
    */
   public final double[] reduce(double[] values, double identity, DoubleBinaryOperator combine) {
@@ -183,18 +181,21 @@ public abstract sealed class IndexPartition extends IndexMapping
   }
 
   /**
-   * Folds per-index objects into one object per group, written into an array the caller
-   * allocated: for each group with members, the fold starts from its first member's value and
-   * applies {@code combine} with each further member in ascending member order. A group without
-   * members keeps its entry in {@code groupValues}; indices in no group are ignored.
+   * Writes one value per group into {@code groupValues}, combined from the values of the indices of
+   * that group. This is the form of {@code reduce} for objects.
+   * <p>
+   * For each group, starts from the value of its first index and combines the result so far with
+   * the value of each further index, in ascending order of the indices. A group without indices
+   * keeps its entry in {@code groupValues}, and the values of indices in no group are left out.
    * <p>
    * <strong>Time:</strong> O(indexCount + groupCount).
    *
-   * @param <T>         element type, nullable or not
-   * @param values      values indexed by node or edge, of length {@link #indexCount()}
-   * @param groupValues receives one value per group; length {@link #groupCount()}, and a
-   *                    different array than {@code values}
-   * @param combine     folds the accumulated value with the next member's value
+   * @param <T>         the element type, nullable or not
+   * @param values      the value of each index; length {@link #indexCount()}
+   * @param groupValues receives one value per group, by group ID; length {@link #groupCount()},
+   *                    and not the same array as {@code values}
+   * @param combine     called with the result so far and the value of the next index, returns
+   *                    the two combined
    * @throws IllegalArgumentException if {@code values.length != indexCount()},
    *                                  {@code groupValues.length != groupCount()}, or both are the
    *                                  same array

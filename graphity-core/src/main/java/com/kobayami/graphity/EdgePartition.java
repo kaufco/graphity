@@ -1,73 +1,63 @@
 package com.kobayami.graphity;
 
 /**
- * Bidirectional partition of edges into disjoint groups, with efficient reverse lookup.
+ * A partition of the edges of a graph into groups: the edges behind each edge of a condensed
+ * graph, or the blocks of a graph.
  * <p>
- * Used wherever several edges belong to one group. In a condensation the group is a condensed
- * edge, and multiple original edges map to it; in {@link Biconnectivity#blocks()} the group is
- * a biconnected component. Edges that belong to no group are unmapped
- * ({@code get(edgeIndex) == -1}) - edges inside a group or from or to a node in no group in a
- * condensation, self-loops in a biconnectivity result.
+ * {@link #get(int) get(e)} returns the group of edge {@code e}, or {@code -1} if it is in no
+ * group, and {@link #edgesOf(int)} the edge indices of a group in ascending order. The groups
+ * come from one of two methods:
+ * <ul>
+ *   <li>{@link Graphs#edgePartition(Graph, NodePartition)} groups the edges of the graph of a
+ *       {@link NodePartition} by the edge of its condensed graph that they condense to: the group
+ *       IDs are the edge indices of the condensed graph. Edges within a group of nodes, and edges
+ *       from or to a node in no group, condense to no edge and are in no group.</li>
+ *   <li>{@link Biconnectivity#blocks()} groups the edges by block (biconnected component);
+ *       self-loops are in no block.</li>
+ * </ul>
+ * Here, {@code byPackage} groups the methods of a program by package. Its condensed graph
+ * {@code packageCalls} holds the calls between packages (see
+ * {@link NodePartition#of(Graph, int[], int)}). {@code byPackageCall} tells which calls between
+ * methods are behind the call from {@code service} to {@code model}:
+ * {@snippet file="com/kobayami/graphity/examples/Partitions.java" region="edgesOf"}
+ * {@code reduce} combines data on the edges into one value per group, such as the number of call
+ * sites behind each call between packages.
  * <p>
- * The forward direction (edge → group) is {@link #get(int)}. The reverse direction
- * (group → edges) is provided by {@link #edgesOf(int)}.
+ * Instances are immutable and safe to share between threads.
  * <p>
- * Extends {@link IndexPartition} for generic partition access via {@link #groupCount()},
- * {@link #indexCount()}, {@link #indicesOf(int)}, {@link #sizeOf(int)}, and the
- * {@code reduce} methods. Domain-specific convenience methods ({@link #edgeCount()},
- * {@link #edgesOf(int)}) are aliases of the generic ones.
- * <p>
- * Instances are created via {@link Graphs#edgePartition(Graph, NodePartition)} and
- * {@link Biconnectivity#blocks()}.
- *
- * <pre>{@code
- * EdgePartition ep = Graphs.edgePartition(condensed, partition);
- * SortedIntView origEdges = ep.edgesOf(condensedEdge);         // edges behind one condensed edge
- * double[] weights = ep.reduce(originalWeights, 0.0, Double::sum);  // one value per condensed edge
- *
- * // the edges from node group g to node group h of the partition
- * int gh = condensed.edgeIndexOf(g, h);                         // -1 if none runs from g to h
- * SortedIntView between = gh < 0 ? SortedIntView.EMPTY : ep.edgesOf(gh);
- * }</pre>
- *
- * @see EdgeMapping
- * @see IndexPartition
- * @see Graphs#edgePartition(Graph, NodePartition)
- * @see Biconnectivity#blocks()
+ * <strong>Memory:</strong> 4 x (edgeCount + mappedCount + groupCount) bytes, where mappedCount is
+ * the number of edges that belong to a group.
  */
 public final class EdgePartition extends IndexPartition {
 
-  /**
-   * Package-private constructor.
-   *
-   * @param mapping     forward mapping: original edge index → group ID, or -1
-   * @param members     CSR values: original edge indices per group, ascending within each group
-   * @param memberStart CSR offsets: per-group start indices into members
-   */
+  // Takes the arrays as they are, neither copied nor checked: the caller guarantees the layout of
+  // IndexPartition.
   EdgePartition(int[] mapping, int[] members, int[] memberStart) {
     super(mapping, members, memberStart);
   }
 
   /**
-   * Returns the total number of original edges.
-   * Equivalent to {@link #indexCount()}.
+   * Returns the number of edges of the partitioned graph, in a group or not. Equivalent to
+   * {@link #indexCount()}.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @return original edge count
+   * @return edge count of the partitioned graph
    */
   public int edgeCount() {
     return indexCount();
   }
 
   /**
-   * Returns the edge indices in the given group as a sorted, zero-copy view.
-   * Equivalent to {@link #indicesOf(int)}.
+   * Returns the edge indices in group {@code groupId}, in ascending order. Equivalent to
+   * {@link #indicesOf(int) indicesOf(groupId)}.
+   * <p>
+   * The result is a view of this partition's own array, not a copy.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param groupId group ID (condensed edge index, or block ID) in {@code 0..groupCount()-1}
-   * @return edge indices in this group, sorted ascending
+   * @param groupId group ID in {@code 0..groupCount()-1}
+   * @return edge indices in the group
    * @throws IndexOutOfBoundsException if {@code groupId} is out of range
    */
   public SortedIntView edgesOf(int groupId) {

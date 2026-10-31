@@ -7,83 +7,56 @@ import java.util.BitSet;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Unidirectional mapping between two node ID spaces.
+ * A mapping from the node IDs of one graph to those of another, to extract a subgraph or to
+ * renumber the nodes of a graph.
  * <p>
- * Specializes {@link IndexMapping} for node ID spaces; see {@link IndexMapping} for the
- * shared source/target/{@code -1} contract.
- * <p>
- * Factory methods create mappings in a <strong>natural direction</strong> (new → old):
+ * {@link #get(int) get(node)} is the node ID that {@code node} maps to, or {@code -1} if
+ * {@code node} is not mapped. The factories return mappings from a new graph to an old one. These
+ * map each new node to the node it comes from:
  * <ul>
- *   <li>{@link #forSubgraph} - maps dense new IDs (0..k-1) to original IDs; takes the selection
- *       as a {@link BitSet}, as loose arguments or an {@code int[]}, or as an {@link IntList} -
- *       including the {@link SortedIntView} that {@link Graph#outNodes(int)} and
- *       {@link NodePartition#nodesOf(int)} return</li>
- *   <li>{@link #forPermutation} - maps new IDs to old IDs ({@code order[newId] = oldId})</li>
- *   <li>{@link #reindex(Graph)} - DFS-preorder reindexing for cache-friendly layouts</li>
- *   <li>{@link #of(int[])} - general-purpose, caller defines direction</li>
+ *   <li>{@link #forSubgraph(IntList)} and its overloads - the selected nodes, numbered in
+ *       ascending order;</li>
+ *   <li>{@link #forPermutation(IntList)} - every node, in an order of the caller's choice;</li>
+ *   <li>{@link #reindex(Graph)} - every node, in depth-first preorder;</li>
+ *   <li>{@link #of(int[])} - any mapping, from an array.</li>
  * </ul>
- * Call {@link #inverted(int)} to obtain the reverse direction.
- * Use {@link Graphs#remapped(Graph, NodeMapping)} to apply a mapping to a graph.
- * Use {@link #compose(NodeMapping)} to chain multiple mappings, and {@link #gather(int[])} to
- * carry per-node data along.
- *
- * <pre>{@code
- * // Reindexing for cache-friendly layout (DFS preorder)
- * Graph reindexed = Graphs.remapped(graph, NodeMapping.reindex(graph));
- *
- * // DAG-specific: topological order reindexing
- * Graph topo = Graphs.remapped(graph, NodeMapping.forPermutation(TopOrder.of(graph)));
- *
- * // Subgraph extraction
- * Graph sub = Graphs.remapped(graph, NodeMapping.forSubgraph(selectedNodes));
- * Graph fanout = Graphs.remapped(graph, NodeMapping.forSubgraph(3, 7, 11));
- *
- * // Custom permutation
- * Graph permuted = Graphs.remapped(graph, NodeMapping.forPermutation(order));
- *
- * // Chaining: g1 → g2 → g3
- * NodeMapping nm12 = ...;  // g2 → g1
- * NodeMapping nm23 = ...;  // g3 → g2
- * NodeMapping nm13 = nm12.compose(nm23);  // g3 → g1
- * }</pre>
- *
- * <p>The factories check their input at runtime: a negative or out-of-range node ID raises
- * {@link IndexOutOfBoundsException}, and {@link #forSubgraph} and {@link #forPermutation} reject a
- * repeated node ID with {@link IllegalArgumentException}. {@link #of(int[])} checks only that
- * every value is {@code -1} or a node ID. That no two source IDs map to the same node is the
- * caller's contract there; a repeat surfaces in {@link #inverted(int)} and
- * {@link Graphs#remapped(Graph, NodeMapping)}, which reject it.
+ * {@link Graphs#remapped(Graph, NodeMapping)} builds the new graph from the old one, and
+ * {@code gather} carries data on the old nodes, such as their names, over to the new ones. Here,
+ * {@code calls} holds the calls between the methods of a program, and the methods that
+ * {@code load} reaches become a graph of their own, with their names from {@code names}:
+ * {@snippet file="com/kobayami/graphity/examples/Mappings.java" region="subgraph"}
+ * {@link Graphs#edgeMapping(Graph, Graph, NodeMapping)} derives the {@link EdgeMapping} that
+ * carries data on edges. {@link #inverted(int)} returns the mapping from old to new, and
+ * {@link #compose(NodeMapping)} chains two mappings.
  * <p>
- * <strong>Memory:</strong> same as {@link IndexMapping} - no fields beyond the inherited mapping array.
- *
- * @see IndexMapping
- * @see NodePartition
+ * Instances are immutable and safe to share between threads.
+ * <p>
+ * <strong>Memory:</strong> 4 x indexCount bytes.
  */
 public final class NodeMapping extends IndexMapping {
 
-  /**
-   * Package-private constructor. Used by the factory methods.
-   *
-   * @param mapping    the mapping array (not copied - caller must not retain a reference)
-   * @param validCount number of non-negative entries in {@code mapping}
-   */
+  // Takes the array as it is, not copied: the caller hands over an array that nobody else holds,
+  // and validCount matches it.
   NodeMapping(int[] mapping, int validCount) {
     super(mapping, validCount);
   }
 
   /**
-   * Creates a mapping from the given array. The array is copied.
+   * Returns the mapping that maps each node {@code i} to {@code mapping[i]}, and leaves it
+   * unmapped where that is {@code -1}.
    * <p>
-   * {@code mapping[sourceId] = targetId}, or {@code -1} for unmapped source IDs. Repeated
-   * targets are not rejected here: that no two source IDs map to the same node is the caller's
-   * contract, and a repeat surfaces in {@link #inverted(int)} and
-   * {@link Graphs#remapped(Graph, NodeMapping)}.
+   * Use it for mappings that the other factories do not cover, from new to old or from old to new.
+   * The array is copied. Each value must be {@code -1} or a node ID, and no two nodes may map to
+   * the same node; without a graph, this method can only reject a value below {@code -1}.
+   * {@link Graphs#remapped(Graph, NodeMapping)} rejects a value that is not a node of its graph,
+   * and both it and {@link #inverted(int)} reject two nodes that map to the same node.
    * <p>
-   * <strong>Time:</strong> O(n) where n = mapping.length.
+   * <strong>Time:</strong> O(mapping.length).<br>
+   * <strong>Memory:</strong> 4 x mapping.length bytes for the copy, which the result keeps.
    *
-   * @param mapping source-to-target mapping
-   * @return a new node mapping
-   * @throws IndexOutOfBoundsException if a value is below {@code -1}
+   * @param mapping the node ID that each node maps to, or {@code -1}
+   * @return the mapping
+   * @throws IndexOutOfBoundsException if a value is less than {@code -1}
    */
   public static NodeMapping of(int[] mapping) {
     int[] copy = Arrays.copyOf(mapping, mapping.length);
@@ -97,17 +70,19 @@ public final class NodeMapping extends IndexMapping {
   }
 
   /**
-   * Creates a subgraph mapping from a {@link BitSet} of selected node IDs.
+   * Returns a mapping from the nodes of a subgraph to the selected nodes, given as the set bits
+   * of {@code selected}.
    * <p>
-   * Selected nodes receive dense new IDs in ascending order of their original IDs.
-   * The resulting mapping maps dense IDs (0..k-1) to original IDs.
+   * The selected nodes get the new node IDs {@code 0..selected.cardinality()-1}, in ascending
+   * order of their node IDs. The selected node IDs are checked against a graph only when the
+   * mapping is used: {@link Graphs#remapped(Graph, NodeMapping)} rejects one that is not a node of
+   * its graph.
    * <p>
-   * <strong>Time:</strong> O(n) where n = {@code selected.length()} (the highest selected
-   * node ID plus one) - {@link BitSet} scans cost proportional to its word array, not to
-   * the number of set bits.
+   * <strong>Time:</strong> O(selected.length()).<br>
+   * <strong>Memory:</strong> 4 x selected.cardinality() bytes for the result.
    *
-   * @param selected bit set where each set bit represents a selected node ID
-   * @return mapping from dense IDs to original IDs
+   * @param selected the selected node IDs
+   * @return the mapping from new to old node IDs
    */
   public static NodeMapping forSubgraph(BitSet selected) {
     int k = selected.cardinality();
@@ -120,18 +95,23 @@ public final class NodeMapping extends IndexMapping {
   }
 
   /**
-   * Creates a subgraph mapping from a list of selected node IDs.
+   * Returns a mapping from the nodes of a subgraph to the selected nodes, given as a list.
    * <p>
-   * Selected nodes receive dense new IDs in ascending order of their original IDs.
-   * If the list is not already a {@link SortedIntView}, it is sorted internally.
-   * The resulting mapping maps dense IDs (0..k-1) to original IDs.
+   * The selected nodes get the new node IDs {@code 0..selected.size()-1}, in ascending order of
+   * their node IDs, whatever the order of the list. A {@link SortedIntView}, as
+   * {@link Graphs#reachableFrom(Graph, int)} and {@link NodePartition#nodesOf(int)} return it, is
+   * taken as it is; any other list is sorted first, in a copy. As with
+   * {@link #forSubgraph(BitSet)}, the node IDs are checked against a graph only when the mapping
+   * is used.
    * <p>
-   * <strong>Time:</strong> O(k) if sorted, O(k log k) otherwise.
+   * <strong>Time:</strong> O(k) for a {@link SortedIntView}, O(k log k) for any other list, where
+   * k is {@code selected.size()}.<br>
+   * <strong>Memory:</strong> 4 x selected.size() bytes for the result.
    *
-   * @param selected list of selected node IDs
-   * @return mapping from dense IDs to original IDs
-   * @throws IndexOutOfBoundsException if an ID is negative
-   * @throws IllegalArgumentException if an ID occurs more than once
+   * @param selected the selected node IDs
+   * @return the mapping from new to old node IDs
+   * @throws IndexOutOfBoundsException if a node ID is negative
+   * @throws IllegalArgumentException if a node ID occurs more than once
    */
   public static NodeMapping forSubgraph(IntList selected) {
     int k = selected.size();
@@ -147,20 +127,20 @@ public final class NodeMapping extends IndexMapping {
   }
 
   /**
-   * Creates a subgraph mapping from the given selected node IDs.
+   * Returns a mapping from the nodes of a subgraph to the selected nodes, given as node IDs.
    * <p>
-   * Selected nodes receive dense new IDs in ascending order of their original IDs. The IDs are
-   * copied and sorted internally; the caller's array is left unchanged. The resulting mapping
-   * maps dense IDs (0..k-1) to original IDs.
+   * The selected nodes get the new node IDs {@code 0..selected.length-1}, in ascending order of
+   * their node IDs, whatever the order of the arguments; the array is sorted in a copy. As with
+   * {@link #forSubgraph(BitSet)}, the node IDs are checked against a graph only when the mapping
+   * is used.
    * <p>
-   * <strong>Time:</strong> O(k log k) where k = number of selected IDs. Sortedness is not
-   * detected - pass a {@link SortedIntView} to the {@link #forSubgraph(IntList)} overload to
-   * skip the sort.
+   * <strong>Time:</strong> O(k log k), where k is {@code selected.length}.<br>
+   * <strong>Memory:</strong> 4 x selected.length bytes for the result.
    *
-   * @param selected selected node IDs in any order
-   * @return mapping from dense IDs to original IDs
-   * @throws IndexOutOfBoundsException if an ID is negative
-   * @throws IllegalArgumentException if an ID occurs more than once
+   * @param selected the selected node IDs
+   * @return the mapping from new to old node IDs
+   * @throws IndexOutOfBoundsException if a node ID is negative
+   * @throws IllegalArgumentException if a node ID occurs more than once
    */
   public static NodeMapping forSubgraph(int... selected) {
     int[] map = Arrays.copyOf(selected, selected.length);
@@ -170,17 +150,22 @@ public final class NodeMapping extends IndexMapping {
   }
 
   /**
-   * Creates a permutation mapping from the given order.
+   * Returns a mapping that numbers the nodes in the given order, from new to old node IDs.
    * <p>
-   * {@code order[newId] = oldId}. All nodes are preserved (no subset, no unmapped entries).
-   * The resulting mapping maps new IDs to old IDs.
+   * {@code order.getInt(newNode)} is the node that gets the new node ID {@code newNode}.
+   * {@code order} holds every node ID in {@code 0..order.size()-1} once, so the mapping maps every
+   * node. For example, {@code NodeMapping.forPermutation(TopOrder.of(dag))} numbers the
+   * nodes of a DAG (directed acyclic graph) in topological order, so that every edge of the
+   * remapped graph goes from a lower to a higher node ID.
    * <p>
-   * <strong>Time:</strong> O(n).
+   * <strong>Time:</strong> O(order.size()).<br>
+   * <strong>Memory:</strong> 4 x order.size() bytes for the result; while it runs, 1 bit per
+   * node.
    *
-   * @param order permutation: {@code order.getInt(newId)} is the old ID
-   * @return mapping from new IDs to old IDs
-   * @throws IndexOutOfBoundsException if a value lies outside {@code 0..order.size()-1}
-   * @throws IllegalArgumentException if a value occurs more than once
+   * @param order the node IDs in their new order
+   * @return the mapping from new to old node IDs
+   * @throws IndexOutOfBoundsException if a node ID is not in {@code 0..order.size()-1}
+   * @throws IllegalArgumentException if a node ID occurs more than once
    */
   public static NodeMapping forPermutation(IntList order) {
     int n = order.size();
@@ -202,46 +187,44 @@ public final class NodeMapping extends IndexMapping {
   }
 
   /**
-   * Creates the inverse mapping (target → source) over a target space of {@code targetCount}
-   * node IDs.
+   * Returns the inverse mapping, which maps {@code get(node)} back to {@code node}.
    * <p>
-   * Each target value in this mapping becomes a source in the inverse, and vice versa. The
-   * inverse covers every ID in {@code 0..targetCount-1}; an ID that no source maps to maps to
-   * {@code -1}, and then the inverse is partial. For a mapping from new to old IDs, as the
-   * factories produce it, {@code targetCount} is the node count of the old graph:
+   * The inverse maps the {@code targetCount} nodes of the graph that this mapping maps to; a node
+   * that no node maps to is not mapped, and the inverse is then partial. For a mapping from new
+   * to old node IDs, as the factories return it, {@code targetCount} is the node count of the old
+   * graph, and the inverse gives the new node ID of an old node:
+   * {@code newToOld.inverted(oldGraph.nodeCount()).get(oldNode)}.
+   * <p>
+   * <strong>Time:</strong> O(indexCount + targetCount).<br>
+   * <strong>Memory:</strong> 4 x targetCount bytes for the result.
    *
-   * <pre>{@code
-   * NodeMapping oldToNew = newToOld.inverted(graph.nodeCount());
-   * }</pre>
-   *
-   * <strong>Time:</strong> O(n + targetCount) where n = source space size.<br>
-   * <strong>Memory:</strong> 4 x targetCount bytes for the inverse array.
-   *
-   * @param targetCount size of the target space, which becomes the source space of the inverse
-   * @return the inverse mapping, with {@link #indexCount()} equal to {@code targetCount}
-   * @throws IllegalArgumentException  if {@code targetCount} is negative or larger than
-   *                                   {@code Integer.MAX_VALUE - 8}, the largest array, or
-   *                                   multiple source IDs map to the same target (the mapping is
-   *                                   not injective and cannot be inverted)
-   * @throws IndexOutOfBoundsException if a target is {@code targetCount} or more
+   * @param targetCount the node count of the graph that this mapping maps to
+   * @return the inverse mapping, with an index count of {@code targetCount}
+   * @throws IllegalArgumentException if {@code targetCount} is negative or larger than
+   *                                  {@code Integer.MAX_VALUE - 8}, or two nodes map to the same
+   *                                  node
+   * @throws IndexOutOfBoundsException if a node maps to {@code targetCount} or more
    */
   public NodeMapping inverted(int targetCount) {
     return new NodeMapping(invertArray(mapping, targetCount), mappedCount());
   }
 
   /**
-   * Composes this mapping with an inner mapping: {@code result(x) = this(inner(x))}.
+   * Returns the mapping that applies {@code inner} first and then this mapping.
    * <p>
-   * If {@code this} maps B → C and {@code inner} maps A → B, the result maps A → C.
-   * Unmapped entries ({@code -1}) propagate: if {@code inner} maps x to {@code -1},
-   * or {@code this} does not map the intermediate value, the result is {@code -1}.
+   * If {@code inner} maps the nodes of a graph A to those of B, and this mapping maps B to C, the
+   * result maps A to C. A node is not mapped in the result if {@code inner} does not map it, or if
+   * this mapping does not map the node that {@code inner} maps it to. For mappings from new to old
+   * node IDs, {@code firstToOriginal.compose(secondToFirst)} maps the nodes of a graph remapped
+   * twice back to those of the original one.
    * <p>
-   * <strong>Time:</strong> O(n) where n = inner source space size.
+   * <strong>Time:</strong> O(inner.indexCount()).<br>
+   * <strong>Memory:</strong> 4 x inner.indexCount() bytes for the result.
    *
-   * @param inner the inner mapping to apply first
-   * @return the composed mapping from inner's source space to this mapping's target space
-   * @throws IndexOutOfBoundsException if {@code inner} maps to a value outside this mapping's
-   *                                   source space
+   * @param inner the mapping to apply first
+   * @return the composed mapping
+   * @throws IndexOutOfBoundsException if {@code inner} maps a node to a node ID outside
+   *                                   {@code 0..indexCount()-1}
    */
   public NodeMapping compose(NodeMapping inner) {
     int[] composed = composeArrays(this.mapping, inner.mapping);
@@ -249,97 +232,91 @@ public final class NodeMapping extends IndexMapping {
   }
 
   /**
-   * Carries per-node data from the target space of this mapping into its source space:
-   * {@code result[i] = values[get(i)]}, and {@code 0} where {@code i} is unmapped.
+   * Returns {@code values} renumbered by this mapping: the value at position {@code i} of the
+   * result is {@code values[get(i)]}, or {@code 0} if {@code i} is not mapped.
    * <p>
-   * For a mapping from new to old indices, as the factories produce it, this moves an array
-   * indexed by old nodes to the new numbering:
+   * For a mapping from new to old node IDs, as the factories return it, this carries data on the
+   * nodes of the old graph over to the new graph. {@link #gather(Object[], Object[])} does the
+   * same for objects, such as names.
+   * <p>
+   * <strong>Time:</strong> O(indexCount).<br>
+   * <strong>Memory:</strong> 4 x indexCount bytes for the result.
    *
-   * <pre>{@code
-   * int[] newValues = newToOld.gather(oldValues);
-   * }</pre>
-   *
-   * <strong>Time:</strong> O(n) where n = source space size.<br>
-   * <strong>Memory:</strong> 4 x n bytes for the result.
-   *
-   * @param values values indexed by the target space; must cover every mapped target
-   * @return values indexed by the source space, of length n
-   * @throws IndexOutOfBoundsException if a mapped target lies outside {@code values}
+   * @param values the value of each node of the graph that this mapping maps to
+   * @return the renumbered values, of length {@link #indexCount()}
+   * @throws IndexOutOfBoundsException if a node maps to a node ID outside {@code values}
    */
   public int[] gather(int[] values) {
     return gatherArray(mapping, values);
   }
 
   /**
-   * Carries per-node data from the target space into the source space, as
-   * {@link #gather(int[])} does.
+   * Returns {@code values} renumbered by this mapping, as {@link #gather(int[])} does.
    * <p>
-   * <strong>Time:</strong> O(n) where n = source space size.<br>
-   * <strong>Memory:</strong> 8 x n bytes for the result.
+   * <strong>Time:</strong> O(indexCount).<br>
+   * <strong>Memory:</strong> 8 x indexCount bytes for the result.
    *
-   * @param values values indexed by the target space; must cover every mapped target
-   * @return values indexed by the source space, {@code 0} where unmapped
-   * @throws IndexOutOfBoundsException if a mapped target lies outside {@code values}
+   * @param values the value of each node of the graph that this mapping maps to
+   * @return the renumbered values, of length {@link #indexCount()}
+   * @throws IndexOutOfBoundsException if a node maps to a node ID outside {@code values}
    */
   public long[] gather(long[] values) {
     return gatherArray(mapping, values);
   }
 
   /**
-   * Carries per-node data from the target space into the source space, as
-   * {@link #gather(int[])} does.
+   * Returns {@code values} renumbered by this mapping, as {@link #gather(int[])} does.
    * <p>
-   * <strong>Time:</strong> O(n) where n = source space size.<br>
-   * <strong>Memory:</strong> 8 x n bytes for the result.
+   * <strong>Time:</strong> O(indexCount).<br>
+   * <strong>Memory:</strong> 8 x indexCount bytes for the result.
    *
-   * @param values values indexed by the target space; must cover every mapped target
-   * @return values indexed by the source space, {@code 0} where unmapped
-   * @throws IndexOutOfBoundsException if a mapped target lies outside {@code values}
+   * @param values the value of each node of the graph that this mapping maps to
+   * @return the renumbered values, of length {@link #indexCount()}
+   * @throws IndexOutOfBoundsException if a node maps to a node ID outside {@code values}
    */
   public double[] gather(double[] values) {
     return gatherArray(mapping, values);
   }
 
   /**
-   * Carries per-node objects from the target space into an array the caller allocated for the
-   * source space: {@code newValues[i] = values[get(i)]}, and {@code newValues[i]} untouched
-   * where {@code i} is unmapped. References are copied, not the objects. If an exception is
-   * thrown, {@code newValues} may be partly written.
+   * Writes {@code values} renumbered by this mapping into {@code newValues}, for objects such as
+   * names.
    * <p>
-   * <strong>Time:</strong> O(n) where n = source space size.
+   * {@code newValues[i]} becomes {@code values[get(i)]}, and stays as it is if {@code i} is not
+   * mapped. References are copied, not the objects. If an exception is thrown, {@code newValues}
+   * may be partly written.
+   * <p>
+   * <strong>Time:</strong> O(indexCount).
    *
-   * @param <T>       element type, nullable or not
-   * @param values    values indexed by the target space; must cover every mapped target
-   * @param newValues receives the values indexed by the source space; length
-   *                  {@link #indexCount()}, and a different array than {@code values}
+   * @param <T>       the element type, nullable or not
+   * @param values    the value of each node of the graph that this mapping maps to
+   * @param newValues receives the renumbered values; length {@link #indexCount()}, and not the
+   *                  same array as {@code values}
    * @throws IllegalArgumentException if {@code newValues.length != indexCount()}, or both are the
    *                                  same array
-   * @throws IndexOutOfBoundsException if a mapped target lies outside {@code values}
+   * @throws IndexOutOfBoundsException if a node maps to a node ID outside {@code values}
    */
   public <T extends @Nullable Object> void gather(T[] values, T[] newValues) {
     gatherArray(mapping, values, newValues);
   }
 
   /**
-   * Creates a cache-friendly reindexing mapping via DFS preorder traversal.
+   * Returns a mapping that numbers the nodes of {@code graph} in depth-first preorder, from new to
+   * old node IDs.
    * <p>
-   * Nodes visited close together during DFS receive adjacent new IDs, improving cache
-   * locality for subsequent traversals. The resulting mapping maps new IDs to old IDs
-   * ({@code mapping[newId] = oldId}).
-   * <p>
-   * For DAGs, topological-order reindexing may be more appropriate:
-   * <pre>{@code
-   * NodeMapping.forPermutation(TopOrder.of(graph))
-   * }</pre>
+   * The search starts at node {@code 0}, follows the out-nodes of each node in ascending order,
+   * and starts again at the smallest node not yet visited until it has visited every node; each
+   * node gets the next new node ID when the search reaches it. Nodes that the search visits one
+   * after another thus get adjacent node IDs. Traversals of the remapped graph then read its
+   * arrays more in order, which can make them faster on large graphs.
    * <p>
    * <strong>Time:</strong> O(nodeCount + edgeCount).<br>
-   * <strong>Memory:</strong> O(nodeCount).
+   * <strong>Memory:</strong> 4 x nodeCount bytes for the result; while it runs, 1 bit per node
+   * and up to 8 x nodeCount bytes for the stack, which grows with the deepest path.
    *
-   * @param graph the graph to reindex
-   * @return permutation mapping from new IDs to old IDs (DFS preorder)
-   * @see Graphs#remapped(Graph, NodeMapping)
-   * @throws IllegalArgumentException if a depth-first path is longer than 2^30 - 5 nodes, the most
-   *     frames an array can hold
+   * @param graph the graph whose nodes are numbered
+   * @return the mapping from new to old node IDs
+   * @throws IllegalArgumentException if a depth-first path is longer than 2<sup>30</sup> - 5 nodes
    */
   public static NodeMapping reindex(Graph graph) {
     var traverser = new ReindexTraverser(graph);
@@ -347,19 +324,14 @@ public final class NodeMapping extends IndexMapping {
     return new NodeMapping(traverser.order, graph.nodeCount());
   }
 
-  /**
-   * Iterative DFS (explicit stack, no recursion) that records preorder (= visitation order)
-   * for cache-friendly reindexing.
-   */
+  // Depth-first search with an explicit stack instead of recursion, recording the preorder.
   private static final class ReindexTraverser {
 
     private final Graph graph;
 
-    /**
-     * Visited bits, one per node. A raw {@code long[]} rather than a {@link BitSet}, so that the
-     * inner scan can test and set a node's bit with a single word load and store instead of two
-     * independent {@code get}/{@code set} calls.
-     */
+    // Visited bits, one per node. A raw long[] rather than a BitSet, so that the inner scan can
+    // test and set a node's bit with a single word load and store instead of two independent
+    // get/set calls.
     private final long[] visited;
 
     final int[] order;
@@ -417,11 +389,8 @@ public final class NodeMapping extends IndexMapping {
       }
     }
 
-    /**
-     * Index of the first clear bit at or after {@code from}, mirroring
-     * {@link BitSet#nextClearBit(int)}: words of set bits are skipped 64 at a time, and a result
-     * beyond the node count is left for the caller's bound check to reject.
-     */
+    // BitSet.nextClearBit on the raw words: words of set bits are skipped 64 at a time, and a
+    // result beyond the node count is left for the caller's bound check to reject.
     private static int nextClearBit(long[] bits, int from) {
       int word = from >>> 6;
       long candidates = ~bits[word] & (-1L << from);
@@ -435,10 +404,8 @@ public final class NodeMapping extends IndexMapping {
     }
   }
 
-  /**
-   * Rejects a repeated ID in a sorted selection, and then a negative first ID, the only place one
-   * can be.
-   */
+  // Rejects a repeated ID in a sorted selection, and then a negative first ID, the only place one
+  // can be.
   private static void checkSelection(int[] sorted) {
     for (int i = 1; i < sorted.length; i++) {
       if (sorted[i] == sorted[i - 1]) {

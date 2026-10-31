@@ -9,99 +9,90 @@ import java.util.stream.IntStream;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A read-only directed graph, optimized for performance, low memory and cache-friendly traversal.
+ * A directed graph, which is the input of the algorithms in this library.
  * <p>
- * Nodes are contiguous {@code int} IDs in {@code 0..nodeCount()-1}.
- * Out-adjacency lists are stored back-to-back in a flat array, each sorted ascending.
- * The graph stores only structure (nodes and edges) - labels, weights or metadata
- * must be kept externally (e.g. in parallel arrays indexed by node/edge ID).
+ * Nodes are the {@code int} IDs {@code 0..nodeCount()-1}. Edges are numbered by edge index
+ * {@code 0..edgeCount()-1}, ordered by source and then by target. No two edges have the same
+ * source and target; self-loops are allowed. The graph holds nothing but this structure: names,
+ * weights and any other data live in arrays of the caller, indexed by node ID or by edge index.
  * <p>
- * Build a graph with {@link GraphBuilder}, or with {@link #of(int[], int[])} from arrays that
- * are already in CSR form. A graph can be written to a stream with {@link #writeTo(OutputStream)}
- * and read back with {@link #readFrom(InputStream)}.
+ * {@link GraphBuilder} builds a graph from edges in any order. {@link #of(int[], int[])} takes the
+ * two arrays of a CSR (compressed sparse row) layout. A graph keeps its edges in this form, and
+ * {@link Csr} hands the arrays to algorithm code. {@link #writeTo(OutputStream)} and
+ * {@link #readFrom(InputStream)} store a graph in a stream and load it again.
  * <p>
- * Use {@code Graph} for algorithms that only need out-edges.
- * For in-edge access, obtain a {@link BiAdjacentGraph} via {@link BiAdjacentGraph#of(Graph)};
- * its {@link BiAdjacentGraph#transposed()} is the transposed graph as a constant-time view.
+ * A {@code Graph} holds the out-nodes of every node, called its out-adjacency. Algorithms that
+ * also need the in-nodes take a {@link BiAdjacentGraph}, which {@link BiAdjacentGraph#of(Graph)}
+ * builds and which also gives the transposed graph. Algorithms are not methods of the graph but
+ * classes of their own, such as {@link Components}, {@link TopOrder} and {@link Dominators}; the
+ * {@linkplain com.kobayami.graphity package documentation} lists them by topic.
  * <p>
- * Algorithms are not methods on the graph: they take it as input and live on their own classes,
- * {@link Components}, {@link TopOrder}, {@link EdgeTypes}, {@link BfsDistances}, {@link Ancestry}
- * and {@link Dominators} among them. The
- * {@linkplain com.kobayami.graphity package documentation} lists all of them by question.
+ * Instances are immutable and safe to share between threads.
  * <p>
  * <strong>Memory:</strong> 4 x (nodeCount + edgeCount) bytes.
- *
- * @see BiAdjacentGraph
- * @see BiAdjacentGraph#transposed()
- * @see Graphs#rootNodes(BiAdjacentGraph)
- * @see GraphBuilder
- * @see Components
+ * <p>
+ * A graph has at most {@code Integer.MAX_VALUE - 9} nodes and {@code Integer.MAX_VALUE - 8}
+ * edges.
  */
 public sealed class Graph permits BiAdjacentGraph {
 
-  /** Most nodes {@link #toString()} lists. */
+  // toString() runs implicitly, in debuggers and logs, so it lists a bounded part of the graph:
+  // at most this many nodes, and this many out-nodes over all listed nodes together.
   private static final int TO_STRING_NODES = 16;
-
-  /** Most out-nodes {@link #toString()} lists, over all listed nodes together. */
   private static final int TO_STRING_TARGETS = 64;
 
-  /**
-   * Initial capacity of the {@link #toString()} builder. The longest listing the two limits above
-   * allow stays under 1000 characters, even with ten-digit counts and IDs, so the builder never
-   * grows.
-   */
+  // The longest listing the two limits allow stays under 1000 characters, even with ten-digit
+  // counts and IDs, so the builder never grows.
   private static final int TO_STRING_CAPACITY = 1024;
 
-  /*
-   * Per-node start offset into outAdjacency. Node i's out-nodes occupy
-   * outAdjacency[outAdjacencyStart[i]..outAdjacencyStart[i+1]-1], sorted ascending. Length
-   * nodeCount + 1; the sentinel outAdjacencyStart[nodeCount] == edgeCount keeps
-   * outAdjacencyStart[i+1] always valid (branchless end lookup).
-   */
+  // The CSR layout: the out-nodes of node v are
+  // outAdjacency[outAdjacencyStart[v]..outAdjacencyStart[v + 1] - 1], sorted ascending, and the
+  // position of an out-node in outAdjacency is the edge index of its edge. The sentinel
+  // outAdjacencyStart[nodeCount] == edgeCount makes outAdjacencyStart[v + 1] valid for every node
+  // without a branch.
   private final int[] outAdjacencyStart;
-
-  /* Flat array of all out-adjacency lists, indexed via outAdjacencyStart. */
   private final int[] outAdjacency;
 
-  // Takes the arrays as they are: neither copied nor checked.
+  // Takes the arrays as they are, neither copied nor checked: the caller guarantees the layout.
   Graph(int[] outAdjacencyStart, int[] outAdjacency) {
     this.outAdjacencyStart = outAdjacencyStart;
     this.outAdjacency = outAdjacency;
   }
 
   /**
-   * Returns a graph over arrays that are already in CSR form, as {@link Csr} returns them or
+   * Returns a graph from the two arrays of its CSR layout, as {@link Csr} returns them and
    * {@link #writeTo(OutputStream)} writes them.
    * <p>
    * The out-nodes of node {@code v} are
-   * {@code outAdjacency[outAdjacencyStart[v]..outAdjacencyStart[v + 1] - 1]}; the node count is
-   * {@code outAdjacencyStart.length - 1}. Both arrays are copied, then checked: the offsets start
-   * at {@code 0}, never decrease and end at {@code outAdjacency.length}, every target is a node,
-   * and each adjacency list is sorted ascending without duplicates. For edges in any order, with
-   * duplicates, use {@link GraphBuilder}.
+   * {@code outAdjacency[outAdjacencyStart[v]..outAdjacencyStart[v + 1] - 1]}, and the position of
+   * an out-node in {@code outAdjacency} is the edge index of its edge. For example, the control
+   * flow of a method with a loop:
+   * {@snippet file="com/kobayami/graphity/examples/Building.java" region="of"}
+   * Both arrays are copied and checked: the offsets start at {@code 0}, never decrease and end at
+   * {@code outAdjacency.length}, and the out-nodes of each node are strictly ascending. For edges
+   * in any order or with duplicates, use {@link GraphBuilder}.
    * <p>
    * <strong>Time:</strong> O(nodeCount + edgeCount).<br>
-   * <strong>Memory:</strong> 4 x (nodeCount + 1 + edgeCount) bytes for the copies, which the
-   * result keeps.
+   * <strong>Memory:</strong> 4 x (nodeCount + edgeCount) bytes for the copies, which the result
+   * keeps.
    *
-   * @param outAdjacencyStart the offset of each node's out-nodes, length {@code nodeCount + 1}
-   * @param outAdjacency      the out-nodes of all nodes back to back, length {@code edgeCount}
-   * @return a graph with these edges; edge {@code e} is the one at position {@code e} of
-   *         {@code outAdjacency}
-   * @throws IndexOutOfBoundsException if a target is not in {@code 0..nodeCount-1}
+   * @param outAdjacencyStart where the out-nodes of each node start in {@code outAdjacency},
+   *                          followed by {@code edgeCount}; length {@code nodeCount + 1}
+   * @param outAdjacency      the out-nodes of all nodes, node after node; length
+   *                          {@code edgeCount}
+   * @return the graph
+   * @throws IndexOutOfBoundsException if an out-node is not in {@code 0..nodeCount-1}
    * @throws IllegalArgumentException if {@code outAdjacencyStart} is empty, does not start at
    *                                  {@code 0}, decreases or does not end at
-   *                                  {@code outAdjacency.length}, an adjacency list is not
-   *                                  strictly ascending, or the arrays describe more than
-   *                                  {@code Integer.MAX_VALUE - 9} nodes or
-   *                                  {@code Integer.MAX_VALUE - 8} edges, the limits that
-   *                                  {@link #readFrom(InputStream)} also applies
+   *                                  {@code outAdjacency.length}, the out-nodes of a node are not
+   *                                  strictly ascending, or the arrays hold more nodes or edges
+   *                                  than a graph can have
    */
   public static Graph of(int[] outAdjacencyStart, int[] outAdjacency) {
     return ofOwned(outAdjacencyStart.clone(), outAdjacency.clone());
   }
 
-  /** {@link #of(int[], int[])} on arrays nobody else holds: checked, not copied. */
+  // of(int[], int[]) without the copy, for arrays that nobody else holds, as readFrom reads them.
   static Graph ofOwned(int[] outAdjacencyStart, int[] outAdjacency) {
     if (outAdjacencyStart.length == 0) {
       throw new IllegalArgumentException(
@@ -149,51 +140,33 @@ public sealed class Graph permits BiAdjacentGraph {
   }
 
   /**
-   * Writes the topology of this graph to the stream: its two CSR arrays, as
-   * {@link #of(int[], int[])} takes them, after their lengths. {@link #readFrom(InputStream)}
-   * reads it back.
+   * Writes this graph to {@code out}, for {@link #readFrom(InputStream)} to read back with the same
+   * node IDs and edge indices.
    * <p>
-   * The layout, every field a signed little-endian 32-bit integer in two's complement:
+   * Only the structure is written. Data in arrays indexed by node ID or edge index stays valid for
+   * the graph read back and can follow it in the same stream. Here, the names of the methods of a
+   * program follow the calls between them:
+   * {@snippet file="com/kobayami/graphity/examples/Storing.java" region="writeTo"}
+   * A {@link BiAdjacentGraph} writes its out-adjacency only.
+   * <p>
+   * The format is the two arrays that {@link #of(int[], int[])} takes, preceded by the node count
+   * and the edge count. Every field is a signed 32-bit integer in little-endian byte order:
    * <pre>
-   * byte offset              size in bytes         field
-   * 0                        4                     nodeCount, 0 &lt;= nodeCount &lt;= 2^31 - 10
-   * 4                        4                     edgeCount, 0 &lt;= edgeCount &lt;= 2^31 - 9
+   * offset in bytes          size in bytes         field
+   * 0                        4                     nodeCount
+   * 4                        4                     edgeCount
    * 8                        4 x (nodeCount + 1)   outAdjacencyStart
    * 8 + 4 x (nodeCount + 1)  4 x edgeCount         outAdjacency
    * </pre>
-   * A graph takes exactly {@code 8 + 4 x (nodeCount + 1 + edgeCount)} bytes, without padding or
-   * checksum. The bounds on the counts keep each array within the JDK's soft maximum array length,
-   * {@code 2^31 - 9}, the largest array the library allocates. The arrays follow the rules of
-   * {@link #of(int[], int[])}. The edge count repeats {@code outAdjacencyStart[nodeCount]}, so
-   * that a reader finds the second array without reading the first.
+   * The arrays follow the rules of {@link #of(int[], int[])}. Nothing else is written: no
+   * padding, checksum, magic number or version. So a graph takes exactly
+   * 8 + 4 x (nodeCount + 1 + edgeCount) bytes, and {@link #readFrom(InputStream)} recognizes
+   * foreign data only where it does not form a valid graph. Every implementation of Graphity reads
+   * and writes this format, so a graph written in one language can be read in another.
    * <p>
-   * There is no magic number and no version, because the caller knows from its own data model what
-   * a stream holds, and {@link #readFrom(InputStream)} rejects data that does not form a graph.
+   * Writes in blocks of up to 64 KiB, so {@code out} needs a {@link java.io.BufferedOutputStream}
+   * only if other data shares it in small pieces, as in the example.
    * <p>
-   * The format is platform-independent: nothing but the arrays as 32-bit integers, no Java
-   * serialization. Little-endian, so that consumers on common hardware - a JavaScript
-   * {@code Int32Array} over the buffer, a NumPy array of type {@code <i4} - read the arrays without
-   * conversion; the header keeps them 4-byte aligned.
-   * <p>
-   * The format holds topology only. Node IDs are kept, and edge {@code e} of the read graph is
-   * edge {@code e} of the written one, so data per node or per edge stored separately in arrays
-   * indexed by those IDs stays aligned with the graph.
-   * <p>
-   * A {@link BiAdjacentGraph} writes only its out-adjacency.
-   * <p>
-   * Writes in blocks of 64 KiB, so a file stream needs a {@link java.io.BufferedOutputStream} only
-   * if other data shares it in small pieces.
-   *
-   * <pre>{@code
-   * try (var out = Files.newOutputStream(path)) {
-   *     graph.writeTo(out);
-   * }
-   * Graph loaded;
-   * try (var in = Files.newInputStream(path)) {
-   *     loaded = Graph.readFrom(in);
-   * }
-   * }</pre>
-   *
    * <strong>Time:</strong> O(nodeCount + edgeCount).<br>
    * <strong>Memory:</strong> a 64 KiB buffer.
    *
@@ -205,50 +178,48 @@ public sealed class Graph permits BiAdjacentGraph {
   }
 
   /**
-   * Reads a graph that {@link #writeTo(OutputStream)} wrote, in the layout documented there.
+   * Reads a graph that {@link #writeTo(OutputStream)} wrote, with the same node IDs and edge
+   * indices.
    * <p>
-   * Always returns a {@code Graph} without in-adjacency: also for a stream written from a
-   * {@link BiAdjacentGraph}, and also when called as {@code BiAdjacentGraph.readFrom(in)}, which
-   * compiles because a subclass inherits static methods. Derive the in-adjacency again with
-   * {@link BiAdjacentGraph#of(Graph)}.
+   * Reads exactly the bytes of the graph and leaves {@code in} right after them, where data
+   * written after the graph follows. Here, that data is the names of the methods of a program:
+   * {@snippet file="com/kobayami/graphity/examples/Storing.java" region="readFrom"}
+   * The result has no in-adjacency, even if the stream was written from a {@link BiAdjacentGraph}
+   * and even when called as {@code BiAdjacentGraph.readFrom(in)}; {@link BiAdjacentGraph#of(Graph)}
+   * builds it again.
    * <p>
-   * Reads exactly the bytes of one graph and leaves the stream after them. The arrays are checked
-   * as by {@link #of(int[], int[])}, but the graph keeps the arrays read, without the copy
-   * {@code of} makes. Arrays grow with the data that actually arrives, so a header that
-   * announces more than the stream holds fails at the end of the stream, not with an allocation
-   * of the announced size.
-   * <p>
-   * Reads in blocks of up to 64 KiB, so a file stream needs a {@link java.io.BufferedInputStream}
-   * only if other data shares it in small pieces.
+   * The arrays are checked as by {@link #of(int[], int[])}, but not copied. They grow with the data
+   * that arrives, so a header that announces more than the stream holds ends in an
+   * {@link java.io.EOFException}, not in an allocation of the announced size. Reads in blocks of
+   * up to 64 KiB, so {@code in} needs a {@link java.io.BufferedInputStream} only if other data
+   * shares it in small pieces.
    * <p>
    * <strong>Time:</strong> O(nodeCount + edgeCount).<br>
-   * <strong>Memory:</strong> 4 x (nodeCount + 1 + edgeCount) bytes for the result, plus a
-   * 64 KiB buffer. While an array grows, the old and the new one coexist: the peak is up to
-   * twice the larger array, the price of not trusting the header.
+   * <strong>Memory:</strong> 4 x (nodeCount + edgeCount) bytes for the result and a 64 KiB
+   * buffer; while an array grows, briefly up to 4 x max(nodeCount, edgeCount) bytes more.
    *
    * @param in the stream to read from; not closed
    * @return the graph
    * @throws java.io.EOFException if the stream ends before the graph does
-   * @throws IOException if reading fails, the header has a count outside the bounds of the
-   *                     layout, or the arrays do not form a valid graph; invalid arrays carry the
-   *                     exception of {@link #of(int[], int[])} as cause
+   * @throws IOException if reading fails, a count in the header is negative or larger than a
+   *                     graph can have, or the arrays do not form a graph that
+   *                     {@link #of(int[], int[])} accepts, whose exception is then the cause
    */
   public static Graph readFrom(InputStream in) throws IOException {
     return CsrStreams.read(in);
   }
 
-  /** The offset array, for {@link Csr}. */
+  // For Csr, which hands the arrays to the algorithms of the core and of other modules.
   final int[] outAdjacencyStart() {
     return outAdjacencyStart;
   }
 
-  /** The target array, for {@link Csr}. */
   final int[] outAdjacency() {
     return outAdjacency;
   }
 
   /**
-   * Returns the number of nodes in this graph.
+   * Returns the number of nodes.
    * <p>
    * <strong>Time:</strong> O(1).
    *
@@ -259,7 +230,7 @@ public sealed class Graph permits BiAdjacentGraph {
   }
 
   /**
-   * Returns the number of edges (directed) in this graph.
+   * Returns the number of edges.
    * <p>
    * <strong>Time:</strong> O(1).
    *
@@ -270,18 +241,19 @@ public sealed class Graph permits BiAdjacentGraph {
   }
 
   /**
-   * Returns {@code true} if this graph contains no nodes (and therefore no edges).
+   * Returns whether this graph has no nodes. Equivalent to {@code nodeCount() == 0}.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @return {@code true} if {@code nodeCount() == 0}
+   * @return {@code true} if there are no nodes
    */
   public final boolean isEmpty() {
     return nodeCount() == 0;
   }
 
   /**
-   * Returns the out-degree (number of outgoing edges) of {@code node}.
+   * Returns the out-degree of {@code node}. That is the number of edges with {@code node} as
+   * source.
    * <p>
    * <strong>Time:</strong> O(1).
    *
@@ -295,13 +267,15 @@ public sealed class Graph permits BiAdjacentGraph {
   }
 
   /**
-   * Returns a zero-copy view of {@code node}'s out-nodes, sorted ascending.
-   * Out-nodes are the successors of {@code node} (targets of its outgoing edges).
+   * Returns the out-nodes of {@code node} in ascending order. These are the targets of the edges
+   * with {@code node} as source.
+   * <p>
+   * The result is a view of this graph's own array, not a copy.
    * <p>
    * <strong>Time:</strong> O(1).
    *
    * @param node node ID in {@code 0..nodeCount()-1}
-   * @return out-nodes as a read-only sorted view
+   * @return out-nodes
    * @throws IndexOutOfBoundsException if {@code node} is out of range
    */
   public final SortedIntView outNodes(int node) {
@@ -310,17 +284,19 @@ public sealed class Graph permits BiAdjacentGraph {
   }
 
   /**
-   * Returns the edge index of the first out-edge of the given node.
+   * Returns the start of the edge index range of the out-edges of {@code node}. The out-edges are
+   * the edges with {@code node} as source.
    * <p>
-   * Together with {@link #outEdgeEnd(int)}, this defines the edge index range for
-   * a node's out-edges: {@code outEdgeStart(node)..outEdgeEnd(node)-1}. Edge indices
-   * correspond to positions in the CSR adjacency array and can be used as keys for
-   * external edge metadata (e.g. {@code weights[edgeIndex]}).
+   * Their edge indices are {@code outEdgeStart(node)..outEdgeEnd(node)-1}, in the order of
+   * {@link #outNodes(int)}; the range is empty if {@code node} has no out-edges. A loop over the
+   * range reads the data of each edge from arrays indexed by edge index. Here, it lists the methods
+   * that {@code run} calls, with the number of call sites of each call in {@code siteCount}:
+   * {@snippet file="com/kobayami/graphity/examples/EdgeData.java" region="outEdges"}
    * <p>
    * <strong>Time:</strong> O(1).
    *
    * @param node node ID in {@code 0..nodeCount()-1}
-   * @return edge index of the first out-edge (equal to {@code outEdgeEnd(node)} if no out-edges)
+   * @return start of the range
    * @throws IndexOutOfBoundsException if {@code node} is out of range
    */
   public final int outEdgeStart(int node) {
@@ -329,15 +305,13 @@ public sealed class Graph permits BiAdjacentGraph {
   }
 
   /**
-   * Returns the edge index past the last out-edge of the given node (exclusive).
-   * <p>
-   * Together with {@link #outEdgeStart(int)}, this defines the edge index range for
-   * a node's out-edges.
+   * Returns the end, exclusive, of the edge index range of the out-edges of {@code node}; see
+   * {@link #outEdgeStart(int)}.
    * <p>
    * <strong>Time:</strong> O(1).
    *
    * @param node node ID in {@code 0..nodeCount()-1}
-   * @return edge index past the last out-edge (exclusive)
+   * @return end of the range, exclusive
    * @throws IndexOutOfBoundsException if {@code node} is out of range
    */
   public final int outEdgeEnd(int node) {
@@ -348,30 +322,23 @@ public sealed class Graph permits BiAdjacentGraph {
   /**
    * Returns the node IDs {@code 0..nodeCount()-1} as a stream, in ascending order.
    * <p>
-   * <strong>Time:</strong> O(1) to create; the stream yields nodeCount values.
+   * <strong>Time:</strong> O(1) to create the stream.
    *
-   * @return the node IDs
+   * @return node IDs
    */
   public final IntStream nodes() {
     return IntStream.range(0, nodeCount());
   }
 
   /**
-   * Calls {@code action} once per edge with its source, target and edge index, in edge index
-   * order - that is, by source and then target. On a {@link BiAdjacentGraph} these are its
-   * edges, each once, as stored in the out-adjacency.
+   * Calls {@code action} for every edge with its source, target and edge index, in edge index
+   * order.
    * <p>
-   * Walks the out-adjacency arrays, so the source of each edge costs nothing, unlike
-   * {@link #edgeSource(int)} per edge.
-   *
-   * <pre>{@code
-   * graph.forEachEdge((source, target, edgeIndex) ->
-   *     System.out.println(names[source] + " -> " + names[target] + ": " + weights[edgeIndex]));
-   * }</pre>
-   *
+   * The source comes with each edge at no cost, whereas {@link #edgeSource(int)} searches for it.
+   * <p>
    * <strong>Time:</strong> O(nodeCount + edgeCount).
    *
-   * @param action called with {@code (source, target, edgeIndex)} for every edge
+   * @param action called with {@code (source, target, edgeIndex)} for each edge
    */
   public final void forEachEdge(EdgeConsumer action) {
     int n = nodeCount();
@@ -383,7 +350,7 @@ public sealed class Graph permits BiAdjacentGraph {
   }
 
   /**
-   * Returns the target node of the edge at the given edge index.
+   * Returns the target of edge {@code edgeIndex}.
    * <p>
    * <strong>Time:</strong> O(1).
    *
@@ -397,9 +364,10 @@ public sealed class Graph permits BiAdjacentGraph {
   }
 
   /**
-   * Returns the source node of the edge at the given edge index.
+   * Returns the source of edge {@code edgeIndex}.
    * <p>
-   * Uses binary search over the CSR offset array.
+   * Unlike the target, the source is searched for; {@link #forEachEdge(EdgeConsumer)} gives every
+   * edge with its source without a search.
    * <p>
    * <strong>Time:</strong> O(log nodeCount).
    *
@@ -424,12 +392,12 @@ public sealed class Graph permits BiAdjacentGraph {
   }
 
   /**
-   * Tests whether the edge {@code node → outNode} exists.
+   * Returns whether the edge {@code node -> outNode} exists.
    * <p>
-   * <strong>Time:</strong> O(log outDegree) via binary search.
+   * <strong>Time:</strong> O(log outDegree(node)).
    *
    * @param node    node ID in {@code 0..nodeCount()-1}
-   * @param outNode potential out-node ID
+   * @param outNode node ID; a value out of range yields {@code false}
    * @return {@code true} if the edge exists
    * @throws IndexOutOfBoundsException if {@code node} is out of range
    */
@@ -440,24 +408,18 @@ public sealed class Graph permits BiAdjacentGraph {
   }
 
   /**
-   * Returns the edge index of the edge {@code source → target}, or {@code -1} if there is none.
+   * Returns the edge index of the edge {@code source -> target}, or {@code -1} if there is none.
    * <p>
-   * {@link GraphBuilder#build()} sorts every adjacency list and merges duplicate edges, so the
-   * k-th added edge does not keep index k. This lookup translates an insertion to its final
-   * index; insertions that map to the same index are the duplicates that were merged:
+   * {@link GraphBuilder} sorts the edges and merges duplicates, so an edge does not keep the
+   * position at which it was added; this method finds where it went. Here, {@code calls} was built
+   * with one edge per call site, and the call sites of each call are counted:
+   * {@snippet file="com/kobayami/graphity/examples/EdgeData.java" region="edgeIndexOf"}
+   * <p>
+   * <strong>Time:</strong> O(log outDegree(source)).
    *
-   * <pre>{@code
-   * int[] edgeOfInsertion = new int[insertions];
-   * for (int k = 0; k < insertions; k++) {
-   *     edgeOfInsertion[k] = graph.edgeIndexOf(sources[k], targets[k]);
-   * }
-   * }</pre>
-   *
-   * <strong>Time:</strong> O(log outDegree(source)) via binary search.
-   *
-   * @param source source node ID in {@code 0..nodeCount()-1}
-   * @param target target node ID; any value, an out-of-range one yields {@code -1}
-   * @return edge index in {@code 0..edgeCount()-1}, or {@code -1} if the edge does not exist
+   * @param source node ID in {@code 0..nodeCount()-1}
+   * @param target node ID; a value out of range yields {@code -1}
+   * @return edge index in {@code 0..edgeCount()-1}, or {@code -1}
    * @throws IndexOutOfBoundsException if {@code source} is out of range
    */
   public final int edgeIndexOf(int source, int target) {
@@ -467,10 +429,10 @@ public sealed class Graph permits BiAdjacentGraph {
   }
 
   /**
-   * Tests whether {@code node} has a self-loop (an edge to itself).
-   * Equivalent to {@link #hasOutNode(int, int) hasOutNode(node, node)}.
+   * Returns whether {@code node} has an edge to itself, called a self-loop. Equivalent to
+   * {@link #hasOutNode(int, int) hasOutNode(node, node)}.
    * <p>
-   * <strong>Time:</strong> O(log outDegree) via binary search.
+   * <strong>Time:</strong> O(log outDegree(node)).
    *
    * @param node node ID in {@code 0..nodeCount()-1}
    * @return {@code true} if the edge {@code node -> node} exists
@@ -480,10 +442,7 @@ public sealed class Graph permits BiAdjacentGraph {
     return hasOutNode(node, node);
   }
 
-  /**
-   * Builds the in-adjacency of this graph; the body of {@link BiAdjacentGraph#of(Graph)} for a
-   * graph that is not yet bi-adjacent.
-   */
+  // The body of BiAdjacentGraph.of(Graph) for a graph without in-adjacency.
   final BiAdjacentGraph withInAdjacency() {
     int n = nodeCount();
     int m = edgeCount();
@@ -522,21 +481,22 @@ public sealed class Graph permits BiAdjacentGraph {
   }
 
   /**
-   * Returns a {@link Graph} with only out-adjacency, dropping any in-adjacency data.
-   * If already uni-adjacent, returns {@code this}.
+   * Returns a graph with the same nodes and edges, without in-adjacency. A plain {@code Graph}
+   * returns itself, and a {@link BiAdjacentGraph} returns a {@code Graph} over its out-adjacency.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @return a graph with out-adjacency only
+   * @return this graph, or a graph over the out-adjacency of a {@code BiAdjacentGraph}
    */
   public Graph uniAdjacentGraph() {
     return this;
   }
 
   /**
-   * Two graphs are equal if they have the same nodes and edges.
-   * The concrete type ({@link Graph} vs {@link BiAdjacentGraph}) is irrelevant -
-   * a bi-adjacent graph equals its uni-adjacent counterpart.
+   * Returns whether {@code obj} is a graph with the same nodes and edges.
+   * <p>
+   * The in-adjacency does not count: a {@link BiAdjacentGraph} equals a {@code Graph} with the
+   * same nodes and edges.
    * <p>
    * <strong>Time:</strong> O(nodeCount + edgeCount).
    */
@@ -549,11 +509,10 @@ public sealed class Graph permits BiAdjacentGraph {
   }
 
   /**
-   * Hash code consistent with {@link #equals(Object)}, computed over nodes and edges.
+   * Returns a hash code over the nodes and edges, consistent with {@link #equals(Object)}.
    * <p>
-   * Computed on every call, so every lookup of a graph in a hash-based collection walks the whole
-   * graph. To key a cache by structure, compute {@link Graphs#topologyHash(Graph)} once and keep
-   * it.
+   * It is computed on every call, so each lookup of a graph in a hash-based collection walks the
+   * whole graph. {@link Graphs#topologyHash(Graph)} gives a 64-bit hash to compute once and keep.
    * <p>
    * <strong>Time:</strong> O(nodeCount + edgeCount).
    */
@@ -563,20 +522,15 @@ public sealed class Graph permits BiAdjacentGraph {
   }
 
   /**
-   * Returns the node and edge counts and the out-nodes of the first nodes, bounded regardless of
-   * the graph's size, for debuggers and logs:
-   * <pre>
-   * Graph[nodes=5, edges=4] {0 -&gt; [1, 2], 1 -&gt; [3], 2 -&gt; [], 3 -&gt; [4], 4 -&gt; []}
-   * </pre>
-   * At most 16 nodes and 64 out-nodes in total are listed; {@code ...} marks where a list or the
-   * listing is cut - after node 15 in a larger graph, inside the list that reaches the 64th
-   * out-node, as in {@code {0 -> [1, 2, 3, ..., 64, ...], ...}} for a hub. A
-   * {@link BiAdjacentGraph} is named as such and lists its out-adjacency. For the complete
-   * listing, use {@link Graphs#adjacencyListOf(Graph)}.
+   * Returns the node and edge counts and the out-nodes of the first nodes, for debuggers and logs.
+   * For the control flow of a method with a loop:
+   * {@snippet file="com/kobayami/graphity/examples/Building.java" region="toString"}
+   * The text stays short however large the graph: it lists at most 16 nodes and 64 out-nodes in
+   * total. {@code ...} marks where it is cut - after the 16th node, or inside the list that would
+   * go beyond 64 out-nodes. A {@link BiAdjacentGraph} is named as such and lists its out-nodes.
+   * {@link Graphs#adjacencyListOf(Graph)} gives the whole graph as text.
    * <p>
-   * <strong>Time:</strong> O(1) - bounded by the limits above.
-   *
-   * @return a bounded description of this graph
+   * <strong>Time:</strong> O(1), as the text is bounded.
    */
   @Override
   public final String toString() {

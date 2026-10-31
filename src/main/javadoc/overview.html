@@ -5,75 +5,170 @@
 </head>
 <body>
 <p>
-Graph analysis algorithms for Java on a compact, immutable graph: connected components, bridges
-and articulation points, topological order, cycle and edge classification, reachability and
-breadth-first distances, tree ancestry, dominators and loops, and quotient graphs.
+Graphity is a Java graph library which keeps graphs in a compact, immutable form and provides
+algorithms on top of it, such as strongly and weakly connected components, bridges and articulation
+points, topological order and levels, cycle detection and edge classification, breadth-first
+distances and reachability, lowest common ancestors, dominators, loop nesting and condensed graphs.
 </p>
 <p>
-Built for compiler and analysis pipelines - syntax trees, control- and data-flow graphs,
-dependency graphs. Every algorithm runs without recursion and returns a typed result with
-follow-up queries. Data on nodes and edges stays in arrays you own, indexed by node ID or edge
-index.
+Every algorithm returns a typed, immutable result with follow-up queries, and runs without
+recursion, so deep graphs do not overflow the call stack. Data on nodes and edges stays in your own
+arrays, indexed by node ID or edge index, and every transformation tells you how to carry them
+along. The graph itself stores only structure: 4 bytes per node and per edge, in a compressed sparse
+row (CSR) layout, which is where speed and footprint come from.
 </p>
+
+<h1>Where to start</h1>
+<p>
+The nodes of a {@link com.kobayami.graphity.Graph} are the {@code int} IDs
+{@code 0..nodeCount()-1}, and its edges are numbered by edge index {@code 0..edgeCount()-1},
+ordered by source and then by target.
+{@link com.kobayami.graphity.GraphBuilder} builds a graph from edges in any order. The algorithms
+are not methods of the graph but static methods: {@code of} on a class named after the
+algorithm, such as {@link com.kobayami.graphity.TopOrder#of(com.kobayami.graphity.Graph)
+TopOrder.of} and
+{@link com.kobayami.graphity.Dominators#of(com.kobayami.graphity.BiAdjacentGraph, int)
+Dominators.of}; the methods of {@link com.kobayami.graphity.Components} for the components; and
+those of {@link com.kobayami.graphity.Graphs} for the rest, such as
+{@link com.kobayami.graphity.Graphs#findCycle(com.kobayami.graphity.Graph) Graphs.findCycle}.
+</p>
+<p>
+A {@code Graph} holds the out-nodes of every node.
+{@link com.kobayami.graphity.BiAdjacentGraph#of(com.kobayami.graphity.Graph) BiAdjacentGraph.of}
+adds the in-nodes. The algorithms that need them, such as {@link com.kobayami.graphity.Dominators}
+and {@link com.kobayami.graphity.Components#biconnectivityOf(com.kobayami.graphity.BiAdjacentGraph)
+Components.biconnectivityOf}, take a {@code BiAdjacentGraph}: build it once and pass it to all of
+them.
+</p>
+<p>
+The following example builds a graph of the dependencies between the packages of a small Java
+program. These dependencies contain a cycle:
+{@snippet file="com/kobayami/graphity/examples/GettingStarted.java" region="firstResult"}
+</p>
+
+<h1>Where to find what</h1>
 <table class="striped">
-<caption>Algorithms by question</caption>
+<caption>Entry points by question</caption>
 <thead>
 <tr><th scope="col">Question</th><th scope="col">Entry points</th></tr>
 </thead>
 <tbody>
-<tr><td>Which parts belong together?</td>
-<td>{@link com.kobayami.graphity.Components}: strongly and weakly connected components, bridges,
-articulation points, biconnected components, strong bridges</td></tr>
-<tr><td>In which order, and where are the cycles?</td>
-<td>{@link com.kobayami.graphity.TopOrder}, {@link com.kobayami.graphity.TopOrderAndLevels},
-{@link com.kobayami.graphity.EdgeTypes}, {@link com.kobayami.graphity.BackEdges},
-{@link com.kobayami.graphity.Graphs#isDag(com.kobayami.graphity.Graph)},
-{@link com.kobayami.graphity.Graphs#findCycle(com.kobayami.graphity.Graph)}</td></tr>
-<tr><td>What is reachable, and how far?</td>
-<td>{@link com.kobayami.graphity.BfsDistances},
-{@link com.kobayami.graphity.Graphs#reachableFrom(com.kobayami.graphity.Graph, int)},
-{@link com.kobayami.graphity.Graphs#transitiveClosure(com.kobayami.graphity.Graph)},
-{@link com.kobayami.graphity.Graphs#transitiveReduction(com.kobayami.graphity.Graph)}</td></tr>
-<tr><td>Who is the ancestor of whom in a tree?</td>
-<td>{@link com.kobayami.graphity.Ancestry}, {@link com.kobayami.graphity.PreorderAncestry}</td></tr>
-<tr><td>Which node dominates which?</td>
-<td>{@link com.kobayami.graphity.Dominators}</td></tr>
-<tr><td>Where are the loops, where do phi-nodes go, what controls what? (graphity-controlflow)</td>
-<td>{@link com.kobayami.graphity.controlflow.Loops},
-{@link com.kobayami.graphity.controlflow.IteratedDominanceFrontier},
-{@link com.kobayami.graphity.controlflow.ControlFlow}</td></tr>
-<tr><td>How do I contract, filter or renumber a graph?</td>
-<td>{@link com.kobayami.graphity.NodePartition},
-{@link com.kobayami.graphity.Graphs#remapped(com.kobayami.graphity.Graph, com.kobayami.graphity.NodeMapping)}
-with a {@link com.kobayami.graphity.NodeMapping} from
-{@link com.kobayami.graphity.NodeMapping#forSubgraph(java.util.BitSet)},
-{@link com.kobayami.graphity.NodeMapping#forPermutation(it.unimi.dsi.fastutil.ints.IntList)},
-{@link com.kobayami.graphity.NodeMapping#reindex(com.kobayami.graphity.Graph)} or
-{@link com.kobayami.graphity.NodeMapping#of(int[])}</td></tr>
-<tr><td>How does my edge data follow a transformation?</td>
-<td>{@link com.kobayami.graphity.Graphs#edgeMapping(com.kobayami.graphity.Graph, com.kobayami.graphity.Graph, com.kobayami.graphity.NodeMapping)},
-{@link com.kobayami.graphity.Graphs#transposedEdgeMapping(com.kobayami.graphity.Graph)},
-{@link com.kobayami.graphity.Graphs#edgePartition(com.kobayami.graphity.Graph, com.kobayami.graphity.NodePartition)}</td></tr>
 <tr><td>How do I build a graph?</td>
-<td>{@link com.kobayami.graphity.GraphBuilder}, or
-{@link com.kobayami.graphity.Graph#of(int[], int[])} from CSR arrays</td></tr>
-<tr><td>How do I store and load a graph?</td>
-<td>{@link com.kobayami.graphity.Graph#writeTo(java.io.OutputStream)},
-{@link com.kobayami.graphity.Graph#readFrom(java.io.InputStream)}</td></tr>
-<tr><td>How do I look at a graph? (graphity-dot, graphity-mermaid)</td>
-<td>{@link com.kobayami.graphity.dot.DotWriter},
-{@link com.kobayami.graphity.mermaid.MermaidWriter}</td></tr>
+<td>{@link com.kobayami.graphity.GraphBuilder} from edges in any order, or
+{@link com.kobayami.graphity.Graph#of(int[], int[]) Graph.of} from the two arrays of a CSR
+layout.</td></tr>
+<tr><td>Which parts belong together?</td>
+<td>{@link com.kobayami.graphity.Components}: strongly and weakly connected components, and the
+connected components of the graph read as undirected; bridges, articulation points and
+biconnected components; strong bridges and strong articulation points.</td></tr>
+<tr><td>In which order, and where are the cycles?</td>
+<td>A topological order ({@link com.kobayami.graphity.TopOrder}), and one with a level per node
+({@link com.kobayami.graphity.TopOrderAndLevels}); whether a graph has a cycle, and one of its
+cycles ({@link com.kobayami.graphity.Graphs#isDag(com.kobayami.graphity.Graph) Graphs.isDag},
+{@link com.kobayami.graphity.Graphs#findCycle(com.kobayami.graphity.Graph) Graphs.findCycle});
+the tree, back, forward and cross edges of a depth-first search
+({@link com.kobayami.graphity.EdgeTypes}, {@link com.kobayami.graphity.BackEdges}).</td></tr>
+<tr><td>What is reachable, and how far?</td>
+<td>The nodes reachable from one or several nodes
+({@link com.kobayami.graphity.Graphs#reachableFrom(com.kobayami.graphity.Graph, int)
+Graphs.reachableFrom}); distances and shortest paths by breadth-first search
+({@link com.kobayami.graphity.BfsDistances}); transitive closure and, for a DAG (directed acyclic
+graph), transitive reduction
+({@link com.kobayami.graphity.Graphs#transitiveClosure(com.kobayami.graphity.Graph)
+Graphs.transitiveClosure},
+{@link com.kobayami.graphity.Graphs#transitiveReduction(com.kobayami.graphity.Graph)
+Graphs.transitiveReduction}).</td></tr>
+<tr><td>Who is the ancestor of whom in a tree?</td>
+<td>Parent, depth and LCA (lowest common ancestor) in a forest
+({@link com.kobayami.graphity.Ancestry}); the ancestor test in O(1) and the nodes of each
+subtree ({@link com.kobayami.graphity.PreorderAncestry}); shape checks such as
+{@link com.kobayami.graphity.Graphs#isTree(com.kobayami.graphity.Graph) Graphs.isTree},
+{@link com.kobayami.graphity.Graphs#isPath(com.kobayami.graphity.Graph) Graphs.isPath} and
+{@link com.kobayami.graphity.Graphs#isBipartite(com.kobayami.graphity.Graph)
+Graphs.isBipartite}.</td></tr>
+<tr><td>Which node dominates which?</td>
+<td>Dominators from one or several entries, and post-dominators on the transposed graph
+({@link com.kobayami.graphity.Dominators}); the dominator tree
+({@link com.kobayami.graphity.Graphs#dominatorTree(com.kobayami.graphity.Dominators)
+Graphs.dominatorTree}).</td></tr>
+<tr><td>Where are the loops, where do phi-nodes go, what controls what?
+({@code graphity-controlflow})</td>
+<td>The loop nesting forest, irreducible loops included
+({@link com.kobayami.graphity.controlflow.Loops}); the blocks where SSA (static single
+assignment) form places phi-nodes
+({@link com.kobayami.graphity.controlflow.IteratedDominanceFrontier}); dominance frontiers and
+control dependence ({@link com.kobayami.graphity.controlflow.ControlFlow}).</td></tr>
+<tr><td>How do I condense, filter or renumber a graph?</td>
+<td>The condensed graph of a partition of your choosing
+({@link com.kobayami.graphity.NodePartition#condense() NodePartition.condense}); subgraphs and
+renumbered graphs
+({@link com.kobayami.graphity.Graphs#remapped(com.kobayami.graphity.Graph,
+com.kobayami.graphity.NodeMapping) Graphs.remapped} with a
+{@link com.kobayami.graphity.NodeMapping}); the transposed graph, without copying
+({@link com.kobayami.graphity.BiAdjacentGraph#transposed() BiAdjacentGraph.transposed}).</td></tr>
+<tr><td>How does my data follow a transformation?</td>
+<td>{@link com.kobayami.graphity.NodeMapping} for data on nodes;
+{@link com.kobayami.graphity.Graphs#edgeMapping(com.kobayami.graphity.Graph,
+com.kobayami.graphity.Graph, com.kobayami.graphity.NodeMapping) Graphs.edgeMapping},
+{@link com.kobayami.graphity.Graphs#transposedEdgeMapping(com.kobayami.graphity.Graph)
+Graphs.transposedEdgeMapping} and
+{@link com.kobayami.graphity.Graphs#edgePartition(com.kobayami.graphity.Graph,
+com.kobayami.graphity.NodePartition) Graphs.edgePartition} for data on edges.</td></tr>
+<tr><td>How do I store, load and compare graphs?</td>
+<td>{@link com.kobayami.graphity.Graph#writeTo(java.io.OutputStream) Graph.writeTo} and
+{@link com.kobayami.graphity.Graph#readFrom(java.io.InputStream) Graph.readFrom}, as the two
+arrays of the CSR layout; a 64-bit hash of the nodes and edges
+({@link com.kobayami.graphity.Graphs#topologyHash(com.kobayami.graphity.Graph)
+Graphs.topologyHash}); the edges added and removed between two versions of a graph
+({@link com.kobayami.graphity.Graphs#diff(com.kobayami.graphity.Graph, com.kobayami.graphity.Graph)
+Graphs.diff}).</td></tr>
+<tr><td>How do I look at a graph? ({@code graphity-dot}, {@code graphity-mermaid})</td>
+<td>{@link com.kobayami.graphity.dot.DotWriter} and
+{@link com.kobayami.graphity.mermaid.MermaidWriter}, with labels, attributes, shapes and
+clusters from your own arrays;
+{@link com.kobayami.graphity.Graphs#adjacencyListOf(com.kobayami.graphity.Graph)
+Graphs.adjacencyListOf} for a whole graph as text.</td></tr>
+<tr><td>How do I write a search of my own?</td>
+<td>The base classes of depth-first and breadth-first searches, without recursion
+({@link com.kobayami.graphity.DfsTraverser}, {@link com.kobayami.graphity.DfsEdgeTraverser},
+{@link com.kobayami.graphity.FrontierTraverser}); {@link com.kobayami.graphity.Csr} hands the
+arrays of a graph to loops of your own.</td></tr>
 </tbody>
 </table>
 <p>
-The library comes as modules released together at the same version: {@code graphity-core} with
-the graph, the builder and every algorithm that applies to any directed graph,
-{@code graphity-controlflow} with the analyses that need the concepts of control flow,
-{@code graphity-dot} with a writer for DOT and {@code graphity-mermaid} with a writer for
-Mermaid. The package documentation of {@link com.kobayami.graphity},
-{@link com.kobayami.graphity.controlflow}, {@link com.kobayami.graphity.dot} and
-{@link com.kobayami.graphity.mermaid} lists the main entry points by topic, each with a short
-description.
+The documentation of each package, listed below, groups its entry points by topic, and the
+documentation of each class names the algorithm it uses.
 </p>
+
+<h1>Contracts</h1>
+<p>
+Every method states its contract: what it returns and throws, whether a result is a view or a
+copy, in which order the results come where that matters, and its cost in time and memory. Three
+rules hold across the whole API:
+</p>
+<ul>
+<li>No parameter, return value or element in the API is {@code null} unless its type is
+annotated {@code @Nullable}.</li>
+<li>Graphs, mappings, partitions and the results of the algorithms are immutable and safe to
+share between threads. The builder, the traversers and the writers are mutable and not safe to
+share between threads.</li>
+<li>A node ID, an edge index or any other ID or position outside its range throws
+{@link java.lang.IndexOutOfBoundsException}; any other invalid argument throws
+{@link java.lang.IllegalArgumentException}.</li>
+</ul>
+
+<h1>Further references</h1>
+<ul>
+<li><b>Guide:</b> <a href="https://kaufco.github.io/graphity-doc/?lang=java">kaufco.github.io/graphity-doc</a>
+- one page per problem, from building a graph to control-flow analysis: the problem, the graph before
+and after, and tested code, with an index by API and a glossary.</li>
+<li><b>README:</b> <a href="https://github.com/kaufco/graphity#readme">kaufco/graphity</a>
+- how to add Graphity to a project, a first complete program, and how it compares with other
+libraries.</li>
+<li><b>Repository:</b> <a href="https://github.com/kaufco/graphity">kaufco/graphity</a>
+- the source code, the changelog and the issues.</li>
+</ul>
+
+<h1>Packages</h1>
 </body>
 </html>

@@ -3,38 +3,28 @@ package com.kobayami.graphity;
 import java.util.Objects;
 
 /**
- * Strongly connected components of a directed {@link Graph}.
+ * The SCCs (strongly connected components) of a graph, as {@link Components#sccsOf(Graph)}
+ * returns them.
  * <p>
- * Each node belongs to exactly one SCC, identified by an SCC ID in {@code 0..groupCount()-1}.
- * Trivial SCCs (single node, no self-loop) are included - use {@link #containsCycle(int)} to
- * distinguish trivial from non-trivial components.
+ * It is a {@link NodePartition} whose groups are the SCCs, numbered by SCC ID
+ * {@code 0..sccCount()-1}. {@link #sccOf(int)} returns the SCC of a node and {@link #nodesOf(int)}
+ * the nodes of an SCC. {@link #containsCycle(int)} distinguishes the SCCs with a cycle from those
+ * of a single node without one. {@link #condense()} returns the DAG (directed acyclic graph) of
+ * the SCCs.
  * <p>
- * SCC IDs are assigned in <strong>reverse topological order</strong> of the component DAG:
- * the first completed SCC (a "sink" with no outgoing edges to other SCCs) gets SCC ID 0.
+ * Every node is in exactly one SCC; a node that lies on no cycle is an SCC of its own. SCC IDs are
+ * in reverse topological order: every edge between two SCCs goes from the higher SCC ID to the
+ * lower one, so SCC {@code 0} has no edges to other SCCs. The nodes of each SCC are in ascending
+ * order. Here, {@code dependencies} are the dependencies between the packages of a program, and
+ * {@code names} holds the names of the packages. The example groups the packages by SCC, in the
+ * order of the SCC IDs. In this order, each package comes after the packages it uses, and the
+ * packages that use each other come together:
+ * {@snippet file="com/kobayami/graphity/examples/Connectivity.java" region="sccsOf"}
  * <p>
- * Extends {@link NodePartition}: use {@link #sccOf(int)} for node → SCC ID,
- * {@link #nodesOf(int)} for SCC ID → nodes, {@link #sccCount()} for the number of SCCs. The
- * generic {@link #get(int)} and {@link #groupCount()} answer the same.
+ * Instances are immutable and safe to share between threads.
  * <p>
- * Obtain via {@link Components#sccsOf(Graph)}:
- * <pre>{@code
- * var sccs = Components.sccsOf(graph);
- * sccs.sccCount();             // number of SCCs
- * var scc = sccs.sccOf(node);  // SCC ID of this node
- * sccs.sizeOf(scc);            // number of nodes in this SCC
- * sccs.nodesOf(scc);           // sorted view of nodes in this SCC
- * sccs.containsCycle(scc);     // does this SCC contain a cycle?
- * Graph condensed = sccs.condense(); // condensation DAG
- * }</pre>
- *
- * <strong>Time:</strong> O(nodeCount + edgeCount) for computation, plus sorting the members of
- * each component: O(nodeCount x log nodeCount) in the worst case, as for
- * {@link Components#sccsOf(Graph)}.<br>
- * <strong>Memory:</strong> O(nodeCount) for the result; O(nodeCount) additional during computation.
- *
- * @see Graph
- * @see NodePartition
- * @see Components
+ * <strong>Memory:</strong> 4 x (2 x nodeCount + sccCount) bytes; the graph is shared, not
+ * copied.
  */
 public final class Sccs extends NodePartition {
 
@@ -43,12 +33,12 @@ public final class Sccs extends NodePartition {
   }
 
   /**
-   * Returns the SCC ID of the given node. Equivalent to {@link #get(int)}.
+   * Returns the SCC ID of {@code node}. Equivalent to {@link #get(int) get(node)}.
    * <p>
    * <strong>Time:</strong> O(1).
    *
    * @param node node ID in {@code 0..nodeCount()-1}
-   * @return SCC ID in {@code 0..sccCount()-1}
+   * @return SCC ID
    * @throws IndexOutOfBoundsException if {@code node} is out of range
    */
   public int sccOf(int node) {
@@ -60,21 +50,21 @@ public final class Sccs extends NodePartition {
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @return number of SCCs
+   * @return SCC count
    */
   public int sccCount() {
     return groupCount();
   }
 
   /**
-   * Returns whether the given SCC contains a cycle.
-   * An SCC is cyclic if it has more than one node, or if its single node has a self-loop.
+   * Returns whether SCC {@code sccId} contains a cycle: whether it has more than one node, or a
+   * single node with a self-loop.
    * <p>
-   * <strong>Time:</strong> O(1) for multi-node SCCs; O(log outDegree) for single-node SCCs
-   * (self-loop check via binary search).
+   * <strong>Time:</strong> O(1) for an SCC of more than one node, O(log outDegree(v)) for an SCC
+   * of a single node {@code v}.
    *
-   * @param sccId SCC ID in {@code 0..groupCount()-1}
-   * @return {@code true} if this SCC contains a cycle
+   * @param sccId SCC ID in {@code 0..sccCount()-1}
+   * @return {@code true} if the SCC contains a cycle
    * @throws IndexOutOfBoundsException if {@code sccId} is out of range
    */
   public boolean containsCycle(int sccId) {
@@ -84,8 +74,10 @@ public final class Sccs extends NodePartition {
   }
 
   /**
-   * Returns whether the graph is strongly connected (consists of at most one SCC).
-   * An empty graph (0 nodes) is considered strongly connected (vacuously true).
+   * Returns whether the graph is strongly connected: whether it has at most one SCC. Equivalent to
+   * {@code sccCount() <= 1}.
+   * <p>
+   * A graph without nodes counts as strongly connected.
    * <p>
    * <strong>Time:</strong> O(1).
    *

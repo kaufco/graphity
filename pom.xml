@@ -101,9 +101,9 @@
     <jmh.version>1.37</jmh.version>
     <jol.version>0.17</jol.version>
 
-    <!-- Error Prone 2.43 and later need JDK 21 to run; 2.42 is the last release that runs
-         on JDK 17, the oldest JDK the build is tested on. NullAway needs Error Prone 2.36+. -->
-    <errorprone.version>2.42.0</errorprone.version>
+    <!-- Error Prone runs inside javac, on the JDK 25 of the build; from 2.43 on, it needs JDK 21
+         or newer to run. NullAway needs Error Prone 2.36+. -->
+    <errorprone.version>2.51.0</errorprone.version>
     <nullaway.version>0.14.2</nullaway.version>
 
     <compiler-plugin.version>3.11.0</compiler-plugin.version>
@@ -116,6 +116,7 @@
     <build-helper-plugin.version>3.6.1</build-helper-plugin.version>
     <gpg-plugin.version>3.2.8</gpg-plugin.version>
     <central-publishing-plugin.version>0.11.0</central-publishing-plugin.version>
+    <enforcer-plugin.version>3.5.0</enforcer-plugin.version>
   </properties>
 
   <dependencyManagement>
@@ -254,13 +255,6 @@
                   <arg>-Xplugin:ErrorProne -XepDisableAllChecks -Xep:NullAway:ERROR -XepOpt:NullAway:OnlyNullMarked=true</arg>
                 </compilerArgs>
                 <annotationProcessorPaths>
-                  <!-- Ahead of Error Prone's own Guava 33.4, which makes JDK 24 and later
-                       warn about sun.misc.Unsafe on every build. -->
-                  <path>
-                    <groupId>com.google.guava</groupId>
-                    <artifactId>guava</artifactId>
-                    <version>${guava.version}</version>
-                  </path>
                   <path>
                     <groupId>com.google.errorprone</groupId>
                     <artifactId>error_prone_core</artifactId>
@@ -351,12 +345,24 @@
             <quiet>true</quiet>
             <!-- One title for the per-module Javadoc jars and the aggregated site alike;
                  ${project.name} would name the parent POM on the aggregated site. -->
-            <doctitle>Graphity ${project.version} API</doctitle>
-            <windowtitle>Graphity ${project.version} API</windowtitle>
+            <doctitle>Graphity for Java ${project.version}</doctitle>
+            <windowtitle>Graphity for Java ${project.version}</windowtitle>
             <!-- The doctitle shows only on an overview page, which the aggregated site gets from
                  src/main/javadoc/overview.html and a single-package module jar does not; the
                  header puts the version on every page. -->
-            <header>Graphity ${project.version}</header>
+            <header>Graphity for Java ${project.version}</header>
+            <!-- Types of the dependencies get their short names and a link to their documentation.
+                 The element lists lie in the repository, so the build needs no third-party site. -->
+            <offlineLinks>
+              <offlineLink>
+                <url>https://fastutil.di.unimi.it/docs/</url>
+                <location>${maven.multiModuleProjectDirectory}/src/javadoc-links/fastutil</location>
+              </offlineLink>
+              <offlineLink>
+                <url>https://jspecify.dev/docs/api/</url>
+                <location>${maven.multiModuleProjectDirectory}/src/javadoc-links/jspecify</location>
+              </offlineLink>
+            </offlineLinks>
             <!-- One group per published module on the aggregated site. -->
             <groups>
               <group>
@@ -385,6 +391,19 @@
               <link>https://docs.oracle.com/en/java/javase/17/docs/api/</link>
             </links>
             <linksource>true</linksource>
+            <!-- {@snippet file="..." region="..."} embeds a region of a source file of
+                 graphity-examples, whose build compiles the examples and whose tests check what
+                 their comments claim. An absolute path, because the Javadoc jar of each module
+                 and javadoc:aggregate run in different directories; the directory with .mvn is
+                 the repository root, from wherever Maven starts. -->
+            <additionalOptions>
+              <additionalOption>--snippet-path</additionalOption>
+              <additionalOption>${maven.multiModuleProjectDirectory}/graphity-examples/src/main/java</additionalOption>
+              <!-- The Graphity theme on top of the standard stylesheet, and colored examples. -->
+              <additionalOption>--add-stylesheet</additionalOption>
+              <additionalOption>${maven.multiModuleProjectDirectory}/src/main/javadoc/graphity-javadoc.css</additionalOption>
+              <additionalOption>--syntax-highlight</additionalOption>
+            </additionalOptions>
             <tags>
               <tag><name>apiNote</name><placement>a</placement><head>API Note:</head></tag>
               <tag><name>implSpec</name><placement>a</placement><head>Implementation Requirements:</head></tag>
@@ -394,6 +413,31 @@
         </plugin>
       </plugins>
     </pluginManagement>
+
+    <plugins>
+      <plugin>
+        <!-- One JDK builds everything - CI, releases, the Javadoc site: JDK 25. The code is
+             compiled for Java 17 (release above), the oldest version the library runs on; the CI
+             runs the tests of the JDK 25 build on Java 17, 21 and 25. -->
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <version>${enforcer-plugin.version}</version>
+        <executions>
+          <execution>
+            <id>require-jdk-25</id>
+            <goals><goal>enforce</goal></goals>
+            <configuration>
+              <rules>
+                <requireJavaVersion>
+                  <version>[25,)</version>
+                  <message>Building Graphity needs JDK 25; the library itself runs on Java 17 and newer.</message>
+                </requireJavaVersion>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
   </build>
 
   <!-- Publishing to Maven Central needs PGP signatures and the Central Portal

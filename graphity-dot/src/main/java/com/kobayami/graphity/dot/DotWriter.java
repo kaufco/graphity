@@ -13,51 +13,45 @@ import java.util.function.IntPredicate;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Writes a graph in Graphviz's DOT language, with labels, attributes and clusters taken from the
- * caller's data by node ID and edge index.
- *
- * <pre>{@code
- * DotWriter.of(graph)
- *     .nodeLabel(node -> names[node])
- *     .edgeLabel(edge -> String.valueOf(weights[edge]))
- *     .nodeAttributes((node, attributes) -> {
- *         if (node == entry) attributes.put("shape", "doublecircle");
- *     })
- *     .edgeAttributes((edge, attributes) -> {
- *         if (isBackEdge[edge]) attributes.put("color", "red");
- *     })
- *     .clusters(sccs, scc -> "SCC " + scc)
- *     .write(out);
- * }</pre>
- *
- * Nodes are named by their IDs. The output lists the clusters in group order with their nodes,
- * then the nodes in no cluster, then the edges in edge index order, so the same graph and hooks
- * always give the same text. A node appears only if it carries a label or attributes, or belongs
- * to a cluster, or has no written edge - DOT creates every other node from its edges.
+ * A writer of DOT (the language of Graphviz) that labels and styles a graph with the caller's data
+ * by node ID and edge index.
+ * <p>
+ * {@link #of(Graph)} returns a writer for a graph, the methods that configure it return the writer
+ * again, and {@link #write(Appendable)} or {@link #writeToString()} write the text. The graph holds
+ * no data, so labels and attributes come from hooks that receive a node ID or an edge index and
+ * read the caller's arrays. Here, the packages of a small program get their names from
+ * {@code names}. The strongly connected components {@code sccs} tell which packages are in a
+ * cycle, and these are drawn in red:
+ * {@snippet file="com/kobayami/graphity/examples/WritingDot.java" region="nodeAttributes"}
+ * Nodes are named by their node IDs. The text lists the graph attributes, the clusters in group
+ * order with their nodes, then the nodes in no cluster, then the edges in edge index order, so the
+ * same graph and hooks always give the same text. A node outside the clusters is listed only if it
+ * has a label or attributes, or no edge in the text; Graphviz creates the other nodes from their
+ * edges.
  * <p>
  * Labels and attribute values are written as quoted strings: the writer escapes quotes and
- * backslashes, turns line breaks into DOT's {@code \n}, and writes NUL, which DOT cannot hold, as
- * U+FFFD. Graphviz decodes HTML entities such as {@code &lt;} in labels, so in the attributes
- * {@code label}, {@code xlabel}, {@code headlabel} and {@code taillabel} the writer also turns
- * {@code &} into {@code &amp;}, and a label shows exactly its text; other values, such as a
- * {@code URL}, keep their {@code &}. Attribute names must be identifiers -
- * a letter or underscore, then letters, digits or underscores - other than the DOT keywords
- * {@code node}, {@code edge}, {@code graph}, {@code digraph}, {@code subgraph} and
- * {@code strict}. A hook that returns {@code null} adds nothing.
+ * backslashes and turns line breaks into DOT's {@code \n}. Graphviz decodes HTML entities such as
+ * {@code &lt;} in the attributes {@code label}, {@code xlabel}, {@code headlabel} and
+ * {@code taillabel}. In these, the writer also turns {@code &} into {@code &amp;}, so that a label
+ * shows exactly its text. Other values, such as a {@code URL}, keep their {@code &}. NUL, which
+ * DOT cannot hold, is written as U+FFFD.
  * <p>
- * A writer holds its configuration and may write any number of times. It is not safe for
- * concurrent configuration; the graph itself is only read. For Markdown, issues and
+ * Attribute names must be identifiers - an ASCII letter or underscore, then ASCII letters, digits
+ * or underscores - other than the DOT keywords {@code node}, {@code edge}, {@code graph},
+ * {@code digraph}, {@code subgraph} and {@code strict}, in any letter case.
+ * <p>
+ * A writer keeps its configuration and can write any number of times. For Markdown and
  * documentation, {@code MermaidWriter} in the module {@code graphity-mermaid} writes a Mermaid
  * flowchart.
- *
- * @see AttributeHook
+ * <p>
+ * Instances are mutable and not safe to share between threads.
  */
 public final class DotWriter {
 
   private static final Set<String> KEYWORDS =
       Set.of("node", "edge", "graph", "digraph", "subgraph", "strict");
 
-  /** The attributes whose values Graphviz reads as labels, decoding HTML entities. */
+  // The attributes whose values Graphviz reads as labels, decoding HTML entities.
   private static final Set<String> LABEL_ATTRIBUTES =
       Set.of("label", "xlabel", "headlabel", "taillabel");
 
@@ -73,24 +67,24 @@ public final class DotWriter {
   }
 
   /**
-   * Returns a writer for the graph, with no labels, attributes, clusters or filter yet.
+   * Returns a writer for {@code graph}, with no labels, attributes, clusters or filter yet.
    * <p>
    * <strong>Time:</strong> O(1).
    *
    * @param graph the graph to write
-   * @return a new writer
+   * @return the writer
    */
   public static DotWriter of(Graph graph) {
     return new DotWriter(graph);
   }
 
   /**
-   * Sets a graph attribute, such as {@code rankdir} to {@code LR}.
+   * Sets an attribute of the graph, such as {@code rankdir} to {@code LR}.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param name  the attribute name, an identifier other than a DOT keyword
-   * @param value the value, escaped by the writer
+   * @param name  attribute name, an identifier other than a DOT keyword
+   * @param value attribute value
    * @return this writer
    * @throws IllegalArgumentException if {@code name} is not an identifier or is a DOT keyword
    */
@@ -101,11 +95,11 @@ public final class DotWriter {
 
   /**
    * Sets the label of each node, by node ID; {@code null} leaves a node unlabeled, and Graphviz
-   * then shows its ID.
+   * then shows its node ID.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param label the label of a node
+   * @param label called with a node ID, returns the label of the node or {@code null}
    * @return this writer
    */
   public DotWriter nodeLabel(IntFunction<@Nullable String> label) {
@@ -118,7 +112,7 @@ public final class DotWriter {
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param label the label of an edge
+   * @param label called with an edge index, returns the label of the edge or {@code null}
    * @return this writer
    */
   public DotWriter edgeLabel(IntFunction<@Nullable String> label) {
@@ -127,13 +121,15 @@ public final class DotWriter {
   }
 
   /**
-   * Sets a hook that adds DOT attributes to each node, by node ID - {@code shape},
-   * {@code color}, {@code style} or anything else Graphviz reads. A {@code label} put here
-   * replaces the one from {@link #nodeLabel(IntFunction)}.
+   * Sets the hook that adds DOT attributes, such as {@code shape}, {@code color} or {@code style},
+   * to each node, by node ID.
+   * <p>
+   * The hook receives the label from {@link #nodeLabel(IntFunction)} as the attribute
+   * {@code label}, which it can replace or remove.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param hook adds the attributes of one node
+   * @param hook called with each node that is written, puts its attributes
    * @return this writer
    */
   public DotWriter nodeAttributes(AttributeHook hook) {
@@ -142,12 +138,15 @@ public final class DotWriter {
   }
 
   /**
-   * Sets a hook that adds DOT attributes to each edge, by edge index. A {@code label} put here
-   * replaces the one from {@link #edgeLabel(IntFunction)}.
+   * Sets the hook that adds DOT attributes, such as {@code color} or {@code style}, to each edge,
+   * by edge index.
+   * <p>
+   * The hook receives the label from {@link #edgeLabel(IntFunction)} as the attribute
+   * {@code label}, which it can replace or remove.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param hook adds the attributes of one edge
+   * @param hook called with each edge that is written, puts its attributes
    * @return this writer
    */
   public DotWriter edgeAttributes(AttributeHook hook) {
@@ -156,16 +155,20 @@ public final class DotWriter {
   }
 
   /**
-   * Draws each group of the partition as a cluster, labeled by group ID; {@code null} leaves a
-   * cluster unlabeled, also under a graph {@code label}, which Graphviz would otherwise repeat on
-   * every cluster. Nodes in no group stay outside every cluster.
+   * Draws each group of {@code partition} as a cluster, with a label by group ID.
+   * <p>
+   * Nodes in no group stay outside every cluster, and a group without a node to write has no
+   * cluster. A label of {@code null} leaves a cluster unlabeled, also when the graph has a
+   * {@code label}, which Graphviz would otherwise repeat on every cluster.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param partition the groups, over the nodes of this writer's graph - {@code Sccs} among them
-   * @param label     the label of a cluster
+   * @param partition the groups, over the nodes of the graph, such as an
+   *                  {@link com.kobayami.graphity.Sccs}
+   * @param label     called with a group ID, returns the label of its cluster or {@code null}
    * @return this writer
-   * @throws IllegalArgumentException if the partition covers a different number of nodes
+   * @throws IllegalArgumentException if {@code partition} has a different node count than the
+   *                                  graph
    */
   public DotWriter clusters(NodePartition partition, IntFunction<@Nullable String> label) {
     selection.clusters(partition, label);
@@ -173,12 +176,13 @@ public final class DotWriter {
   }
 
   /**
-   * Writes only the nodes the filter accepts, and only the edges between them. Node IDs stay
-   * those of the graph, so the hooks keep reading the same data.
+   * Restricts the text to the nodes that {@code include} accepts and the edges between them.
+   * <p>
+   * Node IDs stay those of the graph, so the hooks keep reading the same arrays.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param include whether to write a node
+   * @param include called with a node ID, returns whether to write the node
    * @return this writer
    */
   public DotWriter nodeFilter(IntPredicate include) {
@@ -187,8 +191,11 @@ public final class DotWriter {
   }
 
   /**
-   * Writes the undirected reading: a {@code graph} with {@code --} edges, each reciprocal pair
-   * once, as its edge from the lower node ID, whose index the edge hooks receive.
+   * Switches to the undirected reading of the graph: a {@code graph} with {@code --} edges instead
+   * of a {@code digraph}.
+   * <p>
+   * The edges {@code a -> b} and {@code b -> a} become one, written as the edge from the lower
+   * node ID; the edge hooks receive its edge index.
    * <p>
    * <strong>Time:</strong> O(1).
    *
@@ -200,13 +207,15 @@ public final class DotWriter {
   }
 
   /**
-   * Writes the graph to {@code out}.
+   * Writes the graph to {@code out}, as DOT text.
    * <p>
-   * <strong>Time:</strong> O(nodeCount + edgeCount) plus the hooks; in the undirected reading,
-   * O(log outDegree) more per edge to find reciprocal pairs.
+   * <strong>Time:</strong> O(nodeCount + edgeCount + groupCount), plus the hooks, with groupCount
+   * the number of groups of the partition drawn as clusters; in the undirected reading,
+   * O(log outDegree(target)) more per edge.<br>
+   * <strong>Memory:</strong> nodeCount bytes while it runs.
    *
-   * @param out where to write; not closed
-   * @throws IOException if {@code out} throws
+   * @param out where the text goes; not closed
+   * @throws IOException if writing to {@code out} fails
    * @throws IllegalArgumentException if an attribute hook puts a name that is not an identifier
    *                                  or is a DOT keyword; what was written before stays in
    *                                  {@code out}
@@ -275,7 +284,9 @@ public final class DotWriter {
   /**
    * Returns the DOT text of the graph, as {@link #write(Appendable)} writes it.
    * <p>
-   * <strong>Time:</strong> as for {@link #write(Appendable)}.
+   * <strong>Time:</strong> as for {@link #write(Appendable)}.<br>
+   * <strong>Memory:</strong> the text for the result; while it runs, up to twice as much again
+   * and nodeCount bytes more.
    *
    * @return the DOT text
    * @throws IllegalArgumentException as for {@link #write(Appendable)}
@@ -331,11 +342,9 @@ public final class DotWriter {
     return name;
   }
 
-  /**
-   * Writes {@code text} as a DOT quoted string that shows exactly that text, NUL aside, which DOT
-   * cannot hold. For an attribute in which Graphviz decodes HTML entities, the labels,
-   * {@code decodesEntities} turns {@code &} into {@code &amp;}.
-   */
+  // Writes text as a DOT quoted string that shows exactly that text, NUL aside, which DOT cannot
+  // hold. For an attribute in which Graphviz decodes HTML entities, the labels, decodesEntities
+  // turns & into &amp;.
   private static void quote(String text, boolean decodesEntities, Appendable out)
       throws IOException {
     out.append('"');

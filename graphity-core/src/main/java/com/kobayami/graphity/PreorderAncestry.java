@@ -5,39 +5,35 @@ import it.unimi.dsi.fastutil.ints.IntList;
 import java.util.Objects;
 
 /**
- * An {@link Ancestry} that also knows the preorder of its forest, which makes the ancestor test
- * constant-time and every subtree a contiguous range.
+ * An {@link Ancestry} that also holds the preorder of its forest, for an ancestor test in O(1) and
+ * the nodes of every subtree.
  * <p>
- * Built from an existing index via {@link #of(Ancestry)}. It shares the three arrays of that
- * index and adds three of its own: the preorder position of each node, the size of each
- * subtree, and the node at each preorder position. In preorder, the subtree of a node is the
- * range {@code [preorderIndexOf(node), preorderIndexOf(node) + subtreeSizeOf(node))}, so
- * {@link #isAncestorOf(int, int)} is a range test and {@link #subtreeOf(int)} a view.
+ * {@link #of(Ancestry)} builds it from an index and shares the arrays of that index. In preorder,
+ * every subtree is a contiguous range: the subtree of {@code node} takes the positions
+ * {@code preorderIndexOf(node)..preorderIndexOf(node) + subtreeSizeOf(node) - 1} of
+ * {@link #preorder()}. So {@link #isAncestorOf(int, int)} is a range test, and
+ * {@link #subtreeOf(int)} returns a view of that range. Here, the basic blocks of the method
+ * {@code load} that {@code body} dominates, from the {@code dominators} of {@code load}:
+ * {@snippet file="com/kobayami/graphity/examples/Dominance.java" region="subtreeOf"}
  * <p>
- * The preorder is canonical: roots in ascending order, the children of each node in ascending
- * order. For a tree whose IDs were assigned in source-order preorder, as is usual for a syntax
- * tree, {@link #preorder()} is the identity and the subtree of {@code node} is the ID range
- * {@code [node, node + subtreeSizeOf(node))}.
- *
- * <pre>{@code
- * var ancestry = PreorderAncestry.of(Ancestry.of(ast));
- * boolean inMethod = ancestry.isAncestorOf(method, expression);   // O(1)
- * IntList body = ancestry.subtreeOf(method);                      // zero-copy
- * }</pre>
- *
+ * The preorder visits the roots in ascending order, and the children of each node in ascending
+ * order. If the node IDs were assigned in this order, as is usual for a syntax tree numbered in
+ * source order, the preorder is {@code 0..nodeCount-1}, and the subtree of {@code node} is
+ * {@code node..node + subtreeSizeOf(node) - 1}.
+ * <p>
+ * Instances are immutable and safe to share between threads.
+ * <p>
  * <strong>Memory:</strong> 12 x nodeCount bytes on top of the {@link Ancestry} it extends.
- *
- * @see Ancestry
  */
 public final class PreorderAncestry extends Ancestry {
 
-  /** Position of each node in {@link #order}. */
+  // Position of each node in order.
   private final int[] preorderIndex;
 
-  /** Number of nodes in the subtree of each node, the node itself included. */
+  // Number of nodes in the subtree of each node, the node itself included.
   private final int[] subtreeSize;
 
-  /** Node at each preorder position, wrapped once so that views need no further copy. */
+  // Node at each preorder position, wrapped once so that views need no further copy.
   private final IntImmutableList order;
 
   private PreorderAncestry(Ancestry ancestry, int[] preorderIndex, int[] subtreeSize, int[] order) {
@@ -48,17 +44,18 @@ public final class PreorderAncestry extends Ancestry {
   }
 
   /**
-   * Derives the preorder index of the given ancestor index.
+   * Returns a {@code PreorderAncestry} for the forest of {@code ancestry}.
    * <p>
-   * The result shares the arrays of {@code ancestry}. If {@code ancestry} already is a
-   * {@code PreorderAncestry}, it is returned unchanged. Not cached - keep the result.
+   * The result shares the arrays of {@code ancestry} instead of copying them. The preorder is
+   * computed anew on every call, not cached: keep the result to use it more than once. If
+   * {@code ancestry} already is a {@code PreorderAncestry}, returns it.
    * <p>
    * <strong>Time:</strong> O(nodeCount), or O(1) if already a {@code PreorderAncestry}.<br>
-   * <strong>Memory:</strong> 12 x nodeCount bytes for the result; 8 x nodeCount bytes
-   * additional during computation.
+   * <strong>Memory:</strong> +12 x nodeCount bytes for the result; while it runs, 8 x nodeCount
+   * bytes more; none if already a {@code PreorderAncestry}.
    *
-   * @param ancestry the ancestor index to extend
-   * @return the preorder index
+   * @param ancestry the index to add the preorder to
+   * @return the index with the preorder
    */
   public static PreorderAncestry of(Ancestry ancestry) {
     if (ancestry instanceof PreorderAncestry preorderAncestry) return preorderAncestry;
@@ -72,15 +69,15 @@ public final class PreorderAncestry extends Ancestry {
   }
 
   /**
-   * Returns whether {@code node} is an ancestor of {@code descendant}. A node is its own
-   * ancestor.
+   * Returns whether {@code node} is an ancestor of {@code descendant}: whether it lies on the path
+   * from the root of its tree to {@code descendant}. A node is its own ancestor.
    * <p>
-   * <strong>Time:</strong> O(1) - a range test on the preorder positions.
+   * <strong>Time:</strong> O(1).
    *
-   * @param node       potential ancestor, a node ID in {@code 0..nodeCount()-1}
-   * @param descendant potential descendant, a node ID in {@code 0..nodeCount()-1}
+   * @param node       node ID in {@code 0..nodeCount-1}
+   * @param descendant node ID in {@code 0..nodeCount-1}
    * @return {@code true} if {@code node} is an ancestor of {@code descendant}
-   * @throws IndexOutOfBoundsException if a node ID is out of range
+   * @throws IndexOutOfBoundsException if {@code node} or {@code descendant} is out of range
    */
   @Override
   public boolean isAncestorOf(int node, int descendant) {
@@ -91,12 +88,12 @@ public final class PreorderAncestry extends Ancestry {
   }
 
   /**
-   * Returns the number of nodes in the subtree of {@code node}, the node itself included.
+   * Returns the number of nodes in the subtree of {@code node}, {@code node} included.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param node node ID in {@code 0..nodeCount()-1}
-   * @return subtree size, at least 1
+   * @param node node ID in {@code 0..nodeCount-1}
+   * @return subtree size, at least {@code 1}
    * @throws IndexOutOfBoundsException if {@code node} is out of range
    */
   public int subtreeSizeOf(int node) {
@@ -105,14 +102,14 @@ public final class PreorderAncestry extends Ancestry {
   }
 
   /**
-   * Returns the subtree of {@code node} in preorder, starting with {@code node}.
+   * Returns the nodes of the subtree of {@code node}, in preorder, starting with {@code node}.
    * <p>
-   * The list is a zero-copy, read-only view.
+   * The result is an unmodifiable view of this index's own array, not a copy.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param node node ID in {@code 0..nodeCount()-1}
-   * @return the nodes of the subtree, {@code subtreeSizeOf(node)} of them
+   * @param node node ID in {@code 0..nodeCount-1}
+   * @return nodes of the subtree
    * @throws IndexOutOfBoundsException if {@code node} is out of range
    */
   public IntList subtreeOf(int node) {
@@ -122,14 +119,14 @@ public final class PreorderAncestry extends Ancestry {
   }
 
   /**
-   * Returns all nodes in preorder: roots in ascending order, the children of each node in
+   * Returns all nodes in preorder: the roots in ascending order, and the children of each node in
    * ascending order.
    * <p>
-   * The list is a zero-copy, read-only view.
+   * The result is an unmodifiable view of this index's own array, not a copy.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @return all nodes, each exactly once
+   * @return all nodes, each once
    */
   public IntList preorder() {
     return order;
@@ -138,13 +135,13 @@ public final class PreorderAncestry extends Ancestry {
   /**
    * Returns the position of {@code node} in {@link #preorder()}.
    * <p>
-   * With it, a caller can lay out per-node data in preorder - for example prefix sums, which
-   * then aggregate any subtree in O(1).
+   * Data in an array indexed by preorder position has every subtree in a contiguous range. Prefix
+   * sums over such an array, for example, give the sum over any subtree in O(1).
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param node node ID in {@code 0..nodeCount()-1}
-   * @return preorder position in {@code 0..nodeCount()-1}
+   * @param node node ID in {@code 0..nodeCount-1}
+   * @return position in {@code 0..nodeCount-1}
    * @throws IndexOutOfBoundsException if {@code node} is out of range
    */
   public int preorderIndexOf(int node) {

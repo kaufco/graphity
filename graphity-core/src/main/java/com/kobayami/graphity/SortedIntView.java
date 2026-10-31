@@ -15,56 +15,42 @@ import java.util.function.IntConsumer;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A read-only, zero-copy view over a sorted range of a primitive {@code int[]} array.
+ * A list of {@code int} values in ascending order and without duplicates, as a view of a range
+ * of an array.
  * <p>
- * Exposes a window {@code [fromIndex, toIndex)} into a backing array.
- * The backing region must be sorted ascending with no duplicates (set semantics).
- * The view is immutable and thread-safe as long as the backing array is not modified.
+ * Adjacency lookups such as {@link Graph#outNodes(int)} return it, as do other methods of this
+ * library that return nodes or edge indices in ascending order, such as
+ * {@link Graphs#reachableFrom(Graph, int)}. It is an {@link IntList} of the fastutil library, so
+ * it reads, iterates and streams like any list, without boxing; methods that would change it
+ * throw {@link UnsupportedOperationException}. Since its values are sorted and distinct,
+ * {@link #indexOf(int)} and {@code contains(int)} search in O(log size()), and {@link #first()}
+ * and {@link #last()} are the smallest and the largest value.
  * <p>
- * Indexed access is O(1); search and membership tests are O(log n) via binary search.
- * Sub-range slicing and equality checks operate without copying data.
+ * A view shares its array with the object it comes from instead of copying it; a method that
+ * returns a copy, such as {@link #union(SortedIntView)}, says so. Instances are immutable and
+ * safe to share between threads, as the arrays behind them never change. A view that
+ * {@link #viewOf(int[], int, int)} makes of an array of the caller stays sorted and unchanged only
+ * as long as nobody modifies that range of the array.
  * <p>
- * Implements {@link IntList} for API compatibility but does not support mutation.
- * <p>
- * <strong>Memory:</strong> O(1) - holds only a reference to the shared array plus the two
- * {@code int} bounds ({@link #fromIndex}, {@link #toIndex}).
+ * <strong>Memory:</strong> constant; the values stay in the shared array.
  */
 public final class SortedIntView extends AbstractIntList implements RandomAccess {
 
-  /** Canonical empty view. Immutable and safely shared. */
+  /** An empty view. */
   public static final SortedIntView EMPTY = new SortedIntView(new int[0], 0, 0);
 
-  /** Backing array shared across views over the same source. Read-only contract. */
+  // The view is array[fromIndex..toIndex - 1]. The array may be shared with a graph and other
+  // views, and is never written.
   private final int[] array;
-
-  /** Inclusive start of this view's window into {@link #array}. */
   private final int fromIndex;
-
-  /** Exclusive end of this view's window into {@link #array}. */
   private final int toIndex;
 
-  /**
-   * Creates a view over the entire given array.
-   * <p>
-   * <strong>Time:</strong> O(1).
-   *
-   * @param array the backing array (must be sorted ascending, no duplicates)
-   */
+  // Both take the array as it is, without a copy, and check only the bounds of the range: the
+  // caller guarantees that the range is strictly ascending.
   SortedIntView(int[] array) {
     this(array, 0, array.length);
   }
 
-  /**
-   * Creates a view over the range {@code [fromIndex, toIndex)} of the given array.
-   * The caller must ensure the range is sorted ascending with no duplicates.
-   * <p>
-   * <strong>Time:</strong> O(1).
-   *
-   * @param array     the backing array
-   * @param fromIndex start index (inclusive)
-   * @param toIndex   end index (exclusive)
-   * @throws IndexOutOfBoundsException if the range is invalid
-   */
   SortedIntView(int[] array, int fromIndex, int toIndex) {
     Objects.checkFromToIndex(fromIndex, toIndex, array.length);
     this.array = array;
@@ -73,11 +59,11 @@ public final class SortedIntView extends AbstractIntList implements RandomAccess
   }
 
   /**
-   * Returns the element at the given index within this view.
+   * Returns the value at position {@code index}.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param index index within this view in {@code 0..size()-1}
+   * @param index position in {@code 0..size()-1}
    * @throws IndexOutOfBoundsException if {@code index} is out of range
    */
   @Override
@@ -87,7 +73,7 @@ public final class SortedIntView extends AbstractIntList implements RandomAccess
   }
 
   /**
-   * Returns the number of elements in this view.
+   * Returns the number of values.
    * <p>
    * <strong>Time:</strong> O(1).
    */
@@ -97,11 +83,11 @@ public final class SortedIntView extends AbstractIntList implements RandomAccess
   }
 
   /**
-   * Returns the first (smallest) element in this view.
+   * Returns the first value, which is the smallest.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @return the smallest element
+   * @return smallest value
    * @throws NoSuchElementException if the view is empty
    */
   public int first() {
@@ -110,11 +96,11 @@ public final class SortedIntView extends AbstractIntList implements RandomAccess
   }
 
   /**
-   * Returns the last (largest) element in this view.
+   * Returns the last value, which is the largest.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @return the largest element
+   * @return largest value
    * @throws NoSuchElementException if the view is empty
    */
   public int last() {
@@ -123,12 +109,12 @@ public final class SortedIntView extends AbstractIntList implements RandomAccess
   }
 
   /**
-   * Returns the index of {@code value} within this view, or {@code -1} if not found.
+   * Returns the position of {@code value}, or {@code -1} if the view does not contain it.
    * <p>
-   * <strong>Time:</strong> O(log n) via binary search.
+   * <strong>Time:</strong> O(log size()).
    *
    * @param value the value to search for
-   * @return zero-based index, or {@code -1}
+   * @return position in {@code 0..size()-1}, or {@code -1}
    */
   @Override
   public int indexOf(int value) {
@@ -137,40 +123,33 @@ public final class SortedIntView extends AbstractIntList implements RandomAccess
   }
 
   /**
-   * Identical to {@link #indexOf(int)} - no duplicates exist.
+   * Returns the position of {@code value}, or {@code -1} if the view does not contain it.
+   * Equivalent to {@link #indexOf(int)}, since no value occurs twice.
    * <p>
-   * <strong>Time:</strong> O(log n) via binary search.
+   * <strong>Time:</strong> O(log size()).
    */
   @Override
   public int lastIndexOf(int value) {
     return indexOf(value);
   }
 
-  /**
-   * Returns the absolute index of {@code value} in {@code array[fromIndex..toIndex)},
-   * or {@code -1} if not found.
-   * <p>
-   * <strong>Time:</strong> O(log n) via binary search.
-   */
+  // indexOf and contains on a range of an array, without a view object, for the adjacency lookups
+  // of the graph classes. indexOfInRange returns the position in the array, not in the range: in
+  // the out-adjacency of a graph, that is the edge index.
   static int indexOfInRange(int[] array, int fromIndex, int toIndex, int value) {
     int index = Arrays.binarySearch(array, fromIndex, toIndex, value);
     return index >= 0 ? index : -1;
   }
 
-  /**
-   * Returns {@code true} if {@code array[fromIndex..toIndex)} contains {@code value}.
-   * <p>
-   * <strong>Time:</strong> O(log n) via binary search.
-   */
   static boolean containsInRange(int[] array, int fromIndex, int toIndex, int value) {
     return Arrays.binarySearch(array, fromIndex, toIndex, value) >= 0;
   }
 
   /**
-   * Returns a copy of this view's contents as a new {@code int[]}.
+   * Returns the values as a new array.
    * <p>
-   * <strong>Time:</strong> O(n).<br>
-   * <strong>Memory:</strong> 4 x n bytes.
+   * <strong>Time:</strong> O(size()).<br>
+   * <strong>Memory:</strong> 4 x size() bytes for the result.
    */
   @Override
   public int[] toIntArray() {
@@ -179,12 +158,14 @@ public final class SortedIntView extends AbstractIntList implements RandomAccess
   }
 
   /**
-   * Copies this view's contents into {@code dest}, or allocates a new array if
-   * {@code dest} is {@code null} or too small.
+   * Returns the values in {@code dest} from position {@code 0} on, or in a new array if
+   * {@code dest} is {@code null} or too short.
    * <p>
-   * <strong>Time:</strong> O(n).<br>
-   * <strong>Memory:</strong> 4 x n bytes if {@code dest} is {@code null} or too small; none
-   * otherwise.
+   * <strong>Time:</strong> O(size()).<br>
+   * <strong>Memory:</strong> 4 x size() bytes if it returns a new array, otherwise none.
+   *
+   * @param dest the array to fill, or {@code null} for a new one
+   * @return {@code dest}, or a new array
    */
   @Override
   public int[] toArray(int @Nullable [] dest) {
@@ -197,11 +178,13 @@ public final class SortedIntView extends AbstractIntList implements RandomAccess
   }
 
   /**
-   * Copies {@code length} elements starting at {@code srcOffset} into {@code dest}.
+   * Copies {@code length} values, from position {@code srcOffset} on, into {@code dest} at
+   * {@code destOffset}.
    * <p>
    * <strong>Time:</strong> O(length).
    *
-   * @throws IndexOutOfBoundsException if the source or destination range is invalid
+   * @throws IndexOutOfBoundsException if the range to copy is not within this view or not within
+   *                                   {@code dest}
    */
   @Override
   public void getElements(int srcOffset, int[] dest, int destOffset, int length) {
@@ -211,9 +194,9 @@ public final class SortedIntView extends AbstractIntList implements RandomAccess
   }
 
   /**
-   * Applies {@code action} to each element in this view, in order.
+   * Calls {@code action} for every value, in ascending order.
    * <p>
-   * <strong>Time:</strong> O(n).
+   * <strong>Time:</strong> O(size()).
    */
   @Override
   public void forEach(IntConsumer action) {
@@ -223,12 +206,11 @@ public final class SortedIntView extends AbstractIntList implements RandomAccess
   }
 
   /**
-   * Returns a list iterator starting at the given position, backed directly by the array.
-   * No per-element bounds checking.
+   * Returns a list iterator over the values, starting at position {@code index}.
    * <p>
-   * <strong>Time:</strong> O(1) to create; O(1) per advance.
+   * <strong>Time:</strong> O(1) to create the iterator.
    *
-   * @param index starting position in {@code 0..size()}
+   * @param index position in {@code 0..size()}
    * @throws IndexOutOfBoundsException if {@code index} is out of range
    */
   @Override
@@ -253,12 +235,9 @@ public final class SortedIntView extends AbstractIntList implements RandomAccess
   }
 
   /**
-   * Returns a spliterator over this view's elements with ORDERED, SORTED, SIZED, SUBSIZED,
-   * DISTINCT, IMMUTABLE and NONNULL characteristics. Supports efficient parallel splitting.
+   * Returns a spliterator over the values, which reports them as sorted, distinct and immutable.
    * <p>
-   * The order is the natural one, so {@link Spliterator#getComparator()} returns {@code null}.
-   * <p>
-   * <strong>Time:</strong> O(1) to create.
+   * <strong>Time:</strong> O(1) to create the spliterator.
    */
   @Override
   public IntSpliterator spliterator() {
@@ -267,13 +246,15 @@ public final class SortedIntView extends AbstractIntList implements RandomAccess
   }
 
   /**
-   * Returns a zero-copy sub-view covering {@code [fromIndex, toIndex)} within this view.
+   * Returns the values at the positions {@code fromIndex..toIndex-1} as a view of the same array,
+   * not a copy.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param fromIndex start index within this view (inclusive)
-   * @param toIndex   end index within this view (exclusive)
-   * @throws IndexOutOfBoundsException if the range is invalid
+   * @param fromIndex first position
+   * @param toIndex   end position, exclusive
+   * @throws IndexOutOfBoundsException if {@code fromIndex} is negative, {@code toIndex} is greater
+   *                                   than {@code size()}, or {@code fromIndex > toIndex}
    */
   @Override
   public SortedIntView subList(int fromIndex, int toIndex) {
@@ -284,20 +265,20 @@ public final class SortedIntView extends AbstractIntList implements RandomAccess
   }
 
   /**
-   * Returns a view over {@code array[fromIndex..toIndex)}, after checking that the range is
-   * strictly ascending, or {@link #EMPTY} if the range is empty.
+   * Returns a view of {@code array[fromIndex..toIndex-1]}, which must be strictly ascending.
    * <p>
-   * The view shares {@code array} instead of copying it: it stays sorted and unchanged only as
-   * long as nobody modifies that range of the array.
+   * The range is checked, not copied: the view shares {@code array}, and stays sorted and
+   * unchanged only as long as nobody modifies that range of it.
    * <p>
-   * <strong>Time:</strong> O(toIndex - fromIndex) for the check.
+   * <strong>Time:</strong> O(toIndex - fromIndex).
    *
-   * @param array     the backing array
-   * @param fromIndex start index (inclusive)
-   * @param toIndex   end index (exclusive)
-   * @return a view over the range
-   * @throws IndexOutOfBoundsException if the range is invalid
-   * @throws IllegalArgumentException if the range is not strictly ascending
+   * @param array     the array to view
+   * @param fromIndex first position of the range
+   * @param toIndex   end position of the range, exclusive
+   * @return a view of the range
+   * @throws IndexOutOfBoundsException if {@code fromIndex} is negative, {@code toIndex} is greater
+   *                                   than {@code array.length}, or {@code fromIndex > toIndex}
+   * @throws IllegalArgumentException  if the range is not strictly ascending
    */
   public static SortedIntView viewOf(int[] array, int fromIndex, int toIndex) {
     Objects.checkFromToIndex(fromIndex, toIndex, array.length);
@@ -313,14 +294,10 @@ public final class SortedIntView extends AbstractIntList implements RandomAccess
   }
 
   /**
-   * Compares this view with {@code other} by the {@link java.util.List} contract: equal if
-   * {@code other} is a list with the same elements in the same order. Another
-   * {@code SortedIntView} is compared range against range.
+   * Returns whether {@code other} is a list with the same values in the same order, as the
+   * {@link java.util.List} contract defines it.
    * <p>
-   * <strong>Time:</strong> O(n).
-   *
-   * @param other the object to compare against
-   * @return {@code true} if {@code other} is a list with the same elements in the same order
+   * <strong>Time:</strong> O(size()).
    */
   @Override
   public boolean equals(@Nullable Object other) {
@@ -344,9 +321,9 @@ public final class SortedIntView extends AbstractIntList implements RandomAccess
   }
 
   /**
-   * Computes the hash code using direct array access, consistent with the {@link IntList} contract.
+   * Returns a hash code over the values, as the {@link java.util.List} contract defines it.
    * <p>
-   * <strong>Time:</strong> O(n).
+   * <strong>Time:</strong> O(size()).
    */
   @Override
   public int hashCode() {
@@ -358,15 +335,20 @@ public final class SortedIntView extends AbstractIntList implements RandomAccess
   }
 
   /**
-   * Returns the sorted, duplicate-free union of this view and {@code other}.
+   * Returns the values of this view and {@code other} together, in ascending order and without
+   * duplicates.
    * <p>
-   * <strong>Time:</strong> O(n + m).<br>
-   * <strong>Memory:</strong> up to 4 x (n + m) bytes.
+   * The result is a copy, merged on every call, unless one of the two views is empty: then it is
+   * the other one.
+   * <p>
+   * <strong>Time:</strong> O(size() + other.size()).<br>
+   * <strong>Memory:</strong> up to 4 x (size() + other.size()) bytes for the result; while it
+   * runs, up to as much again if the two views share values.
    *
-   * @param other the other sorted view
-   * @return the union; {@code this} or {@code other} itself if the other one is empty
+   * @param other the view to unite with this one
+   * @return the union
    * @throws IllegalArgumentException if the union has more than {@code Integer.MAX_VALUE - 8}
-   *                                  values, the largest array
+   *                                  values, the most an array can hold
    */
   public SortedIntView union(SortedIntView other) {
     if (other.isEmpty()) {
@@ -379,15 +361,8 @@ public final class SortedIntView extends AbstractIntList implements RandomAccess
         unionInRange(array, fromIndex, toIndex, other.array, other.fromIndex, other.toIndex));
   }
 
-  /**
-   * Computes the sorted union of two sorted, duplicate-free ranges.
-   * Each distinct value appears exactly once in the result.
-   * <p>
-   * <strong>Time:</strong> O(n + m) where n = aTo - aFrom, m = bTo - bFrom.<br>
-   * <strong>Memory:</strong> up to 4 x (n + m) bytes.
-   *
-   * @throws IllegalArgumentException if the union has more values than the largest array holds
-   */
+  // The merge behind union and BiAdjacentGraph.neighbors, on ranges of arrays, so that neither
+  // needs view objects. Throws IllegalArgumentException if the union does not fit into an array.
   static int[] unionInRange(int[] a, int aFrom, int aTo, int[] b, int bFrom, int bTo) {
     var out = new int[unionCapacity(a, aFrom, aTo, b, bFrom, bTo, ArrayLimits.MAX_ARRAY_LENGTH)];
     int outPos = 0;
@@ -424,14 +399,11 @@ public final class SortedIntView extends AbstractIntList implements RandomAccess
     return outPos == out.length ? out : Arrays.copyOf(out, outPos);
   }
 
-  /**
-   * The length to allocate for the union of two sorted, duplicate-free ranges: the sum of their
-   * sizes, or, if that exceeds {@code maxLength}, the size of the union itself, counted by a
-   * merge that writes nothing. {@code maxLength} is the largest array length; tests pass a small
-   * one.
-   *
-   * @throws IllegalArgumentException if the union has more than {@code maxLength} values
-   */
+  // The length to allocate for the union of two sorted, duplicate-free ranges: the sum of their
+  // sizes, or, if that exceeds maxLength, the size of the union itself, counted by a merge that
+  // writes nothing - so that two large ranges with many common values still fit. maxLength is
+  // the largest array length; tests pass a small one. Throws IllegalArgumentException if the
+  // union has more than maxLength values.
   static int unionCapacity(
       int[] a, int aFrom, int aTo, int[] b, int bFrom, int bTo, int maxLength) {
     long sizeSum = (long) (aTo - aFrom) + (bTo - bFrom);

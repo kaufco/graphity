@@ -5,93 +5,62 @@ import java.util.Arrays;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 
 /**
- * Bidirectional partition of nodes into disjoint groups.
+ * A partition of the nodes of a graph into groups, such as its components.
  * <p>
- * Each node belongs to at most one group, identified by a group ID in
- * {@code 0..groupCount()-1}. The forward direction (node → group) is
- * {@link #get(int)}, with {@code -1} for a node in no group. The reverse
- * direction (group → nodes) is provided by {@link #nodesOf(int)}. Partitions from
- * {@link Components} cover every node; one built with {@link #of(Graph, int[], int)} may
- * leave nodes out, which {@link #isPartial()} reports.
+ * {@link #get(int) get(node)} returns the group of {@code node}, or {@code -1} if it is in no
+ * group, and {@link #nodesOf(int)} the nodes of a group in ascending order. {@link Components}
+ * returns partitions into components, in which every node is in exactly one group: an
+ * {@link Sccs} for the strongly connected components, a plain {@code NodePartition} for the weakly
+ * connected ones.
+ * {@link #of(Graph, int[], int)} takes groups of the caller's choice, which may leave nodes out.
  * <p>
- * Internally uses a CSR (Compressed Sparse Row) layout for the reverse direction,
- * enabling zero-copy {@link SortedIntView} access to group members.
+ * A partition holds the graph whose nodes it partitions. {@link #condense()} builds the condensed
+ * graph, with a node for each group and an edge between two groups wherever an edge of the graph
+ * runs between them. {@link Graphs#edgePartition(Graph, NodePartition)} builds the
+ * {@link EdgePartition} that tells which edges of the graph are behind each edge of the condensed
+ * graph. The methods for groups of any kind, such as {@link #groupCount()}, {@link #sizeOf(int)}
+ * and {@code reduce}, come from {@link IndexPartition}.
  * <p>
- * Holds a reference to the original {@link Graph} from which the partition was computed.
- * This enables {@link #condense()} to build the condensation graph without requiring
- * the graph as an explicit parameter.
+ * Instances are immutable and safe to share between threads.
  * <p>
- * Extends {@link IndexPartition} for generic partition access via {@link #groupCount()},
- * {@link #indexCount()}, {@link #indicesOf(int)}, {@link #sizeOf(int)}, and the
- * {@code reduce} methods. Domain-specific convenience methods ({@link #nodeCount()},
- * {@link #nodesOf(int)}) are aliases of the generic ones.
- * <p>
- * Sealed to package-internal domain-specific partitions (e.g. {@link Sccs}); the
- * package-private constructor already restricts extension to this package, and
- * {@code permits} makes that explicit.
- * <p>
- * <strong>Memory:</strong> up to 4 x (2 x nodeCount + groupCount + 1) bytes for the backing
- * arrays ({@code mapping}, {@link #members}, {@link #memberStart}), plus a shared reference to
- * the original {@link #graph}.
- *
- * <pre>{@code
- * int groupId = partition.get(node);
- * SortedIntView members = partition.nodesOf(groupId);
- * int groups = partition.groupCount();
- * Graph condensed = partition.condense();
- * }</pre>
- *
- * @see NodeMapping
- * @see IndexPartition
- * @see Sccs
- * @see Components
+ * <strong>Memory:</strong> 4 x (nodeCount + mappedCount + groupCount) bytes, where mappedCount is
+ * the number of nodes that belong to a group; the graph is shared, not copied.
  */
 public sealed class NodePartition extends IndexPartition permits Sccs {
 
-  /** The graph from which this partition was computed. */
+  // The partitioned graph, for condense() and Graphs.edgePartition: neither takes it as a
+  // parameter, so a wrong one cannot be passed.
   final Graph graph;
 
-  /**
-   * Package-private constructor.
-   *
-   * @param graph       the graph from which this partition was computed
-   * @param nodeToGroup mapping from node ID to group ID, or {@code -1} for a node in no group
-   * @param members     CSR values: group member node IDs, sorted ascending within each group
-   * @param memberStart CSR offsets: per-group start indices into {@code members}
-   */
+  // Takes the arrays as they are, neither copied nor checked: the caller guarantees the layout of
+  // IndexPartition.
   NodePartition(Graph graph, int[] nodeToGroup, int[] members, int[] memberStart) {
     super(nodeToGroup, members, memberStart);
     this.graph = graph;
   }
 
   /**
-   * Creates a partition of the graph's nodes into groups chosen by the caller.
+   * Returns a partition of the nodes of {@code graph} into groups of the caller's choice.
    * <p>
    * {@code groupOf[node]} is the group of each node, in {@code 0..groupCount-1}, or {@code -1}
-   * for a node in no group. Such nodes and their edges do not appear in {@link #condense()}.
-   * Groups without members are allowed and become isolated nodes of the condensation, so group
-   * IDs taken from an external numbering stay valid. The array is copied.
+   * for a node in no group; the array is copied. A group may have no nodes: it becomes a node
+   * without edges in {@link #condense()}, so that group IDs from a numbering of the caller stay
+   * valid. Here, {@code packageOf} holds the package of each method of {@code calls} as a node ID
+   * of the package graph {@code dependencies}, and the condensed graph shows which packages call
+   * which:
+   * {@snippet file="com/kobayami/graphity/examples/Partitions.java" region="of"}
    * <p>
-   * The partition then contracts the graph like one from {@link Components}:
-   *
-   * <pre>{@code
-   * var partition = NodePartition.of(graph, packageOf, packageCount);
-   * Graph packages = partition.condense();                                // node IDs are group IDs
-   * EdgePartition provenance = Graphs.edgePartition(packages, partition); // edges behind each package edge
-   * }</pre>
-   *
    * <strong>Time:</strong> O(nodeCount + groupCount).<br>
-   * <strong>Memory:</strong> 4 x (nodeCount + groupedNodeCount + groupCount + 1) bytes for the
-   * result.
+   * <strong>Memory:</strong> 4 x (nodeCount + mappedCount + groupCount) bytes for the result.
    *
    * @param graph      the graph whose nodes are partitioned
-   * @param groupOf    group ID of each node, or {@code -1}; length {@code graph.nodeCount()}
-   * @param groupCount number of groups, in {@code 0..Integer.MAX_VALUE-9}, as many as a graph
-   *                   can have nodes: each group becomes a node of {@link #condense()}
+   * @param groupOf    the group of each node, or {@code -1}; length {@code graph.nodeCount()}
+   * @param groupCount the number of groups, at most as many as a graph can have nodes
    * @return the partition
-   * @throws IllegalArgumentException if {@code groupOf.length != graph.nodeCount()},
-   *                                  {@code groupCount} is out of range, or an entry lies
-   *                                  outside {@code -1..groupCount-1}
+   * @throws IndexOutOfBoundsException if a group is not in {@code -1..groupCount-1}
+   * @throws IllegalArgumentException  if {@code groupOf.length != graph.nodeCount()}, or
+   *                                   {@code groupCount} is negative or larger than a graph can
+   *                                   have nodes
    */
   public static NodePartition of(Graph graph, int[] groupOf, int groupCount) {
     int n = graph.nodeCount();
@@ -116,8 +85,8 @@ public sealed class NodePartition extends IndexPartition permits Sccs {
   }
 
   /**
-   * Returns the number of nodes of the partitioned graph, including nodes in no group.
-   * Equivalent to {@link #indexCount()}.
+   * Returns the number of nodes of the partitioned graph, in a group or not. Equivalent to
+   * {@link #indexCount()}.
    * <p>
    * <strong>Time:</strong> O(1).
    *
@@ -128,13 +97,15 @@ public sealed class NodePartition extends IndexPartition permits Sccs {
   }
 
   /**
-   * Returns the nodes in the given group as a sorted, zero-copy view.
-   * Equivalent to {@link #indicesOf(int)}.
+   * Returns the nodes in group {@code groupId}, in ascending order. Equivalent to
+   * {@link #indicesOf(int) indicesOf(groupId)}.
+   * <p>
+   * The result is a view of this partition's own array, not a copy.
    * <p>
    * <strong>Time:</strong> O(1).
    *
    * @param groupId group ID in {@code 0..groupCount()-1}
-   * @return nodes in this group, sorted ascending
+   * @return nodes in the group
    * @throws IndexOutOfBoundsException if {@code groupId} is out of range
    */
   public final SortedIntView nodesOf(int groupId) {
@@ -142,25 +113,26 @@ public sealed class NodePartition extends IndexPartition permits Sccs {
   }
 
   /**
-   * Builds the condensation graph from this partition.
+   * Returns the condensed graph, with a node for each group and an edge between two groups
+   * wherever an edge of the partitioned graph runs between them.
    * <p>
-   * Each group becomes a single node in the condensation graph. An edge exists from group
-   * {@code g} to group {@code h} if any node in {@code g} has an out-edge to any node in
-   * {@code h} in the original graph. Self-edges (intra-group edges) are omitted, and so are
-   * edges from or to a node in no group. Duplicate edges are removed; adjacency lists are
-   * sorted ascending.
+   * The node IDs of the condensed graph are the group IDs. It has the edge {@code g -> h} if a
+   * node in group {@code g} has an out-node in group {@code h} and {@code g != h}. Edges within a
+   * group and edges from or to a node in no group are left out. The edges from one group to
+   * another become a single edge. {@link Graphs#edgePartition(Graph, NodePartition)} tells which
+   * edges are behind each edge of the condensed graph. For an {@link Sccs}, the condensed graph is
+   * acyclic.
    * <p>
-   * The condensation graph has {@code groupCount()} nodes, where node IDs correspond to group IDs.
-   * Use {@code get(originalNode)} to map an original node to its condensation node ID,
-   * and {@code nodesOf(condensationNode)} to retrieve all original nodes within a
-   * condensation node.
+   * The condensed graph is built anew on every call, not cached: keep the result to use it more
+   * than once.
    * <p>
-   * <strong>Time:</strong> O(nodeCount + groupCount + edgeCount + Σ d x log d), where d is the
-   * out-degree of each group in the condensation (one sort per group).<br>
-   * <strong>Memory:</strong> O(groupCount + condensationEdgeCount) for the result;
-   * O(groupCount) additional during computation.
+   * <strong>Time:</strong> O(nodeCount + edgeCount + groupCount), plus O(d log d) for each group
+   * with d out-nodes in the result.<br>
+   * <strong>Memory:</strong> 4 x (groupCount + condensedEdgeCount) bytes for the result, where
+   * condensedEdgeCount is its edge count; while it runs, 1 bit per group and up to
+   * 6 x condensedEdgeCount bytes more.
    *
-   * @return the condensation graph
+   * @return the condensed graph
    */
   public final Graph condense() {
     int groups = groupCount();

@@ -5,112 +5,77 @@ import it.unimi.dsi.fastutil.ints.IntList;
 import java.util.Objects;
 
 /**
- * Abstract base class for <strong>stack-safe</strong> depth-first traversal of a {@link Graph}.
+ * The base class of a depth-first search of your own over a {@link Graph}. A subclass overrides
+ * the hooks {@link #enterNode(int)} and {@link #leaveNode(int)}, and a {@code run} method starts
+ * the search.
  * <p>
- * It keeps its DFS stack on the heap rather than on the call stack, so
- * it never overflows even on graphs with very deep paths (DFS depth &ge; 10^6).
- * It is <strong>node-centric</strong>: subclasses override {@link #enterNode(int)} (preorder) and
- * optionally {@link #leaveNode(int)} (postorder). There are deliberately no per-edge hooks, which
- * keeps the traversal loop tight and fast.
+ * The search visits each node it reaches once. It calls {@link #enterNode(int)} when it reaches a
+ * node (preorder) and {@link #leaveNode(int)} when it has searched from all out-nodes of the node
+ * (postorder). It takes the out-nodes of each node in ascending order, so the hooks come in the
+ * order of a textbook recursive
+ * <a href="https://en.wikipedia.org/wiki/Depth-first_search">depth-first search</a>. The search
+ * itself runs without recursion and keeps its stack on the heap, so a deep graph does not overflow
+ * the call stack. Here, {@code calls} are the calls between the methods of a program, and the
+ * postorder puts each method after the methods it calls, except along calls that close a cycle:
+ * {@snippet file="com/kobayami/graphity/examples/Traversals.java" region="leaveNode"}
  * <p>
- * This covers the large majority of user traversals: pre/postorder processing, subtree pruning,
- * reachability, DFS ordering, cycle detection via {@link #isOnStack(int)}, and depth tracking.
- * It cannot express edge-centric algorithms that must inspect edges to already-visited nodes;
- * for those, use {@link DfsEdgeTraverser}, which reports every edge with the state of
- * its target, or the ready-made {@link Components}, {@link EdgeTypes} and {@link BackEdges}.
- *
- * <h2>Example: parenthesized DFS trace</h2>
- * <pre>{@code
- * class TraceDfs extends DfsTraverser {
- *     TraceDfs(Graph graph) { super(graph); }
- *     @Override protected boolean enterNode(int node) {
- *         System.out.print("(" + node);
- *         return true;   // descend into children
- *     }
- *     @Override protected void leaveNode(int node) {
- *         System.out.print(")");
- *     }
- * }
- * new TraceDfs(graph).run();
- * }</pre>
- *
- * <h2>Example: depth-limited DFS (cut)</h2>
- * <pre>{@code
- * class ShallowDfs extends DfsTraverser {
- *     final int maxDepth;
- *     int depth;
- *     ShallowDfs(Graph graph, int maxDepth) {
- *         super(graph);
- *         this.maxDepth = maxDepth;
- *     }
- *     @Override protected boolean enterNode(int node) {
- *         process(node);
- *         depth++;
- *         return depth < maxDepth;   // false → prune the subtree
- *     }
- *     @Override protected void leaveNode(int node) {
- *         depth--;
- *     }
- * }
- * }</pre>
- *
- * <p>Discovery order is that of a textbook recursive depth-first search: out-neighbors are scanned
- * in ascending adjacency order, descending immediately into the first unvisited child.
- * <p>{@code run} methods may be called <strong>multiple times</strong>, and freely combined
- * (e.g., {@code run(int); run(); run(list)}). Already-visited nodes are never revisited -
- * the visited set is cumulative across calls. {@link #leaveNode(int)} is invoked exactly once for
- * every visited node, including nodes whose subtree was pruned by {@link #enterNode(int)}, unless
- * the traversal is stopped before with {@link #stop()}.
- * <p>A hook must not call a {@code run} method of the same instance; such a call throws
- * {@link IllegalStateException}. The list passed to {@link #run(IntList)} must not be modified
- * until that call returns. If a {@code run} call ends with an exception - thrown by a hook
- * or by the traversal itself - the state of the instance is undefined (nodes of the interrupted
- * path may still count as on the stack, for instance); use a new instance for further runs.
+ * Between its two hooks, a node is on the current path. The current path leads from the node where
+ * the search started to the node being searched. The hooks may call {@link #isVisited(int)} and
+ * {@link #isOnStack(int)}, end the search at a node by returning {@code false} from
+ * {@link #enterNode(int)}, and end the whole run with {@link #stop()}.
  * <p>
- * <strong>Memory:</strong> O(nodeCount) - visited/on-stack state is packed 2 bits per node into a
- * single {@code int[]}; the explicit stack grows on demand up to the longest DFS path.
- *
- * @see Graph
- * @see DfsEdgeTraverser
- * @see Graphs#rootNodes(BiAdjacentGraph)
+ * {@link #run()} searches from every node in ascending order, {@link #run(int)} from one node and
+ * {@link #run(IntList)} from several, such as the root nodes that
+ * {@link Graphs#rootNodes(BiAdjacentGraph)} returns. The visited nodes add up over the runs of an
+ * instance: a node is visited at most once in the lifetime of the instance, and a later run skips
+ * it. A hook must not start another run of the same instance, which throws
+ * {@link IllegalStateException}. If a run ends with an exception from a hook or from the search,
+ * the state of the instance is undefined: nodes of the interrupted path may still count as on the
+ * path, for example. A new instance is needed for further runs.
+ * <p>
+ * {@link DfsEdgeTraverser} also calls a hook for every edge, which suits searches that look at
+ * edges to nodes already visited. This class calls no such hook, which makes it the faster choice
+ * where node hooks suffice. {@link FrontierTraverser} searches breadth-first. Common searches are
+ * ready-made, such as {@link TopOrder}, {@link EdgeTypes}, {@link BackEdges} and
+ * {@link Graphs#findCycle(Graph)}.
+ * <p>
+ * Instances are mutable and not safe to share between threads.
+ * <p>
+ * <strong>Memory:</strong> 2 bits per node for the visited state, and up to 8 x nodeCount bytes
+ * for the stack, which grows with the deepest path searched.
  */
 public abstract class DfsTraverser {
 
-  /** Bit 0 of a node's packed state: the node has been discovered. */
+  // The two flags of a node in the packed state: reached by the search, and on the current path
+  // (the gray set).
   private static final int VISITED = 0b01;
-
-  /** Bit 1 of a node's packed state: the node is currently on the DFS path (gray set). */
   private static final int ON_STACK = 0b10;
 
-  /** The graph being traversed. */
+  /** The graph that this traverser searches. */
   protected final Graph graph;
 
-  /**
-   * Packed per-node state: visited and on-stack flags, 2 bits per node, 16 nodes per int
-   * (bit 0 = visited, bit 1 = on-stack). One memory touch per node check instead of two
-   * separate bit-set lookups. Cumulative across {@code run} calls.
-   */
+  // Both flags of a node in one int, 16 nodes per int (bit 0 visited, bit 1 on the path), so that
+  // a check of a node reads one int instead of two bit sets. Kept over all runs.
   private final int[] state;
 
-  /**
-   * Explicit DFS stack, replacing the call stack; grows on demand. Each frame is two
-   * interleaved ints: the node ID at depth {@code d} and its resume position in the
-   * adjacency array, sharing a cache line. A raw array rather than a list, so that the
-   * traversal loop keeps array reference and stack pointer in registers; the field only
-   * carries the capacity across {@code run} calls.
-   */
+  // The stack that replaces the call stack. A frame is two interleaved ints, the node at depth d
+  // and its resume position in the adjacency array, on one cache line. A raw array rather than a
+  // list, so that the loop keeps the array and the top index in registers; the field only carries
+  // the grown capacity from one run to the next.
   private int[] frames;
 
-  /** Set by {@link #stop()}; cleared when a {@code run} call starts. */
+  // Set by stop(); cleared when a run starts.
   private boolean stopRequested;
 
-  /** Set while a {@code run} call is in progress, so that a hook cannot start another one. */
+  // Set while a run is in progress, so that a hook cannot start another one.
   private boolean running;
 
   /**
-   * Creates a traverser for the given graph.
+   * Creates a traverser for {@code graph}, with no node visited.
+   * <p>
+   * <strong>Time:</strong> O(nodeCount).
    *
-   * @param graph the graph to traverse
+   * @param graph the graph to search
    */
   protected DfsTraverser(Graph graph) {
     this.graph = graph;
@@ -120,79 +85,87 @@ public abstract class DfsTraverser {
   }
 
   /**
-   * Preorder hook, called once when {@code node} is discovered.
+   * Called when the search reaches {@code node}, before its out-nodes: the preorder hook.
+   * <p>
+   * The search calls it once per node: for a start node, or for an unvisited out-node of the node
+   * it is searching. From this call on, {@code node} counts as visited and is on the current path.
+   * Returning {@code true} lets the search go on with the out-nodes of {@code node}. Returning
+   * {@code false} skips them, and {@link #leaveNode(int)} follows right away; out-nodes skipped
+   * this way stay unvisited unless the search reaches them from another node.
    *
-   * @param node node ID in {@code 0..nodeCount()-1}
-   * @return {@code true} to descend into the node's children; {@code false} to prune the subtree
-   *     (the node is treated like a leaf - {@link #leaveNode(int)} still runs)
+   * @param node node ID in {@code 0..nodeCount-1}
+   * @return {@code true} to search from the out-nodes of {@code node}, {@code false} to skip them
    */
   protected abstract boolean enterNode(int node);
 
   /**
-   * Postorder hook, called once per visited node, after its subtree (if not pruned) has
-   * finished. Not called for the nodes on the current path when the traversal is stopped with
-   * {@link #stop()}. Default: no-op.
+   * Called when the search leaves {@code node}, after it has searched from all its out-nodes: the
+   * postorder hook. Does nothing unless overridden.
+   * <p>
+   * The search calls it once for every node it has visited, right after
+   * {@link #enterNode(int)} if that returned {@code false}. From this call on, {@code node} is no
+   * longer on the current path. After {@link #stop()}, it is not called for the nodes still on
+   * the path.
    *
-   * @param node node ID in {@code 0..nodeCount()-1}
+   * @param node node ID in {@code 0..nodeCount-1}
    */
   protected void leaveNode(int node) {}
 
   /**
-   * Returns whether {@code node} has already been discovered.
+   * Returns whether the search has reached {@code node}, in this run or in an earlier one.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param node node ID in {@code 0..nodeCount()-1}
-   * @return {@code true} if visited
+   * @param node node ID in {@code 0..nodeCount-1}; for any other value the method returns
+   *             {@code false} or throws {@code IndexOutOfBoundsException}
+   * @return {@code true} if {@link #enterNode(int)} has been called for {@code node}
    */
   protected final boolean isVisited(int node) {
     return (state[node >> 4] >>> ((node & 0xF) << 1) & VISITED) != 0;
   }
 
   /**
-   * Returns whether {@code node} is currently on the DFS path (i.e. it is the current node or an
-   * ancestor of it). This is the gray set that edge-centric algorithms would otherwise maintain
-   * in their own {@code onStack} bit-set.
+   * Returns whether {@code node} is on the stack of the search, that is, on the current path.
+   * <p>
+   * The current path leads from the node where the search started to the node being searched. A
+   * node is on the path from its {@link #enterNode(int)} until its {@link #leaveNode(int)}. An
+   * edge from the node being searched to a node on the path closes a cycle. Outside a run, no node
+   * is on the path.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param node node ID in {@code 0..nodeCount()-1}
-   * @return {@code true} if {@code node} lies on the current DFS path
+   * @param node node ID in {@code 0..nodeCount-1}; for any other value the method returns
+   *             {@code false} or throws {@code IndexOutOfBoundsException}
+   * @return {@code true} if {@code node} is on the current path
    */
   protected final boolean isOnStack(int node) {
     return (state[node >> 4] >>> ((node & 0xF) << 1) & ON_STACK) != 0;
   }
 
   /**
-   * Stops the traversal in progress: the current {@code run} call returns as soon as the hook
-   * that calls this method returns, without calling any further hook. Nodes on the current DFS
-   * path are not left - {@link #leaveNode(int)} is not called for them - and count as visited
-   * and no longer on the stack afterwards. The visited state is kept, so a later {@code run} call
-   * skips everything visited so far; the edges of the stopped path that were not scanned yet are
-   * not resumed.
+   * Stops the run in progress: the run returns as soon as the hook that calls this method
+   * returns, without calling another hook.
    * <p>
-   * Callable from {@link #enterNode(int)} and {@link #leaveNode(int)}; outside a {@code run} call
-   * it has no effect. To cancel from another thread, let a hook check a flag of your own and call
-   * this method.
+   * {@link #leaveNode(int)} is not called for the nodes on the current path, but they count as
+   * visited and as no longer on the path. A later run skips every node visited so far; it does not
+   * go on where the stopped run ended. Called outside a run, this method has no effect. To cancel
+   * a run from another thread, let a hook check a flag of your own and call this method.
    * <p>
-   * <strong>Time:</strong> O(1); the traversal checks for it after every hook call - twice per
-   * node, not per edge.
+   * <strong>Time:</strong> O(1).
    */
   protected final void stop() {
     stopRequested = true;
   }
 
   /**
-   * Runs a full DFS forest over all nodes. Forest roots are picked sequentially (0, 1, 2, …),
-   * skipping already-visited nodes (including nodes visited by previous {@code run} calls).
+   * Searches from every node not visited yet, in ascending order, until every node is visited.
    * <p>
-   * May be called multiple times, and freely combined with other {@code run} methods.
+   * A node that no earlier search has reached when its turn comes starts a search of its own.
    * <p>
-   * <strong>Time:</strong> O(nodeCount + edgeCount).
+   * <strong>Time:</strong> O(nodeCount + edgeCount), plus the hooks.
    *
-   * @throws IllegalArgumentException if a depth-first path is longer than 2^30 - 5 nodes, the most
-   *     frames an array can hold
-   * @throws IllegalStateException if called from a hook, while a {@code run} call is in progress
+   * @throws IllegalArgumentException if a depth-first path is longer than 2<sup>30</sup> - 5 nodes
+   * @throws IllegalStateException if called from a hook, during a run of this instance
    */
   public final void run() {
     begin();
@@ -209,18 +182,16 @@ public abstract class DfsTraverser {
   }
 
   /**
-   * Runs DFS from a single start node. Only visits nodes reachable from {@code startNode}
-   * that have not been visited yet (by this or previous {@code run} calls).
+   * Searches from {@code startNode}, visiting the nodes it reaches that are not visited yet.
    * <p>
-   * May be called multiple times, and freely combined with other {@code run} methods.
+   * If {@code startNode} is visited already, nothing happens.
    * <p>
-   * <strong>Time:</strong> O(reachable nodes + reachable edges).
+   * <strong>Time:</strong> O(reachable nodes + reachable edges), plus the hooks.
    *
-   * @param startNode the start node
+   * @param startNode node ID in {@code 0..nodeCount-1}
    * @throws IndexOutOfBoundsException if {@code startNode} is out of range
-   * @throws IllegalArgumentException if a depth-first path is longer than 2^30 - 5 nodes, the most
-   *     frames an array can hold
-   * @throws IllegalStateException if called from a hook, while a {@code run} call is in progress
+   * @throws IllegalArgumentException if a depth-first path is longer than 2<sup>30</sup> - 5 nodes
+   * @throws IllegalStateException if called from a hook, during a run of this instance
    */
   public final void run(int startNode) {
     Objects.checkIndex(startNode, graph.nodeCount());
@@ -233,19 +204,19 @@ public abstract class DfsTraverser {
   }
 
   /**
-   * Runs DFS starting from the given nodes, in list order. Only visits nodes reachable from
-   * the specified start set that have not been visited yet. Already-visited start nodes are
-   * skipped; {@link #stop()} ends the whole call, not just the current start node.
+   * Searches from each of {@code startNodes} in list order, skipping those visited already.
    * <p>
-   * May be called multiple times, and freely combined with other {@code run} methods.
+   * The list is checked before the first hook, so a start node out of range leaves the traverser
+   * unchanged. {@link #stop()} ends the whole call, not only the search from one start node.
    * <p>
-   * <strong>Time:</strong> O(reachable nodes + reachable edges).
+   * <strong>Time:</strong> O(startNodes.size() + reachable nodes + reachable edges), plus the
+   * hooks.
    *
-   * @param startNodes the start nodes, each in {@code 0..nodeCount()-1}, visited in list order
-   * @throws IndexOutOfBoundsException if a start node is out of range; then no node is visited
-   * @throws IllegalArgumentException if a depth-first path is longer than 2^30 - 5 nodes, the most
-   *     frames an array can hold
-   * @throws IllegalStateException if called from a hook, while a {@code run} call is in progress
+   * @param startNodes node IDs, each in {@code 0..nodeCount-1}; not to be changed until the call
+   *                   returns
+   * @throws IndexOutOfBoundsException if a start node is out of range
+   * @throws IllegalArgumentException if a depth-first path is longer than 2<sup>30</sup> - 5 nodes
+   * @throws IllegalStateException if called from a hook, during a run of this instance
    */
   public final void run(IntList startNodes) {
     Checks.checkNodes(startNodes, graph.nodeCount());
@@ -261,10 +232,8 @@ public abstract class DfsTraverser {
     }
   }
 
-  /**
-   * Starts a {@code run} call after its argument checks: rejects a call from a hook and clears an
-   * earlier {@link #stop()}. The caller clears {@link #running} in a {@code finally}.
-   */
+  // Starts a run after its argument checks: rejects a call from a hook and clears an earlier
+  // stop(). The caller clears running in a finally.
   private void begin() {
     if (running) {
       throw new IllegalStateException("a run is in progress; a hook must not start another run");
@@ -273,21 +242,14 @@ public abstract class DfsTraverser {
     stopRequested = false;
   }
 
-  /**
-   * The single entry of every {@code run} method: the visited check lives here only.
-   *
-   * @return {@code false} if the traversal was stopped
-   */
+  // The single entry of every run method, so that the visited check lives here only. Returns false
+  // if the run was stopped.
   private boolean dfsIfUnvisited(int root) {
     return isVisited(root) || dfsFrom(root);
   }
 
-  /**
-   * Iterative DFS from {@code root} (assumed unvisited). The tight inner scan keeps
-   * {@code i}/{@code end} in registers and touches the stack only when descending.
-   *
-   * @return {@code false} if the traversal was stopped
-   */
+  // The search from root, which is unvisited. The inner scan keeps i and end in registers and
+  // touches the stack only when it descends. Returns false if the run was stopped.
   private boolean dfsFrom(int root) {
     int[] out = Csr.outAdjacencyStart(graph);
     int[] adj = Csr.outAdjacency(graph);
@@ -356,7 +318,7 @@ public abstract class DfsTraverser {
     return true;
   }
 
-  /** Clears the on-stack flag of every node in {@code frames[0..top]}, once per stop. */
+  // Clears the on-stack flag of every node in frames[0..top], once per stop.
   private void leaveStack(int[] frames, int top) {
     for (int d = 0; d <= top; d++) {
       int w = frames[2 * d];

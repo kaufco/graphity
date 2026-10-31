@@ -13,77 +13,70 @@ import java.util.Arrays;
 import java.util.Objects;
 
 /**
- * The loop nesting forest of a control-flow graph, irreducible loops included.
+ * The loop nesting forest of a control-flow graph: its loops, how they nest and where each of
+ * them is entered, irreducible loops included.
  * <p>
- * A loop has a header, through which it is normally entered, and a body; it may sit inside
- * another loop. The forest is defined on every graph, reducible or not:
+ * A loop has a header, through which it is normally entered, and a body: the header, the other
+ * nodes of the loop and those of the loops nested in it. {@link #of(BiAdjacentGraph, int)} finds
+ * the loops from the entry of the graph - here, the loop of a method {@code load} around its
+ * block {@code then}, from its control flow {@code cfg} and its entry block {@code entry}:
+ * {@snippet file="com/kobayami/graphity/examples/AnalyzingControlFlow.java" region="loops"}
+ * The forest is defined on every graph, reducible or not, over the nodes that the entries reach:
  * <ul>
- *   <li>The outermost loops are the strongly connected components that contain at least one
- *       edge.</li>
+ *   <li>The outermost loops are the {@linkplain Sccs strongly connected components} that
+ *       contain at least one edge.</li>
  *   <li>The header of a loop is the node of its component that a depth-first search from the
- *       graph's entries reaches first. Entries are searched in list order and successors in
- *       ascending order.</li>
+ *       entries reaches first. The search takes the entries in list order and the out-nodes of a
+ *       node in ascending order.</li>
  *   <li>Without the edges that lead into the header from inside the component, the rest of it
  *       breaks up into the nested loops, by the same rule.</li>
  * </ul>
- * This is Havlak's loop nesting forest. On a reducible graph its loops are exactly the natural
- * loops. An irreducible cycle - one that can be entered at more than one node, as {@code goto},
- * bytecode or generated state machines produce - appears as one loop with several
- * {@linkplain #entriesOf(int) entries}, and which of them is the header depends on the node
- * numbering. An entry of the graph that lies in a loop counts as an entry of that loop. A node
- * with a self-loop lies in a loop even alone, and heads one of its own unless it heads a larger
- * one; unreachable nodes are in no loop.
  * <p>
- * Loops have IDs in {@code 0..loopCount()-1}, numbered in preorder of the forest: an enclosing
- * loop has a smaller ID than the loops inside it, so iterating IDs downwards visits inner loops
- * first, and the loops nested in {@code L}, {@code L} included, occupy a contiguous ID range.
- * {@link #isInLoop(int, int)} is a range test on {@link #innermostLoopOf(int)}, and
- * {@link #bodyOf(int)} is a slice of one shared array.
+ * Uses Havlak's algorithm, without recursion. On a reducible graph, the loops are the natural
+ * loops. An irreducible loop is a cycle that can be entered at more than one node, as
+ * {@code goto}, bytecode or generated state machines produce it. It is one loop with several
+ * {@linkplain #entriesOf(int) entries}, and which of them is the header depends on the order of
+ * the search. An entry of the graph that lies in a loop is an entry of that loop. A node with a
+ * self-loop is the header of a loop of its own, unless it already is the header of a larger one.
+ * Nodes that no entry reaches are in no loop.
  * <p>
- * Like {@link Dominators}, the analysis reads predecessors and takes a {@link BiAdjacentGraph};
- * the same graph serves both.
- *
- * <pre>{@code
- * var loops = Loops.of(cfg, entry);
- * for (int loop = loops.loopCount() - 1; loop >= 0; loop--) {   // inner loops first
- *     int header = loops.headerOf(loop);
- *     IntList body = loops.bodyOf(loop);                        // nested loops included
- * }
- * }</pre>
- *
- * <strong>Memory:</strong> 4 x nodeCount bytes, plus 4 bytes per node that lies in a loop,
- * 24 bytes per loop and 4 bytes per loop entry.
- *
- * @see Sccs
- * @see Dominators
+ * Loops have IDs {@code 0..loopCount()-1}, in preorder of the forest: a loop has a smaller ID than
+ * the loops nested in it, which follow it as one range of IDs. Going through the IDs downwards
+ * visits the inner loops first.
+ * <p>
+ * Like {@link Dominators}, the analysis follows edges against their direction and so takes a
+ * {@link BiAdjacentGraph}; the same graph serves both. Instances are immutable and safe to share
+ * between threads.
+ * <p>
+ * <strong>Memory:</strong> 4 x nodeCount bytes, plus 4 bytes per node in a loop, 24 bytes per
+ * loop and 4 bytes per entry of a loop.
  */
 public final class Loops {
 
-  /** Innermost loop of each node, {@code -1} outside every loop. */
+  // Innermost loop of each node, -1 outside every loop.
   private final int[] innermostLoop;
 
-  /** Header node of each loop. */
+  // Header node of each loop.
   private final int[] header;
 
-  /** Enclosing loop of each loop, {@code -1} at the top level. */
+  // Enclosing loop of each loop, -1 for an outermost loop.
   private final int[] parent;
 
-  /** One past the last loop nested in each loop: the loops in {@code L} are {@code [L, end[L])}. */
+  // One past the last loop nested in each loop: the loops in L are [L, subtreeEnd[L]).
   private final int[] subtreeEnd;
 
-  /** Number of loops containing each loop, itself included. */
+  // Number of loops containing each loop, itself included.
   private final int[] depth;
 
-  /**
-   * Start of each loop's own nodes in {@link #bodies}; the body of {@code L} with its nested
-   * loops is {@code [bodyStart[L], bodyStart[subtreeEnd[L]])}.
-   */
+  // Start of each loop's own nodes in bodies; the body of L with its nested loops is
+  // [bodyStart[L], bodyStart[subtreeEnd[L]]).
   private final int[] bodyStart;
 
-  /** All loop bodies in loop-ID order, each loop's own nodes header first, then ascending. */
+  // All loop bodies in loop ID order, each loop's own nodes header first, then ascending.
   private final IntImmutableList bodies;
 
-  /** Entries of each loop as CSR offsets into {@link #entries}, each list ascending. */
+  // The entries of each loop in CSR layout: those of L are
+  // entries[entryStart[L]..entryStart[L + 1] - 1], ascending.
   private final int[] entryStart;
 
   private final int[] entries;
@@ -105,44 +98,42 @@ public final class Loops {
   }
 
   /**
-   * Computes the loop nesting forest of a graph with a single entry.
-   * <p>
-   * Equivalent to {@link #of(BiAdjacentGraph, IntList)} with a one-element list.
+   * Returns the loop nesting forest of {@code graph} with one entry. Equivalent to
+   * {@link #of(BiAdjacentGraph, IntList) of(graph, IntList.of(entry))}.
    * <p>
    * <strong>Time:</strong> as for {@link #of(BiAdjacentGraph, IntList)}.<br>
    * <strong>Memory:</strong> as for {@link #of(BiAdjacentGraph, IntList)}.
    *
    * @param graph the control-flow graph
-   * @param entry the entry node ID in {@code 0..nodeCount()-1}
+   * @param entry node ID in {@code 0..nodeCount-1}
    * @return the loop nesting forest
    * @throws IndexOutOfBoundsException if {@code entry} is out of range
-   * @throws IllegalArgumentException if {@code graph.nodeCount() > 2^30 - 6}
+   * @throws IllegalArgumentException if {@code graph} has more than 2<sup>30</sup> - 6 nodes
    */
   public static Loops of(BiAdjacentGraph graph, int entry) {
     return of(graph, IntLists.singleton(entry));
   }
 
   /**
-   * Computes the loop nesting forest of a graph with the given entries.
+   * Returns the loop nesting forest of {@code graph} with the given entries.
    * <p>
-   * Entries follow the conventions of {@link Dominators#of(BiAdjacentGraph, IntList)}: an empty
-   * list leaves every node unreachable, duplicates are ignored. Their order matters here,
-   * because it decides which node of an irreducible loop the search reaches first. The
-   * predecessors are read from the in-adjacency of the graph. Construction is iterative:
-   * Havlak's algorithm with union-find, keeping the edges that enter a collapsed loop in linked
-   * lists instead of copying them to each enclosing header.
+   * The entries work as in {@link Dominators#of(BiAdjacentGraph, IntList)}: an entry given twice
+   * counts once, and with no entries, no node is reachable, so there is no loop. Their order
+   * matters here: it decides which node of an irreducible loop the search reaches first, and so
+   * which node is its header.
    * <p>
-   * <strong>Time:</strong> O((nodeCount + edgeCount) x log nodeCount) on a reducible graph. On
-   * an irreducible graph, an edge additionally costs one step for every loop it enters other
+   * <strong>Time:</strong> O(entries.size() + (nodeCount + edgeCount) log nodeCount) on a reducible
+   * graph. On an irreducible graph, an edge costs one more step for every loop it enters other
    * than through the header.<br>
-   * <strong>Memory:</strong> as given in the class description for the result; about
-   * 48 x nodeCount + 4 x edgeCount bytes additional during computation.
+   * <strong>Memory:</strong> the result, as given in the class documentation; while it runs,
+   * about 45 x nodeCount + 4 x edgeCount bytes more, plus 28 bytes per loop and 12 bytes per
+   * entry of a loop.
    *
    * @param graph   the control-flow graph
-   * @param entries the entry node IDs, each in {@code 0..nodeCount()-1}
+   * @param entries node IDs in {@code 0..nodeCount-1}, in the order the search takes them
    * @return the loop nesting forest
    * @throws IndexOutOfBoundsException if an entry is out of range
-   * @throws IllegalArgumentException if {@code graph.nodeCount() > 2^30 - 6}
+   * @throws IllegalArgumentException if {@code graph} has more than 2<sup>30</sup> - 6 nodes
    */
   public static Loops of(BiAdjacentGraph graph, IntList entries) {
     int n = graph.nodeCount();
@@ -159,7 +150,7 @@ public final class Loops {
       if (p > 0 && last[v] > last[p]) last[p] = last[v];
     }
 
-    // Predecessors from the in-adjacency over node IDs, translated per edge through `number`
+    // In-nodes from the in-adjacency over node IDs, translated per edge through `number`
     // (0 = unreachable).
     int[] predStart = Csr.inAdjacencyStart(graph);
     int[] preds = Csr.inAdjacency(graph);
@@ -168,7 +159,7 @@ public final class Loops {
     //    search subtree that reaches w inside that subtree. Union-find collapses finished loops
     //    into their header; the edges that enter a collapsed region from outside wait in a
     //    linked list per region, so an enclosing header scans each of them once instead of
-    //    rescanning every predecessor of every node inside.
+    //    rescanning every in-node of every node inside.
     var uf = new int[size];
     for (int v = 0; v < size; v++) uf[v] = v;
     var enclosing = new int[size];
@@ -327,10 +318,10 @@ public final class Loops {
       if (l >= 0 && header[l] != node) bodies[bodyWritePos[l]++] = node;
     }
 
-    // 6) Entries: x enters every loop that contains x but not one of its predecessors - a chain
-    //    from the innermost loop of x upwards. Walking each chain only above the part already
-    //    marked keeps this proportional to the result. A graph entry has the virtual root as
-    //    predecessor, which no loop contains.
+    // 6) Entries: x enters every loop that contains x but not one of its in-nodes - a chain from
+    //    the innermost loop of x upwards. Walking each chain only above the part already marked
+    //    keeps this proportional to the result. A graph entry has the virtual root as in-node,
+    //    which no loop contains.
     var entryLoops = new IntArrayList();
     var entryNodes = new IntArrayList();
     for (int x = 0; x < n; x++) {
@@ -386,7 +377,7 @@ public final class Loops {
         entryStart, loopEntries, reducible);
   }
 
-  /** Whether the loop {@code inner}, {@code -1} for none, is {@code loop} or nested in it. */
+  // Whether the loop inner, -1 for none, is loop or nested in it.
   private static boolean contains(int[] subtreeEnd, int loop, int inner) {
     return inner >= loop && inner < subtreeEnd[loop];
   }
@@ -417,15 +408,17 @@ public final class Loops {
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @return number of loops
+   * @return loop count
    */
   public int loopCount() {
     return header.length;
   }
 
   /**
-   * Returns whether every loop has exactly one entry, its header. Then the graph is reducible
-   * and the loops are its natural loops.
+   * Returns whether the graph is reducible: whether every loop has its header as its only entry.
+   * <p>
+   * The loops of a reducible graph are its natural loops. A node counts only if the entries reach
+   * it.
    * <p>
    * <strong>Time:</strong> O(1).
    *
@@ -436,11 +429,11 @@ public final class Loops {
   }
 
   /**
-   * Returns the innermost loop containing {@code node}, or {@code -1} if it lies in no loop.
+   * Returns the innermost loop that contains {@code node}, or {@code -1} if it lies in no loop.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param node node ID in {@code 0..nodeCount()-1}
+   * @param node node ID in {@code 0..nodeCount-1}
    * @return loop ID, or {@code -1}
    * @throws IndexOutOfBoundsException if {@code node} is out of range
    */
@@ -450,12 +443,13 @@ public final class Loops {
   }
 
   /**
-   * Returns the number of loops containing {@code node}, {@code 0} outside every loop.
+   * Returns the loop depth of {@code node}: the number of loops that contain it. A node in no loop
+   * has loop depth {@code 0}.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param node node ID in {@code 0..nodeCount()-1}
-   * @return nesting depth
+   * @param node node ID in {@code 0..nodeCount-1}
+   * @return loop depth
    * @throws IndexOutOfBoundsException if {@code node} is out of range
    */
   public int loopDepthOf(int node) {
@@ -465,11 +459,11 @@ public final class Loops {
   }
 
   /**
-   * Returns whether {@code node} lies in {@code loop}, including its nested loops.
+   * Returns whether {@code node} lies in {@code loop}, directly or in a loop nested in it.
    * <p>
-   * <strong>Time:</strong> O(1) - a range test on loop IDs.
+   * <strong>Time:</strong> O(1).
    *
-   * @param node node ID in {@code 0..nodeCount()-1}
+   * @param node node ID in {@code 0..nodeCount-1}
    * @param loop loop ID in {@code 0..loopCount()-1}
    * @return {@code true} if the node is in the loop
    * @throws IndexOutOfBoundsException if {@code node} or {@code loop} is out of range
@@ -495,17 +489,18 @@ public final class Loops {
   }
 
   /**
-   * Returns the entries of {@code loop}: the nodes of the loop with a reachable predecessor
-   * outside it, and the entries of the graph that lie in it. Exactly {@code {headerOf(loop)}}
-   * for a loop that can only be entered through its header.
+   * Returns the entries of {@code loop}, in ascending order.
    * <p>
-   * The list is a zero-copy, read-only view.
+   * These are the nodes of the loop with an in-node outside the loop, and the entries of the graph
+   * that lie in the loop. An in-node counts only if the entries of the graph reach it. A loop that
+   * can only be entered through its header has the header as its only entry.
    * <p>
-   * <strong>Time:</strong> O(number of entries), for the order check of
-   * {@link SortedIntView#viewOf(int[], int, int)}.
+   * The result is a view of this forest's own array, not a copy.
+   * <p>
+   * <strong>Time:</strong> O(entriesOf(loop).size()).
    *
    * @param loop loop ID in {@code 0..loopCount()-1}
-   * @return the entry nodes, sorted ascending
+   * @return entry node IDs
    * @throws IndexOutOfBoundsException if {@code loop} is out of range
    */
   public SortedIntView entriesOf(int loop) {
@@ -514,7 +509,7 @@ public final class Loops {
   }
 
   /**
-   * Returns the loop that immediately encloses {@code loop}, or {@code -1} at the top level.
+   * Returns the loop that immediately encloses {@code loop}, or {@code -1} for an outermost loop.
    * <p>
    * <strong>Time:</strong> O(1).
    *
@@ -528,17 +523,19 @@ public final class Loops {
   }
 
   /**
-   * Returns the body of {@code loop}, nested loops included: the header first, then the nodes
-   * whose innermost loop is {@code loop} in ascending order, then the bodies of the nested loops
-   * in loop-ID order.
+   * Returns the body of {@code loop}: its nodes and those of the loops nested in it.
    * <p>
-   * The list is a zero-copy, read-only view. All bodies share one array, so they cost 4 bytes
-   * per node in a loop, not one copy per nesting level.
+   * The nodes come in this order: first the header, then, in ascending order, the other nodes whose
+   * innermost loop is {@code loop}, then the nodes of the nested loops in the same form, loop after
+   * loop in ID order.
+   * <p>
+   * The result is an unmodifiable view of this forest's own array, not a copy. All bodies share
+   * the array, so a node is stored once, however deeply its loop is nested.
    * <p>
    * <strong>Time:</strong> O(1).
    *
    * @param loop loop ID in {@code 0..loopCount()-1}
-   * @return the nodes of the loop
+   * @return node IDs of the body
    * @throws IndexOutOfBoundsException if {@code loop} is out of range
    */
   public IntList bodyOf(int loop) {

@@ -3,68 +3,52 @@ package com.kobayami.graphity;
 import java.util.Arrays;
 
 /**
- * Factory for computing connected components of a {@link Graph}.
+ * The algorithms for the components of a graph, and for the edges and nodes whose removal splits
+ * them.
  * <p>
- * Provides five entry points for different component types:
- * <ul>
- *   <li>{@link #sccsOf(Graph)} - Strongly Connected Components (Tarjan's algorithm)</li>
- *   <li>{@link #wccsOf(Graph)} - Weakly Connected Components (Union-Find)</li>
- *   <li>{@link #ccsOf(Graph)} - Connected Components for undirected interpretation
- *       (identical to {@code wccsOf})</li>
- *   <li>{@link #biconnectivityOf(BiAdjacentGraph)} - bridges, articulation points and biconnected
- *       components, also for undirected interpretation</li>
- *   <li>{@link #strongConnectivityOf(BiAdjacentGraph)} - strong bridges and strong articulation
- *       points, the directed counterpart</li>
- * </ul>
- *
- * <pre>{@code
- * var sccs = Components.sccsOf(graph);   // directed: SCCs via Tarjan
- * var wccs = Components.wccsOf(graph);   // directed: WCCs via Union-Find
- * var ccs  = Components.ccsOf(graph);    // undirected interpretation: same as wccsOf
- * // undirected: bridges, cut vertices, blocks
- * var bcc  = Components.biconnectivityOf(BiAdjacentGraph.of(graph));
- * }</pre>
- *
- * <h2>Directed vs. undirected interpretation</h2>
- * The graph data model is always directed (edges have a source and target). Whether a graph
- * is treated as directed or undirected depends on the algorithm:
- * <ul>
- *   <li>{@code sccsOf} treats edges as directed - two nodes are in the same SCC only if
- *       each is reachable from the other <em>following edge directions</em>.</li>
- *   <li>{@code wccsOf} / {@code ccsOf} ignores edge direction - two nodes are in the same
- *       component if connected by any path, regardless of edge direction.</li>
- *   <li>{@code biconnectivityOf} ignores edge direction as well, and it is where the rule
- *       below becomes visible: a reciprocal pair read as two edges would be a cycle, and no
- *       symmetrically stored edge could ever be a bridge.</li>
- * </ul>
- * The undirected reading takes each stored edge as connecting both of its endpoints - the
- * opposite edge does not have to exist - and counts a reciprocal pair {@code a → b} /
- * {@code b → a} as one undirected edge rather than two. Storing undirected edges in both
- * directions is therefore tolerated, not expected: a graph stored symmetrically is read
- * exactly like the same structure stored with a single direction per edge.
- *
- * @see Sccs
- * @see NodePartition
- * @see Biconnectivity
- * @see Graph
+ * {@link #sccsOf(Graph)} returns the SCCs (strongly connected components), and
+ * {@link #wccsOf(Graph)} the weakly connected components. {@link #ccsOf(Graph)} returns the weakly
+ * connected components under another name: the connected components of the graph read as
+ * undirected. {@link #biconnectivityOf(BiAdjacentGraph)} returns the bridges, articulation points
+ * and biconnected components. Bridges and articulation points are the edges and nodes whose removal
+ * splits a connected component. {@link #strongConnectivityOf(BiAdjacentGraph)} returns the strong
+ * bridges and strong articulation points, which split an SCC.
+ * <p>
+ * A graph is always directed, and each method says how it reads the edges. {@code sccsOf} and
+ * {@code strongConnectivityOf} follow them in their direction. {@code wccsOf}, {@code ccsOf} and
+ * {@code biconnectivityOf} read the graph as undirected: an edge connects its source and target
+ * whether or not the reverse edge exists, and the edges {@code a -> b} and {@code b -> a} count
+ * as one undirected edge, not two. An undirected graph can therefore be stored with one edge per
+ * pair of neighbors or with both directions, and these methods read it the same way. For the
+ * bridges this matters: read as two edges, the two directions would form a cycle, and no edge
+ * stored in both directions could be a bridge.
  */
 public final class Components {
 
   private Components() {}
 
   /**
-   * Computes the strongly connected components of the given graph using Tarjan's algorithm.
+   * Returns the SCCs of {@code graph}. Uses
+   * <a href="https://en.wikipedia.org/wiki/Tarjan%27s_strongly_connected_components_algorithm">Tarjan's
+   * algorithm</a>, without recursion.
    * <p>
-   * <strong>Time:</strong> O(nodeCount + edgeCount), plus sorting the members of each component,
-   * O(k log k) for a component of k nodes: O(nodeCount x log nodeCount) in the worst case, when
-   * one component holds most of the nodes.<br>
-   * <strong>Memory:</strong> O(nodeCount) for the result; O(nodeCount) additional during
-   * computation.
+   * Every node is in exactly one SCC; a node that lies on no cycle is an SCC of its own. SCC IDs
+   * are in reverse topological order: every edge between two SCCs goes from the higher SCC ID to
+   * the lower one, so SCC {@code 0} has no edges to other SCCs. The nodes of each SCC are in
+   * ascending order. Here, {@code dependencies} are the dependencies between the packages of a
+   * program, and {@code names} holds the names of the packages. The example groups the packages by
+   * SCC, in the order of the SCC IDs. In this order, each package comes after the packages it uses,
+   * and the packages that use each other come together:
+   * {@snippet file="com/kobayami/graphity/examples/Connectivity.java" region="sccsOf"}
+   * <p>
+   * <strong>Time:</strong> O(nodeCount + edgeCount), plus sorting the nodes of each SCC: up to
+   * O(nodeCount log nodeCount) when one SCC holds most of the nodes.<br>
+   * <strong>Memory:</strong> up to 12 x nodeCount bytes for the result; while it runs,
+   * 24 x nodeCount bytes more.
    *
-   * @param graph the graph to analyze
-   * @return the SCCs as an {@link Sccs} instance
-   * @throws IllegalArgumentException if {@code graph.nodeCount() > 2^30 - 5}, the most nodes for
-   *     which two ints per node fit into one array
+   * @param graph the graph
+   * @return the SCCs
+   * @throws IllegalArgumentException if {@code graph} has more than 2<sup>30</sup> - 5 nodes
    */
   public static Sccs sccsOf(Graph graph) {
     var tarjan = new TarjanTraverser(graph);
@@ -73,17 +57,21 @@ public final class Components {
   }
 
   /**
-   * Computes the weakly connected components of the given directed graph.
+   * Returns the weakly connected components of {@code graph}. These are the components of the
+   * graph read as undirected.
    * <p>
-   * Two nodes are in the same WCC if they are connected by any path, ignoring edge direction.
-   * Uses Union-Find (disjoint-set) - only requires out-edges, no {@link BiAdjacentGraph} needed.
+   * Every node is in exactly one component. Each component is a group of the result. The groups are
+   * in the order of their smallest nodes: group {@code 0} holds node {@code 0}, group {@code 1} the
+   * smallest node not in group {@code 0}, and so on. Uses <a
+   * href="https://en.wikipedia.org/wiki/Disjoint-set_data_structure">union-find</a>, whose cost
+   * grows with alpha(nodeCount). The inverse Ackermann function alpha is below 5 for any graph.
    * <p>
-   * <strong>Time:</strong> O(nodeCount x α(nodeCount) + edgeCount), effectively
-   * O(nodeCount + edgeCount).<br>
-   * <strong>Memory:</strong> O(nodeCount).
+   * <strong>Time:</strong> O((nodeCount + edgeCount) x alpha(nodeCount)).<br>
+   * <strong>Memory:</strong> up to 12 x nodeCount bytes for the result; while it runs,
+   * 9 x nodeCount bytes more.
    *
-   * @param graph the graph to analyze
-   * @return the WCCs as a {@link NodePartition}
+   * @param graph the graph
+   * @return the weakly connected components
    */
   public static NodePartition wccsOf(Graph graph) {
     int n = graph.nodeCount();
@@ -122,110 +110,82 @@ public final class Components {
   }
 
   /**
-   * Computes the connected components of the given graph, reading it as undirected.
+   * Returns the connected components of {@code graph} read as undirected. Equivalent to
+   * {@link #wccsOf(Graph) wccsOf(graph)}.
    * <p>
-   * Each stored edge connects both of its endpoints here, so the opposite edge does not have to
-   * exist, and a reciprocal pair {@code a → b} / {@code b → a} counts as one undirected edge
-   * rather than two. Storing undirected edges in both directions is tolerated, not expected:
-   * both forms give the same components. Self-loops contribute nothing to connectivity and are
-   * ignored.
+   * The two names let a call say which reading of the graph it means.
    * <p>
-   * This is identical to {@link #wccsOf(Graph)}, and not by coincidence: once connectivity is
-   * the question, ignoring edge direction is all the undirected reading amounts to. Both names
-   * exist so that a call can say which reading it means.
-   * <p>
-   * <strong>Time:</strong> O(nodeCount + edgeCount).<br>
-   * <strong>Memory:</strong> O(nodeCount).
+   * <strong>Time:</strong> O((nodeCount + edgeCount) x alpha(nodeCount)), as for
+   * {@link #wccsOf(Graph)}.<br>
+   * <strong>Memory:</strong> up to 12 x nodeCount bytes for the result; while it runs,
+   * 9 x nodeCount bytes more.
    *
-   * @param graph the graph to analyze
-   * @return the connected components as a {@link NodePartition}
-   * @see #wccsOf(Graph)
+   * @param graph the graph
+   * @return the connected components
    */
   public static NodePartition ccsOf(Graph graph) {
     return wccsOf(graph);
   }
 
   /**
-   * Computes bridges, articulation points and biconnected components of the given graph,
-   * treating it as undirected like {@link #ccsOf(Graph)}.
+   * Returns the bridges, articulation points and biconnected components of {@code graph}, read
+   * as undirected.
    * <p>
-   * Where {@code ccsOf} answers whether a graph falls apart, this answers how close it is to
-   * falling apart: which single node or single edge holds it together, and which parts are
-   * robust because all their edges lie on shared cycles. All three results come out of one
-   * depth-first pass and are always computed together.
+   * All three come from one depth-first search, so there is no cheaper method for one of them
+   * alone; {@link Biconnectivity} describes them. The search follows the edges of every node in
+   * both directions, so it takes a {@link BiAdjacentGraph}. For a plain {@link Graph}, call
+   * {@code Components.biconnectivityOf(BiAdjacentGraph.of(graph))}.
+   * Uses <a href="https://en.wikipedia.org/wiki/Biconnected_component">the algorithm of Hopcroft
+   * and Tarjan</a>, without recursion.
    * <p>
-   * The edges {@code a → b} and {@code b → a} count as one undirected edge, so a graph that
-   * stores undirected edges in both directions still has bridges. Self-loops are ignored.
-   * <p>
-   * The pass reads the predecessors of every node and so takes a {@link BiAdjacentGraph}. A
-   * caller holding a plain {@link Graph} builds the in-adjacency once with
-   * {@link BiAdjacentGraph#of(Graph)}, at a cost visible at the call site.
-   * <p>
-   * <strong>Time:</strong> O(nodeCount + edgeCount); the bridges, at most nodeCount - 1, are
-   * ordered by counting.<br>
-   * <strong>Memory:</strong> O(nodeCount + edgeCount) for the result; during computation
-   * 29 x nodeCount bytes for the traversal state, 4 x edgeCount bytes for the edge index
-   * translation, up to 4 x edgeCount bytes for the edge stack, which grows on demand and never
-   * exceeds edgeCount entries, and for the bridges up to 12 x nodeCount bytes while they are
-   * collected, half as much again in spare list capacity, and another 16 x nodeCount bytes while
-   * they are ordered. That is up to 63 x nodeCount + 8 x edgeCount bytes, several times the size
-   * of the graph itself, and worth checking against the available heap on very large graphs.
+   * <strong>Time:</strong> O(nodeCount + edgeCount).<br>
+   * <strong>Memory:</strong> up to 8 x edgeCount + 20 x nodeCount bytes for the result; while it
+   * runs, 8 x edgeCount + 63 x nodeCount bytes more.
    *
-   * @param graph the graph to analyze
-   * @return bridges, articulation points and blocks as a {@link Biconnectivity} instance
-   * @see Biconnectivity
+   * @param graph the graph
+   * @return the bridges, articulation points and biconnected components
    */
   public static Biconnectivity biconnectivityOf(BiAdjacentGraph graph) {
     return Biconnectivity.of(graph);
   }
 
   /**
-   * Computes the strong bridges and strong articulation points of the given graph: the edges
-   * and nodes whose removal increases the number of strongly connected components.
+   * Returns the strong bridges and strong articulation points of {@code graph}. These are the
+   * edges and nodes whose removal splits an SCC.
    * <p>
-   * Edges are read as directed, as in {@link #sccsOf(Graph)}. Both results lie inside strongly
-   * connected components with more than one node; on a DAG both are empty.
+   * The edges are followed in their direction, as by {@link #sccsOf(Graph)};
+   * {@link StrongConnectivity} describes the results. The computation also follows them against
+   * their direction, so it takes a {@link BiAdjacentGraph}. For a plain {@link Graph}, call
+   * {@code Components.strongConnectivityOf(BiAdjacentGraph.of(graph))}. Uses the algorithm of
+   * Italiano, Laura and Santaroni, which finds both from the
+   * {@linkplain Dominators dominators} within each SCC, without recursion.
    * <p>
-   * The computation works on the dominators of each component and of its transpose, following
-   * Italiano, Laura and Santaroni, and so reads the predecessors of every node: it takes a
-   * {@link BiAdjacentGraph}, whose transpose is a constant-time view. A caller holding a plain
-   * {@link Graph} builds the in-adjacency once with {@link BiAdjacentGraph#of(Graph)}. Iterative;
-   * deep graphs do not overflow the call stack.
-   * <p>
-   * <strong>Time:</strong> O((nodeCount + edgeCount) x log nodeCount) in the worst case, from the
-   * dominators; the strong bridges are ordered by counting.<br>
-   * <strong>Memory:</strong> O(nodeCount) for the result; up to about 105 x nodeCount bytes
-   * additional during computation, most of it while the strong bridges are ordered: up to
-   * 2 x nodeCount of them before the duplicates found in both directions are dropped.
+   * <strong>Time:</strong> O((nodeCount + edgeCount) log nodeCount).<br>
+   * <strong>Memory:</strong> up to 28 x nodeCount bytes for the result; while it runs, about
+   * 80 x nodeCount bytes more.
    *
-   * @param graph the graph to analyze
-   * @return strong bridges and strong articulation points as a {@link StrongConnectivity}
-   * @throws IllegalArgumentException if {@code graph.nodeCount() > 2^30 - 6}, the limit of
-   *     {@link Dominators}
-   * @see StrongConnectivity
+   * @param graph the graph
+   * @return the strong bridges and strong articulation points
+   * @throws IllegalArgumentException if {@code graph} has more than 2<sup>30</sup> - 6 nodes
    */
   public static StrongConnectivity strongConnectivityOf(BiAdjacentGraph graph) {
     return StrongConnectivity.of(graph);
   }
 
-  /**
-   * Iterative Tarjan SCC. Performs a single-pass DFS with an explicit stack (no recursion,
-   * so deep graphs cannot overflow the JVM call stack), identifying all strongly connected
-   * components. SCC IDs are assigned in reverse topological order of the component DAG.
-   * <p>
-   * The per-node state - index, lowlink, visited and on-stack - lives in two interleaved
-   * {@code int} lanes per node: {@code index | visited << 31} and {@code lowlink | onStack << 31}.
-   * index and lowlink are both node IDs, so 31 bits each suffice. Every node touch is then one
-   * cache line instead of two int arrays plus two bit-sets, and the layout stays within 32-bit
-   * arithmetic, which a port to a language without 64-bit integer operators can mirror. Two lanes
-   * per node cap the node count at 2^30 - 5, {@link ArrayLimits#MAX_NODE_COUNT_TWO_INTS}; a
-   * depth-first path through every node then still fits into the frame stack.
-   * <p>
-   * Two stacks drive the traversal: {@code frames} for the DFS descent (each entry a node ID and
-   * its resume position), and {@code sccStack} holding nodes not yet assigned to a
-   * completed SCC - a node may be finished in DFS but still on {@code sccStack} until its SCC
-   * root finishes.
-   */
+  // Tarjan's algorithm with an explicit frame stack, so deep graphs cannot overflow the call
+  // stack. An SCC closes only after every SCC it reaches, which puts the SCC IDs in reverse
+  // topological order.
+  //
+  // The per-node state - index, lowlink, visited and on-stack - lives in two interleaved int lanes
+  // per node, index | visited << 31 and lowlink | onStack << 31: index and lowlink are below
+  // nodeCount, so 31 bits each suffice. Every node touch is then one cache line instead of two int
+  // arrays plus two bit sets, and the layout stays within 32-bit arithmetic, which a port to a
+  // language without 64-bit integer operators can mirror. Two lanes per node cap the node count at
+  // ArrayLimits.MAX_NODE_COUNT_TWO_INTS, 2^30 - 5; a depth-first path through every node then
+  // still fits into the frame stack.
+  //
+  // sccStack holds the nodes not yet assigned to a completed SCC: a node can be finished in the
+  // search and still wait there until the root of its SCC finishes.
   private static final class TarjanTraverser {
 
     private static final int VALUE = Integer.MAX_VALUE;   // bits 0-30 of a lane

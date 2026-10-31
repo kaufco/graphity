@@ -20,7 +20,7 @@ cd graphity-benchmarks
 
 This builds the benchmark JAR and runs the smallest synthetic profile (`quick`, minute-scale) through all measurement phases, aggregates a Markdown report, and updates the versioned baseline archive. Output is stored in `graphity-benchmarks/measurements/` (gitignored scratch) and `graphity-benchmarks/reports/` (versioned).
 
-Requires JDK 21 or newer (same as the main library), Maven, and `python3` on `PATH` (used by the runner for matrix validation, JMH-JSON aggregation, and report post-processing).
+Requires JDK 25 (same as the main library), Maven, and `python3` on `PATH` (used by the runner for matrix validation, JMH-JSON aggregation, and report post-processing).
 
 ## What gets measured
 

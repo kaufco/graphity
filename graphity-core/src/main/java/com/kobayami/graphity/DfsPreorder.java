@@ -3,39 +3,36 @@ package com.kobayami.graphity;
 import it.unimi.dsi.fastutil.ints.IntList;
 import java.util.Arrays;
 
-/**
- * Depth-first preorder of the nodes reachable from a list of entries - the first step of
- * {@link Dominators}. The {@code graphity-controlflow} module keeps its own copy for the loop
- * nesting forest.
- * <p>
- * Preorder numbers start at 1. Number 0 is a virtual root above all entries, so that several
- * entries need no special case downstream: every entry the search starts from is a child of
- * the virtual root, and {@link #isEntry(int)} marks every entry, also one that the search
- * reached from an earlier entry. Successors are visited in ascending node order and entries in
- * list order. Iterative; the frame stack lives on the heap.
- */
+// The depth-first preorder of the nodes reachable from a list of entries, the first step of
+// Dominators. graphity-controlflow keeps a copy for Loops, as a module cannot see this class;
+// change both together.
+//
+// Preorder numbers start at 1. Number 0 is a virtual root above all entries, so that several
+// entries need no special case downstream: every entry the search starts from is a child of the
+// virtual root, and isEntry marks every entry, also one that the search reached from an earlier
+// entry. Out-nodes are visited in ascending order and entries in list order. Without recursion;
+// the frame stack lives on the heap.
 final class DfsPreorder {
 
-  /**
-   * Largest supported node count, 2^30 - 6. The control-flow analyses hold two {@code int}s per
-   * preorder number, the virtual root included, so {@code 2 x (MAX_NODE_COUNT + 1)} has to stay
-   * within the largest array, {@link ArrayLimits#MAX_ARRAY_LENGTH}.
-   */
+  // The largest supported node count, 2^30 - 6: Dominators holds two ints per preorder number,
+  // the virtual root included, in one array, so 2 x (MAX_NODE_COUNT + 1) has to stay within the
+  // largest array. Loops takes the same limit, so that it accepts the graphs that Dominators
+  // accepts.
   static final int MAX_NODE_COUNT = ArrayLimits.MAX_NODE_COUNT_TWO_INTS - 1;
 
-  /** Number of nodes reachable from the entries. */
+  // The number of nodes reachable from the entries.
   final int reachedCount;
 
-  /** Node with each preorder number, {@code order[0] == -1} for the virtual root. */
+  // The node with each preorder number; order[0] == -1 for the virtual root.
   final int[] order;
 
-  /** Preorder number of each node, {@code 0} for a node not reachable from any entry. */
+  // The preorder number of each node; 0 for a node not reachable from any entry.
   final int[] preorderNumber;
 
-  /** Preorder number of each node's parent in the search tree, {@code 0} below the virtual root. */
+  // The preorder number of the parent of each node in the search tree; 0 below the virtual root.
   final int[] parent;
 
-  /** Bit set over preorder numbers: set for every entry. */
+  // A bit set over preorder numbers, set for every entry.
   private final long[] entryBits;
 
   private DfsPreorder(
@@ -47,13 +44,9 @@ final class DfsPreorder {
     this.entryBits = entryBits;
   }
 
-  /**
-   * Runs the search.
-   *
-   * @param analysis name of the calling analysis, for the exception message
-   * @throws IndexOutOfBoundsException if an entry is out of range
-   * @throws IllegalArgumentException if {@code graph.nodeCount() > MAX_NODE_COUNT}
-   */
+  // Runs the search; analysis names the caller in the message of the node limit. Throws
+  // IndexOutOfBoundsException for an entry out of range and IllegalArgumentException above
+  // MAX_NODE_COUNT nodes.
   static DfsPreorder of(Graph graph, IntList entries, String analysis) {
     int n = graph.nodeCount();
     ArrayLimits.checkNodeCount(n, MAX_NODE_COUNT, analysis);
@@ -114,7 +107,8 @@ final class DfsPreorder {
     return new DfsPreorder(count, order, preorderNumber, parent, entryBits);
   }
 
-  /** Whether the node with this preorder number is one of the entries. */
+  // Whether the node with this preorder number is one of the entries, also if the search reached
+  // it from an earlier entry.
   boolean isEntry(int number) {
     return (entryBits[number >> 6] & (1L << number)) != 0;
   }

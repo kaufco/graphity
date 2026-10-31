@@ -4,41 +4,24 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 import java.util.Arrays;
 
 /**
- * Bridges, articulation points and biconnected components of a graph read as undirected.
+ * The bridges, articulation points and biconnected components of a graph read as undirected, as
+ * {@link Components#biconnectivityOf(BiAdjacentGraph)} returns them.
  * <p>
- * Obtain via {@link Components#biconnectivityOf(BiAdjacentGraph)}. All three results come out of
- * one depth-first pass; there is no cheaper entry point that computes only one of them.
- * <ul>
- *   <li>A <strong>bridge</strong> is an edge whose removal increases the number of connected
- *       components.</li>
- *   <li>An <strong>articulation point</strong> (cut vertex) is a node whose removal does the
- *       same.</li>
- *   <li>A <strong>block</strong> (biconnected component) is a maximal set of edges in which
- *       any two edges lie on a common cycle. Blocks partition the edges, not the nodes - an
- *       articulation point belongs to every block that meets it.</li>
- * </ul>
- *
- * <h2>Undirected interpretation</h2>
- * The graph data model is directed, and this algorithm reads it as undirected, like
- * {@link Components#ccsOf(Graph)}: the edges {@code a → b} and {@code b → a} are one
- * undirected edge, not two, so a graph that stores undirected edges in both directions still
- * has bridges. Both edge indices of such a reciprocal pair land in the same block. Self-loops
- * are ignored - they are in no block, and they can neither disconnect a graph nor lie on a
- * cycle with another edge.
- *
- * <pre>{@code
- * var biconnectivity = Components.biconnectivityOf(dependencies);   // a BiAdjacentGraph
- * Edges criticalLinks = biconnectivity.bridges();               // with their edge indices
- * SortedIntView singlePointsOfFailure = biconnectivity.articulationPoints();
- * EdgePartition blocks = biconnectivity.blocks();
- * for (int block = 0; block < blocks.groupCount(); block++) {
- *     SortedIntView edgeIndices = blocks.edgesOf(block);
- * }
- * }</pre>
- *
- * @see Components#biconnectivityOf(BiAdjacentGraph)
- * @see Components#ccsOf(Graph)
- * @see EdgePartition
+ * A bridge is an edge whose removal increases the number of connected components, and an
+ * articulation point is a node whose removal does the same. A biconnected component, also called
+ * a block, is a maximal group of edges in which any two edges lie on a common cycle. The blocks
+ * partition the edges, not the nodes: an articulation point belongs to every block it touches.
+ * <p>
+ * The graph is read as undirected, as described at {@link Components}: the edges
+ * {@code a -> b} and {@code b -> a} are one undirected edge. So a graph that stores its edges in
+ * both directions still has bridges, and the two directions of an edge lie in the same block.
+ * Self-loops are in no block and never a bridge. Here, the control flow of the method
+ * {@code load}, whose loop is connected to the rest only through {@code header}:
+ * {@snippet file="com/kobayami/graphity/examples/Connectivity.java" region="biconnectivity"}
+ * <p>
+ * Instances are immutable and safe to share between threads.
+ * <p>
+ * <strong>Memory:</strong> up to 8 x edgeCount + 20 x nodeCount bytes.
  */
 public final class Biconnectivity {
 
@@ -52,7 +35,7 @@ public final class Biconnectivity {
     this.blocks = blocks;
   }
 
-  /** Computes bridges, articulation points and blocks of the given graph, read as undirected. */
+  // The body of Components.biconnectivityOf, here because the constructor is private.
   static Biconnectivity of(BiAdjacentGraph graph) {
     var finder = new BlockFinder(graph);
     finder.run();
@@ -60,46 +43,48 @@ public final class Biconnectivity {
   }
 
   /**
-   * Returns the bridges, each as one edge of the graph with its edge index, ordered by edge
-   * index. A bridge the graph stores in both directions is reported as the edge from the lower
-   * to the higher node ID; its other direction lies in the same block of {@link #blocks()}.
+   * Returns the bridges, in edge index order.
+   * <p>
+   * Of a bridge stored in both directions, only the edge from the lower to the higher node ID is
+   * listed; {@link #blocks()} puts the other direction in the same block.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @return the bridges of the graph
+   * @return bridges
    */
   public Edges bridges() {
     return bridges;
   }
 
   /**
-   * Returns the articulation points, sorted ascending.
+   * Returns the articulation points, in ascending order.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @return the articulation points of the graph
+   * @return articulation points
    */
   public SortedIntView articulationPoints() {
     return articulationPoints;
   }
 
   /**
-   * Returns the biconnected components as a partition of the edge indices.
+   * Returns the blocks, as a partition of the edges.
    * <p>
-   * Group IDs are block IDs; {@code blocks().edgesOf(blockId)} lists the edge indices of one
-   * block, and {@code blocks().get(edgeIndex)} names the block of one edge. Self-loops are
-   * unmapped ({@code -1}), so {@link IndexMapping#isPartial()} is {@code true} exactly when
-   * the graph has self-loops. Both edge indices of a reciprocal pair are in the same block.
+   * Each block is a group of the partition: {@code blocks().get(e)} returns the block of edge
+   * {@code e}, and {@code blocks().edgesOf(block)} the edges of a block. Self-loops are in no
+   * block and map to {@code -1}, so {@link IndexMapping#isPartial()} returns {@code true} exactly
+   * if the graph has self-loops. Which block gets which group ID is not specified, but the same
+   * graph always yields the same group IDs.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @return the blocks of the graph
+   * @return blocks
    */
   public EdgePartition blocks() {
     return blocks;
   }
 
-  /** The nodes whose flag is set, ascending; {@link StrongConnectivity} uses it as well. */
+  // The nodes whose flag is set, in ascending order; StrongConnectivity uses it as well.
   static SortedIntView flaggedNodes(boolean[] isFlagged) {
     int count = 0;
     for (boolean flag : isFlagged) {
@@ -114,26 +99,23 @@ public final class Biconnectivity {
     return new SortedIntView(nodes);
   }
 
-  /**
-   * Hopcroft-Tarjan biconnectivity on an explicit stack (no recursion, so deep graphs cannot
-   * overflow the JVM call stack).
-   * <p>
-   * Neighbours are read as undirected by merging a node's out- and in-adjacency, both sorted
-   * ascending, emitting each neighbour once. The merge is also where a block's edge indices
-   * come from: for one undirected edge it sees the out-adjacency slot - already an edge index -
-   * and the in-adjacency slot in the same step, and the latter translates to an
-   * edge index through {@link Graphs#transposedEdgeMapping(Graph)}.
-   * <p>
-   * Collapsing the reciprocal pair removes the usual complication around the edge back to the
-   * depth-first parent: the parent appears exactly once in the merged sequence, so skipping it
-   * needs no per-frame flag and no parent-edge identity.
-   * <p>
-   * Per-node state ({@code disc}, {@code low}, {@code dfsParent}, {@code blockMark} and the two
-   * merge cursors) lives in arrays rather than in stack frames, because a node is on the
-   * depth-first stack at most once - which keeps the stack itself a plain {@code int[]} of node
-   * IDs and needs no resizing. The edge stack does grow on demand: a graph whose blocks close
-   * early never allocates it in full.
-   */
+  // Hopcroft and Tarjan's algorithm on an explicit stack, so deep graphs cannot overflow the call
+  // stack.
+  //
+  // Neighbors are read as undirected by merging a node's out- and in-adjacency, both sorted
+  // ascending, emitting each neighbor once. The merge is also where a block's edge indices come
+  // from: for one undirected edge it sees the out-adjacency slot - already an edge index - and the
+  // in-adjacency slot in the same step, and the latter translates to an edge index through
+  // Graphs.transposedEdgeMapping.
+  //
+  // Collapsing the reciprocal pair removes the usual complication around the edge back to the
+  // depth-first parent: the parent appears exactly once in the merged sequence, so skipping it
+  // needs no per-frame flag and no parent-edge identity.
+  //
+  // Per-node state (disc, low, dfsParent, blockMark and the two merge cursors) lives in arrays
+  // rather than in stack frames, because a node is on the depth-first stack at most once - which
+  // keeps the stack itself a plain int[] of node IDs that needs no resizing. The edge stack does
+  // grow on demand: a graph whose blocks close early never allocates it in full.
   private static final class BlockFinder {
 
     private static final int UNVISITED = 0;
@@ -144,15 +126,15 @@ public final class Biconnectivity {
     private final int[] inAdjacency;
     private final int[] inAdjacencyStart;
 
-    /** In-adjacency slot → edge index of the same edge in the graph. */
+    // In-adjacency slot -> edge index of the same edge in the graph.
     private final int[] inSlotToEdge;
 
-    /** Discovery time, {@code UNVISITED} until the node is reached. Counting starts at 1. */
+    // Discovery time, UNVISITED until the node is reached. Counting starts at 1.
     private final int[] disc;
     private final int[] low;
     private final int[] dfsParent;
 
-    /** Edge-stack height before the tree edge into this node was pushed. */
+    // Edge-stack height before the tree edge into this node was pushed.
     private final int[] blockMark;
 
     private final int[] outCursor;
@@ -163,18 +145,18 @@ public final class Biconnectivity {
     private int edgeTop;
 
     private final boolean[] isArticulation;
-    /** Bridges as parallel lists of source, target and edge index, each a stored edge. */
+    // Bridges as parallel lists of source, target and edge index, each a stored edge.
     private final IntArrayList bridgeSources = new IntArrayList();
     private final IntArrayList bridgeTargets = new IntArrayList();
     private final IntArrayList bridgeEdgeIndices = new IntArrayList();
 
-    /** Edge index → block ID, {@code -1} for a self-loop. */
+    // Edge index -> block ID, -1 for a self-loop.
     private final int[] blockOfEdge;
     private int blockCount;
 
     private int timer;
 
-    /** Neighbour found by {@link #advance(int)}, with the edge indices of its two directions. */
+    // Neighbor found by advance(int), with the edge indices of its two directions.
     private int pendingNode;
     private int pendingOutEdge;
     private int pendingInSlot;
@@ -253,7 +235,7 @@ public final class Biconnectivity {
       }
     }
 
-    /** Discovers {@code node} as a child of {@code parent} and initialises its merge cursors. */
+    // Discovers node as a child of parent and initializes its merge cursors.
     private void discover(int node, int parent) {
       disc[node] = ++timer;
       low[node] = disc[node];
@@ -262,11 +244,8 @@ public final class Biconnectivity {
       inCursor[node] = inAdjacencyStart[node];
     }
 
-    /**
-     * Advances {@code node}'s merge cursors to its next undirected neighbour, skipping
-     * self-loops, and reports it in {@code pendingNode}. Returns {@code false} once the
-     * neighbours are exhausted.
-     */
+    // Advances node's merge cursors to its next undirected neighbor, skipping self-loops, and
+    // reports it in pendingNode. Returns false once the neighbors are exhausted.
     private boolean advance(int node) {
       int out = outCursor[node];
       int outEnd = outAdjacencyStart[node + 1];
@@ -308,10 +287,8 @@ public final class Biconnectivity {
       return false;
     }
 
-    /**
-     * Pushes the edge indices of the pending undirected edge - one per stored direction, so a
-     * reciprocal pair pushes both and lands in one block.
-     */
+    // Pushes the edge indices of the pending undirected edge - one per stored direction, so a
+    // reciprocal pair pushes both and lands in one block.
     private void pushPendingEdges() {
       if (pendingOutEdge >= 0) pushEdge(pendingOutEdge);
       if (pendingInSlot >= 0) pushEdge(inSlotToEdge[pendingInSlot]);
@@ -327,12 +304,10 @@ public final class Biconnectivity {
       edgeStack[edgeTop++] = edgeIndex;
     }
 
-    /**
-     * Records the bridge {@code parent - child} before its block closes. Every block below the
-     * child is closed already, so the edges above {@code mark} are exactly the one or two stored
-     * directions of the bridge, pushed {@code parent -> child} first. A bridge stored both ways is
-     * reported from the lower node ID.
-     */
+    // Records the bridge parent - child before its block closes. Every block below the child is
+    // closed already, so the edges above mark are exactly the one or two stored directions of the
+    // bridge, pushed parent -> child first. A bridge stored both ways is reported from the lower
+    // node ID.
     private void addBridge(int parent, int child, int mark) {
       assert edgeTop - mark == 1 || edgeTop - mark == 2;
       int edge = edgeTop - mark == 2 && parent > child ? edgeStack[mark + 1] : edgeStack[mark];
@@ -342,7 +317,7 @@ public final class Biconnectivity {
       bridgeEdgeIndices.add(edge);
     }
 
-    /** Turns the edges above {@code mark} into one block. */
+    // Turns the edges above mark into one block.
     private void closeBlock(int mark) {
       int block = blockCount++;
       while (edgeTop > mark) {

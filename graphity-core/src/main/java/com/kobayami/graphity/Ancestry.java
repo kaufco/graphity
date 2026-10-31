@@ -4,53 +4,39 @@ import java.util.Arrays;
 import java.util.Objects;
 
 /**
- * Ancestor queries on a forest of out-trees, in particular the lowest common ancestor.
+ * An index of a forest for ancestor queries: the parent and depth of a node, whether one node is
+ * an ancestor of another, and the lowest common ancestor of two nodes.
  * <p>
- * Built once via {@link #of(Graph)} and then queried arbitrarily often: the preprocessing is a
- * heavy-path decomposition, which answers a lowest-common-ancestor query in O(log nodeCount)
- * without storing a table per level.
+ * {@link #of(Graph)} builds the index of a forest whose edges point from parent to child, such
+ * as a syntax tree. For a forest whose edges point from child to parent, pass the transposed
+ * graph: {@code Ancestry.of(BiAdjacentGraph.of(forest).transposed())}. {@link #of(Dominators)}
+ * builds the index of a dominator tree, in which the ancestors of a node are its dominators. The
+ * index is built once and answers each query in O(log nodeCount) at most, however deep the
+ * forest; {@link PreorderAncestry#of(Ancestry)} adds an ancestor test in O(1) and the nodes of
+ * each subtree.
  * <p>
- * A node is its own ancestor, so {@code lowestCommonAncestorOf(a, a) == a} and
- * {@code isAncestorOf(a, a)} is {@code true}. Two nodes in different trees of the forest have
- * no common ancestor, and the query returns {@code -1}.
+ * A node is its own ancestor, so {@code isAncestorOf(a, a)} is {@code true} and
+ * {@code lowestCommonAncestorOf(a, a)} is {@code a}. Two nodes in different trees of the forest
+ * have no common ancestor. Uses
+ * <a href="https://en.wikipedia.org/wiki/Heavy-light_decomposition">heavy-light
+ * decomposition</a>.
  * <p>
- * The input must be a forest of <strong>out-trees</strong> - edges point from parent to child.
- * For a forest of in-trees, pass the transpose:
- * {@code Ancestry.of(BiAdjacentGraph.of(inTreeForest).transposed())}. A graph that is not a
- * forest is rejected; in a general directed acyclic graph a node can have several parents, and
- * then the common ancestors of two nodes have no unique deepest element.
- *
- * <pre>{@code
- * var ancestry = Ancestry.of(ast);
- * int enclosing = ancestry.lowestCommonAncestorOf(exprA, exprB);  // innermost common element
- * boolean inScope = ancestry.isAncestorOf(scope, symbol);
- * }</pre>
- *
- * {@link #of(Dominators)} indexes a dominator tree the same way, so that {@code isAncestorOf}
- * answers "dominates". For constant-time ancestor tests and subtree views, derive a
- * {@link PreorderAncestry} via {@link PreorderAncestry#of(Ancestry)}; it shares the arrays of
- * this index.
+ * Instances are immutable and safe to share between threads.
  * <p>
- * <strong>Time:</strong> O(nodeCount + edgeCount) for construction.<br>
- * <strong>Memory:</strong> 12 x nodeCount bytes for the result;
- * 12 x nodeCount bytes additional during construction.
- *
- * @see Graphs#isForest(Graph)
- * @see BiAdjacentGraph#transposed()
+ * <strong>Memory:</strong> 12 x nodeCount bytes, of which an index built by
+ * {@link #of(Dominators)} shares 4 x nodeCount bytes with the dominators.
  */
 public sealed class Ancestry permits PreorderAncestry {
 
-  /** Parent of each node, {@code -1} for a tree root. */
+  // Parent of each node, -1 for a tree root.
   final int[] parent;
 
-  /** Distance from the tree root, {@code 0} for a tree root. */
+  // Distance from the tree root, 0 for a tree root.
   final int[] depth;
 
-  /**
-   * Topmost node of the heavy chain containing each node. Jumping from a node to
-   * {@code parent[chainHead[node]]} skips a whole chain, and every root-to-node path crosses
-   * O(log nodeCount) chains.
-   */
+  // Topmost node of the heavy chain containing each node. Jumping from a node to
+  // parent[chainHead[node]] skips a whole chain, and every root-to-node path crosses
+  // O(log nodeCount) chains.
   final int[] chainHead;
 
   Ancestry(int[] parent, int[] depth, int[] chainHead) {
@@ -60,15 +46,20 @@ public sealed class Ancestry permits PreorderAncestry {
   }
 
   /**
-   * Builds the ancestor index of the given forest.
+   * Returns the ancestor index of {@code forest}, whose edges point from parent to child.
+   * <p>
+   * In such a forest, no node has more than one in-node, and there is no cycle, not even a
+   * self-loop; {@link Graphs#isForest(Graph)} tests this without an exception. The roots of the
+   * trees are the root nodes of the graph.
    * <p>
    * <strong>Time:</strong> O(nodeCount + edgeCount).<br>
-   * <strong>Memory:</strong> 12 x nodeCount bytes for the result;
-   * 12 x nodeCount bytes additional during computation.
+   * <strong>Memory:</strong> 12 x nodeCount bytes for the result; while it runs, 12 x nodeCount
+   * bytes more.
    *
-   * @param forest a forest of out-trees (every node has in-degree ≤ 1, no cycles)
+   * @param forest a forest whose edges point from parent to child
    * @return the ancestor index
-   * @throws IllegalArgumentException if the graph is not a forest of out-trees
+   * @throws IllegalArgumentException if a node of {@code forest} has more than one in-node, or
+   *                                  {@code forest} has a cycle
    */
   public static Ancestry of(Graph forest) {
     // The forest check is that of Graphs.computeForestInfo, here with witnesses for the
@@ -93,9 +84,9 @@ public sealed class Ancestry permits PreorderAncestry {
       }
     }
 
-    // BFS from all roots. With in-degree ≤ 1 every node is enqueued at most once, so the queue
-    // doubles as a topological order: parents before children. A node it misses lies on a cycle, a
-    // self-loop included, or below one.
+    // Breadth-first search from all roots. With in-degree at most 1, every node is enqueued at most
+    // once, so the queue doubles as a topological order: parents before children. A node it misses
+    // lies on a cycle, a self-loop included, or below one.
     var depth = new int[n];
     Arrays.fill(depth, -1);
     var order = new int[n];
@@ -125,19 +116,21 @@ public sealed class Ancestry permits PreorderAncestry {
   }
 
   /**
-   * Builds the ancestor index of a dominator tree. Equivalent to
-   * {@code Ancestry.of(Graphs.dominatorTree(dominators))}, but without building and checking the
-   * tree as a graph: the immediate dominators are shared as the parent array.
+   * Returns the ancestor index of the dominator tree of {@code dominators}, in which the
+   * ancestors of a node are its dominators.
    * <p>
-   * On the result, {@code isAncestorOf(a, b)} answers "{@code a} dominates {@code b}" and
-   * {@code lowestCommonAncestorOf(a, b)} returns the nearest common dominator, {@code -1} if only
-   * the virtual root above several entries dominates both. An unreachable node is an isolated
-   * root, so it is its own ancestor; check {@link Dominators#isReachable(int)} where that
-   * matters.
+   * {@code isAncestorOf(a, b)} returns whether {@code a} dominates {@code b}.
+   * {@code lowestCommonAncestorOf(a, b)} returns the closest node that dominates both, or
+   * {@code -1} if no node does. With several entries, only a virtual root lies above them. A node
+   * that no entry reaches is a tree of its own and dominates only itself here;
+   * {@link Dominators#isReachable(int)} returns {@code false} for such a node.
+   * <p>
+   * The result is the same as that of {@code Ancestry.of(Graphs.dominatorTree(dominators))}, but
+   * shares the immediate dominators instead of building the tree as a graph.
    * <p>
    * <strong>Time:</strong> O(nodeCount).<br>
-   * <strong>Memory:</strong> 8 x nodeCount bytes for the result, the parent array being shared;
-   * 20 x nodeCount bytes additional during computation.
+   * <strong>Memory:</strong> 8 x nodeCount bytes for the result, which shares the immediate
+   * dominators; while it runs, 20 x nodeCount bytes more.
    *
    * @param dominators the dominators whose tree to index
    * @return the ancestor index of the dominator tree
@@ -171,10 +164,8 @@ public sealed class Ancestry permits PreorderAncestry {
     return withHeavyChains(parent, depth, order);
   }
 
-  /**
-   * Completes the index from the parents, the depths and an order in which every parent comes
-   * before its children.
-   */
+  // Completes the index from the parents, the depths and an order in which every parent comes
+  // before its children.
   private static Ancestry withHeavyChains(int[] parent, int[] depth, int[] order) {
     int n = parent.length;
 
@@ -209,12 +200,10 @@ public sealed class Ancestry permits PreorderAncestry {
     return new Ancestry(parent, depth, chainHead);
   }
 
-  /**
-   * Names a node that actually lies on a cycle, not merely one hanging below it. An unreached
-   * node has an unreached parent - the search visits every child of every node it reaches - so
-   * walking up from any unreached node stays unreached and cannot end at a root. After
-   * {@code nodeCount} steps the walk is on the cycle it circles.
-   */
+  // Names a node that actually lies on a cycle, not merely one hanging below it. An unreached
+  // node has an unreached parent - the search visits every child of every node it reaches - so
+  // walking up from any unreached node stays unreached and cannot end at a root. After nodeCount
+  // steps the walk is on the cycle it circles.
   private static int nodeOnCycle(int[] parent, int[] depth) {
     int n = depth.length;
     int node = -1;
@@ -232,19 +221,18 @@ public sealed class Ancestry permits PreorderAncestry {
   }
 
   /**
-   * Returns the lowest common ancestor of the two nodes, or {@code -1} if they lie in
-   * different trees of the forest.
+   * Returns the lowest common ancestor of {@code a} and {@code b}, or {@code -1} if they are in
+   * different trees.
    * <p>
-   * The lowest common ancestor is the deepest node that is an ancestor of both. Since a node
-   * counts as its own ancestor, the result is {@code a} itself if {@code a} is an ancestor of
-   * {@code b}, and the tree root if the two branch apart directly below it.
+   * The lowest common ancestor is the deepest node that is an ancestor of both. As a node is its
+   * own ancestor, the result is {@code a} if {@code a} is an ancestor of {@code b}.
    * <p>
    * <strong>Time:</strong> O(log nodeCount).
    *
-   * @param a first node ID in {@code 0..nodeCount()-1}
-   * @param b second node ID in {@code 0..nodeCount()-1}
-   * @return the lowest common ancestor, or {@code -1} if the nodes are in different trees
-   * @throws IndexOutOfBoundsException if a node ID is out of range
+   * @param a node ID in {@code 0..nodeCount-1}
+   * @param b node ID in {@code 0..nodeCount-1}
+   * @return lowest common ancestor, or {@code -1}
+   * @throws IndexOutOfBoundsException if {@code a} or {@code b} is out of range
    */
   public final int lowestCommonAncestorOf(int a, int b) {
     Objects.checkIndex(a, parent.length);
@@ -265,28 +253,31 @@ public sealed class Ancestry permits PreorderAncestry {
   }
 
   /**
-   * Returns whether {@code node} is an ancestor of {@code descendant}, that is, whether it
-   * lies on the path from {@code descendant} to its tree root. A node is its own ancestor.
+   * Returns whether {@code node} is an ancestor of {@code descendant}: whether it lies on the path
+   * from the root of its tree to {@code descendant}. Equivalent to
+   * {@code lowestCommonAncestorOf(node, descendant) == node}.
    * <p>
-   * <strong>Time:</strong> O(log nodeCount) - this is a lowest-common-ancestor query, not a
-   * constant-time interval test. O(1) on a {@link PreorderAncestry}.
+   * A node is its own ancestor. {@link PreorderAncestry} answers in O(1).
+   * <p>
+   * <strong>Time:</strong> O(log nodeCount).
    *
-   * @param node       potential ancestor, a node ID in {@code 0..nodeCount()-1}
-   * @param descendant potential descendant, a node ID in {@code 0..nodeCount()-1}
+   * @param node       node ID in {@code 0..nodeCount-1}
+   * @param descendant node ID in {@code 0..nodeCount-1}
    * @return {@code true} if {@code node} is an ancestor of {@code descendant}
-   * @throws IndexOutOfBoundsException if a node ID is out of range
+   * @throws IndexOutOfBoundsException if {@code node} or {@code descendant} is out of range
    */
   public boolean isAncestorOf(int node, int descendant) {
     return lowestCommonAncestorOf(node, descendant) == node;
   }
 
   /**
-   * Returns the distance from {@code node} to the root of its tree, {@code 0} for a root.
+   * Returns the depth of {@code node}: the number of edges from the root of its tree to it. A root
+   * has depth {@code 0}.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param node node ID in {@code 0..nodeCount()-1}
-   * @return depth of the node
+   * @param node node ID in {@code 0..nodeCount-1}
+   * @return depth
    * @throws IndexOutOfBoundsException if {@code node} is out of range
    */
   public final int depthOf(int node) {
@@ -299,8 +290,8 @@ public sealed class Ancestry permits PreorderAncestry {
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param node node ID in {@code 0..nodeCount()-1}
-   * @return parent node ID, or {@code -1} for a tree root
+   * @param node node ID in {@code 0..nodeCount-1}
+   * @return parent, or {@code -1}
    * @throws IndexOutOfBoundsException if {@code node} is out of range
    */
   public final int parentOf(int node) {

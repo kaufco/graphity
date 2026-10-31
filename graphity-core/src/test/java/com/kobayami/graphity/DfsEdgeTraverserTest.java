@@ -470,7 +470,7 @@ class DfsEdgeTraverserTest {
     }
   }
 
-  // ---- Equivalent of the recursion-to-hooks example in docs/tutorial.md ----
+  // ---- A recursive algorithm turned into hooks: subtree sizes ----
 
   static class SubtreeSizes extends DfsEdgeTraverser {
     final int[] parent;
@@ -496,7 +496,7 @@ class DfsEdgeTraverserTest {
   }
 
   @Test
-  void tutorialSubtreeSizesOnATree() {
+  void subtreeSizesOnATree() {
     // 0 -> 1, 0 -> 2, 1 -> 3, 1 -> 4, 2 -> 5
     var sizes = new SubtreeSizes(TestGraphs.of(6, 0, 1, 0, 2, 1, 3, 1, 4, 2, 5));
     sizes.run();
@@ -504,7 +504,7 @@ class DfsEdgeTraverserTest {
   }
 
   @Test
-  void tutorialSubtreeSizesOnADeepPath() {
+  void subtreeSizesOnADeepPath() {
     int n = 1_000_000;
     var sizes = new SubtreeSizes(TestGraphs.path(n));
     sizes.run();

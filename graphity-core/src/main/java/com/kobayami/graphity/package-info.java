@@ -1,141 +1,101 @@
 /**
- * Graph analysis algorithms for Java on a compact, immutable graph: connected components,
- * bridges and articulation points, topological order, cycle and edge classification,
- * reachability and breadth-first distances, tree ancestry, dominators, and quotient graphs.
+ * Directed graphs and their analysis, for tools that see a program as graphs: components, orders
+ * and cycles, reachability, trees and dominators, and graphs derived from other graphs.
  * <p>
- * Graphity targets compiler and analysis pipelines - abstract syntax trees, control- and
- * data-flow graphs, dependency graphs - and more generally any case where a graph is built from
- * a domain model, analyzed, and the results used. Every algorithm runs without recursion, so deep
- * graphs need no stack tuning, and returns a typed, immutable result with follow-up queries
- * rather than a generic collection.
+ * This package is the module {@code graphity-core}; the modules {@code graphity-controlflow},
+ * {@code graphity-dot} and {@code graphity-mermaid} build on it and are released with it at the
+ * same version. A {@link Graph} has the nodes {@code 0..nodeCount()-1} and holds nothing but its
+ * edges, in 4 bytes per node and per edge; names and other data on nodes and edges stay in arrays
+ * of the caller, indexed by node ID or edge index. {@link GraphBuilder} builds a graph from a
+ * model of the caller, and the algorithms take the graph and return immutable results. None of
+ * them recurses, so a deep graph does not overflow the call stack. Here, the packages of a small
+ * program and the packages each of them uses become a graph, which has a cycle:
+ * {@snippet file="com/kobayami/graphity/examples/GettingStarted.java" region="firstResult"}
  *
- * <h2>Algorithms</h2>
- *
- * <h3>Components and connectivity</h3>
+ * <h2>Graphs</h2>
  * <ul>
- *   <li>{@link Components#sccsOf(Graph)} - strongly connected components (Tarjan), as
- *       {@link Sccs} with a cycle test per component and the condensation.</li>
- *   <li>{@link Components#wccsOf(Graph)} and {@link Components#ccsOf(Graph)} - weakly connected
- *       components, and connected components under the undirected reading.</li>
- *   <li>{@link Components#biconnectivityOf(BiAdjacentGraph)} - bridges, articulation points and
- *       biconnected components ({@link Biconnectivity}).</li>
- *   <li>{@link Components#strongConnectivityOf(BiAdjacentGraph)} - strong bridges and strong
- *       articulation points ({@link StrongConnectivity}).</li>
- *   <li>{@link Graphs#isStronglyConnected(Graph)} and {@link Graphs#isWeaklyConnected(Graph)}.</li>
- * </ul>
- *
- * <h3>Order, cycles and edge classification</h3>
- * <ul>
- *   <li>{@link TopOrder#of(Graph)} - topological order by depth-first search;
- *       {@link TopOrderAndLevels#of(Graph)} - Kahn's order with a level per node.</li>
- *   <li>{@link Graphs#isDag(Graph)} and {@link Sccs#containsCycle(int)} - cycle tests;
- *       {@link Graphs#findCycle(Graph)} - one concrete cycle as a witness.</li>
- *   <li>{@link EdgeTypes#of(Graph)} - tree, back, forward and cross edges;
- *       {@link BackEdges#of(Graph)} - the back edges alone.</li>
- * </ul>
- *
- * <h3>Reachability and distances</h3>
- * <ul>
- *   <li>{@link BfsDistances#of(Graph, int)} - breadth-first distances and shortest paths from
- *       one or several sources.</li>
- *   <li>{@link Graphs#reachableFrom(Graph, int)} - the nodes reachable from a source, sorted.</li>
- *   <li>{@link Graphs#transitiveClosure(Graph)} and {@link Graphs#transitiveReduction(Graph)} -
- *       every pair connected by a path, and the edges of a DAG not implied by others.</li>
- * </ul>
- *
- * <h3>Trees and ancestry</h3>
- * <ul>
- *   <li>{@link Ancestry#of(Graph)} - parent, depth and lowest common ancestor in trees and
- *       forests; {@link PreorderAncestry#of(Ancestry)} - constant-time ancestor test and subtree
- *       views.</li>
- *   <li>Shape checks: {@link Graphs#isTree(Graph)}, {@link Graphs#isForest(Graph)} and
- *       {@link Graphs#isPath(Graph)}, and under the undirected reading
- *       {@link Graphs#isUndirectedTree(Graph)}, {@link Graphs#isUndirectedForest(Graph)} and
- *       {@link Graphs#isBipartite(Graph)}.</li>
- * </ul>
- *
- * <h3>Dominators</h3>
- * <ul>
- *   <li>{@link Dominators#of(BiAdjacentGraph, int)} - dominators from one or several entries
- *       (Lengauer-Tarjan), and post-dominators on the transposed graph;
- *       {@link Graphs#dominatorTree(Dominators)} builds the dominator tree.</li>
- * </ul>
- * <p>
- * Loops, dominance frontiers, control dependence and phi placement are in the module
- * {@code graphity-controlflow}, package {@code com.kobayami.graphity.controlflow}; the writer for
- * DOT is in {@code graphity-dot}, package {@code com.kobayami.graphity.dot}, and the writer for
- * Mermaid in {@code graphity-mermaid}, package {@code com.kobayami.graphity.mermaid}.
- *
- * <h3>Transformations</h3>
- * <ul>
- *   <li>{@link NodePartition#of(Graph, int[], int)} with {@link NodePartition#condense()} - the
- *       quotient graph by a partition of your choosing; {@link Sccs} condenses to the DAG of
- *       components the same way.</li>
- *   <li>{@link Graphs#remapped(Graph, NodeMapping)} - subgraph extraction and renumbering;
- *       {@link NodeMapping#reindex(Graph)} - a depth-first numbering for cache locality.</li>
- *   <li>{@link BiAdjacentGraph#transposed()} - the transposed graph as a constant-time view.</li>
- * </ul>
- *
- * <h2>Data on nodes and edges</h2>
- * <p>
- * The graph holds structure only. Names, weights and any other data live in arrays you own,
- * indexed by node ID {@code 0..nodeCount()-1} or by edge index {@code 0..edgeCount()-1}:
- * <pre>{@code
- * String[] names = new String[graph.nodeCount()];      // names[node]
- * double[] weights = new double[graph.edgeCount()];    // weights[edgeIndex]
- * int edgeIndex = graph.edgeIndexOf(source, target);
- * }</pre>
- * Every transformation that renumbers nodes or edges comes with a {@link NodeMapping} or
- * {@link EdgeMapping} that carries such arrays along ({@code gather}), and a
- * {@link NodePartition} or {@link EdgePartition} combines them per group ({@code reduce}).
- *
- * <h2>Graph model</h2>
- * <ul>
- *   <li>{@link Graph} - read-only graph with out-adjacency only.</li>
- *   <li>{@link BiAdjacentGraph} - adds in-adjacency for constant-time predecessor access;
- *       obtained via {@link BiAdjacentGraph#of(Graph)}.</li>
- *   <li>{@link GraphBuilder} - mutable, add-only builder that produces immutable {@code Graph}
- *       instances; {@link Graph#of(int[], int[])} takes arrays already in CSR form.</li>
- *   <li>{@link SortedIntView} - the zero-copy, sorted view returned by adjacency and
- *       group-membership lookups throughout the library.</li>
- *   <li>{@link Graph#nodes()} and {@link Graph#forEachEdge(EdgeConsumer)} - every node as a
- *       stream, every edge with source, target and edge index, in edge index order;
- *       {@link Graphs#adjacencyListOf(Graph)} - the complete adjacency list as text, where
- *       {@code toString()} is bounded.</li>
- *   <li>{@link Csr} - read access to the CSR arrays themselves, for algorithm code that loops
- *       over all edges; the built-in algorithms use it too.</li>
+ *   <li>{@link Graph} - a directed graph with the out-nodes of every node;
+ *       {@link BiAdjacentGraph} - one that also holds the in-nodes, for the algorithms that follow
+ *       edges against their direction. It gives the transposed graph as well.</li>
+ *   <li>{@link GraphBuilder} - builds a graph from edges in any order;
+ *       {@link Graph#of(int[], int[])} takes the arrays of its CSR (compressed sparse row) layout,
+ *       which {@link Csr} hands to algorithm code of your own.</li>
  *   <li>{@link Graph#writeTo(java.io.OutputStream)} and
- *       {@link Graph#readFrom(java.io.InputStream)} - write the topology to a stream and read it
- *       back, as plain little-endian arrays.</li>
- *   <li>{@link Graphs#topologyHash(Graph)} and {@link Graphs#diff(Graph, Graph)} - a 64-bit
- *       structural hash to keep, and the edges added and removed between two versions
- *       ({@link GraphDiff}).</li>
+ *       {@link Graph#readFrom(java.io.InputStream)} - store a graph in a stream and load it
+ *       again.</li>
+ *   <li>{@link SortedIntView} - the sorted list of node IDs or edge indices that lookups such as
+ *       {@link Graph#outNodes(int)} return; {@link Edges} - a list of edges, each with its source,
+ *       target and edge index.</li>
+ *   <li>{@link Graphs#adjacencyListOf(Graph)}, {@link Graphs#topologyHash(Graph)} and
+ *       {@link Graphs#diff(Graph, Graph)} - a whole graph as text, a hash to keep, and the edges
+ *       added and removed between two versions of a graph.</li>
  * </ul>
- * <p>
- * Graphs are stored in a CSR (Compressed Sparse Row) layout: nodes are contiguous {@code int}
- * IDs and the adjacency lists are flat {@code int[]} arrays, 4 bytes per node and per edge.
- * Direction is an interpretation rather than a graph type: edges are stored as directed pairs,
- * and the algorithms for which the distinction matters offer both readings.
  *
- * <h2>Custom traversals</h2>
+ * <h2>Components and connectivity</h2>
  * <ul>
- *   <li>{@link DfsTraverser} - depth-first traversal for arbitrarily deep graphs, with
- *       pre- and postorder hooks.</li>
- *   <li>{@link DfsEdgeTraverser} - the same with a hook per edge that reports the
- *       target's state, for algorithms that must look at every edge.</li>
- *   <li>{@link FrontierTraverser} - breadth-first traversal with level tracking.</li>
+ *   <li>{@link Components#sccsOf(Graph)} - the SCCs (strongly connected components), as
+ *       {@link Sccs}.</li>
+ *   <li>{@link Components#wccsOf(Graph)} - the weakly connected components, which are the
+ *       components of the graph read as undirected.</li>
+ *   <li>{@link Components#biconnectivityOf(BiAdjacentGraph)} - the bridges, articulation points
+ *       and biconnected components, as {@link Biconnectivity}.</li>
+ *   <li>{@link Components#strongConnectivityOf(BiAdjacentGraph)} - the strong bridges and strong
+ *       articulation points, as {@link StrongConnectivity}.</li>
+ *   <li>{@link Graphs#isStronglyConnected(Graph)} and {@link Graphs#isWeaklyConnected(Graph)} -
+ *       the same questions for the whole graph, answered without the components.</li>
+ * </ul>
+ *
+ * <h2>Orders, cycles and traversals</h2>
+ * <ul>
+ *   <li>{@link TopOrder} - a topological order of a DAG (directed acyclic graph);
+ *       {@link TopOrderAndLevels} - one with a level per node.</li>
+ *   <li>{@link Graphs#isDag(Graph)} and {@link Graphs#findCycle(Graph)} - whether a graph has a
+ *       cycle, and one of its cycles.</li>
+ *   <li>{@link EdgeTypes} - the tree, back, forward and cross edges of a depth-first search;
+ *       {@link BackEdges} - the back edges alone.</li>
+ *   <li>{@link DfsTraverser}, {@link DfsEdgeTraverser} and {@link FrontierTraverser} - the base
+ *       classes of depth-first and breadth-first searches of your own.</li>
+ * </ul>
+ *
+ * <h2>Reachability and distances</h2>
+ * <ul>
+ *   <li>{@link Graphs#reachableFrom(Graph, int)} - the nodes reachable from one or several nodes;
+ *       {@link Graphs#rootNodes(BiAdjacentGraph)} - the nodes with in-degree 0, called root
+ *       nodes.</li>
+ *   <li>{@link BfsDistances} - distances and shortest paths from one or several nodes.</li>
+ *   <li>{@link Graphs#transitiveClosure(Graph)} and {@link Graphs#transitiveReduction(Graph)} -
+ *       an edge for every path, and the fewest edges for the same paths.</li>
+ * </ul>
+ *
+ * <h2>Trees and dominators</h2>
+ * <ul>
+ *   <li>{@link Ancestry} - parent, depth and lowest common ancestor in a forest;
+ *       {@link PreorderAncestry} - the ancestor test in O(1) and the nodes of each subtree.</li>
+ *   <li>{@link Graphs#isTree(Graph)}, {@link Graphs#isForest(Graph)} and
+ *       {@link Graphs#isPath(Graph)} - shape checks, and their counterparts for the graph read as
+ *       undirected, such as {@link Graphs#isUndirectedTree(Graph)}.</li>
+ *   <li>{@link Dominators} - the dominators of a control-flow graph, and on its transposed graph
+ *       the post-dominators; {@link Graphs#dominatorTree(Dominators)} - the dominator tree as a
+ *       graph.</li>
  * </ul>
  * <p>
- * None of them recurses, so none is limited by the call stack. All of them can be run several
- * times with accumulated visited state, started from any set of nodes - for instance
- * {@link Graphs#rootNodes(BiAdjacentGraph)} - and stopped from any hook.
+ * Loops, dominance frontiers, control dependence and the placement of phi-nodes are in the module
+ * {@code graphity-controlflow}. The module {@code graphity-mermaid} writes a graph as a Mermaid
+ * flowchart, and {@code graphity-dot} writes it as text in DOT (the language of Graphviz).
  *
- * <h2>Null</h2>
+ * <h2>Derived graphs and the data on them</h2>
+ * <ul>
+ *   <li>{@link Graphs#remapped(Graph, NodeMapping)} with a {@link NodeMapping} - a subgraph or a
+ *       graph with renumbered nodes; {@link EdgeMapping} carries data on the edges over to
+ *       it.</li>
+ *   <li>{@link NodePartition#condense()} - the condensed graph of a partition of the nodes into
+ *       groups; {@link EdgePartition} - the edges behind each of its edges.</li>
+ *   <li>{@link BiAdjacentGraph#transposed()} - the transposed graph, without copying;
+ *       {@link Graphs#transposedEdgeMapping(Graph)} carries data on the edges over to it.</li>
+ * </ul>
  * <p>
- * No parameter, return value or element is {@code null} unless its type is annotated
- * {@code @Nullable}: the package is {@code @NullMarked} (JSpecify), so Kotlin and nullness
- * checkers read the contract from the signatures. Passing {@code null} where it is not allowed
- * violates the contract; the library does not check for it at run time.
+ * No parameter, return value or element in this package is {@code null} unless its type is
+ * annotated {@code @Nullable}.
  */
 @NullMarked
 package com.kobayami.graphity;

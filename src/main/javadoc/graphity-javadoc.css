@@ -1,0 +1,418 @@
+/*
+ * The Graphity Javadoc theme.
+ *
+ * For javadoc --add-stylesheet (JDK 25 standard doclet); loads after stylesheet.css and overrides it.
+ * Modelled on GitHub's Primer design (light theme): its system font stacks, colors, 6px radii,
+ * "Box" cards, underline navigation and the GitHub syntax colors.
+ * Works with and without --syntax-highlight (the .hljs-* rules below only apply when it is on).
+ * No web fonts: every font comes from the operating system.
+ */
+
+:root {
+    /* ---- Primer tokens ---- */
+    --gh-fg: #1f2328;                       /* fgColor-default */
+    --gh-fg-muted: #59636e;                 /* fgColor-muted, 6.1:1 on white */
+    --gh-accent: #0969da;                   /* fgColor-accent, 5.2:1 on white */
+    --gh-accent-subtle: #ddf4ff;            /* bgColor-accent-muted */
+    --gh-border: #d1d9e0;                   /* borderColor-default */
+    --gh-border-muted: #dfe4e9;             /* borderColor-muted on white */
+    --gh-canvas-subtle: #f6f8fa;            /* bgColor-muted */
+    --gh-neutral-muted: #f0f1f3;            /* inline code: rgba(129,139,152,.12) on white, opaque
+                                               so links in code keep 4.5:1 on striped rows too */
+    --gh-hover: rgba(208, 215, 222, 0.32);  /* control-transparent hover */
+    --gh-selected: rgba(129, 139, 152, 0.10);
+    --gh-underline: #fd8c73;                /* UnderlineNav selected item */
+    --gh-attention-subtle: #fff8c5;
+
+    /* ---- Javadoc variables ---- */
+    --body-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial,
+                        sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+    --block-font-family: var(--body-font-family);
+    --code-font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    --body-font-size: 14px;
+    --block-font-size: 16px;
+    --code-font-size: 13.6px;
+    --nav-font-size: 14px;
+    --block-line-height: 1.5;
+    --code-line-height: 1.45;
+    --body-text-color: var(--gh-fg);
+    --block-text-color: var(--gh-fg);
+    --body-background-color: #ffffff;
+    --section-background-color: var(--body-background-color);
+    --detail-background-color: #ffffff;
+    --code-background-color: var(--gh-canvas-subtle);
+    --mark-background-color: var(--gh-canvas-subtle);
+    --detail-block-color: var(--gh-canvas-subtle);
+    --navbar-background-color: var(--gh-canvas-subtle);
+    --navbar-text-color: var(--gh-fg);
+    --subnav-background-color: var(--gh-canvas-subtle);
+    --subnav-link-color: var(--gh-fg);
+    --member-heading-background-color: var(--gh-canvas-subtle);
+    --selected-background-color: var(--gh-accent-subtle);
+    --selected-text-color: var(--gh-fg);
+    --selected-link-color: var(--gh-accent);
+    --table-header-color: var(--gh-canvas-subtle);
+    --even-row-color: #ffffff;
+    --odd-row-color: #ffffff;
+    --title-color: var(--gh-fg);
+    --link-color: var(--gh-accent);
+    --link-color-active: var(--gh-accent);
+    --toc-background-color: #ffffff;
+    --toc-highlight-color: var(--gh-selected);
+    --toc-hover-color: var(--gh-hover);
+    --snippet-background-color: var(--gh-canvas-subtle);
+    --snippet-text-color: var(--gh-fg);
+    --snippet-highlight-color: var(--gh-attention-subtle);
+    --pre-background-color: var(--gh-canvas-subtle);
+    --pre-text-color: var(--gh-fg);
+    --border-color: var(--gh-border);
+    --table-border-color: var(--gh-border);
+    --tab-border-radius: 6px 6px 0 0;
+    --search-input-background-color: #ffffff;
+    --search-input-text-color: var(--gh-fg);
+    --search-input-placeholder-color: var(--gh-fg-muted);
+    --search-tag-highlight-color: var(--gh-attention-subtle);
+    --button-border-color: var(--gh-border);
+    --button-active-filter: brightness(96%);
+    --button-focus-filter: brightness(102%);
+    --invalid-tag-background-color: #ffebe9;
+    --invalid-tag-text-color: #82071e;
+    --source-linenumber-color: var(--gh-fg-muted);
+    --top-nav-height: 48px;
+    --sub-nav-height: 44px;
+    --nav-height: calc(var(--top-nav-height) + var(--sub-nav-height));
+    --max-content-width: 1280px;
+    --content-margin: 0 auto;
+}
+
+/* ---- Header: light grey app header, underline navigation ---- */
+header {
+    border-bottom: 1px solid var(--gh-border);
+}
+.top-nav {
+    font-size: 14px;
+}
+ul.nav-list li,
+.top-nav .nav-list a:link, .top-nav .nav-list a:visited, .top-nav .nav-list a:active {
+    text-transform: none;
+}
+.top-nav .nav-list a:hover {
+    color: var(--gh-fg);
+    text-decoration: none;
+}
+.about-language {
+    color: var(--gh-fg-muted);
+    font-size: 14px;
+}
+@media screen and (min-width: 1001px) {
+    ul.nav-list {
+        align-self: stretch;
+        padding-left: 8px;
+    }
+    ul.nav-list li {
+        display: flex;
+        align-items: center;
+        height: auto;
+        padding: 0 8px;
+        margin: 0 2px;
+    }
+    .nav-bar-cell1-rev {
+        background: transparent;
+        color: var(--gh-fg);
+        font-weight: 600;
+        border-radius: 0;
+        box-shadow: inset 0 -2px 0 var(--gh-underline);
+    }
+}
+ol.sub-nav-list a.current-selection {
+    background-color: transparent;
+    color: var(--gh-fg);
+}
+ol.sub-nav-list li:first-child a {
+    color: var(--gh-fg-muted);
+}
+input[type="text"] {
+    height: 30px;
+    border: 1px solid var(--gh-border);
+    border-radius: 6px;
+    background-position: 8px 8px;
+    padding-left: 28px;
+    box-sizing: border-box;
+    font-size: 14px;
+}
+input[type="text"]:focus {
+    outline: 2px solid var(--gh-accent);
+    outline-offset: -1px;
+    border-color: var(--gh-accent);
+}
+input#reset-search { top: 9px; }
+
+/* ---- Layout, headings, links ---- */
+main {
+    padding: 24px 32px 40px;
+}
+@media screen and (max-width: 800px) {
+    main { padding: 16px; }
+}
+.main-grid nav.toc {
+    border-right: 1px solid var(--gh-border-muted);
+}
+nav.toc a {
+    border-radius: 6px;
+    margin: 1px 8px 1px 0;
+    padding: 6px 8px;
+    color: var(--gh-fg);
+}
+nav.toc a.current-selection {
+    box-shadow: inset 3px 0 0 var(--gh-accent);
+    font-weight: 600;
+}
+a[href]:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+}
+.title {
+    font-size: 2em;
+    font-weight: 600;
+    padding-bottom: 0.3em;
+    border-bottom: 1px solid var(--gh-border-muted);
+    margin: 8px 0 16px;
+}
+body.class-declaration-page .summary h2,
+body.class-declaration-page .details h2,
+body.class-use-page h2,
+body.module-declaration-page .block-list h2 {
+    font-style: normal;
+    font-weight: 600;
+    font-size: 1.5em;
+    padding-bottom: 0.3em;
+    border-bottom: 1px solid var(--gh-border-muted);
+    margin: 24px 0 16px;
+}
+hr {
+    border: 0;
+    border-top: 1px solid var(--gh-border-muted);
+    margin: 16px 0;
+}
+dl.notes > dt {
+    font-size: 14px;
+    font-weight: 600;
+    margin-top: 16px;
+}
+section.class-description,
+ul.block-list > li, ul.details-list > li, ul.member-list > li, ul.summary-list > li {
+    line-height: 1.5;
+}
+
+/* ---- Code in running text: GitHub's grey pill ---- */
+div.block code:not(pre code),
+dl.notes > dd code {
+    font-size: 85%;
+    font-weight: 400;
+    background-color: var(--gh-neutral-muted);
+    padding: 0.2em 0.4em;
+    border-radius: 6px;
+    white-space: break-spaces;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+}
+:is(h1, h2, h3, h4, h5, h6) code {
+    background: none;
+    padding: 0;
+}
+kbd {
+    display: inline-block;
+    font: 11px var(--code-font-family);
+    line-height: 10px;
+    color: var(--gh-fg);
+    vertical-align: middle;
+    background-color: var(--gh-canvas-subtle);
+    border: 1px solid var(--gh-border);
+    border-radius: 6px;
+    box-shadow: inset 0 -1px 0 var(--gh-border);
+    padding: 4px;
+}
+
+/* ---- Code blocks ---- */
+.module-signature,
+.package-signature,
+.type-signature {
+    background-color: var(--gh-canvas-subtle);
+    border-radius: 6px;
+    padding: 12px 16px;
+}
+pre {
+    border-radius: 6px;
+    padding: 16px;
+}
+div.snippet-container {
+    background-color: transparent;
+    padding-right: 0;
+    margin: 0 0 16px;
+}
+div.snippet-container pre.snippet {
+    padding: 16px 48px 16px 16px;
+    margin: 0;
+}
+button.snippet-copy {
+    top: 8px;
+    right: 8px;
+}
+
+/* ---- Member details as GitHub "Box" cards ---- */
+ul.member-list > li {
+    margin-bottom: 16px;
+}
+section[class$="-details"] .detail {
+    border: 1px solid var(--gh-border);
+    border-radius: 6px;
+    overflow: hidden;
+}
+body.class-declaration-page .details h3 {
+    margin: 0;
+    padding: 10px 16px;
+    border: 0;
+    border-bottom: 1px solid var(--gh-border);
+    font-size: 16px;
+    font-weight: 600;
+}
+section[class$="-details"] .detail > div {
+    padding: 0 16px 4px;
+}
+section[class$="-details"] .detail .member-signature {
+    margin: 0 -16px 16px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--gh-border-muted);
+}
+body.class-declaration-page section.detail:target,
+body.class-declaration-page section.detail:has(> h3:target) {
+    border-color: var(--gh-accent);
+    box-shadow: 0 0 0 1px var(--gh-accent);
+}
+body.class-declaration-page section.detail:target > h3,
+body.class-declaration-page section.detail > h3:target {
+    background-color: var(--gh-accent-subtle);
+    color: var(--gh-fg);
+}
+body.class-declaration-page section.detail:target > h3 > a.anchor-link > img,
+body.class-declaration-page section.detail > h3:target > a.anchor-link > img {
+    filter: none;
+}
+
+/* ---- Summary tables as Box lists, tabs as underline navigation ---- */
+.summary-table, .details-table {
+    border: 1px solid var(--gh-border);
+    border-radius: 6px;
+    overflow: hidden;
+}
+.summary-table > div, .details-table > div {
+    padding: 8px 16px;
+    line-height: 1.5;
+}
+.summary-table > div:not(.table-header), .details-table > div:not(.table-header) {
+    border-top: 1px solid var(--gh-border-muted);
+}
+.summary-table > div.table-header, .details-table > div.table-header {
+    height: auto;
+    font-size: 14px;
+    font-weight: 600;
+    border-bottom: 0;
+}
+.summary-table div.block {
+    font-size: inherit;
+}
+div.table-tabs,
+.caption {
+    padding: 0;
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--gh-border-muted);
+    display: flex;
+    gap: 8px;
+}
+div.table-tabs > button,
+div.table-tabs > button.table-tab,
+.caption span {
+    background: transparent;
+    color: var(--gh-fg);
+    font-size: 14px;
+    font-weight: 400;
+    height: auto;
+    margin: 0 0 -1px;
+    padding: 8px 8px 7px;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: 6px 6px 0 0;
+}
+div.table-tabs > button.table-tab:hover {
+    background: var(--gh-hover);
+}
+div.table-tabs > .active-table-tab,
+.caption span {
+    background: transparent;
+    color: var(--gh-fg);
+    font-weight: 600;
+    border-bottom-color: var(--gh-underline);
+}
+.inherited-list h3 {
+    background: none;
+    padding: 0 0 8px;
+    height: auto;
+    font-size: 14px;
+}
+.inherited-list > code {
+    border-radius: 6px;
+    padding: 12px 16px;
+}
+
+/* ---- Tables written in doc comments (class="striped", "plain", "borderless") ---- */
+table.borderless th, table.borderless td,
+table.plain th, table.plain td,
+table.striped th, table.striped td {
+    padding: 6px 13px;
+}
+table.striped > thead > tr > th, table.striped > tbody > tr > td, table.striped > tbody > tr > th {
+    border: 1px solid var(--gh-border);
+}
+table.striped > tbody > tr:nth-child(even) {
+    background-color: var(--gh-canvas-subtle);
+}
+
+/* ---- External-link marker in the link color ---- */
+main a[href*="://"]::after,
+main a[href*="://"]:hover::after,
+main a[href*="://"]:focus::after {
+    background-image: none;
+    background-color: currentColor;
+    -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="768" height="768"><path d="M584 664H104V184h216V80H0v688h688V448H584zM384 0l132 132-240 240 120 120 240-240 132 132V0z"/></svg>') center / contain no-repeat;
+    mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="768" height="768"><path d="M584 664H104V184h216V80H0v688h688V448H584zM384 0l132 132-240 240 120 120 240-240 132 132V0z"/></svg>') center / contain no-repeat;
+}
+
+/* ---- Syntax highlighting (javadoc --syntax-highlight): GitHub light colors ----
+ * ":root" raises the specificity above highlight.css, which javadoc links after this file. */
+:root .hljs-keyword,
+:root .hljs-type,
+:root .hljs-doctag,
+:root .hljs-template-tag,
+:root .hljs-template-variable,
+:root .hljs-variable.language_ { color: #cf222e; }
+:root .hljs-title,
+:root .hljs-title.class_,
+:root .hljs-title.function_ { color: #8250df; }
+:root .hljs-attr,
+:root .hljs-attribute,
+:root .hljs-literal,
+:root .hljs-meta,
+:root .hljs-number,
+:root .hljs-operator,
+:root .hljs-variable { color: #0550ae; }
+:root .hljs-string,
+:root .hljs-regexp,
+:root .hljs-char.escape_ { color: #0a3069; }
+:root .hljs-built_in,
+:root .hljs-symbol { color: #953800; }
+:root .hljs-comment,
+:root .hljs-code,
+:root .hljs-quote { color: #59636e; font-style: normal; }
+:root .hljs-name { color: #116329; }
+:root .hljs-params,
+:root .hljs-property { color: inherit; }

@@ -8,117 +8,108 @@ import java.util.Arrays;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Utility methods for graph transformations and shape checks.
+ * Operations on graphs, in five families: derived graphs, edge mappings, node sets, shape checks,
+ * and a graph as text, hash or diff.
+ * <ul>
+ *   <li><strong>Derived graphs:</strong> {@link #remapped(Graph, NodeMapping)} renumbers the
+ *       nodes of a graph by a {@link NodeMapping}, which also selects subgraphs;
+ *       {@link #transitiveClosure(Graph)} and {@link #transitiveReduction(Graph)} add and drop
+ *       the edges that other paths imply; {@link #dominatorTree(Dominators)} turns
+ *       {@link Dominators} into a graph.</li>
+ *   <li><strong>Edge mappings:</strong> {@link #edgeMapping(Graph, Graph, NodeMapping)},
+ *       {@link #transposedEdgeMapping(Graph)} and {@link #edgePartition(Graph, NodePartition)}
+ *       relate the edges of a remapped, transposed or condensed graph to the edges of the graph
+ *       it came from.</li>
+ *   <li><strong>Node sets:</strong> {@link #rootNodes(BiAdjacentGraph)} and
+ *       {@link #reachableFrom(Graph, IntList)}.</li>
+ *   <li><strong>Shape checks:</strong> {@link #isDag(Graph)}, {@link #isForest(Graph)},
+ *       {@link #isTree(Graph)}, {@link #isPath(Graph)} and {@link #isStronglyConnected(Graph)}
+ *       read the graph as directed, and {@link #findCycle(Graph)} returns a cycle that makes a
+ *       graph no DAG (directed acyclic graph); {@link #isUndirectedForest(Graph)},
+ *       {@link #isUndirectedTree(Graph)}, {@link #isBipartite(Graph)} and
+ *       {@link #isWeaklyConnected(Graph)} read it as undirected.</li>
+ *   <li><strong>Text, hash and diff:</strong> {@link #adjacencyListOf(Graph)} writes a whole
+ *       graph as text, {@link #topologyHash(Graph)} hashes it into 64 bits to keep, and
+ *       {@link #diff(Graph, Graph)} returns the edges added and removed between two versions of
+ *       a graph.</li>
+ * </ul>
  * <p>
- * Provides operations that create new {@link Graph} instances from existing graphs
- * and {@link NodeMapping}s (the original graph is never modified), predicate methods to test
- * structural properties of a graph - with {@link #findCycle(Graph)} as the witness for
- * {@link #isDag(Graph)} -, its complete text form, {@link #adjacencyListOf(Graph)}, a structural
- * hash, {@link #topologyHash(Graph)}, and the {@link #diff(Graph, Graph)} of two versions.
+ * Data on nodes and edges follows a renumbered, transposed or condensed graph through the
+ * mappings. Like the node mappings that the factories of {@link NodeMapping} make, the edge
+ * mappings point from new to old: from the derived graph to the original one. Their
+ * {@code gather} methods carry an array of data over to the derived graph. An
+ * {@link EdgePartition} groups the edges of the original by the condensed edge they became, and
+ * its {@code reduce} methods combine their data.
  * <p>
- * A predicate whose name does not say otherwise reads the graph as directed; the ones prefixed
- * {@code undirected} read it as {@link Components#ccsOf(Graph)} does. {@code isBipartite} and
- * {@code isWeaklyConnected} carry no prefix because neither property has a directed reading that
- * could be meant instead; {@code isStronglyConnected} is directed by definition.
- *
- * <pre>{@code
- * // Shape checks, directed reading
- * Graphs.isDag(graph);              // acyclic?
- * Graphs.isForest(graph);           // DAG with all inDegrees <= 1?
- * Graphs.isTree(graph);             // forest with exactly one root?
- * Graphs.isPath(graph);             // tree with all outDegrees <= 1?
- * Graphs.isStronglyConnected(graph); // every node reaches every other?
- *
- * // Shape checks, undirected reading
- * Graphs.isBipartite(graph);        // nodes split into two classes?
- * Graphs.isUndirectedTree(graph);   // connected and acyclic?
- * Graphs.isUndirectedForest(graph); // acyclic?
- * Graphs.isWeaklyConnected(graph);  // one component?
- *
- * // Reindexing for cache-friendly layout
- * NodeMapping newToOld = NodeMapping.reindex(graph);
- * Graph reindexed = Graphs.remapped(graph, newToOld);
- *
- * // Subgraph extraction
- * Graph sub = Graphs.remapped(graph, NodeMapping.forSubgraph(selectedNodes));
- * Graph reached = Graphs.remapped(graph, NodeMapping.forSubgraph(Graphs.reachableFrom(graph, entry)));
- *
- * // Custom permutation
- * Graph permuted = Graphs.remapped(graph, NodeMapping.forPermutation(order));
- *
- * // Edge metadata on a transpose
- * EdgeMapping transposedToOld = Graphs.transposedEdgeMapping(graph);
- * }</pre>
- *
- * @see NodeMapping
- * @see NodePartition
- * @see EdgeMapping
- * @see EdgePartition
- * @see Graph
+ * A shape check without a prefix reads the graph as directed. One prefixed {@code undirected} reads
+ * it as undirected, as {@link Components#ccsOf(Graph)} does: each edge connects its source and
+ * target both ways, and the edges {@code a -> b} and {@code b -> a} count as one.
+ * {@code isBipartite} and {@code isWeaklyConnected} read it so too, without the prefix, because
+ * neither property has a directed reading. The checks of the undirected reading use <a
+ * href="https://en.wikipedia.org/wiki/Disjoint-set_data_structure">union-find</a>, whose cost grows
+ * with alpha(nodeCount). The inverse Ackermann function alpha is below 5 for any graph. No shape
+ * check needs memory in proportion to the edge count.
+ * <p>
+ * Every result is computed anew on every call, not cached, and shares no array with the
+ * arguments: keep a result to use it more than once. No method recurses, so deep graphs do not
+ * overflow the call stack.
  */
 public final class Graphs {
 
   // The constants of topologyHash. Changing one of them, or a shift or rotation distance in the
   // code, changes the hash of every graph, which a release must announce in its changelog.
 
-  /** Seed: the fractional part of the square root of 2, scaled to 64 bits and rounded. */
+  // Seed: the fractional part of the square root of 2, scaled to 64 bits and rounded.
   private static final long HASH_SEED = 0x6A09E667F3BCC909L;
 
-  /** Spreads each input over all 64 bits: 2^64 / golden ratio, rounded down. */
+  // Spreads each input over all 64 bits: 2^64 / golden ratio, rounded down.
   private static final long HASH_GOLDEN_GAMMA = 0x9E3779B97F4A7C15L;
 
-  /** Multiplier of each step: PRIME64_2 of xxHash64. */
+  // Multiplier of each step: PRIME64_2 of xxHash64.
   private static final long HASH_STEP_PRIME = 0xC2B2AE3D27D4EB4FL;
 
-  /**
-   * The two multipliers of the SplitMix64 finalizer, as in {@code java.util.SplittableRandom}
-   * (Steele, Lea and Flood, 2014).
-   */
+  // The two multipliers of the SplitMix64 finalizer, as in java.util.SplittableRandom (Steele,
+  // Lea and Flood, 2014).
   private static final long SPLITMIX64_MULTIPLIER_1 = 0xBF58476D1CE4E5B9L;
 
   private static final long SPLITMIX64_MULTIPLIER_2 = 0x94D049BB133111EBL;
 
-  /**
-   * Characters the {@link #adjacencyListOf(Graph)} builder reserves per node: a line without its
-   * targets, {@code "1234567 -> []\n"}, and some slack. An estimate for the initial capacity; the
-   * builder grows past it if needed.
-   */
+  // The initial capacity of the builder in adjacencyListOf, an estimate it grows past if needed:
+  // per node a line without its out-nodes, "1234567 -> []\n", and some slack; per out-node
+  // ", 123456".
   private static final int LIST_CHARS_PER_NODE = 16;
 
-  /** Characters the same builder reserves per target, {@code ", 123456"}. */
   private static final int LIST_CHARS_PER_EDGE = 8;
 
   private Graphs() {}
 
   /**
-   * Creates a new graph by remapping node IDs according to the given mapping.
+   * Returns {@code graph} with its nodes renumbered by {@code newToOld}: node {@code i} of the
+   * result is node {@code newToOld.get(i)} of {@code graph}.
    * <p>
-   * The mapping must be in the <strong>natural direction</strong> (new → old), as produced
-   * by all {@link NodeMapping} factory methods. Internally, the inverse (old → new) is
-   * computed in O(n) for edge-target translation.
+   * The result has the edges of {@code graph} between the nodes that {@code newToOld} maps to;
+   * the other nodes are left out, with their edges. The factories of {@link NodeMapping} make the
+   * mapping: {@link NodeMapping#forSubgraph(IntList) forSubgraph} selects nodes,
+   * {@link NodeMapping#forPermutation(IntList) forPermutation} and
+   * {@link NodeMapping#reindex(Graph) reindex} reorder all of them. Data on the nodes follows
+   * with the {@code gather} methods of the mapping, data on the edges with
+   * {@link #edgeMapping(Graph, Graph, NodeMapping)}. Here, {@code calls} holds the calls between
+   * the methods of a program, and the methods that {@code load} reaches become a graph of their
+   * own, with their names from {@code names}:
+   * {@snippet file="com/kobayami/graphity/examples/Mappings.java" region="subgraph"}
+   * To merge nodes into groups instead, use {@link NodePartition#condense()}.
    * <p>
-   * For <strong>permutations</strong> (reorder), all edges are preserved with remapped IDs.
-   * For <strong>subgraph</strong> mappings, edges to nodes not in the subgraph are dropped.
-   * Adjacency lists in the resulting graph are sorted ascending.
-   * <p>
-   * The parameter type is {@link NodeMapping}, <strong>not</strong> a {@link NodePartition}:
-   * a partition is many-to-one, so it cannot be inverted and is not a {@code NodeMapping}.
-   * Passing one is therefore a compile error, not a runtime failure.
-   * <p>
-   * <strong>Time:</strong> O(nodeCount + edgeCount + Σ newDegree x log(newDegree)).<br>
-   * <strong>Memory:</strong> O(nodeCount + edgeCount) for the result;
-   * O(nodeCount) additional during computation (inverse mapping).
+   * <strong>Time:</strong> O(nodeCount + edgeCount log maxOutDegree).<br>
+   * <strong>Memory:</strong> 4 bytes per node and per edge for the result; while it runs,
+   * 4 x nodeCount bytes more.
    *
-   * @param graph    the original graph
-   * @param newToOld mapping from new node IDs to original node IDs
-   * @return a new graph with remapped node IDs
-   * @throws IllegalArgumentException if a new node is unmapped, or two new nodes map to the same
-   *         original node
-   * @throws IndexOutOfBoundsException if a new node maps to an ID that is not a node of
-   *         {@code graph}
-   * @see NodeMapping#reindex(Graph)
-   * @see NodeMapping#forSubgraph(java.util.BitSet)
-   * @see NodeMapping#forPermutation(IntList)
+   * @param graph    the graph to renumber
+   * @param newToOld the node of {@code graph} for each node of the result
+   * @return the renumbered graph
+   * @throws IllegalArgumentException  if a node of the result maps to {@code -1}, or two map to
+   *                                   the same node
+   * @throws IndexOutOfBoundsException if a node of the result maps to an ID that is not a node
+   *                                   of {@code graph}
    */
   public static Graph remapped(Graph graph, NodeMapping newToOld) {
     int newNodeCount = newToOld.mapping.length;
@@ -127,7 +118,7 @@ public final class Graphs {
       return new Graph(new int[]{0}, new int[0]);
     }
 
-    // Inverse (old → new) for edge-target translation, built in the same pass that checks every
+    // Inverse (old to new) for edge-target translation, built in the same pass that checks every
     // new node. Not IndexMapping.invertArray: remapped rejects an unmapped new node, which an
     // inverse skips, and names both new nodes of a repeat.
     int[] oldOf = newToOld.mapping;
@@ -221,24 +212,21 @@ public final class Graphs {
   }
 
   /**
-   * Returns the dominator tree as a graph: an edge {@code idom(n) -> n} for every node that has
-   * an immediate dominator.
+   * Returns the dominator tree of {@code dominators} as a graph, with an edge {@code d -> n} for
+   * every node {@code n} whose immediate dominator is {@code d}.
    * <p>
-   * Every root of the dominator forest - each entry, and each node only the virtual root above
-   * several entries dominates - has in-degree 0, and so has every unreachable node. The result
-   * is a forest of out-trees, ready for a traversal such as SSA renaming — assigning each
-   * use its reaching definition — with {@link DfsTraverser#enterNode(int)} and
-   * {@code leaveNode(int)}. For ancestor
-   * queries, {@link Ancestry#of(Dominators)} is cheaper than {@code Ancestry.of(dominatorTree(d))}:
-   * it shares the immediate dominators instead of building and checking a graph.
-   * <p>
-   * Computed on every call, not cached - keep the result.
+   * The result has the node IDs of the analyzed graph, and its edges point away from the roots
+   * of the tree, for a walk down the tree such as with a {@link DfsTraverser}. Its root nodes are
+   * the entries, the nodes that only the virtual root above several entries dominates, and the
+   * unreachable nodes. To ask whether one node dominates another, use
+   * {@link Ancestry#of(Dominators)}, which shares the immediate dominators instead of building
+   * this graph.
    * <p>
    * <strong>Time:</strong> O(nodeCount).<br>
-   * <strong>Memory:</strong> 4 x (nodeCount + 1) bytes plus 4 bytes per tree edge for the result.
+   * <strong>Memory:</strong> 4 bytes per node and per edge for the result.
    *
-   * @param dominators the dominators to arrange as a tree
-   * @return the dominator tree, with the node IDs of the analyzed graph
+   * @param dominators the dominators of a graph
+   * @return the dominator tree
    */
   public static Graph dominatorTree(Dominators dominators) {
     var children = ParentForest.childrenOf(dominators.immediateDominator);
@@ -246,27 +234,27 @@ public final class Graphs {
   }
 
   /**
-   * Returns the transitive closure: an edge {@code u -> v} whenever {@code v} is reachable from
-   * {@code u} by a non-empty path. A node has an edge to itself exactly if it lies on a cycle.
+   * Returns the transitive closure of {@code graph}: the same nodes, with an edge {@code u -> v}
+   * wherever a path of one or more edges leads from {@code u} to {@code v}.
    * <p>
-   * Computed on one bit row per strongly connected component over the condensation, sinks first,
-   * so the work is about sccCount x condensationEdgeCount / 64 word operations, and the rows
-   * hold sccCount<sup>2</sup> / 8 bytes while it runs - about 1.25 GB for 10<sup>5</sup>
-   * components. The result can have up to nodeCount<sup>2</sup> edges, 4 bytes each. For the
-   * nodes reachable from one node, {@link #reachableFrom(Graph, int)} is far cheaper.
+   * A node has a self-loop in the result if and only if it lies on a cycle. The result can have
+   * up to nodeCount<sup>2</sup> edges; for the nodes reachable from a few nodes,
+   * {@link #reachableFrom(Graph, IntList)} costs far less.
    * <p>
-   * <strong>Time:</strong> O(nodeCount + edgeCount + sccCount x (sccCount + condensationEdgeCount)
-   * / 64 + resultEdgeCount x log nodeCount) - the rows are allocated and scanned whole, and the
-   * logarithm sorts each component's targets once.<br>
-   * <strong>Memory:</strong> 4 x (nodeCount + 1 + resultEdgeCount) bytes for the result;
-   * sccCount<sup>2</sup> / 8 bytes for the rows plus O(nodeCount + edgeCount) during
-   * computation, rows and result side by side at the peak.
+   * The closure is computed on the SCCs (strongly connected components) of {@code graph}, with a
+   * row of bits per SCC for the SCCs it reaches. The rows take sccCount<sup>2</sup> / 8 bytes,
+   * about 1.25 GB for 100 000 SCCs.
+   * <p>
+   * <strong>Time:</strong> O(nodeCount + edgeCount + sccCount x (sccCount + edgeCount) / 64 +
+   * resultEdgeCount log nodeCount), with sccCount the number of SCCs.<br>
+   * <strong>Memory:</strong> 4 bytes per node and per edge for the result; while it runs,
+   * sccCount<sup>2</sup> / 8 bytes for the rows, which are held together with the result at the
+   * peak, and O(nodeCount + edgeCount) more.
    *
    * @param graph the graph to close
-   * @return the transitive closure, over the same nodes
-   * @throws IllegalArgumentException if the closure has more than {@code Integer.MAX_VALUE - 8}
-   *                                  edges, or {@code graph.nodeCount() > 2^30 - 5}, the limit of
-   *                                  {@link Components#sccsOf(Graph)}
+   * @return the transitive closure
+   * @throws IllegalArgumentException if the closure has more edges than a graph can have, or
+   *                                  {@code graph} has more than 2<sup>30</sup> - 5 nodes
    */
   public static Graph transitiveClosure(Graph graph) {
     int n = graph.nodeCount();
@@ -277,7 +265,7 @@ public final class Graphs {
     int[] dagTargets = Csr.outAdjacency(dag);
     int words = (k + 63) >>> 6;
 
-    // SCC IDs are in reverse topological order: every successor of c has a smaller ID.
+    // SCC IDs are in reverse topological order: every out-node of c in dag has a smaller ID.
     var reach = new long[k][];
     var reachSize = new int[k];
     long total = 0;
@@ -331,23 +319,25 @@ public final class Graphs {
   }
 
   /**
-   * Returns the transitive reduction of a DAG: the edges not implied by a longer path. The result
-   * has the same reachability as the input with as few edges as possible, and on a DAG it is
-   * unique. For a graph with cycles, reduce its condensation, {@link Sccs#condense()}.
+   * Returns the transitive reduction of {@code dag}: the same nodes, keeping each edge
+   * {@code u -> v} unless another path leads from {@code u} to {@code v}.
    * <p>
-   * Visits each node's out-nodes in topological order and keeps an edge only if no earlier
-   * out-node already reaches its target, on one bit row per node, sinks first: about
-   * edgeCount x nodeCount / 64 word operations, and nodeCount<sup>2</sup> / 8 bytes for the rows
-   * while it runs - about 1.25 GB for 10<sup>5</sup> nodes.
+   * From each node, the result reaches the same nodes as {@code dag}, with as few edges as
+   * possible; on a DAG, this result is unique. For a graph with cycles, reduce the DAG of its
+   * SCCs, which is {@code Components.sccsOf(graph).condense()}.
    * <p>
-   * <strong>Time:</strong> O(nodeCount + (nodeCount + edgeCount) x nodeCount / 64 +
-   * edgeCount x log maxOutDegree) - the rows are allocated whole.<br>
-   * <strong>Memory:</strong> 4 x (nodeCount + 1 + resultEdgeCount) bytes for the result;
-   * nodeCount<sup>2</sup> / 8 bytes plus O(nodeCount + edgeCount) during computation.
+   * The reduction is computed with a row of bits per node for the nodes it reaches. The rows
+   * take nodeCount<sup>2</sup> / 8 bytes, about 1.25 GB for 100 000 nodes.
+   * <p>
+   * <strong>Time:</strong> O(nodeCount + edgeCount log maxOutDegree + (nodeCount + edgeCount)
+   * x nodeCount / 64).<br>
+   * <strong>Memory:</strong> 4 bytes per node and per edge for the result; while it runs,
+   * nodeCount<sup>2</sup> / 8 bytes for the rows and O(nodeCount + edgeCount) more.
    *
    * @param dag the DAG to reduce
-   * @return the transitive reduction, over the same nodes
-   * @throws IllegalArgumentException if the graph has a cycle, a self-loop included
+   * @return the transitive reduction
+   * @throws IllegalArgumentException if {@code dag} has a cycle, a self-loop included, or if a
+   *                                  depth-first path is longer than 2<sup>30</sup> - 5 nodes
    */
   public static Graph transitiveReduction(Graph dag) {
     int n = dag.nodeCount();
@@ -402,39 +392,34 @@ public final class Graphs {
   }
 
   /**
-   * Derives an edge mapping from a node mapping and two graphs.
+   * Returns the edge mapping from {@code newGraph} to {@code oldGraph} that goes with the node
+   * mapping {@code newToOld}.
    * <p>
-   * For each edge in {@code newGraph}, looks up the corresponding edge in {@code oldGraph}
-   * using the node mapping. The result maps new edge indices to old edge indices.
+   * Edge {@code s -> t} of {@code newGraph} maps to the edge
+   * {@code newToOld.get(s) -> newToOld.get(t)} of {@code oldGraph}, or to {@code -1} if
+   * {@code oldGraph} has no such edge or {@code s} or {@code t} maps to {@code -1}. For a graph
+   * from {@link #remapped(Graph, NodeMapping) remapped(oldGraph, newToOld)}, every edge has its
+   * counterpart, and the {@code gather} methods of the result carry data on the edges over to
+   * the new graph. Here, {@code siteCount} holds the number of call sites of each call by edge
+   * index of {@code calls}, and the subgraph {@code loading} from the example at
+   * {@link #remapped(Graph, NodeMapping)} takes these counts along:
+   * {@snippet file="com/kobayami/graphity/examples/Mappings.java" region="edgeMapping"}
+   * For the opposite direction, from the edges of {@code oldGraph} to those of {@code newGraph},
+   * invert the result with {@link EdgeMapping#inverted(int)}. The transposed graph needs
+   * {@link #transposedEdgeMapping(Graph)} instead, as its edges run the other way.
    * <p>
-   * The node mapping must be in the direction new → old (as produced by all
-   * {@link NodeMapping} factory methods), and its source space must be the nodes of
-   * {@code newGraph}. It may be partial: a new edge without a counterpart in {@code oldGraph} maps
-   * to {@code -1}, and so does every edge from or to a new node that maps to {@code -1}. Through
-   * the inverse of a subgraph's node mapping, the edges of a graph thus map onto the subgraph, and
-   * those of removed nodes to {@code -1}.
-   * <p>
-   * <strong>Not applicable to a transpose.</strong> The lookup searches the target of each
-   * new edge in the out-adjacency of its source, and {@link BiAdjacentGraph#transposed()} swaps
-   * those two roles - so {@code edgeMapping(transpose, graph, identity)} returns almost
-   * exclusively {@code -1} instead of failing. Use
-   * {@link #transposedEdgeMapping(Graph)} for that case.
-   * <p>
-   * <strong>Time:</strong> O(newNodeCount + newEdgeCount + Σ newDegree x log(oldDegree)), summed
-   * over the new nodes, where oldDegree is the out-degree of a node's old counterpart: one binary
-   * search in that list per edge.<br>
-   * <strong>Memory:</strong> O(newEdgeCount) for the result.
+   * <strong>Time:</strong> O(nodeCount + edgeCount log maxOutDegree), with the node and edge
+   * count of {@code newGraph} and the out-degrees of {@code oldGraph}.<br>
+   * <strong>Memory:</strong> 4 bytes per edge of {@code newGraph} for the result.
    *
-   * @param newGraph the new (remapped) graph
-   * @param oldGraph the original graph
-   * @param newToOld node mapping from new node IDs to old node IDs, {@code -1} for a new node
-   *     without an old counterpart
-   * @return edge mapping from new edge indices to old edge indices
-   * @throws IllegalArgumentException if the source space of {@code newToOld} is not
-   *     {@code newGraph.nodeCount()}
+   * @param newGraph the graph whose edges are mapped
+   * @param oldGraph the graph they are mapped to
+   * @param newToOld the node of {@code oldGraph} for each node of {@code newGraph}, or
+   *                 {@code -1}
+   * @return the edge mapping
+   * @throws IllegalArgumentException  if {@code newToOld.indexCount() != newGraph.nodeCount()}
    * @throws IndexOutOfBoundsException if a node of {@code newGraph} maps to an ID that is not a
-   *     node of {@code oldGraph}
-   * @see #transposedEdgeMapping(Graph)
+   *                                   node of {@code oldGraph}
    */
   public static EdgeMapping edgeMapping(Graph newGraph, Graph oldGraph, NodeMapping newToOld) {
     int newNodeCount = newGraph.nodeCount();
@@ -474,35 +459,24 @@ public final class Graphs {
   }
 
   /**
-   * Derives the edge mapping between a graph and its transpose.
+   * Returns the edge mapping from the transposed graph of {@code graph} to {@code graph}.
    * <p>
-   * Maps each edge index of the transpose of {@code graph} to the edge index of the same edge
-   * in {@code graph}, in the direction new → old like every other mapping factory here.
-   * {@link BiAdjacentGraph#transposed()} preserves nodes but not edge indices, so this is what
-   * translates edge metadata onto the transpose:
-   * <pre>{@code
-   * Graph transpose = BiAdjacentGraph.of(graph).transposed();
-   * EdgeMapping newToOld = Graphs.transposedEdgeMapping(graph);
-   * double[] transposedWeights = new double[transpose.edgeCount()];
-   * for (int e = 0; e < transpose.edgeCount(); e++) {
-   *     transposedWeights[e] = weights[newToOld.get(e)];
-   * }
-   * }</pre>
-   * The mapping is <strong>total</strong>: every edge of the transpose is an edge of the
-   * original with source and target swapped, so it holds no {@code -1} entries and
-   * {@link IndexMapping#isPartial()} is {@code false}.
-   * <p>
-   * For a single edge rather than a full pass, use
-   * {@link BiAdjacentGraph#transposedEdgeIndex(int)}, which is the inverse direction.
+   * Edge {@code e} of {@code BiAdjacentGraph.of(graph).transposed()} maps to the edge of
+   * {@code graph} it reverses: the transposed graph keeps the node IDs, but not the edge indices.
+   * The mapping is total, and its {@code gather} methods carry data on the edges over to the
+   * transposed graph. Here, {@code siteCount} holds the number of call sites of each call by edge
+   * index of {@code calls}, and the counts follow the calls to the transposed graph, which lists
+   * the callers of {@code parse}:
+   * {@snippet file="com/kobayami/graphity/examples/Mappings.java" region="transposedEdges"}
+   * {@link BiAdjacentGraph#transposedEdgeIndex(int)} translates a single edge, in the opposite
+   * direction.
    * <p>
    * <strong>Time:</strong> O(nodeCount + edgeCount).<br>
-   * <strong>Memory:</strong> 4 x edgeCount bytes for the result, plus 4 x nodeCount bytes
-   * during computation.
+   * <strong>Memory:</strong> 4 x edgeCount bytes for the result; while it runs, 4 x nodeCount
+   * bytes more.
    *
-   * @param graph the graph whose transpose is to be addressed
-   * @return edge mapping from the transpose's edge indices to this graph's edge indices
-   * @see BiAdjacentGraph#transposed()
-   * @see BiAdjacentGraph#transposedEdgeIndex(int)
+   * @param graph the graph whose transposed graph is mapped to it
+   * @return the edge mapping from the transposed graph to {@code graph}
    */
   public static EdgeMapping transposedEdgeMapping(Graph graph) {
     int n = graph.nodeCount();
@@ -510,7 +484,7 @@ public final class Graphs {
     var targets = Csr.outAdjacency(graph);
     var start = Csr.outAdjacencyStart(graph);
 
-    // Write pointer per target node: where that node's next in-edge slot goes.
+    // Write pointer per target node: where the next edge into that node goes in the in-adjacency.
     // A bi-adjacent graph already has those offsets; otherwise count and prefix-sum them.
     int[] writePos;
     if (graph instanceof BiAdjacentGraph biAdjacent) {
@@ -529,8 +503,8 @@ public final class Graphs {
     }
 
     // Same counting sort as BiAdjacentGraph.of, with the edge index as payload instead
-    // of the source node. Ascending node scan makes slot q of the transpose and entry q of
-    // the mapping describe the same edge.
+    // of the source node. Ascending node scan makes edge q of the transposed graph and entry q
+    // of the mapping describe the same edge.
     int[] mapping = new int[m];
     for (int node = 0; node < n; node++) {
       int end = start[node + 1];
@@ -543,29 +517,28 @@ public final class Graphs {
   }
 
   /**
-   * Derives an edge partition from a node partition and its condensation.
+   * Returns the edge partition that goes with the node partition {@code partition}, from the
+   * edges of the partitioned graph to the edges of {@code condensedGraph}.
    * <p>
-   * Maps the edge indices of the original graph - the one the partition was computed from - to
-   * condensed edge indices. Intra-group edges (edges where both source and target belong to the
-   * same group) are unmapped ({@code -1}), and so are edges from or to a node in no group.
-   * Multiple original cross-group edges that connect the same pair of groups map to the same
-   * condensed edge (many-to-one mapping).
+   * The edges from group {@code g} to group {@code h} all map to the condensed edge {@code g -> h},
+   * which is edge {@code condensedGraph.edgeIndexOf(g, h)}. {@link EdgePartition#edgesOf(int)}
+   * lists them, and the {@code reduce} methods of the result combine their data. An edge inside a
+   * group, or from or to a node in no group, maps to {@code -1}. Here, {@code byPackage} groups the
+   * methods of a program by package. Its condensed graph {@code packageCalls} holds the calls
+   * between packages (see {@link NodePartition#of(Graph, int[], int)}). {@code byPackageCall} tells
+   * which calls between methods are behind the call from {@code service} to {@code model}:
+   * {@snippet file="com/kobayami/graphity/examples/Partitions.java" region="edgesOf"}
+   * {@code condensedGraph} must be {@code partition.condense()}; only its node count is checked.
    * <p>
-   * The condensed graph must be the result of {@link NodePartition#condense()} applied to the
-   * given partition; only its node count is checked. The original graph is not a parameter: the
-   * partition holds it, so a wrong one cannot be passed.
-   * <p>
-   * <strong>Time:</strong> O(originalNodeCount + originalEdgeCount + Σ log(condensedDegree)),
-   * summed over the cross-group edges, where condensedDegree is the out-degree of an edge's source
-   * group in the condensed graph: one binary search in that list per edge.<br>
-   * <strong>Memory:</strong> O(originalEdgeCount + condensedEdgeCount) for the result.
+   * <strong>Time:</strong> O(nodeCount + edgeCount log maxOutDegree), with the node and edge
+   * count of the partitioned graph and the out-degrees of {@code condensedGraph}.<br>
+   * <strong>Memory:</strong> up to 12 bytes per edge of the partitioned graph for the result.
    *
-   * @param condensedGraph the condensation graph (from {@link NodePartition#condense()})
-   * @param partition      node partition mapping (from {@link Components} or
-   *                       {@link NodePartition#of(Graph, int[], int)})
-   * @return edge partition from original edge indices to condensed edge indices
+   * @param condensedGraph the graph that {@code partition.condense()} returned
+   * @param partition      the partition of the nodes
+   * @return the edge partition, with a group per edge of {@code condensedGraph}
    * @throws IllegalArgumentException if {@code condensedGraph.nodeCount()} is not
-   *     {@code partition.groupCount()}
+   *                                  {@code partition.groupCount()}
    */
   public static EdgePartition edgePartition(Graph condensedGraph, NodePartition partition) {
     int groupCount = partition.groupCount();
@@ -603,19 +576,17 @@ public final class Graphs {
   }
 
   /**
-   * Returns the root nodes of the given graph - the nodes without incoming edges - in ascending
-   * order. They are the natural starting points of a traversal over a DAG or a forest:
-   * <pre>{@code
-   * traverser.run(Graphs.rootNodes(graph));
-   * }</pre>
-   * Each call scans all nodes; keep the result if it is needed more than once. For a single node,
-   * {@link BiAdjacentGraph#isRootNode(int)} answers in constant time.
+   * Returns the root nodes of {@code graph} in ascending order. A root node has in-degree 0.
+   * <p>
+   * A traversal of a DAG or a forest starts from them, as in
+   * {@code traverser.run(Graphs.rootNodes(graph))} with a {@link DfsTraverser}.
+   * {@link BiAdjacentGraph#isRootNode(int)} checks a single node in O(1).
    * <p>
    * <strong>Time:</strong> O(nodeCount).<br>
    * <strong>Memory:</strong> 4 bytes per root node for the result.
    *
-   * @param graph the graph to search, with in-adjacency
-   * @return the root nodes, sorted ascending; newly allocated
+   * @param graph the graph to search
+   * @return the root nodes
    */
   public static SortedIntView rootNodes(BiAdjacentGraph graph) {
     int n = graph.nodeCount();
@@ -633,16 +604,15 @@ public final class Graphs {
   }
 
   /**
-   * Returns the nodes reachable from {@code source}, the source included, in ascending order.
-   * <p>
-   * Equivalent to {@link #reachableFrom(Graph, IntList)} with a one-element list.
+   * Returns the nodes reachable from {@code source}, in ascending order and with {@code source}
+   * included. Equivalent to {@code reachableFrom(graph, IntLists.singleton(source))}.
    * <p>
    * <strong>Time:</strong> O(nodeCount + edgeCount).<br>
    * <strong>Memory:</strong> as for {@link #reachableFrom(Graph, IntList)}.
    *
    * @param graph  the graph to search
-   * @param source source node ID in {@code 0..nodeCount()-1}
-   * @return the reachable nodes, sorted ascending
+   * @param source node ID in {@code 0..nodeCount-1}
+   * @return the reachable nodes
    * @throws IndexOutOfBoundsException if {@code source} is out of range
    */
   public static SortedIntView reachableFrom(Graph graph, int source) {
@@ -650,27 +620,23 @@ public final class Graphs {
   }
 
   /**
-   * Returns the nodes reachable from at least one of the given sources, the sources included,
-   * in ascending order.
+   * Returns the nodes reachable from at least one of {@code sources}, in ascending order and with
+   * the sources included.
    * <p>
-   * Edges are followed in their direction; for the nodes that reach the sources, pass the
-   * transpose. Duplicate sources are ignored, an empty list gives an empty result. The result is
-   * sorted, so it extracts the reachable part directly:
-   *
-   * <pre>{@code
-   * Graph function = Graphs.remapped(cfg, NodeMapping.forSubgraph(Graphs.reachableFrom(cfg, entry)));
-   * }</pre>
-   *
-   * For distances and shortest paths, use {@link BfsDistances}.
+   * The search follows the edges in their direction; for the nodes from which a source is
+   * reachable, search the transposed graph, as shown at {@link BiAdjacentGraph#transposed()}.
+   * A source given twice counts once, and with no sources, no node is reachable. Being sorted, the
+   * result goes straight into {@link NodeMapping#forSubgraph(IntList)} for the subgraph of the
+   * reachable nodes, as shown at {@link #remapped(Graph, NodeMapping)}. For distances and
+   * shortest paths, use {@link BfsDistances}.
    * <p>
-   * <strong>Time:</strong> O(nodeCount + edgeCount).<br>
-   * <strong>Memory:</strong> 4 bytes per reachable node for the result. During the traversal,
-   * one bit per node and a queue that grows by doubling towards the reachable count, briefly up
-   * to 12 bytes per reachable node while it is copied.
+   * <strong>Time:</strong> O(sources.size() + nodeCount + edgeCount).<br>
+   * <strong>Memory:</strong> 4 bytes per reachable node for the result; while it runs, 1 bit per
+   * node and briefly up to 12 bytes per reachable node.
    *
    * @param graph   the graph to search
-   * @param sources source node IDs, each in {@code 0..nodeCount()-1}
-   * @return the reachable nodes, sorted ascending
+   * @param sources node IDs, each in {@code 0..nodeCount-1}
+   * @return the reachable nodes
    * @throws IndexOutOfBoundsException if a source is out of range
    */
   public static SortedIntView reachableFrom(Graph graph, IntList sources) {
@@ -716,19 +682,17 @@ public final class Graphs {
   }
 
   /**
-   * Returns whether the given graph is a DAG (contains no cycles).
+   * Returns whether {@code graph} is a DAG: a graph without cycles. A self-loop is a cycle.
    * <p>
-   * Uses a single DFS pass with back-edge detection. Self-loops are detected as cycles.
-   * Terminates early on the first cycle found.
+   * {@link #findCycle(Graph)} returns a cycle where this method finds one.
    * <p>
-   * <strong>Time:</strong> O(nodeCount + edgeCount), with early termination.<br>
-   * <strong>Memory:</strong> O(nodeCount).
+   * <strong>Time:</strong> O(nodeCount + edgeCount), stopping at the first cycle.<br>
+   * <strong>Memory:</strong> 2 bits per node while it runs, and up to 8 x nodeCount bytes for
+   * the stack, which grows with the deepest path.
    *
    * @param graph the graph to check
-   * @return {@code true} if the graph contains no cycles
-   * @throws IllegalArgumentException if a depth-first path is longer than 2^30 - 5 nodes, the most
-   *     frames an array can hold
-   * @see #findCycle(Graph)
+   * @return {@code true} if {@code graph} has no cycle
+   * @throws IllegalArgumentException if a depth-first path is longer than 2<sup>30</sup> - 5 nodes
    */
   public static boolean isDag(Graph graph) {
     var checker = new CycleChecker(graph, false);
@@ -737,32 +701,26 @@ public final class Graphs {
   }
 
   /**
-   * Returns the nodes of one cycle of the graph in order, or an empty list if the graph is a DAG.
+   * Returns the nodes of a cycle of {@code graph} in the order of its edges, or an empty list if
+   * {@code graph} is a DAG.
    * <p>
-   * A depth-first search from node 0 upwards, successors in ascending order, stops at the first
-   * edge {@code u -> v} back to a node on its current path; the result is that path from
-   * {@code v} to {@code u}, and the edge {@code u -> v} closes it. A self-loop is a cycle of one
-   * node. The result is deterministic, but not necessarily the shortest cycle. To find a cycle
-   * inside one strongly connected component, call this on the component's subgraph; the result
-   * then holds node IDs of the subgraph, which the {@link NodeMapping} of the subgraph translates
+   * The last node has an edge to the first, and a self-loop is a cycle of one node. The search
+   * goes depth-first, from each unvisited node in ascending order and through the out-nodes in
+   * ascending order, and returns the first cycle it closes: always the same one, but not
+   * necessarily the shortest. Here, the cycle in the dependencies between the packages of a
+   * program:
+   * {@snippet file="com/kobayami/graphity/examples/GraphOperations.java" region="findCycle"}
+   * For a cycle inside a given SCC, search the subgraph of its nodes from
+   * {@link #remapped(Graph, NodeMapping)}; the node mapping of the subgraph translates the result
    * back.
-   *
-   * <pre>{@code
-   * IntList cycle = Graphs.findCycle(dependencies);
-   * if (!cycle.isEmpty()) {
-   *     // report cycle.getInt(0) -> cycle.getInt(1) -> ... -> cycle.getInt(0)
-   * }
-   * }</pre>
-   *
+   * <p>
    * <strong>Time:</strong> O(nodeCount + edgeCount), stopping at the first cycle.<br>
-   * <strong>Memory:</strong> O(nodeCount) during computation; 4 bytes per node of the cycle for
-   * the result.
+   * <strong>Memory:</strong> 4 bytes per node of the cycle for the result; while it runs, 2 bits
+   * per node and up to 8 x nodeCount bytes for the stack, which grows with the deepest path.
    *
    * @param graph the graph to search
-   * @return the nodes of one cycle in order, each once, or an empty list; unmodifiable
-   * @throws IllegalArgumentException if a depth-first path is longer than 2^30 - 5 nodes, the most
-   *     frames an array can hold
-   * @see #isDag(Graph)
+   * @return the nodes of the cycle, each once, or an empty list; unmodifiable
+   * @throws IllegalArgumentException if a depth-first path is longer than 2<sup>30</sup> - 5 nodes
    */
   public static IntList findCycle(Graph graph) {
     var checker = new CycleChecker(graph, true);
@@ -772,19 +730,17 @@ public final class Graphs {
   }
 
   /**
-   * Returns whether the given graph is a forest (DAG where every node has in-degree ≤ 1).
+   * Returns whether {@code graph} is a forest: a DAG in which every node has in-degree at most 1,
+   * so that the edges point away from the root nodes.
    * <p>
-   * Equivalently: a forest is a DAG consisting of zero or more disjoint trees.
-   * An empty graph is a forest.
-   * <p>
-   * Reads the graph as directed. For the undirected reading see
+   * The empty graph is a forest. For the undirected reading, see
    * {@link #isUndirectedForest(Graph)}.
    * <p>
    * <strong>Time:</strong> O(nodeCount + edgeCount).<br>
-   * <strong>Memory:</strong> O(nodeCount).
+   * <strong>Memory:</strong> 8 x nodeCount bytes while it runs.
    *
    * @param graph the graph to check
-   * @return {@code true} if the graph is a forest
+   * @return {@code true} if {@code graph} is a forest
    */
   public static boolean isForest(Graph graph) {
     var info = computeForestInfo(graph);
@@ -792,22 +748,17 @@ public final class Graphs {
   }
 
   /**
-   * Returns whether the given graph is a tree (forest that is weakly connected).
+   * Returns whether {@code graph} is a tree: a forest with at most one root node.
    * <p>
-   * A tree has exactly one root node (in-degree 0), and every other node has
-   * in-degree exactly 1, so its edges point away from the root. An empty graph is a
-   * tree (vacuously). A single node with no edges is a tree.
-   * <p>
-   * Reads the graph as directed. For the undirected reading see
-   * {@link #isUndirectedTree(Graph)}; for the reading in which edges point toward the root,
-   * apply this to the transpose, {@code BiAdjacentGraph.of(graph).transposed()} - which builds the
-   * in-adjacency and therefore costs 4 x (nodeCount + edgeCount) bytes, unlike this method itself.
+   * The edges of a tree point away from its root. For a tree whose edges point toward the root,
+   * check the transposed graph, which is {@code BiAdjacentGraph.of(graph).transposed()}. For the
+   * undirected reading, see {@link #isUndirectedTree(Graph)}. The empty graph is a tree.
    * <p>
    * <strong>Time:</strong> O(nodeCount + edgeCount).<br>
-   * <strong>Memory:</strong> O(nodeCount).
+   * <strong>Memory:</strong> 8 x nodeCount bytes while it runs.
    *
    * @param graph the graph to check
-   * @return {@code true} if the graph is a tree
+   * @return {@code true} if {@code graph} is a tree
    */
   public static boolean isTree(Graph graph) {
     var info = computeForestInfo(graph);
@@ -815,15 +766,15 @@ public final class Graphs {
   }
 
   /**
-   * Returns whether the given graph is a path (tree where every node has out-degree ≤ 1).
+   * Returns whether {@code graph} is a path: a tree in which every node has out-degree at most 1.
    * <p>
-   * A path is a linear chain of nodes. An empty graph is a path. A single node is a path.
+   * The empty graph is a path.
    * <p>
    * <strong>Time:</strong> O(nodeCount + edgeCount).<br>
-   * <strong>Memory:</strong> O(nodeCount).
+   * <strong>Memory:</strong> 8 x nodeCount bytes while it runs.
    *
    * @param graph the graph to check
-   * @return {@code true} if the graph is a path
+   * @return {@code true} if {@code graph} is a path
    */
   public static boolean isPath(Graph graph) {
     var info = computeForestInfo(graph);
@@ -831,29 +782,24 @@ public final class Graphs {
   }
 
   /**
-   * Returns whether the given graph is strongly connected: every node reaches every other,
-   * following edge directions.
+   * Returns whether {@code graph} is strongly connected: every node reaches every other along
+   * the edges.
    * <p>
-   * This is the whole-graph question behind {@link Components#sccsOf(Graph)}, answered without
-   * building the partition: one depth-first search from node 0 in the manner of Tarjan's
-   * algorithm, which stops as soon as a node below the root closes a component of its own - the
-   * graph then has a second component. Until that moment no component has been removed from
-   * Tarjan's stack, so the stack is exactly the set of visited nodes and needs no storage of its
-   * own. On a result already computed, {@link Sccs#isStronglyConnected()} answers in O(1). An
-   * empty graph and a single node are strongly connected (vacuously). Iterative; deep graphs do
-   * not overflow the call stack.
+   * Answers without the partition of {@link Components#sccsOf(Graph)}. Uses
+   * <a href="https://en.wikipedia.org/wiki/Tarjan%27s_strongly_connected_components_algorithm">Tarjan's
+   * algorithm</a>, without recursion. It starts from node 0 and stops as soon as an SCC without
+   * node 0 is complete.
+   * Where the SCCs are already computed, {@link Sccs#isStronglyConnected()} answers in O(1). The
+   * empty graph is strongly connected, and so is a single node. For the undirected reading, see
+   * {@link #isWeaklyConnected(Graph)}.
    * <p>
-   * <strong>Time:</strong> O(nodeCount + edgeCount), with early termination.<br>
-   * <strong>Memory:</strong> 8 x nodeCount bytes, plus a frame stack that grows with the search
-   * depth, up to another 8 x nodeCount bytes; nothing afterwards.
+   * <strong>Time:</strong> O(nodeCount + edgeCount), stopping at the first SCC without node 0.<br>
+   * <strong>Memory:</strong> 8 x nodeCount bytes while it runs, and up to 8 x nodeCount bytes for
+   * the stack, which grows with the deepest path.
    *
    * @param graph the graph to check
-   * @return {@code true} if the graph consists of at most one strongly connected component
-   * @throws IllegalArgumentException if the depth-first search is deeper than 2^30 - 5 nodes, the
-   *     most frames an array can hold
-   * @see Components#sccsOf(Graph)
-   * @see Sccs#isStronglyConnected()
-   * @see #isWeaklyConnected(Graph)
+   * @return {@code true} if every node reaches every other
+   * @throws IllegalArgumentException if a depth-first path is longer than 2<sup>30</sup> - 5 nodes
    */
   public static boolean isStronglyConnected(Graph graph) {
     int n = graph.nodeCount();
@@ -862,6 +808,8 @@ public final class Graphs {
     }
     int[] out = Csr.outAdjacencyStart(graph);
     int[] adj = Csr.outAdjacency(graph);
+    // Until a second component closes, no node has left Tarjan's stack, so the stack is exactly
+    // the set of visited nodes and needs no array of its own.
     var index = new int[n];   // discovery time from 1; 0 = unvisited
     var low = new int[n];
     int[] frames = DfsFrames.initial(n);
@@ -908,14 +856,9 @@ public final class Graphs {
     }
   }
 
-  /**
-   * Iterative DFS (explicit stack, no recursion) for cycle detection. Detects back-edges
-   * (including self-loops) and terminates early on the first cycle found.
-   * <p>
-   * visited and on-stack flags are packed 2 bits per node into a single {@code int[]}
-   * (bit 0 = visited, bit 1 = on-stack, 16 nodes per int): one memory touch per node check
-   * instead of two separate bit-set lookups.
-   */
+  // The depth-first search of isDag and findCycle, without recursion; it stops at the first edge
+  // back to a node on the current path, a self-loop included. The visited and on-stack flags of
+  // 16 nodes share one int, 2 bits each, so a node check touches memory once instead of twice.
   private static final class CycleChecker {
 
     private static final int VISITED = 0b01;
@@ -924,12 +867,12 @@ public final class Graphs {
     private final Graph graph;
     private final int[] state;
 
-    /** Whether to keep the cycle; {@link #isDag(Graph)} needs only the answer. */
+    // Whether to keep the cycle; isDag needs only the answer.
     private final boolean recordCycle;
 
     boolean hasCycle;
 
-    /** The cycle closed by the first back edge, from its target to its source. */
+    // The cycle closed by the first back edge, from its target to its source.
     int @Nullable [] cycle;
 
     CycleChecker(Graph graph, boolean recordCycle) {
@@ -997,13 +940,9 @@ public final class Graphs {
     }
   }
 
-  /**
-   * Returns the root count and the largest out-degree of {@code graph} if it is a forest, or null
-   * if some node has in-degree > 1 or lies on or below a cycle.
-   * <p>
-   * {@link Ancestry#of(Graph)} makes the same check, with a witness for its message; a change to
-   * what counts as a forest changes both.
-   */
+  // The root count and the largest out-degree of graph if it is a forest, or null if some node
+  // has in-degree > 1 or lies on or below a cycle. Ancestry.of(Graph) makes the same check, with a
+  // witness for its message; a change to what counts as a forest changes both.
   private static @Nullable ForestInfo computeForestInfo(Graph graph) {
     int n = graph.nodeCount();
     var targets = Csr.outAdjacency(graph);
@@ -1043,31 +982,20 @@ public final class Graphs {
   private record ForestInfo(int rootCount, int maxOutDegree) {}
 
   /**
-   * Returns whether the given graph is bipartite, reading it as undirected.
+   * Returns whether {@code graph} is bipartite: its nodes split into two sets such that every
+   * edge runs from one set to the other.
    * <p>
-   * The nodes of a bipartite graph split into two classes such that every edge runs between the
-   * classes rather than inside one. The graph is read as undirected like
-   * {@link Components#ccsOf(Graph)}: the edges {@code a → b} and {@code b → a} are one undirected
-   * edge rather than two. That collapsing cannot change the answer, since a reciprocal pair is an
-   * even cycle either way - but a <strong>self-loop</strong> can, and it makes the graph not
-   * bipartite, because a node adjacent to itself belongs in neither class. This is the one place
-   * where the undirected predicates here do not ignore self-loops: two-colorability is not a
-   * connectivity question. An empty graph is bipartite.
+   * Reads the graph as undirected, so the direction of the edges does not matter. A self-loop
+   * makes the graph not bipartite, unlike the other checks of the undirected reading, which
+   * ignore self-loops. The empty graph is bipartite.
    * <p>
-   * Terminates as soon as an edge closes an odd cycle. Its double cover holds two elements per
-   * node in one array, so it requires {@code nodeCount <= 2^30 - 5} - the only predicate here that
-   * rejects a graph by its node count alone, before reading an edge. That limit is reachable
-   * rather than theoretical - a graph of 10^9 nodes fits in a large heap - so exceeding it is
-   * rejected outright instead of surfacing as a failure to allocate the array.
-   * <p>
-   * <strong>Time:</strong> O(nodeCount x α(nodeCount) + edgeCount), effectively
-   * O(nodeCount + edgeCount), with early termination.<br>
-   * <strong>Memory:</strong> 10 x nodeCount bytes.
+   * <strong>Time:</strong> O(nodeCount + edgeCount x alpha(nodeCount)), stopping at the first
+   * cycle of odd length.<br>
+   * <strong>Memory:</strong> 10 x nodeCount bytes while it runs.
    *
    * @param graph the graph to check
-   * @return {@code true} if the graph is bipartite
-   * @throws IllegalArgumentException if {@code graph.nodeCount() > 2^30 - 5}
-   * @see #isUndirectedForest(Graph)
+   * @return {@code true} if {@code graph} is bipartite
+   * @throws IllegalArgumentException if {@code graph} has more than 2<sup>30</sup> - 5 nodes
    */
   public static boolean isBipartite(Graph graph) {
     int n = graph.nodeCount();
@@ -1102,29 +1030,21 @@ public final class Graphs {
   }
 
   /**
-   * Returns whether the given graph is a tree when read as undirected: connected, with exactly
-   * {@code nodeCount - 1} undirected edges.
+   * Returns whether {@code graph} is a tree when read as undirected: connected and without
+   * cycles.
    * <p>
-   * Where {@link #isTree(Graph)} requires every edge to point away from one root, this ignores
-   * direction entirely, so a graph whose edges point toward a root, or in mixed directions, is a
-   * tree here as long as the underlying undirected structure is one. The graph is read as
-   * undirected like {@link Components#ccsOf(Graph)}: the edges {@code a → b} and {@code b → a} are
-   * one undirected edge rather than two, so a graph storing its undirected edges symmetrically is
-   * a tree exactly when the same structure stored with a single direction per edge is. Self-loops
-   * are ignored. An empty graph is a tree (vacuously), and so is a single node with no edges.
+   * Unlike for {@link #isTree(Graph)}, the direction of the edges does not matter: edges toward
+   * the root, or in mixed directions, make a tree as well. The edges {@code a -> b} and
+   * {@code b -> a} count as one, so a tree may store its edges in both directions, and self-loops
+   * are ignored. The empty graph is a tree.
    * <p>
-   * A non-empty graph holding more than {@code 3 x nodeCount - 2} edges is rejected without
-   * reading any of them, since no tree can store that many even with a self-loop on every node.
-   * <p>
-   * <strong>Time:</strong> O(nodeCount x α(nodeCount) + edgeCount), effectively
-   * O(nodeCount + edgeCount), plus O(log outDegree) per edge that is stored in both directions;
-   * O(1) when the edge count alone rules out a tree.<br>
-   * <strong>Memory:</strong> 5 x nodeCount bytes.
+   * <strong>Time:</strong> O(nodeCount + edgeCount x alpha(nodeCount)), plus O(log maxOutDegree)
+   * for each pair {@code a -> b}, {@code b -> a}; O(1) for more than 3 x nodeCount - 2 edges, too
+   * many for any tree.<br>
+   * <strong>Memory:</strong> 5 x nodeCount bytes while it runs.
    *
    * @param graph the graph to check
-   * @return {@code true} if the graph is a tree when read as undirected
-   * @see #isTree(Graph)
-   * @see #isUndirectedForest(Graph)
+   * @return {@code true} if {@code graph} is a tree when read as undirected
    */
   public static boolean isUndirectedTree(Graph graph) {
     int n = graph.nodeCount();
@@ -1140,28 +1060,19 @@ public final class Graphs {
   }
 
   /**
-   * Returns whether the given graph is a forest when read as undirected, that is, whether it holds
-   * no undirected cycle.
+   * Returns whether {@code graph} is a forest when read as undirected: without cycles.
    * <p>
-   * A forest is a disjoint union of trees, so this is {@link #isUndirectedTree(Graph)} without the
-   * requirement that there be exactly one component. It is also the undirected counterpart of
-   * {@link #isDag(Graph)}: an undirected graph is acyclic exactly when it is a forest. The graph is
-   * read as undirected like {@link Components#ccsOf(Graph)}, so a reciprocal pair
-   * {@code a → b} / {@code b → a} is one edge and not a cycle, and self-loops are ignored. An empty
-   * graph is a forest.
+   * Unlike for {@link #isForest(Graph)}, the direction of the edges does not matter. The edges
+   * {@code a -> b} and {@code b -> a} count as one, so they make no cycle, and self-loops are
+   * ignored. The empty graph is a forest.
    * <p>
-   * A non-empty graph holding more than {@code 3 x nodeCount - 2} edges is rejected without
-   * reading any of them, since no forest can store that many even with a self-loop on every node.
-   * <p>
-   * <strong>Time:</strong> O(nodeCount x α(nodeCount) + edgeCount), effectively
-   * O(nodeCount + edgeCount), plus O(log outDegree) per edge that is stored in both directions;
-   * O(1) when the edge count alone rules out a forest.<br>
-   * <strong>Memory:</strong> 5 x nodeCount bytes.
+   * <strong>Time:</strong> O(nodeCount + edgeCount x alpha(nodeCount)), plus O(log maxOutDegree)
+   * for each pair {@code a -> b}, {@code b -> a}; O(1) for more than 3 x nodeCount - 2 edges, too
+   * many for any forest.<br>
+   * <strong>Memory:</strong> 5 x nodeCount bytes while it runs.
    *
    * @param graph the graph to check
-   * @return {@code true} if the graph holds no undirected cycle
-   * @see #isForest(Graph)
-   * @see #isUndirectedTree(Graph)
+   * @return {@code true} if {@code graph} is a forest when read as undirected
    */
   public static boolean isUndirectedForest(Graph graph) {
     if (exceedsAcyclicEdgeBound(graph)) {
@@ -1171,23 +1082,19 @@ public final class Graphs {
   }
 
   /**
-   * Returns whether the given graph is weakly connected: at most one component when edge
-   * direction is ignored.
+   * Returns whether {@code graph} is weakly connected: connected when the direction of the edges
+   * is ignored.
    * <p>
-   * This is the whole-graph question behind {@link Components#wccsOf(Graph)}, which it would
-   * otherwise be answered from, and it needs neither that partition nor a full pass - the check
-   * stops once the nodes are known to form one component. For the directed reading see
-   * {@link #isStronglyConnected(Graph)}. An empty graph and a single node are weakly connected
-   * (vacuously). Self-loops are irrelevant here, as they connect nothing.
+   * Answers without the partition of {@link Components#wccsOf(Graph)}, and stops as soon as all
+   * nodes are connected. The empty graph is weakly connected, and so is a single node. For the
+   * directed reading, see {@link #isStronglyConnected(Graph)}.
    * <p>
-   * <strong>Time:</strong> O(nodeCount x α(nodeCount) + edgeCount), effectively
-   * O(nodeCount + edgeCount), with early termination.<br>
-   * <strong>Memory:</strong> 5 x nodeCount bytes.
+   * <strong>Time:</strong> O(nodeCount + edgeCount x alpha(nodeCount)), stopping once all nodes
+   * are connected.<br>
+   * <strong>Memory:</strong> 5 x nodeCount bytes while it runs.
    *
    * @param graph the graph to check
-   * @return {@code true} if the graph consists of at most one weakly connected component
-   * @see Components#wccsOf(Graph)
-   * @see #isStronglyConnected(Graph)
+   * @return {@code true} if {@code graph} is weakly connected
    */
   public static boolean isWeaklyConnected(Graph graph) {
     int n = graph.nodeCount();
@@ -1214,33 +1121,28 @@ public final class Graphs {
     return false;
   }
 
-  /**
-   * Returns whether {@code graph} holds more edges than any acyclic undirected reading could: at
-   * most {@code nodeCount - 1} undirected edges, each stored in up to two directions, plus at most
-   * one self-loop per node. A shortcut only: {@link #undirectedMergeCount(Graph)} rejects such a
-   * graph as well, within its first 3 x nodeCount edges, but this answers in O(1) and allocates
-   * nothing.
-   */
+  // Whether graph holds more edges than any acyclic undirected reading could: at most
+  // nodeCount - 1 undirected edges, each stored in up to two directions, plus at most one
+  // self-loop per node. A shortcut only: undirectedMergeCount rejects such a graph as well,
+  // within its first 3 x nodeCount edges, but this answers in O(1) and allocates nothing.
   private static boolean exceedsAcyclicEdgeBound(Graph graph) {
     int n = graph.nodeCount();
     return graph.edgeCount() > (n == 0 ? 0 : 3L * n - 2);
   }
 
-  /**
-   * Merges the endpoints of every undirected edge and returns the number of merges performed, so
-   * that the nodes form {@code nodeCount - result} components; or {@code -1} as soon as an edge
-   * closes an undirected cycle. Self-loops are skipped.
-   * <p>
-   * Nodes are walked in ascending order, and that is what makes a failed union classifiable. A
-   * failure means both endpoints are already connected, so the edge is either the second stored
-   * direction of an edge already counted or a genuine extra edge closing a cycle. For
-   * {@code v > u} the opposite direction sits in a list not yet visited, so this is the first
-   * encounter with {@code {u,v}} and the failure is a cycle. For {@code v < u} one binary search
-   * in v's out-adjacency decides it. A successful union never needs the test: had the opposite
-   * direction been counted, the endpoints would already be connected and the union would have
-   * failed. Searching always would cost a search per edge; searching never would report every
-   * symmetrically stored edge as a cycle.
-   */
+  // Merges the endpoints of every undirected edge and returns the number of merges, so that the
+  // nodes form nodeCount - result components; or -1 as soon as an edge closes an undirected
+  // cycle. Self-loops are skipped.
+  //
+  // Nodes are walked in ascending order, and that is what makes a failed union classifiable. A
+  // failure means both endpoints are already connected, so the edge is either the second stored
+  // direction of an edge already counted or a genuine extra edge closing a cycle. For v > u the
+  // opposite direction sits in a list not yet visited, so this is the first encounter with {u,v}
+  // and the failure is a cycle. For v < u one binary search in v's out-adjacency decides it. A
+  // successful union never needs the test: had the opposite direction been counted, the
+  // endpoints would already be connected and the union would have failed. Searching always would
+  // cost a search per edge; searching never would report every symmetrically stored edge as a
+  // cycle.
   private static int undirectedMergeCount(Graph graph) {
     int n = graph.nodeCount();
     var targets = Csr.outAdjacency(graph);
@@ -1267,19 +1169,18 @@ public final class Graphs {
   }
 
   /**
-   * Returns the complete adjacency list of the graph, one line per node in ascending order:
-   * <pre>
-   * 0 -&gt; [17, 532]
-   * 1 -&gt; [4]
-   * 2 -&gt; []
-   * </pre>
-   * Each line ends with a line feed. Unlike {@link Graph#toString()}, which is bounded because it
-   * runs implicitly, this lists every node and edge; a {@link BiAdjacentGraph} lists its
-   * out-adjacency. The text of a graph with a few hundred million edges exceeds what a
-   * {@code String} can hold and ends in an {@link OutOfMemoryError}.
+   * Returns the whole graph as text: one line per node with its out-nodes, in ascending order.
+   * <p>
+   * Each line ends with a line feed. For the control flow of a method with a loop:
+   * {@snippet file="com/kobayami/graphity/examples/GraphOperations.java" region="adjacencyListOf"}
+   * Unlike {@link Graph#toString()}, which is cut short for large graphs, this lists every node
+   * and edge; a {@link BiAdjacentGraph} lists its out-nodes. The text of a graph with a few
+   * hundred million edges is longer than a {@code String} can be and ends in an
+   * {@link OutOfMemoryError}.
    * <p>
    * <strong>Time:</strong> O(nodeCount + edgeCount).<br>
-   * <strong>Memory:</strong> O(nodeCount + edgeCount) characters for the result.
+   * <strong>Memory:</strong> 1 byte per character for the result; while it runs, about as much
+   * again.
    *
    * @param graph the graph to list
    * @return the adjacency list, one line per node
@@ -1302,21 +1203,22 @@ public final class Graphs {
   }
 
   /**
-   * Returns a 64-bit hash of the graph's structure, consistent with {@link Graph#equals(Object)}:
-   * equal graphs - a {@link BiAdjacentGraph} and its uni-adjacent counterpart included - always
-   * have equal hashes, and different graphs rarely do.
+   * Returns a 64-bit hash of the nodes and edges of {@code graph}, consistent with
+   * {@link Graph#equals(Object)}.
    * <p>
-   * Computed on every call, not cached - compute it once and keep it, for instance as the key of
-   * a cache over graph structure or to detect the fixpoint of a transformation. The value depends
-   * only on the structure, so it is the same in every run and on every JVM; a Graphity release
-   * that changes it says so in its changelog. Equal hashes do not prove equal graphs, and the hash
-   * is not built to resist graphs crafted to collide; compare with {@link Graph#equals(Object)}
-   * where it matters. {@link Graph#hashCode()} stays O(nodeCount + edgeCount) per call.
+   * Equal graphs have equal hashes, and different graphs rarely do. A {@link BiAdjacentGraph} and a
+   * {@code Graph} with the same nodes and edges count as equal. Like {@link Graph#hashCode()}, the
+   * hash is computed on every call: compute it once and keep it, for instance as the key of a cache
+   * of results per graph, or to see when a transformation stops changing a graph. It depends on
+   * nothing but the nodes and edges, so it is the same in every run and on every JVM; a release of
+   * Graphity that changes it says so in its changelog. Every implementation of Graphity computes
+   * the same hash. Equal hashes do not prove equal graphs, and graphs can be made to collide on
+   * purpose: compare with {@link Graph#equals(Object)} where it matters.
    * <p>
    * <strong>Time:</strong> O(nodeCount + edgeCount).
    *
    * @param graph the graph to hash
-   * @return the structural hash
+   * @return the hash
    */
   public static long topologyHash(Graph graph) {
     int n = graph.nodeCount();
@@ -1337,22 +1239,23 @@ public final class Graphs {
     return h ^ (h >>> 31);
   }
 
-  /** One order-sensitive step of {@link #topologyHash(Graph)}. */
+  // One order-sensitive step of topologyHash.
   private static long mixInto(long h, int value) {
     return Long.rotateLeft(h ^ (value * HASH_GOLDEN_GAMMA), 29) * HASH_STEP_PRIME;
   }
 
   /**
-   * Returns the edges added and removed between two graphs over the same nodes.
+   * Returns the edges added and removed between {@code before} and {@code after}. Both are graphs
+   * over the same nodes.
    * <p>
-   * Merges the sorted adjacency lists of both graphs node by node, so both lists of the result
-   * come out in edge index order, each edge named by its index in the graph it belongs to: added
-   * edges by their index in {@code after}, removed edges by their index in {@code before}. An
-   * empty diff means the graphs are equal.
+   * Added edges come with their edge indices in {@code after}, removed edges with theirs in
+   * {@code before}. With these edge indices, the caller can look up data on the edges of either
+   * graph in arrays indexed by edge index. Both lists are in edge index order. An empty diff means
+   * that the graphs are equal.
    * <p>
-   * <strong>Time:</strong> O(nodeCount + edgeCount of both graphs).<br>
-   * <strong>Memory:</strong> 12 bytes per added or removed edge for the result, and up to 18 more
-   * while it is collected.
+   * <strong>Time:</strong> O(nodeCount + edgeCount), with the edges of both graphs.<br>
+   * <strong>Memory:</strong> 12 bytes per added or removed edge for the result; while it runs,
+   * up to 18 bytes more per such edge.
    *
    * @param before the older graph
    * @param after  the newer graph, with the same node count

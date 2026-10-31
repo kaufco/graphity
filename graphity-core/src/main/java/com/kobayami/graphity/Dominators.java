@@ -6,80 +6,54 @@ import java.util.Arrays;
 import java.util.Objects;
 
 /**
- * Immediate dominators of a directed graph with one or more entries.
+ * The dominators of a graph with one or more entries, such as the control flow of a method,
+ * given by the immediate dominator of every node.
  * <p>
- * A node {@code d} dominates {@code n} if every path from an entry to {@code n} passes through
- * {@code d}; every node dominates itself. The immediate dominator of {@code n} is its closest
- * strict dominator, and the immediate dominators form the dominator tree. Several entries
- * behave like a virtual root above all of them: a node that only this root dominates - every
- * entry, and every node reachable from two entries without a common real dominator - has no
- * immediate dominator and is a root of the dominator forest.
+ * A node {@code d} dominates a node {@code n} if every path from an entry to {@code n} passes
+ * through {@code d}; every node dominates itself. The immediate dominator of {@code n} is the
+ * dominator closest to {@code n} other than {@code n} itself. The immediate dominators form the
+ * dominator tree, which {@link Graphs#dominatorTree(Dominators)} returns as a graph. Several
+ * entries act like one virtual root above all of them. A node that only this virtual root
+ * dominates, such as an entry, has no immediate dominator and is a root of the dominator tree,
+ * which is then a forest. A node that no entry reaches has no immediate dominator either;
+ * {@link #isReachable(int)} tells the two apart.
  * <p>
- * The analysis reads the predecessors of each node and so takes a {@link BiAdjacentGraph}. A
- * caller holding a plain {@link Graph} builds the in-adjacency once, at a visible cost, and can
- * hand the same graph to the other analyses that need it, such as the loop nesting forest of the
- * {@code graphity-controlflow} module:
- *
- * <pre>{@code
- * BiAdjacentGraph cfg = BiAdjacentGraph.of(graph);   // +4 x (nodeCount + edgeCount) bytes
- * }</pre>
- *
- * The type is deliberately lean. It holds the immediate dominators, a reachability bit set and
- * the graph, and everything else is built from it on demand:
- *
- * <pre>{@code
- * var dominators = Dominators.of(cfg, entry);
- * Graph tree = Graphs.dominatorTree(dominators);              // edge idom(n) -> n
- * var index = Ancestry.of(dominators);                        // "a dominates b" in O(log n)
- * boolean dominates = index.isAncestorOf(a, b);
- * }</pre>
- *
- * Dominance frontiers, control dependence and the iterated dominance frontiers for φ placement
- * are control-flow concepts and come with the {@code graphity-controlflow} module, which reads
- * this type through its public methods.
- *
- * There is no {@code dominates(a, b)} here: with the immediate dominators alone it would walk up
- * the tree in O(depth), and a long straight-line region makes the depth linear in the graph.
- * {@link Ancestry#of(Dominators)} answers it in O(log nodeCount), {@link PreorderAncestry} in
- * O(1). In that index an unreachable node is an isolated root, so check {@link #isReachable(int)}
- * where that matters.
+ * Whether one node dominates another is an ancestor query on the dominator tree.
+ * {@link Ancestry#of(Dominators)} answers it in O(log nodeCount) and {@link PreorderAncestry} in
+ * O(1). The analysis follows the edges against their direction, so it takes a
+ * {@link BiAdjacentGraph}. Here, the dominators of the basic blocks of the method {@code load} from
+ * its {@code entry}, and whether {@code body} and {@code then} dominate {@code next}:
+ * {@snippet file="com/kobayami/graphity/examples/Dominance.java" region="dominators"}
  * <p>
- * <strong>Post-dominators</strong> are the dominators of the transposed graph, with the exits
- * as entries. The caller chooses the exits; a node from which no exit is reachable - an
- * infinite loop - has no post-dominator unless a virtual exit node with edges from such loops is
- * added before the analysis:
- *
- * <pre>{@code
- * var postDominators = Dominators.of(cfg.transposed(), exits);   // cfg: a BiAdjacentGraph
- * }</pre>
- *
- * With {@code cfg} a {@link BiAdjacentGraph}, the transpose is a constant-time view sharing its
- * arrays, and again a {@code BiAdjacentGraph}.
+ * The post-dominators are the dominators of the transposed graph, with the exits as entries. A
+ * node {@code p} post-dominates {@code n} if every path from {@code n} to an exit passes through
+ * {@code p}. Here, {@code next} is the first block that every path from {@code body} to the
+ * {@code exit} of {@code load} passes through:
+ * {@snippet file="com/kobayami/graphity/examples/Dominance.java" region="postDominators"}
+ * A node from which no exit can be reached, such as one in an endless loop, has no
+ * post-dominator, unless an extra exit with an edge from that loop is added to the graph first.
  * <p>
- * <strong>Common ancestors in a DAG.</strong> The deepest node that lies on every path from a
- * root to both {@code a} and {@code b} is their nearest common dominator:
- * {@code Ancestry.of(Dominators.of(dag, roots)).lowestCommonAncestorOf(a, b)}, with {@code -1}
- * if only the virtual root qualifies. On the transpose with the sinks as entries, the same query
- * gives the nearest node that every path from {@code a} and from {@code b} to a sink passes
- * through.
+ * Uses <a href="https://en.wikipedia.org/wiki/Dominator_(graph_theory)">the algorithm of
+ * Lengauer and Tarjan</a>, without recursion. Dominance frontiers and control dependence are in
+ * the module {@code graphity-controlflow}.
  * <p>
- * <strong>Memory:</strong> 4 x nodeCount bytes plus a bit per node, and a reference to the
- * graph, which stays reachable for as long as the dominators are held.
- *
- * @see Graphs#dominatorTree(Dominators)
- * @see Ancestry#of(Dominators)
+ * Instances are immutable and safe to share between threads.
+ * <p>
+ * <strong>Memory:</strong> 4 x nodeCount bytes and 1 bit per node, plus the graph, which stays
+ * reachable as long as the dominators are.
  */
 public final class Dominators {
 
-  /** Unlinked marker in the ancestor lane of the path-compression forest. */
+  // Unlinked marker in the ancestor lane of the path-compression forest.
   private static final int UNLINKED = -1;
 
   private final BiAdjacentGraph graph;
 
-  /** Immediate dominator of each node, {@code -1} for a root of the forest and when unreachable. */
+  // Immediate dominator of each node, -1 for a root of the forest and when unreachable. Shared
+  // as the parent array by Ancestry.of(Dominators).
   final int[] immediateDominator;
 
-  /** Bit set of the nodes reachable from at least one entry. */
+  // Bit set of the nodes reachable from at least one entry.
   private final long[] reachable;
 
   private Dominators(BiAdjacentGraph graph, int[] immediateDominator, long[] reachable) {
@@ -89,41 +63,39 @@ public final class Dominators {
   }
 
   /**
-   * Computes the dominators of a graph with a single entry.
+   * Returns the dominators of {@code graph} with the single entry {@code entry}. Equivalent to
+   * {@link #of(BiAdjacentGraph, IntList) of(graph, IntList.of(entry))}.
    * <p>
-   * Equivalent to {@link #of(BiAdjacentGraph, IntList)} with a one-element list.
-   * <p>
-   * <strong>Time:</strong> O((nodeCount + edgeCount) x log nodeCount) in the worst case.<br>
-   * <strong>Memory:</strong> as for {@link #of(BiAdjacentGraph, IntList)}.
+   * <strong>Time:</strong> O((nodeCount + edgeCount) log nodeCount).<br>
+   * <strong>Memory:</strong> 4 x nodeCount bytes and 1 bit per node for the result; while it
+   * runs, up to 32 x nodeCount bytes more.
    *
-   * @param graph the graph to analyze
-   * @param entry the entry node ID in {@code 0..nodeCount()-1}
+   * @param graph the graph
+   * @param entry node ID in {@code 0..nodeCount-1}
    * @return the dominators
    * @throws IndexOutOfBoundsException if {@code entry} is out of range
-   * @throws IllegalArgumentException if {@code graph.nodeCount() > 2^30 - 6}
+   * @throws IllegalArgumentException if {@code graph} has more than 2<sup>30</sup> - 6 nodes
    */
   public static Dominators of(BiAdjacentGraph graph, int entry) {
     return of(graph, IntLists.singleton(entry));
   }
 
   /**
-   * Computes the dominators of a graph with the given entries.
+   * Returns the dominators of {@code graph} with the given entries.
    * <p>
-   * Several entries behave like a virtual root above all of them. An empty list leaves every
-   * node unreachable; duplicate entries are ignored. The predecessors are read from the
-   * in-adjacency of the graph. Construction is iterative and follows Lengauer and Tarjan, in the
-   * simple version with path compression: O(m log n) also on the inputs where the iterative
-   * algorithm and plain SEMI-NCA turn quadratic.
+   * Several entries act like one virtual root above all of them, as the class documentation
+   * describes. Their order does not matter. An entry given twice counts once, and with no
+   * entries, no node is reachable.
    * <p>
-   * <strong>Time:</strong> O((nodeCount + edgeCount) x log nodeCount) in the worst case.<br>
-   * <strong>Memory:</strong> 4 x nodeCount bytes plus a bit per node for the result; up to
-   * 40 x nodeCount bytes additional during computation.
+   * <strong>Time:</strong> O(entries.size() + (nodeCount + edgeCount) log nodeCount).<br>
+   * <strong>Memory:</strong> 4 x nodeCount bytes and 1 bit per node for the result; while it
+   * runs, up to 32 x nodeCount bytes more.
    *
-   * @param graph   the graph to analyze
-   * @param entries the entry node IDs, each in {@code 0..nodeCount()-1}
+   * @param graph   the graph
+   * @param entries node IDs, each in {@code 0..nodeCount-1}
    * @return the dominators
    * @throws IndexOutOfBoundsException if an entry is out of range
-   * @throws IllegalArgumentException if {@code graph.nodeCount() > 2^30 - 6}
+   * @throws IllegalArgumentException if {@code graph} has more than 2<sup>30</sup> - 6 nodes
    */
   public static Dominators of(BiAdjacentGraph graph, IntList entries) {
     int n = graph.nodeCount();
@@ -143,15 +115,12 @@ public final class Dominators {
     return new Dominators(graph, immediateDominator, reachable);
   }
 
-  /**
-   * Immediate dominators of each block's induced subgraph, as node IDs, {@code -1} for the entry
-   * of a block. A block is the set of nodes the search numbers from one entry. No entry may be
-   * reached by the search from an earlier one, and every node must be reached. One node of every
-   * strongly connected component, sink components first, satisfies this: each search stays inside
-   * its component, so the blocks are the components and the edges between them are ignored.
-   *
-   * @throws IllegalArgumentException if {@code graph.nodeCount() > 2^30 - 6}
-   */
+  // Immediate dominators of each block's induced subgraph, as node IDs, -1 for the entry of a
+  // block: StrongConnectivity needs the dominators within each SCC. A block is the set of nodes
+  // the search numbers from one entry. No entry may be reached by the search from an earlier one,
+  // and every node must be reached. One node of every SCC, sink SCCs first, satisfies this: each
+  // search stays inside its SCC, so the blocks are the SCCs and the edges between them are
+  // ignored. Throws IllegalArgumentException above DfsPreorder.MAX_NODE_COUNT nodes.
   static int[] withinBlocks(BiAdjacentGraph graph, IntList entries) {
     var dfs = DfsPreorder.of(graph, entries, "Dominators");
     int[] idom = lengauerTarjan(dfs, Csr.inAdjacencyStart(graph), Csr.inAdjacency(graph), true);
@@ -164,19 +133,16 @@ public final class Dominators {
     return immediateDominator;
   }
 
-  /**
-   * Immediate dominators by preorder number, {@code 0} for the virtual root. {@code inStart} and
-   * {@code in} are the in-adjacency over node IDs, translated per edge into preorder numbers
-   * (0 = unreachable). Kept apart from the caller so that the JIT compiles the hot loop on its
-   * own.
-   * <p>
-   * Step 1 settles a node once the search path from its semidominator down to it is linked: the
-   * node then gets its immediate dominator, or a node with the same one, which step 2 resolves.
-   * <p>
-   * With {@code withinBlocks}, predecessors outside the block of the node are ignored, as
-   * described at {@link #withinBlocks}. A block is a contiguous range of preorder numbers that
-   * starts at its entry, and every predecessor in another block comes from a later one.
-   */
+  // Immediate dominators by preorder number, 0 for the virtual root. inStart and in are the
+  // in-adjacency over node IDs, translated per edge into preorder numbers (0 = unreachable). Kept
+  // apart from the caller so that the JIT compiles the hot loop on its own.
+  //
+  // Step 1 settles a node once the search path from its semidominator down to it is linked: the
+  // node then gets its immediate dominator, or a node with the same one, which step 2 resolves.
+  //
+  // With withinBlocks, in-nodes outside the block of the node are ignored, as described at
+  // withinBlocks. A block is a contiguous range of preorder numbers that starts at its entry, and
+  // every in-node in another block comes from a later one.
   private static int[] lengauerTarjan(
       DfsPreorder dfs, int[] inStart, int[] in, boolean withinBlocks) {
     int size = dfs.reachedCount + 1;
@@ -240,10 +206,8 @@ public final class Dominators {
     return idom;
   }
 
-  /**
-   * The node of least semidominator on the forest path from {@code v} up to, but excluding, its
-   * tree root, compressing the path on the way.
-   */
+  // The node of least semidominator on the forest path from v up to, but excluding, its tree
+  // root, compressing the path on the way.
   private static int eval(int[] lanes, int[] semi, int v) {
     int ancestor = lanes[2 * v];
     if (ancestor == UNLINKED) return v;
@@ -251,11 +215,9 @@ public final class Dominators {
     return lanes[2 * v + 1];
   }
 
-  /**
-   * Path compression without recursion and without a stack: the way up reverses the ancestor
-   * pointers, the way down restores them pointing at the tree root and carries the best label
-   * along.
-   */
+  // Path compression without recursion and without a stack: the way up reverses the ancestor
+  // pointers, the way down restores them pointing at the tree root and carries the best label
+  // along.
   private static void compress(int[] lanes, int[] semi, int v) {
     int below = UNLINKED;
     int x = v;
@@ -276,26 +238,27 @@ public final class Dominators {
   }
 
   /**
-   * Returns the graph these dominators were computed on, for analyses that combine both, such as
+   * Returns the graph these dominators were computed on, for analyses that need both, such as
    * dominance frontiers.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @return the analyzed graph
+   * @return the graph
    */
   public BiAdjacentGraph graph() {
     return graph;
   }
 
   /**
-   * Returns the immediate dominator of {@code node}, or {@code -1} if it has none: for an
-   * entry, for a node that only the virtual root above several entries dominates, and for an
-   * unreachable node.
+   * Returns the immediate dominator of {@code node}, or {@code -1} if it has none.
+   * <p>
+   * A node has none if it is an entry, if only the virtual root above several entries dominates
+   * it, or if no entry reaches it.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param node node ID in {@code 0..nodeCount()-1}
-   * @return the immediate dominator, or {@code -1}
+   * @param node node ID in {@code 0..nodeCount-1}
+   * @return immediate dominator, or {@code -1}
    * @throws IndexOutOfBoundsException if {@code node} is out of range
    */
   public int immediateDominatorOf(int node) {
@@ -304,12 +267,12 @@ public final class Dominators {
   }
 
   /**
-   * Returns whether {@code node} is reachable from at least one entry.
+   * Returns whether {@code node} is reachable from an entry.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param node node ID in {@code 0..nodeCount()-1}
-   * @return {@code true} if the node is reachable
+   * @param node node ID in {@code 0..nodeCount-1}
+   * @return {@code true} if a path leads from an entry to {@code node}
    * @throws IndexOutOfBoundsException if {@code node} is out of range
    */
   public boolean isReachable(int node) {

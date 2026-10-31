@@ -7,34 +7,33 @@ import java.util.Arrays;
 import java.util.Objects;
 
 /**
- * Breadth-first distances from one or several sources, with a shortest path to every reachable
- * node.
+ * The distances of the nodes of a graph from one or several sources, with a shortest path to
+ * every node reached.
  * <p>
- * The distance of a node is the number of edges on a shortest path from the nearest source;
- * every source has distance 0. Edges are followed in their direction; for distances against the
- * direction, pass the transpose. Unreachable nodes have distance {@code -1}.
- *
- * <pre>{@code
- * var distances = BfsDistances.of(graph, entry);
- * int hops = distances.distanceOf(target);    // -1 if unreachable
- * IntList path = distances.pathTo(target);    // entry, ..., target
- * }</pre>
- *
- * If only the set of reachable nodes is needed, {@link Graphs#reachableFrom(Graph, IntList)} is
- * far cheaper.
+ * The sources are the nodes where the search starts. The distance of a node is the number of edges
+ * on a shortest path to it from the nearest source. A source has distance 0, and a node that no
+ * source reaches has distance {@code -1}. Edges are followed in their direction. For distances
+ * against their direction, pass the transposed graph:
+ * {@code BiAdjacentGraph.of(graph).transposed()}. Here, {@code calls} are the calls between the
+ * methods of a program, and the search finds a shortest chain of calls from {@code main} to
+ * {@code parse}:
+ * {@snippet file="com/kobayami/graphity/examples/Traversals.java" region="pathTo"}
  * <p>
- * <strong>Memory:</strong> 8 x nodeCount bytes: the distance and the breadth-first predecessor
- * of each node.
- *
- * @see Graphs#reachableFrom(Graph, IntList)
- * @see FrontierTraverser
+ * Uses a <a href="https://en.wikipedia.org/wiki/Breadth-first_search">breadth-first search</a>
+ * that takes the sources in list order and the out-nodes of each node in ascending order. For the
+ * reachable nodes alone, {@link Graphs#reachableFrom(Graph, IntList)} needs less memory.
+ * <p>
+ * Instances are immutable and safe to share between threads.
+ * <p>
+ * <strong>Memory:</strong> 8 x nodeCount bytes: the distance of each node and the node before it
+ * on its shortest path.
  */
 public final class BfsDistances {
 
-  /** Distance of each node from the nearest source, {@code -1} if unreachable. */
+  // The distance of each node from the nearest source, -1 if no source reaches it.
   private final int[] distance;
 
-  /** Breadth-first predecessor of each node, {@code -1} for a source and when unreachable. */
+  // The node before each node on its shortest path, -1 for a source and for a node not reached.
   private final int[] predecessor;
 
   private final int maxDistance;
@@ -46,15 +45,14 @@ public final class BfsDistances {
   }
 
   /**
-   * Computes the distances from a single source.
-   * <p>
-   * Equivalent to {@link #of(Graph, IntList)} with a one-element list.
+   * Returns the distances of the nodes of {@code graph} from {@code source}. Equivalent to
+   * {@code of(graph, IntList.of(source))}.
    * <p>
    * <strong>Time:</strong> O(nodeCount + edgeCount).<br>
    * <strong>Memory:</strong> as for {@link #of(Graph, IntList)}.
    *
    * @param graph  the graph to search
-   * @param source source node ID in {@code 0..nodeCount()-1}
+   * @param source node ID in {@code 0..nodeCount-1}
    * @return the distances
    * @throws IndexOutOfBoundsException if {@code source} is out of range
    */
@@ -63,17 +61,16 @@ public final class BfsDistances {
   }
 
   /**
-   * Computes the distance of every node to the nearest of the given sources.
+   * Returns the distances of the nodes of {@code graph} from the nearest of {@code sources}.
    * <p>
-   * Duplicate sources are ignored; an empty list leaves every node unreachable. The search is
-   * iterative.
+   * A source given twice counts once, and with no sources, no node is reachable.
    * <p>
-   * <strong>Time:</strong> O(nodeCount + edgeCount).<br>
-   * <strong>Memory:</strong> 8 x nodeCount bytes for the result; 4 x nodeCount bytes additional
-   * during the search.
+   * <strong>Time:</strong> O(sources.size() + nodeCount + edgeCount).<br>
+   * <strong>Memory:</strong> 8 x nodeCount bytes for the result; while it runs, 4 x nodeCount
+   * bytes more.
    *
    * @param graph   the graph to search
-   * @param sources source node IDs, each in {@code 0..nodeCount()-1}
+   * @param sources node IDs, each in {@code 0..nodeCount-1}
    * @return the distances
    * @throws IndexOutOfBoundsException if a source is out of range
    */
@@ -113,13 +110,13 @@ public final class BfsDistances {
   }
 
   /**
-   * Returns the number of edges on a shortest path from the nearest source to {@code node}, or
-   * {@code -1} if no source reaches it.
+   * Returns the distance of {@code node}, or {@code -1} if no source reaches it. The distance is
+   * the number of edges on a shortest path to {@code node} from the nearest source.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param node node ID in {@code 0..nodeCount()-1}
-   * @return the distance, or {@code -1}
+   * @param node node ID in {@code 0..nodeCount-1}
+   * @return distance, or {@code -1}
    * @throws IndexOutOfBoundsException if {@code node} is out of range
    */
   public int distanceOf(int node) {
@@ -128,12 +125,12 @@ public final class BfsDistances {
   }
 
   /**
-   * Returns whether a source reaches {@code node}.
+   * Returns whether a source reaches {@code node}. Equivalent to {@code distanceOf(node) >= 0}.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @param node node ID in {@code 0..nodeCount()-1}
-   * @return {@code true} if the node is reachable
+   * @param node node ID in {@code 0..nodeCount-1}
+   * @return {@code true} if a source reaches {@code node}
    * @throws IndexOutOfBoundsException if {@code node} is out of range
    */
   public boolean isReachable(int node) {
@@ -142,17 +139,17 @@ public final class BfsDistances {
   }
 
   /**
-   * Returns a shortest path from the nearest source to {@code node}: the source first,
-   * {@code node} last, {@code distanceOf(node) + 1} nodes in all. Empty if {@code node} is
-   * unreachable.
+   * Returns a shortest path to {@code node} from the nearest source, or an empty list if no source
+   * reaches {@code node}.
    * <p>
-   * Among several shortest paths, the one found first by the breadth-first search is returned.
+   * The path has {@code distanceOf(node) + 1} nodes, with the source first and {@code node} last.
+   * Of several shortest paths, this method returns the one that the search finds first.
    * <p>
-   * <strong>Time:</strong> O(path length).<br>
-   * <strong>Memory:</strong> 4 x (path length) bytes for the result.
+   * <strong>Time:</strong> O(distanceOf(node)).<br>
+   * <strong>Memory:</strong> 4 x (distanceOf(node) + 1) bytes for the result.
    *
-   * @param node node ID in {@code 0..nodeCount()-1}
-   * @return the path as an unmodifiable list, or an empty list
+   * @param node node ID in {@code 0..nodeCount-1}
+   * @return the node IDs of the path, or an empty list; unmodifiable
    * @throws IndexOutOfBoundsException if {@code node} is out of range
    */
   public IntList pathTo(int node) {
@@ -167,11 +164,12 @@ public final class BfsDistances {
   }
 
   /**
-   * Returns the largest finite distance, {@code -1} if no node is reachable.
+   * Returns the largest distance of a node that a source reaches, or {@code -1} if there are no
+   * sources.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @return the largest distance of a reachable node, or {@code -1}
+   * @return largest distance, or {@code -1}
    */
   public int maxDistance() {
     return maxDistance;

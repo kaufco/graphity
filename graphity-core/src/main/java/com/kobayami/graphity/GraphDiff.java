@@ -1,25 +1,18 @@
 package com.kobayami.graphity;
 
 /**
- * The edges that differ between two graphs over the same nodes, as computed by
- * {@link Graphs#diff(Graph, Graph)}.
+ * The edges added and removed between two graphs over the same nodes, as
+ * {@link Graphs#diff(Graph, Graph)} returns them.
  * <p>
- * {@link #addedEdges()} names each edge by its edge index in the newer graph,
- * {@link #removedEdges()} by its edge index in the older one, so that edge data of either version
- * stays reachable. Both lists are in edge index order - by source and then target.
- *
- * <pre>{@code
- * GraphDiff diff = Graphs.diff(before, after);
- * if (!diff.isEmpty()) {
- *     Edges added = diff.addedEdges();       // edge indices of `after`
- *     Edges removed = diff.removedEdges();   // edge indices of `before`
- * }
- * }</pre>
- *
+ * Each edge comes with its edge index in the graph it belongs to: an added edge with its edge
+ * index in the newer graph, a removed edge with its edge index in the older one. With these edge
+ * indices, the caller can look up data on the edges of either graph in arrays indexed by edge
+ * index. Both lists are in edge index order. To see whether a graph changed without keeping the
+ * older one, compare hashes from {@link Graphs#topologyHash(Graph)} instead.
+ * <p>
+ * Instances are immutable and safe to share between threads.
+ * <p>
  * <strong>Memory:</strong> 12 bytes per added or removed edge.
- *
- * @see Graphs#diff(Graph, Graph)
- * @see Graphs#topologyHash(Graph)
  */
 public final class GraphDiff {
 
@@ -56,22 +49,21 @@ public final class GraphDiff {
   }
 
   /**
-   * Returns whether the two graphs have the same edges - then they are equal.
+   * Returns whether no edge was added or removed, that is, whether the two graphs are equal.
+   * Equivalent to {@code addedEdges().isEmpty() && removedEdges().isEmpty()}.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @return {@code true} if no edge was added or removed
+   * @return {@code true} if the graphs are equal
    */
   public boolean isEmpty() {
     return addedEdges.isEmpty() && removedEdges.isEmpty();
   }
 
   /**
-   * Returns the number of added and removed edges.
+   * Returns the numbers of added and removed edges, for debuggers and logs.
    * <p>
    * <strong>Time:</strong> O(1).
-   *
-   * @return a short description of this diff
    */
   @Override
   public String toString() {

@@ -5,37 +5,37 @@ import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.ints.IntLists;
 
 /**
- * Topological sort of a directed acyclic graph (DAG).
+ * The topological order of a DAG (directed acyclic graph), in which every node comes before its
+ * out-nodes.
  * <p>
- * Uses a single DFS pass (reverse postorder) for maximum performance.
- * For topological order with level information, use {@link TopOrderAndLevels#of(Graph)}.
- *
- * <pre>{@code
- * IntList order = TopOrder.of(graph);
- * // order[0] has no predecessors in the order,
- * // order[last] has no successors in the order.
- * }</pre>
- *
- * @see TopOrderAndLevels
- * @see Graphs#isDag(Graph)
+ * Uses a
+ * <a href="https://en.wikipedia.org/wiki/Topological_sorting#Depth-first_search">depth-first
+ * search</a>, without recursion: {@link #of(Graph)} returns its reverse postorder. The search
+ * starts at the nodes in ascending order and takes the out-nodes of each node in ascending order,
+ * as {@link DfsTraverser#run()} does, so a graph always gets the same order.
+ * {@link TopOrderAndLevels} returns another topological order, together with a level per node.
+ * <p>
+ * A graph with a cycle has no topological order, and {@link #of(Graph)} rejects it;
+ * {@link Graphs#isDag(Graph)} tests for a cycle, and {@link Graphs#findCycle(Graph)} returns one.
+ * On a graph with cycles, {@link Components#sccsOf(Graph)} puts each cycle into one SCC (strongly
+ * connected component) and numbers the SCCs in reverse topological order.
  */
 public final class TopOrder {
 
   private TopOrder() {}
 
   /**
-   * Computes a topological ordering of the given graph via DFS (reverse postorder).
-   * <p>
-   * The returned list contains all node IDs in an order such that for every directed
-   * edge u → v, u appears before v.
+   * Returns the nodes of {@code graph} in topological order: for every edge {@code u -> v},
+   * {@code u} comes before {@code v}.
    * <p>
    * <strong>Time:</strong> O(nodeCount + edgeCount).<br>
-   * <strong>Memory:</strong> O(nodeCount).
+   * <strong>Memory:</strong> 4 x nodeCount bytes for the result; while it runs, 2 bits per node
+   * and up to 8 x nodeCount bytes for the stack, which grows with the deepest path.
    *
-   * @param graph the graph to sort (must be a DAG)
-   * @return an unmodifiable list of node IDs in topological order
-   * @throws IllegalArgumentException if the graph contains a cycle, or if a depth-first path is
-   *     longer than 2^30 - 5 nodes, the most frames an array can hold
+   * @param graph the DAG to sort
+   * @return the node IDs in topological order; unmodifiable
+   * @throws IllegalArgumentException if {@code graph} has a cycle, or if a depth-first path is
+   *                                  longer than 2<sup>30</sup> - 5 nodes
    */
   public static IntList of(Graph graph) {
     var traverser = new TopOrderTraverser(graph);
@@ -46,14 +46,10 @@ public final class TopOrder {
     return IntLists.unmodifiable(IntArrayList.wrap(traverser.order));
   }
 
-  /**
-   * Iterative DFS (explicit stack, no recursion) that records reverse postorder
-   * (= topological order) and detects back-edges (cycles).
-   * <p>
-   * visited and on-stack flags are packed 2 bits per node into a single {@code int[]}
-   * (bit 0 = visited, bit 1 = on-stack, 16 nodes per int): one memory touch per node check
-   * instead of two separate bit-set lookups.
-   */
+  // The depth-first search without recursion, writing each node into order from the back when it
+  // leaves it, and stopping at the first edge to a node on its path, which closes a cycle. Both
+  // flags of a node share one int, 16 nodes per int (bit 0 visited, bit 1 on the path), so that a
+  // check of a node reads one int instead of two bit sets.
   private static final class TopOrderTraverser {
 
     private static final int VISITED = 0b01;
@@ -97,8 +93,8 @@ public final class TopOrder {
         while (top >= 0) {
           int u = frames[2 * top];
           int end = out[u + 1];
-          // Tight neighbor scan: i and end stay in registers; the frame list is
-          // touched only when we actually descend, not once per edge.
+          // The scan keeps i and end in registers and touches the stack only when it
+          // descends, not once per edge.
           int i = frames[2 * top + 1];
           while (i < end) {
             int v = adj[i++];

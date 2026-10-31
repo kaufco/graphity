@@ -1,29 +1,21 @@
 /**
- * Export of Graphity graphs to Mermaid flowcharts, which render directly in Markdown, issues and
+ * Export of graphs to Mermaid flowcharts, which render directly in Markdown, in issues and in
  * documentation.
  * <p>
- * The module {@code graphity-mermaid} builds on {@code graphity-core} and is released together
- * with it, at the same version. Export is output only and has no place on the path of an
- * analysis; callers who never print a graph do not carry it. DOT, for Graphviz and large graphs,
- * is the module {@code graphity-dot}.
- *
- * <ul>
- *   <li>{@link MermaidWriter} - a Mermaid flowchart with labels, node shapes, classes, edge
- *       styles and subgraphs; for graphs of a few hundred nodes.</li>
- *   <li>{@link MermaidWriter.Direction} and {@link MermaidWriter.Shape} - the direction of the
- *       flowchart and the shape of a node.</li>
- * </ul>
+ * This package is the module {@code graphity-mermaid}, released with {@code graphity-core} at the
+ * same version. {@link MermaidWriter} writes a graph as the text of a Mermaid flowchart, in the
+ * {@linkplain MermaidWriter.Direction direction} of choice and with node
+ * {@linkplain MermaidWriter.Shape shapes}. A graph holds no data, so the writer takes labels,
+ * shapes, classes and styles from hooks that receive a node ID or an edge index and read the
+ * caller's arrays. The clusters come from a partition of the nodes, with a hook for their labels.
+ * Here, the packages of a small program that depend on each other in a cycle:
+ * {@snippet file="com/kobayami/graphity/examples/WritingMermaid.java" region="cycle"}
+ * The node filter keeps the node IDs of the graph, so the hooks read the same arrays as for the
+ * whole graph. Mermaid renders graphs of a few hundred nodes well; for larger ones, the module
+ * {@code graphity-dot} writes DOT (the language of Graphviz).
  * <p>
- * The graph holds structure only, so every hook is addressed by node ID or edge index and reads
- * the caller's arrays: names, weights, colours, groups. The writer escapes what the hooks return
- * and writes in a fixed order - the subgraphs in group order with their nodes, then the other
- * nodes by ID, then the links in edge index order - so the same input always gives the same
- * text. It exports part of a graph through a node filter without renumbering it, and can write
- * the undirected reading with each reciprocal pair as one link.
- * <p>
- * The package follows the core's null contract: nothing is {@code null} unless its type is
- * annotated {@code @Nullable}. The hooks for labels, shapes, classes and styles may return
- * {@code null}, which means none.
+ * No parameter, return value or element in this package is {@code null} unless its type is
+ * annotated {@code @Nullable}.
  */
 @NullMarked
 package com.kobayami.graphity.mermaid;

@@ -4,52 +4,38 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntLists;
 
 /**
- * Back-edge detection for directed graphs.
+ * The back edges of a graph: the edges that a depth-first search finds pointing back to a node on
+ * its current path, self-loops included.
  * <p>
- * Back-edges are edges that point from a node to one of its ancestors in the DFS tree
- * (including self-loops). Removing all back-edges from a graph makes it a DAG - they
- * form a <em>feedback arc set</em> (not necessarily minimal, but practical for most
- * dependency-analysis scenarios).
+ * Every cycle contains a back edge, so a graph without back edges is a DAG (directed acyclic
+ * graph), and removing the back edges of a graph leaves a DAG. They form a feedback arc set,
+ * though not in general a smallest one.
  * <p>
- * Uses a single DFS pass. See {@link #of(Graph)} for time and memory complexity.
- *
- * <pre>{@code
- * Edges backEdges = BackEdges.of(graph);
- * // backEdges.count() == 0  ⟺  graph is a DAG
- * for (int p = 0; p < backEdges.count(); p++) {
- *     int src = backEdges.sourceNodes().getInt(p);
- *     int tgt = backEdges.targetNodes().getInt(p);
- *     int edgeIndex = backEdges.edgeIndices().getInt(p);
- *     // src → tgt is a back-edge (cycle-causing)
- * }
- * }</pre>
- *
- * @see Edges
- * @see EdgeTypes
- * @see Graphs#isDag(Graph)
+ * Uses the
+ * <a href="https://en.wikipedia.org/wiki/Depth-first_search#Output_of_a_depth-first_search">
+ * depth-first search</a> of {@link EdgeTypes#of(Graph)}, without recursion: {@link #of(Graph)}
+ * finds the edges that {@code EdgeTypes} classifies as {@link EdgeType#BACK}, without classifying
+ * the others.
  */
 public final class BackEdges {
 
   private BackEdges() {}
 
   /**
-   * Computes all back-edges of the given graph via a single DFS pass.
+   * Returns the back edges of {@code graph}, in the order in which the search finds them.
    * <p>
-   * Back-edges point from a node to an ancestor in the DFS tree (or to itself = self-loop).
-   * Their removal yields a DAG.
-   * <p>
-   * The edges come in the order the search finds them, not in edge index order like the other
-   * results that list edges. For that order, use
-   * {@link Edges#of(EdgeTypes, EdgeType) Edges.of(EdgeTypes.of(graph), EdgeType.BACK)}: the same
-   * edges, at the cost of classifying every edge first.
+   * Unlike the other results that list edges, they do not come in edge index order. For that
+   * order, use {@link Edges#of(EdgeTypes, EdgeType) Edges.of(EdgeTypes.of(graph), EdgeType.BACK)}:
+   * the same edges, at the cost of classifying every edge first.
    * <p>
    * <strong>Time:</strong> O(nodeCount + edgeCount).<br>
-   * <strong>Memory:</strong> O(nodeCount) + O(backEdgeCount) for the result.
+   * <strong>Memory:</strong> 12 bytes per back edge for the result; while it runs, up to 18 bytes
+   * more per back edge, 2 bits per node and up to 8 x nodeCount bytes for the stack, which grows
+   * with the deepest path.
    *
-   * @param graph the graph to analyze
-   * @return the back-edges with their edge indices, in the order the search finds them
-   * @throws IllegalArgumentException if a depth-first path is longer than 2^30 - 5 nodes, the most
-   *     frames an array can hold
+   * @param graph the graph to search
+   * @return the back edges with their edge indices
+   * @throws IllegalArgumentException if a depth-first path is longer than 2<sup>30</sup> - 5 nodes
    */
   public static Edges of(Graph graph) {
     var traverser = new BackEdgeCollector(graph);
@@ -65,15 +51,10 @@ public final class BackEdges {
         IntLists.unmodifiable(traverser.edgeIndices));
   }
 
-  /**
-   * Iterative DFS (explicit stack, no recursion) that collects back-edges. A back-edge is an
-   * edge to a node that is currently on the DFS stack.
-   * <p>
-   * The visited and on-stack flags are packed 2 bits per node into a single {@code int[]}
-   * (bit 0 = visited, bit 1 = on-stack, 16 nodes per int). Every edge inspects both flags of
-   * its target; a single packed word gives one memory touch per node instead of two separate
-   * bit-set lookups - the shift/mask ALU work is free next to the cache miss it avoids.
-   */
+  // The depth-first search without recursion, collecting every edge to a node on its path. Each
+  // edge checks both flags of its target, so they share one int, 16 nodes per int (bit 0
+  // visited, bit 1 on the path): one load per edge instead of two bit-set lookups, and the shifts
+  // cost nothing next to the cache miss they save.
   private static final class BackEdgeCollector {
 
     private static final int VISITED = 0b01;
@@ -116,8 +97,8 @@ public final class BackEdges {
         while (top >= 0) {
           int u = frames[2 * top];
           int end = out[u + 1];
-          // Tight neighbor scan: i and end stay in registers; the frame list is
-          // touched only when we actually descend, not once per edge.
+          // The scan keeps i and end in registers and touches the stack only when it
+          // descends, not once per edge.
           int i = frames[2 * top + 1];
           while (i < end) {
             int v = adj[i++];

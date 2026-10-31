@@ -1,92 +1,82 @@
 package com.kobayami.graphity;
 
 /**
- * Read access to the arrays of a graph's CSR layout, for algorithm code that must loop over them
- * without a call or a bounds check per edge.
+ * Access to the arrays in which a graph keeps its edges, for algorithm code that loops over all
+ * edges. These arrays are called the CSR (compressed sparse row) layout of the graph.
  * <p>
- * Each method returns the graph's own array, not a copy, in constant time. The layout:
- * <ul>
- *   <li>{@code outAdjacencyStart} has length {@code nodeCount + 1}, starts with {@code 0}, ends
- *       with {@code edgeCount} and never decreases; the out-nodes of node {@code v} are
- *       {@code outAdjacency[outAdjacencyStart[v]..outAdjacencyStart[v + 1] - 1]}, sorted
- *       ascending without duplicates, and the position of an entry in {@code outAdjacency} is
- *       the index of that edge.</li>
- *   <li>{@code inAdjacencyStart} and {@code inAdjacency} hold the in-nodes of a
- *       {@link BiAdjacentGraph} in the same layout. Positions in {@code inAdjacency} are not edge
- *       indices: {@link Graphs#transposedEdgeMapping(Graph)} maps every position to its edge index
- *       in one pass, {@link BiAdjacentGraph#transposedEdgeIndex(int)} relates a single edge.</li>
- * </ul>
- * The typical loop loads the arrays into local variables once:
- * <pre>{@code
- * int[] start = Csr.outAdjacencyStart(graph);
- * int[] targets = Csr.outAdjacency(graph);
- * for (int v = 0; v < graph.nodeCount(); v++) {
- *     for (int e = start[v], end = start[v + 1]; e < end; e++) {
- *         int w = targets[e];   // edge e: v -> w
- *     }
- * }
- * }</pre>
+ * Each method returns the graph's own array, not a copy. The out-nodes of node {@code v} are
+ * {@code outAdjacency[outAdjacencyStart[v]..outAdjacencyStart[v + 1] - 1]}, in ascending order, and
+ * the position of an out-node in {@code outAdjacency} is the edge index of its edge.
+ * {@code outAdjacencyStart} has {@code nodeCount + 1} values, from {@code 0} to {@code edgeCount}.
+ * A loop loads the two arrays into local variables once and reads them without a method call or an
+ * argument check per edge. Here, {@code calls} holds the calls between the methods of a program,
+ * and the loop counts the callers of each method:
+ * {@snippet file="com/kobayami/graphity/examples/BuildingAndReading.java" region="loop"}
+ * A {@link BiAdjacentGraph} also holds the in-nodes of every node, called its in-adjacency. The
+ * in-adjacency has the same layout, in {@link #inAdjacencyStart(BiAdjacentGraph)} and
+ * {@link #inAdjacency(BiAdjacentGraph)}. A position in {@code inAdjacency} is not an edge index of
+ * the graph, though, but of its transposed graph; {@link Graphs#transposedEdgeMapping(Graph)}
+ * translates all of them in one pass.
  * <p>
- * <strong>The arrays are read-only by contract.</strong> Nothing prevents writing to them, and
- * writing breaks every guarantee of the graph - its immutability, the sorted adjacency every
- * algorithm relies on, and safe sharing between threads - for every holder of the graph. The
- * library's own algorithms read the arrays through this class as well; there is no faster or more
- * privileged access. Code that only needs a node's neighbors is better served by
- * {@link Graph#outNodes(int)} and the edge-index methods on {@link Graph}, which check their
- * arguments.
- *
- * @see Graph
- * @see BiAdjacentGraph
+ * The arrays must not be modified. Nothing prevents a write, but it changes the graph for
+ * everyone who holds it and breaks what every algorithm relies on: that the graph is immutable
+ * and safe to share between threads, and that the out-nodes of each node are sorted. The
+ * algorithms of this library read the arrays the same way. Code that reads the out-nodes of a
+ * few nodes is better served by {@link Graph#outNodes(int)} and the edge index methods of
+ * {@link Graph}, which check their arguments.
  */
 public final class Csr {
 
   private Csr() {}
 
   /**
-   * Returns the out-adjacency offsets of the graph, length {@code nodeCount + 1}.
+   * Returns where the out-nodes of each node start in {@link #outAdjacency(Graph)}, followed by
+   * {@code edgeCount}.
    * <p>
    * <strong>Time:</strong> O(1).
    *
    * @param graph the graph
-   * @return the graph's own offset array; read-only by contract
+   * @return the graph's own array, of length {@code nodeCount + 1}; not to be modified
    */
   public static int[] outAdjacencyStart(Graph graph) {
     return graph.outAdjacencyStart();
   }
 
   /**
-   * Returns the out-adjacency targets of the graph, length {@code edgeCount}; the position of an
-   * entry is the index of its edge.
+   * Returns the out-nodes of all nodes, node after node, at the positions of their edge indices.
    * <p>
    * <strong>Time:</strong> O(1).
    *
    * @param graph the graph
-   * @return the graph's own target array; read-only by contract
+   * @return the graph's own array, of length {@code edgeCount}; not to be modified
    */
   public static int[] outAdjacency(Graph graph) {
     return graph.outAdjacency();
   }
 
   /**
-   * Returns the in-adjacency offsets of the graph, length {@code nodeCount + 1}.
+   * Returns where the in-nodes of each node start in {@link #inAdjacency(BiAdjacentGraph)},
+   * followed by {@code edgeCount}.
    * <p>
    * <strong>Time:</strong> O(1).
    *
    * @param graph the graph
-   * @return the graph's own offset array; read-only by contract
+   * @return the graph's own array, of length {@code nodeCount + 1}; not to be modified
    */
   public static int[] inAdjacencyStart(BiAdjacentGraph graph) {
     return graph.inAdjacencyStart();
   }
 
   /**
-   * Returns the in-adjacency sources of the graph, length {@code edgeCount}. Positions are not
-   * edge indices.
+   * Returns the in-nodes of all nodes, node after node.
+   * <p>
+   * A position in this array is the edge index of the edge in the transposed graph, not in
+   * {@code graph}.
    * <p>
    * <strong>Time:</strong> O(1).
    *
    * @param graph the graph
-   * @return the graph's own source array; read-only by contract
+   * @return the graph's own array, of length {@code edgeCount}; not to be modified
    */
   public static int[] inAdjacency(BiAdjacentGraph graph) {
     return graph.inAdjacency();

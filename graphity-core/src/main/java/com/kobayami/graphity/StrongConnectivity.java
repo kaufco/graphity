@@ -3,34 +3,25 @@ package com.kobayami.graphity;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 
 /**
- * Strong bridges and strong articulation points of a directed graph.
+ * The strong bridges and strong articulation points of a graph, as
+ * {@link Components#strongConnectivityOf(BiAdjacentGraph)} returns them.
  * <p>
- * Obtain via {@link Components#strongConnectivityOf(BiAdjacentGraph)}.
- * <ul>
- *   <li>A <strong>strong bridge</strong> is an edge whose removal increases the number of
- *       strongly connected components.</li>
- *   <li>A <strong>strong articulation point</strong> is a node whose removal does the same:
- *       some two other nodes reach each other in the graph, but not without it.</li>
- * </ul>
- * Both lie inside strongly connected components with more than one node, since removing an edge
- * or node between components never splits a component. On a DAG both are empty, and a self-loop
- * is never a strong bridge. In a cycle without chords every edge is a strong bridge, and every
- * node is a strong articulation point once the cycle has three nodes or more.
- *
- * <h2>Directed interpretation</h2>
- * Edges are read as directed, as in {@link Components#sccsOf(Graph)}: {@code a → b} and
- * {@code b → a} are two edges, and each of them is a strong bridge of the two-node cycle they
- * form. For the undirected reading, see {@link Biconnectivity}.
- *
- * <pre>{@code
- * var strong = Components.strongConnectivityOf(dependencies);   // a BiAdjacentGraph
- * Edges onlyLinks = strong.strongBridges();
- * SortedIntView onlyHubs = strong.strongArticulationPoints();
- * }</pre>
- *
- * @see Components#strongConnectivityOf(BiAdjacentGraph)
- * @see Components#sccsOf(Graph)
- * @see Biconnectivity
+ * A strong bridge is an edge whose removal increases the number of SCCs (strongly connected
+ * components), and a strong articulation point is a node whose removal does the same. Strong
+ * bridges lie inside SCCs of two or more nodes. Strong articulation points lie inside SCCs of
+ * three or more nodes, since without one node of an SCC of two, the other still forms an SCC. So
+ * a graph without cycles has neither, and a self-loop is never a strong bridge.
+ * <p>
+ * The edges are followed in their direction, as by {@link Components#sccsOf(Graph)}: the edges
+ * {@code a -> b} and {@code b -> a} are two edges, and both are strong bridges of the SCC they
+ * form. {@link Biconnectivity} has the counterparts for a graph read as undirected. Here, in the
+ * control flow of the method {@code load}, the loop splits into several SCCs without
+ * {@code header}, {@code body} or {@code next}, but not without {@code then}:
+ * {@snippet file="com/kobayami/graphity/examples/Connectivity.java" region="strongConnectivity"}
+ * <p>
+ * Instances are immutable and safe to share between threads.
+ * <p>
+ * <strong>Memory:</strong> up to 28 x nodeCount bytes.
  */
 public final class StrongConnectivity {
 
@@ -42,14 +33,11 @@ public final class StrongConnectivity {
     this.strongArticulationPoints = strongArticulationPoints;
   }
 
-  /**
-   * Computes both results, following Italiano, Laura and Santaroni: within a strongly connected
-   * component and for any node {@code r} of it, an edge is a strong bridge exactly if it is a
-   * bridge of the flow graph rooted at {@code r} or of its transpose, and a node other than
-   * {@code r} is a strong articulation point exactly if it dominates another node in one of the
-   * two. Whether {@code r} itself is one is a separate check: the rest of its component stays
-   * strongly connected or not.
-   */
+  // The body of Components.strongConnectivityOf, following Italiano, Laura and Santaroni: within
+  // an SCC and for any node r of it, an edge is a strong bridge exactly if it is a bridge of the
+  // flow graph rooted at r or of its transposed graph, and a node other than r is a strong
+  // articulation point exactly if it dominates another node in one of the two. Whether r itself
+  // is one is a separate check: the rest of its SCC stays strongly connected or not.
   static StrongConnectivity of(BiAdjacentGraph graph) {
     int n = graph.nodeCount();
     // The dominators below allow one node less than Tarjan's algorithm: reject before it runs.
@@ -61,7 +49,7 @@ public final class StrongConnectivity {
     int[] memberStart = sccs.memberStart;
 
     // One entry per component, its first member: sink components first for the graph,
-    // source components first for its transpose, so every search stays in its component.
+    // source components first for its transposed graph, so every search stays in its component.
     var sinksFirst = new IntArrayList(sccCount);
     var sourcesFirst = new IntArrayList(sccCount);
     for (int c = 0; c < sccCount; c++) {
@@ -86,17 +74,14 @@ public final class StrongConnectivity {
         Biconnectivity.flaggedNodes(isArticulation));
   }
 
-  /**
-   * Adds the bridges and non-trivial dominators of one flow graph, given by its immediate
-   * dominators and its in-adjacency. The edge {@code idom(v) → v} is a bridge exactly if it
-   * exists - the immediate dominator need not be a predecessor - and {@code v} dominates every
-   * other predecessor of {@code v} in its component: every other way in already passes through
-   * {@code v}.
-   *
-   * @param transposed whether the flow graph is the transpose, so a bridge {@code u → v} found
-   *     there is the edge {@code v → u} of the graph, and the in-adjacency slot of {@code u} is
-   *     the out-adjacency slot of the graph - its edge index
-   */
+  // Adds the bridges and non-trivial dominators of one flow graph, given by its immediate
+  // dominators and its in-adjacency. The edge idom(v) -> v is a bridge exactly if it exists - the
+  // immediate dominator need not be an in-node - and v dominates every other in-node of v in its
+  // SCC: every other way in already passes through v.
+  //
+  // With transposed, the flow graph is the transposed graph, so a bridge u -> v found there is
+  // the edge v -> u of the graph, and the in-adjacency slot of u is the out-adjacency slot of the
+  // graph - its edge index.
   private static void collect(int[] idom, int[] inStart, int[] in, int[] sccOf,
       boolean transposed, IntArrayList sources, IntArrayList targets, IntArrayList edgeIndices,
       boolean[] isArticulation) {
@@ -134,12 +119,10 @@ public final class StrongConnectivity {
     }
   }
 
-  /**
-   * Marks the entry {@code r} of every component of three or more nodes if the rest of the
-   * component is not strongly connected: a search from another member, avoiding {@code r} and
-   * the edges leaving the component, misses a member forwards or backwards. Components of two
-   * nodes keep one node when either is removed, which is still strongly connected.
-   */
+  // Marks the entry r of every SCC of three or more nodes if the rest of the SCC is not strongly
+  // connected: a search from another member, avoiding r and the edges leaving the SCC, misses a
+  // member forwards or backwards. SCCs of two nodes keep one node when either is removed, which
+  // is still strongly connected.
   private static void markEntries(BiAdjacentGraph graph, int[] sccOf, int[] members,
       int[] memberStart, boolean[] isArticulation) {
     int n = graph.nodeCount();
@@ -163,7 +146,7 @@ public final class StrongConnectivity {
     }
   }
 
-  /** Breadth-first count of the members of component {@code scc} reached from {@code start}. */
+  // Breadth-first count of the members of SCC scc reached from start.
   private static int reachedAvoiding(int[] adjStart, int[] adj, int[] sccOf, int scc,
       int avoided, int start, int mark, int[] stamp, int[] queue) {
     stamp[avoided] = mark;
@@ -185,23 +168,22 @@ public final class StrongConnectivity {
   }
 
   /**
-   * Returns the strong bridges with their edge indices, ordered by edge index - that is, by
-   * source and then target.
+   * Returns the strong bridges, in edge index order.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @return the strong bridges of the graph
+   * @return strong bridges
    */
   public Edges strongBridges() {
     return strongBridges;
   }
 
   /**
-   * Returns the strong articulation points, sorted ascending.
+   * Returns the strong articulation points, in ascending order.
    * <p>
    * <strong>Time:</strong> O(1).
    *
-   * @return the strong articulation points of the graph
+   * @return strong articulation points
    */
   public SortedIntView strongArticulationPoints() {
     return strongArticulationPoints;
