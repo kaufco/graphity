@@ -1,6 +1,7 @@
 # Continuous integration on every push to main and on every pull request: one build on
 # JDK 25, the JDK releases are built with, then the tests of exactly that build on every
-# Java version users may run it on (17, 21, 25).
+# Java version users may run it on (17, 21, 25). What the tests do not need - the Javadoc and
+# the benchmarks - is built at the same time, in a job of its own.
 
 name: CI
 
@@ -36,29 +37,58 @@ jobs:
           cache: maven
 
       - name: Build
-        # Compiles (Error Prone, NullAway), builds the Javadoc and packages every module; the
-        # tests run in the next job. copy-dependencies puts each module's test classpath next
-        # to its classes, and the JUnit console launcher runs them without Maven.
+        # Compiles (Error Prone, NullAway) and packages every module with tests; the tests run in
+        # the next job, the Javadoc and the benchmarks in the other one. copy-dependencies puts
+        # each module's test classpath next to its classes, and the JUnit console launcher runs
+        # them without Maven.
         run: |
           set -euo pipefail
-          mvn -B -ntp -DskipTests verify dependency:copy-dependencies \
-              -DincludeScope=test -DoutputDirectory=target/test-deps
-          junit="$(mvn -B -ntp -q -N help:evaluate -Dexpression=junit.version -DforceStdout)"
+          mvn -B -ntp -DskipTests -Dmaven.javadoc.skip=true -pl '!graphity-benchmarks' \
+              verify dependency:copy-dependencies -DincludeScope=test -DoutputDirectory=target/test-deps
+          # Read from the POM directly: help:evaluate would start Maven once more.
+          junit="$(sed -n 's:.*<junit.version>\(.*\)</junit.version>.*:\1:p' pom.xml)"
           mvn -B -ntp -N dependency:copy \
               -Dartifact="org.junit.platform:junit-platform-console-standalone:1.${junit#5.}" \
               -DoutputDirectory=target/ci
+
+      - name: Pack the build for the tests
+        # One file, with each test dependency in it once: the modules share most of them (fastutil
+        # alone is 24 MB), hardlink turns identical copies into one file, and tar stores it once.
+        run: |
+          hardlink --content --quiet graphity-*/target/test-deps
+          tar -cf build.tar target/ci/*.jar graphity-*/target/*.jar \
+              graphity-*/target/test-classes graphity-*/target/test-deps
 
       - name: Keep the build for the tests
         uses: actions/upload-artifact@v4
         with:
           name: build
           retention-days: 1
-          path: |
-            target/ci/*.jar
-            graphity-*/target/*.jar
-            graphity-*/target/test-classes/
-            graphity-*/target/test-deps/
-            !graphity-benchmarks/**
+          # Jars, which are compressed already.
+          compression-level: 0
+          path: build.tar
+
+  javadoc-and-benchmarks:
+    name: Javadoc and benchmarks (JDK 25)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 25 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: Build the Javadoc and the benchmarks
+        # The Javadoc jar of every module that has one, with doclint as configured in the parent
+        # POM, so a Javadoc error fails the run; and the benchmarks, which have no tests. Runs
+        # beside the build rather than after it, and compiles the modules once more for that.
+        run: mvn -B -ntp -DskipTests -pl '!graphity-examples' verify
 
   test:
     name: Test (Java ${{ matrix.java }})
@@ -75,6 +105,9 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: build
+
+      - name: Unpack the build
+        run: tar -xf build.tar
 
       - name: Set up Java ${{ matrix.java }} (Temurin)
         uses: actions/setup-java@v4

@@ -122,7 +122,7 @@ jobs:
         # .pom file"). 2.1.0 still ran on 3.9.16. Do not use the runner's mvn.
         run: |
           set -euo pipefail
-          curl -fsSL -o /tmp/maven.zip \
+          curl -fsSL --proto '=https' -o /tmp/maven.zip \
             https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.16/apache-maven-3.9.16-bin.zip
           echo "5af3b743dd8b876b5c45da33b676251e5f1687712644abb4ee519ca56e1d89ce  /tmp/maven.zip" | sha256sum -c -
           unzip -q /tmp/maven.zip -d "$HOME/.local"
@@ -200,9 +200,12 @@ jobs:
         # bundle. The publishing plugin uploads one bundle for the whole
         # reactor at its end: a module that fails to build, test or sign stops
         # the run before anything is uploaded, so a release is all or nothing.
+        # -T 1 overrides the parallel build of .mvn/maven.config: the plugin
+        # uploads when the last module of the reactor list is deployed, and in a
+        # parallel build that module can finish before the others.
         env:
           MODULES: ${{ steps.modules.outputs.list }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
           CENTRAL_TOKEN_USERNAME: ${{ secrets.CENTRAL_TOKEN_USERNAME }}
           CENTRAL_TOKEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN_PASSWORD }}
-        run: mvn -B -ntp -pl "$MODULES" -am clean deploy -P release
+        run: mvn -B -ntp -T 1 -pl "$MODULES" -am clean deploy -P release
