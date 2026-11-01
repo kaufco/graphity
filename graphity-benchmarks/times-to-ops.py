@@ -770,7 +770,8 @@ def _gh_anchor(text: str) -> str:
     """GitHub Markdown anchor from heading text."""
     text = text.lower()
     text = re.sub(r'[^\w\s-]', '', text)
-    text = re.sub(r'\s+', '-', text.strip())
+    # One hyphen per space, as GitHub does: "A — B" becomes "a--b".
+    text = re.sub(r'\s', '-', text.strip())
     return '#' + text
 
 
@@ -1500,6 +1501,8 @@ def build_combined_for_machine(
             "(`Estimate` below), which comes out a few percent faster for unchanged code.",
             "",
         ]
+    if view is View.HISTORY and kind == "synthetic" and any(r.version == "2.4.0" for r in reports):
+        intro_lines += ["Version `2.4.0` has no numbers for Build: the benchmark failed in that run.", ""]
     if header:
         intro_lines += ["```", header, "```", ""]
 

@@ -25,7 +25,7 @@ RAM:          48.0 GiB
   - [1.9 Reorder (DFS-preorder) cost](#19-reorder-dfs-preorder-cost)
 - [2 Memory Footprint](#2-memory-footprint)
   - [2.1 Total Graph Size](#21-total-graph-size)
-  - [2.2 Bytes per Element  `totalBytes / (Nodes + Edges)`](#22-bytes-per-element-totalbytes-nodes-edges)
+  - [2.2 Bytes per Element  `totalBytes / (Nodes + Edges)`](#22-bytes-per-element--totalbytes--nodes--edges)
 - [3 Allocations](#3-allocations)
   - [3.1 Build](#31-build)
   - [3.2 SCC](#32-scc)

@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="267" height="516" viewBox="0 0 267 516" role="img">
+<svg xmlns="http://www.w3.org/2000/svg" width="305" height="548" viewBox="0 0 305 548" role="img">
 <style>text{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;font-size:11px;fill:#334155}.axis{stroke:#94a3b8;stroke-width:1;fill:none}.grid{stroke:#e2e8f0;stroke-width:1}.ylabel{fill:#64748b;font-size:10px}.tick{fill:#64748b;font-size:10px}.xlabel{font-size:10px}</style>
-<rect x="0" y="0" width="267" height="516" fill="#ffffff"/>
+<rect x="0" y="0" width="305" height="548" fill="#ffffff"/>
 <rect x="56" y="5" width="12" height="12" rx="2" fill="#2563eb"/>
 <text x="72" y="14" class="tick">Graphity 2.0.0</text>
 <rect x="56" y="21" width="12" height="12" rx="2" fill="#dc2626"/>
@@ -11,43 +11,49 @@
 <text x="72" y="62" class="tick">Graphity 2.3.0</text>
 <rect x="56" y="69" width="12" height="12" rx="2" fill="#4f46e5"/>
 <text x="72" y="78" class="tick">Graphity 2.4.0</text>
-<rect x="56" y="85" width="12" height="12" rx="2" fill="#0d9488"/>
-<text x="72" y="94" class="tick">Graphity 2.0.0 (reordered)</text>
-<rect x="56" y="101" width="12" height="12" rx="2" fill="#db2777"/>
-<text x="72" y="110" class="tick">Graphity 2.1.0 (reordered)</text>
-<rect x="56" y="117" width="12" height="12" rx="2" fill="#65a30d"/>
-<text x="72" y="126" class="tick">Graphity 2.2.0 (reordered)</text>
-<rect x="56" y="133" width="12" height="12" rx="2" fill="#7c3aed"/>
-<text x="72" y="142" class="tick">Graphity 2.3.0 (reordered)</text>
-<rect x="56" y="149" width="12" height="12" rx="2" fill="#0369a1"/>
-<text x="72" y="158" class="tick">Graphity 2.4.0 (reordered)</text>
-<line class="grid" x1="56" y1="420.0" x2="243" y2="420.0"/>
-<text class="tick" x="48" y="423.0" text-anchor="end">0%</text>
-<line class="grid" x1="56" y1="383.3" x2="243" y2="383.3"/>
-<text class="tick" x="48" y="386.3" text-anchor="end">200%</text>
-<line class="grid" x1="56" y1="346.7" x2="243" y2="346.7"/>
-<text class="tick" x="48" y="349.7" text-anchor="end">400%</text>
-<line class="grid" x1="56" y1="310.0" x2="243" y2="310.0"/>
-<text class="tick" x="48" y="313.0" text-anchor="end">600%</text>
-<line class="grid" x1="56" y1="273.3" x2="243" y2="273.3"/>
-<text class="tick" x="48" y="276.3" text-anchor="end">800%</text>
-<line class="grid" x1="56" y1="236.7" x2="243" y2="236.7"/>
-<text class="tick" x="48" y="239.7" text-anchor="end">1000%</text>
-<line class="grid" x1="56" y1="200.0" x2="243" y2="200.0"/>
-<text class="tick" x="48" y="203.0" text-anchor="end">1200%</text>
-<line class="axis" x1="56" y1="200" x2="56" y2="420"/>
-<line class="axis" x1="56" y1="420" x2="243" y2="420"/>
-<text class="ylabel" x="16" y="310.0" text-anchor="middle" transform="rotate(-90 16 310.0)">% of Graphity 2.4.0</text>
-<text class="xlabel" x="149.5" y="432.0" text-anchor="end" transform="rotate(-40 149.5 432.0)">GNP sparse</text>
-<rect x="56.0" y="401.1" width="16" height="18.9" fill="#2563eb" rx="1"><title>Graphity 2.0.0 · GNP sparse: 103%</title></rect>
-<rect x="75.0" y="400.9" width="16" height="19.1" fill="#dc2626" rx="1"><title>Graphity 2.1.0 · GNP sparse: 104%</title></rect>
-<rect x="94.0" y="401.8" width="16" height="18.2" fill="#0891b2" rx="1"><title>Graphity 2.2.0 · GNP sparse: 99%</title></rect>
-<rect x="113.0" y="401.6" width="16" height="18.4" fill="#ea580c" rx="1"><title>Graphity 2.3.0 · GNP sparse: 100%</title></rect>
-<rect x="132.0" y="401.7" width="16" height="18.3" fill="#4f46e5" rx="1"><title>Graphity 2.4.0 · GNP sparse: 100%</title></rect>
-<rect x="151.0" y="249.0" width="16" height="171.0" fill="#0d9488" rx="1"><title>Graphity 2.0.0 (reordered) · GNP sparse: 933%</title></rect>
-<rect x="170.0" y="237.5" width="16" height="182.5" fill="#db2777" rx="1"><title>Graphity 2.1.0 (reordered) · GNP sparse: 996%</title></rect>
-<rect x="189.0" y="268.1" width="16" height="151.9" fill="#65a30d" rx="1"><title>Graphity 2.2.0 (reordered) · GNP sparse: 829%</title></rect>
-<rect x="208.0" y="253.9" width="16" height="166.1" fill="#7c3aed" rx="1"><title>Graphity 2.3.0 (reordered) · GNP sparse: 906%</title></rect>
-<rect x="227.0" y="252.0" width="16" height="168.0" fill="#0369a1" rx="1"><title>Graphity 2.4.0 (reordered) · GNP sparse: 916%</title></rect>
-<line x1="56" y1="401.7" x2="243" y2="401.7" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4 3"/>
+<rect x="56" y="85" width="12" height="12" rx="2" fill="#2563eb"/>
+<text x="72" y="94" class="tick">Graphity 3.0.0</text>
+<rect x="56" y="101" width="12" height="12" rx="2" fill="#0d9488"/>
+<text x="72" y="110" class="tick">Graphity 2.0.0 (reordered)</text>
+<rect x="56" y="117" width="12" height="12" rx="2" fill="#db2777"/>
+<text x="72" y="126" class="tick">Graphity 2.1.0 (reordered)</text>
+<rect x="56" y="133" width="12" height="12" rx="2" fill="#65a30d"/>
+<text x="72" y="142" class="tick">Graphity 2.2.0 (reordered)</text>
+<rect x="56" y="149" width="12" height="12" rx="2" fill="#7c3aed"/>
+<text x="72" y="158" class="tick">Graphity 2.3.0 (reordered)</text>
+<rect x="56" y="165" width="12" height="12" rx="2" fill="#0369a1"/>
+<text x="72" y="174" class="tick">Graphity 2.4.0 (reordered)</text>
+<rect x="56" y="181" width="12" height="12" rx="2" fill="#0d9488"/>
+<text x="72" y="190" class="tick">Graphity 3.0.0 (reordered)</text>
+<line class="grid" x1="56" y1="452.0" x2="281" y2="452.0"/>
+<text class="tick" x="48" y="455.0" text-anchor="end">0%</text>
+<line class="grid" x1="56" y1="415.3" x2="281" y2="415.3"/>
+<text class="tick" x="48" y="418.3" text-anchor="end">200%</text>
+<line class="grid" x1="56" y1="378.7" x2="281" y2="378.7"/>
+<text class="tick" x="48" y="381.7" text-anchor="end">400%</text>
+<line class="grid" x1="56" y1="342.0" x2="281" y2="342.0"/>
+<text class="tick" x="48" y="345.0" text-anchor="end">600%</text>
+<line class="grid" x1="56" y1="305.3" x2="281" y2="305.3"/>
+<text class="tick" x="48" y="308.3" text-anchor="end">800%</text>
+<line class="grid" x1="56" y1="268.7" x2="281" y2="268.7"/>
+<text class="tick" x="48" y="271.7" text-anchor="end">1000%</text>
+<line class="grid" x1="56" y1="232.0" x2="281" y2="232.0"/>
+<text class="tick" x="48" y="235.0" text-anchor="end">1200%</text>
+<line class="axis" x1="56" y1="232" x2="56" y2="452"/>
+<line class="axis" x1="56" y1="452" x2="281" y2="452"/>
+<text class="ylabel" x="16" y="342.0" text-anchor="middle" transform="rotate(-90 16 342.0)">% of Graphity 3.0.0</text>
+<text class="xlabel" x="168.5" y="464.0" text-anchor="end" transform="rotate(-40 168.5 464.0)">GNP sparse</text>
+<rect x="56.0" y="432.7" width="16" height="19.3" fill="#2563eb" rx="1"><title>Graphity 2.0.0 · GNP sparse: 105%</title></rect>
+<rect x="75.0" y="432.4" width="16" height="19.6" fill="#dc2626" rx="1"><title>Graphity 2.1.0 · GNP sparse: 107%</title></rect>
+<rect x="94.0" y="433.4" width="16" height="18.6" fill="#0891b2" rx="1"><title>Graphity 2.2.0 · GNP sparse: 102%</title></rect>
+<rect x="113.0" y="433.1" width="16" height="18.9" fill="#ea580c" rx="1"><title>Graphity 2.3.0 · GNP sparse: 103%</title></rect>
+<rect x="132.0" y="433.2" width="16" height="18.8" fill="#4f46e5" rx="1"><title>Graphity 2.4.0 · GNP sparse: 103%</title></rect>
+<rect x="151.0" y="433.7" width="16" height="18.3" fill="#2563eb" rx="1"><title>Graphity 3.0.0 · GNP sparse: 100%</title></rect>
+<rect x="170.0" y="276.6" width="16" height="175.4" fill="#0d9488" rx="1"><title>Graphity 2.0.0 (reordered) · GNP sparse: 956%</title></rect>
+<rect x="189.0" y="264.8" width="16" height="187.2" fill="#db2777" rx="1"><title>Graphity 2.1.0 (reordered) · GNP sparse: 1021%</title></rect>
+<rect x="208.0" y="296.2" width="16" height="155.8" fill="#65a30d" rx="1"><title>Graphity 2.2.0 (reordered) · GNP sparse: 850%</title></rect>
+<rect x="227.0" y="281.6" width="16" height="170.4" fill="#7c3aed" rx="1"><title>Graphity 2.3.0 (reordered) · GNP sparse: 929%</title></rect>
+<rect x="246.0" y="279.8" width="16" height="172.2" fill="#0369a1" rx="1"><title>Graphity 2.4.0 (reordered) · GNP sparse: 940%</title></rect>
+<rect x="265.0" y="273.7" width="16" height="178.3" fill="#0d9488" rx="1"><title>Graphity 3.0.0 (reordered) · GNP sparse: 973%</title></rect>
+<line x1="56" y1="433.7" x2="281" y2="433.7" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4 3"/>
 </svg>

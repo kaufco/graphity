@@ -14,10 +14,10 @@ RAM:          48.0 GiB
 ## Contents
 
 - [1 Performance](#1-performance)
-  - [1.1 SCC — real-world graphs](#11-scc-real-world-graphs)
-  - [1.2 BackEdges — real-world graphs](#12-backedges-real-world-graphs)
-  - [1.3 EdgeTypes — real-world graphs](#13-edgetypes-real-world-graphs)
-  - [1.4 Reorder (DFS-preorder) cost — real-world graphs](#14-reorder-dfs-preorder-cost-real-world-graphs)
+  - [1.1 SCC — real-world graphs](#11-scc--real-world-graphs)
+  - [1.2 BackEdges — real-world graphs](#12-backedges--real-world-graphs)
+  - [1.3 EdgeTypes — real-world graphs](#13-edgetypes--real-world-graphs)
+  - [1.4 Reorder (DFS-preorder) cost — real-world graphs](#14-reorder-dfs-preorder-cost--real-world-graphs)
 
 ## 1 Performance
 

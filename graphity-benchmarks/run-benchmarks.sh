@@ -36,8 +36,7 @@
 # (averages the JIT lottery, the strongest single lever), 10 short iterations,
 # -Xmx16g -XX:+UseZGC -XX:+AlwaysPreTouch against GC pauses. Each label lives in
 # measurements/ab/<label>/ with the measured commit in meta.json; 'compare' prints
-# means with half-widths and marks cases above 15 %. Methodology for any
-# performance claim: internal/ops/benchmark-protokoll.md.
+# means with half-widths and marks cases above 15 %.
 # ─────────────────────────────────────────────────────────────────────────────
 
 set -euo pipefail

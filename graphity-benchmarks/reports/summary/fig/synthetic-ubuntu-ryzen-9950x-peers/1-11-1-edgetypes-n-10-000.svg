@@ -2,9 +2,9 @@
 <style>text{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;font-size:11px;fill:#334155}.axis{stroke:#94a3b8;stroke-width:1;fill:none}.grid{stroke:#e2e8f0;stroke-width:1}.ylabel{fill:#64748b;font-size:10px}.tick{fill:#64748b;font-size:10px}.xlabel{font-size:10px}</style>
 <rect x="0" y="0" width="832" height="436" fill="#ffffff"/>
 <rect x="56" y="5" width="12" height="12" rx="2" fill="#2563eb"/>
-<text x="72" y="14" class="tick">Graphity 2.4.0</text>
+<text x="72" y="14" class="tick">Graphity 3.0.0</text>
 <rect x="56" y="21" width="12" height="12" rx="2" fill="#0d9488"/>
-<text x="72" y="30" class="tick">Graphity 2.4.0 (reordered)</text>
+<text x="72" y="30" class="tick">Graphity 3.0.0 (reordered)</text>
 <rect x="56" y="37" width="12" height="12" rx="2" fill="#16a34a"/>
 <text x="72" y="46" class="tick">JGraphT</text>
 <rect x="56" y="53" width="12" height="12" rx="2" fill="#ca8a04"/>
@@ -13,60 +13,62 @@
 <text x="72" y="78" class="tick">WebGraph</text>
 <line class="grid" x1="56" y1="340.0" x2="808" y2="340.0"/>
 <text class="tick" x="48" y="343.0" text-anchor="end">0%</text>
-<line class="grid" x1="56" y1="296.0" x2="808" y2="296.0"/>
-<text class="tick" x="48" y="299.0" text-anchor="end">50%</text>
-<line class="grid" x1="56" y1="252.0" x2="808" y2="252.0"/>
-<text class="tick" x="48" y="255.0" text-anchor="end">100%</text>
-<line class="grid" x1="56" y1="208.0" x2="808" y2="208.0"/>
-<text class="tick" x="48" y="211.0" text-anchor="end">150%</text>
-<line class="grid" x1="56" y1="164.0" x2="808" y2="164.0"/>
-<text class="tick" x="48" y="167.0" text-anchor="end">200%</text>
+<line class="grid" x1="56" y1="303.3" x2="808" y2="303.3"/>
+<text class="tick" x="48" y="306.3" text-anchor="end">50%</text>
+<line class="grid" x1="56" y1="266.7" x2="808" y2="266.7"/>
+<text class="tick" x="48" y="269.7" text-anchor="end">100%</text>
+<line class="grid" x1="56" y1="230.0" x2="808" y2="230.0"/>
+<text class="tick" x="48" y="233.0" text-anchor="end">150%</text>
+<line class="grid" x1="56" y1="193.3" x2="808" y2="193.3"/>
+<text class="tick" x="48" y="196.3" text-anchor="end">200%</text>
+<line class="grid" x1="56" y1="156.7" x2="808" y2="156.7"/>
+<text class="tick" x="48" y="159.7" text-anchor="end">250%</text>
 <line class="grid" x1="56" y1="120.0" x2="808" y2="120.0"/>
-<text class="tick" x="48" y="123.0" text-anchor="end">250%</text>
+<text class="tick" x="48" y="123.0" text-anchor="end">300%</text>
 <line class="axis" x1="56" y1="120" x2="56" y2="340"/>
 <line class="axis" x1="56" y1="340" x2="808" y2="340"/>
-<text class="ylabel" x="16" y="230.0" text-anchor="middle" transform="rotate(-90 16 230.0)">% of Graphity 2.4.0</text>
+<text class="ylabel" x="16" y="230.0" text-anchor="middle" transform="rotate(-90 16 230.0)">% of Graphity 3.0.0</text>
 <text class="xlabel" x="102.0" y="352.0" text-anchor="end" transform="rotate(-40 102.0 352.0)">Path</text>
-<rect x="56.0" y="252.0" width="16" height="88.0" fill="#2563eb" rx="1"><title>Graphity 2.4.0 · Path: 100%</title></rect>
-<rect x="75.0" y="240.0" width="16" height="100.0" fill="#0d9488" rx="1"><title>Graphity 2.4.0 (reordered) · Path: 114%</title></rect>
-<rect x="94.0" y="304.7" width="16" height="35.3" fill="#16a34a" rx="1"><title>JGraphT · Path: 40%</title></rect>
-<rect x="113.0" y="312.8" width="16" height="27.2" fill="#ca8a04" rx="1"><title>Guava · Path: 31%</title></rect>
-<rect x="132.0" y="329.2" width="16" height="10.8" fill="#9333ea" rx="1"><title>WebGraph · Path: 12%</title></rect>
+<rect x="56.0" y="266.7" width="16" height="73.3" fill="#2563eb" rx="1"><title>Graphity 3.0.0 · Path: 100%</title></rect>
+<rect x="75.0" y="266.7" width="16" height="73.3" fill="#0d9488" rx="1"><title>Graphity 3.0.0 (reordered) · Path: 100%</title></rect>
+<rect x="94.0" y="311.8" width="16" height="28.2" fill="#16a34a" rx="1"><title>JGraphT · Path: 39%</title></rect>
+<rect x="113.0" y="318.3" width="16" height="21.7" fill="#ca8a04" rx="1"><title>Guava · Path: 30%</title></rect>
+<rect x="132.0" y="331.3" width="16" height="8.7" fill="#9333ea" rx="1"><title>WebGraph · Path: 12%</title></rect>
 <text class="xlabel" x="212.0" y="352.0" text-anchor="end" transform="rotate(-40 212.0 352.0)">Path shfld.</text>
-<rect x="166.0" y="252.0" width="16" height="88.0" fill="#2563eb" rx="1"><title>Graphity 2.4.0 · Path shfld.: 100%</title></rect>
-<rect x="185.0" y="234.1" width="16" height="105.9" fill="#0d9488" rx="1"><title>Graphity 2.4.0 (reordered) · Path shfld.: 120%</title></rect>
-<rect x="204.0" y="320.9" width="16" height="19.1" fill="#16a34a" rx="1"><title>JGraphT · Path shfld.: 22%</title></rect>
-<rect x="223.0" y="322.2" width="16" height="17.8" fill="#ca8a04" rx="1"><title>Guava · Path shfld.: 20%</title></rect>
-<rect x="242.0" y="325.5" width="16" height="14.5" fill="#9333ea" rx="1"><title>WebGraph · Path shfld.: 16%</title></rect>
+<rect x="166.0" y="266.7" width="16" height="73.3" fill="#2563eb" rx="1"><title>Graphity 3.0.0 · Path shfld.: 100%</title></rect>
+<rect x="185.0" y="250.2" width="16" height="89.8" fill="#0d9488" rx="1"><title>Graphity 3.0.0 (reordered) · Path shfld.: 122%</title></rect>
+<rect x="204.0" y="324.3" width="16" height="15.7" fill="#16a34a" rx="1"><title>JGraphT · Path shfld.: 21%</title></rect>
+<rect x="223.0" y="325.3" width="16" height="14.7" fill="#ca8a04" rx="1"><title>Guava · Path shfld.: 20%</title></rect>
+<rect x="242.0" y="328.1" width="16" height="11.9" fill="#9333ea" rx="1"><title>WebGraph · Path shfld.: 16%</title></rect>
 <text class="xlabel" x="322.0" y="352.0" text-anchor="end" transform="rotate(-40 322.0 352.0)">Tree</text>
-<rect x="276.0" y="252.0" width="16" height="88.0" fill="#2563eb" rx="1"><title>Graphity 2.4.0 · Tree: 100%</title></rect>
-<rect x="295.0" y="230.0" width="16" height="110.0" fill="#0d9488" rx="1"><title>Graphity 2.4.0 (reordered) · Tree: 125%</title></rect>
-<rect x="314.0" y="331.2" width="16" height="8.8" fill="#16a34a" rx="1"><title>JGraphT · Tree: 10.0%</title></rect>
-<rect x="333.0" y="333.5" width="16" height="6.5" fill="#ca8a04" rx="1"><title>Guava · Tree: 7.3%</title></rect>
-<rect x="352.0" y="333.3" width="16" height="6.7" fill="#9333ea" rx="1"><title>WebGraph · Tree: 7.7%</title></rect>
+<rect x="276.0" y="266.7" width="16" height="73.3" fill="#2563eb" rx="1"><title>Graphity 3.0.0 · Tree: 100%</title></rect>
+<rect x="295.0" y="247.9" width="16" height="92.1" fill="#0d9488" rx="1"><title>Graphity 3.0.0 (reordered) · Tree: 126%</title></rect>
+<rect x="314.0" y="332.8" width="16" height="7.2" fill="#16a34a" rx="1"><title>JGraphT · Tree: 9.8%</title></rect>
+<rect x="333.0" y="334.7" width="16" height="5.3" fill="#ca8a04" rx="1"><title>Guava · Tree: 7.2%</title></rect>
+<rect x="352.0" y="334.5" width="16" height="5.5" fill="#9333ea" rx="1"><title>WebGraph · Tree: 7.5%</title></rect>
 <text class="xlabel" x="432.0" y="352.0" text-anchor="end" transform="rotate(-40 432.0 352.0)">GNP sparse</text>
-<rect x="386.0" y="252.0" width="16" height="88.0" fill="#2563eb" rx="1"><title>Graphity 2.4.0 · GNP sparse: 100%</title></rect>
-<rect x="405.0" y="146.6" width="16" height="193.4" fill="#0d9488" rx="1"><title>Graphity 2.4.0 (reordered) · GNP sparse: 220%</title></rect>
-<rect x="424.0" y="314.6" width="16" height="25.4" fill="#16a34a" rx="1"><title>JGraphT · GNP sparse: 29%</title></rect>
-<rect x="443.0" y="328.0" width="16" height="12.0" fill="#ca8a04" rx="1"><title>Guava · GNP sparse: 14%</title></rect>
-<rect x="462.0" y="321.9" width="16" height="18.1" fill="#9333ea" rx="1"><title>WebGraph · GNP sparse: 21%</title></rect>
+<rect x="386.0" y="266.7" width="16" height="73.3" fill="#2563eb" rx="1"><title>Graphity 3.0.0 · GNP sparse: 100%</title></rect>
+<rect x="405.0" y="153.6" width="16" height="186.4" fill="#0d9488" rx="1"><title>Graphity 3.0.0 (reordered) · GNP sparse: 254%</title></rect>
+<rect x="424.0" y="319.5" width="16" height="20.5" fill="#16a34a" rx="1"><title>JGraphT · GNP sparse: 28%</title></rect>
+<rect x="443.0" y="330.3" width="16" height="9.7" fill="#ca8a04" rx="1"><title>Guava · GNP sparse: 13%</title></rect>
+<rect x="462.0" y="325.4" width="16" height="14.6" fill="#9333ea" rx="1"><title>WebGraph · GNP sparse: 20%</title></rect>
 <text class="xlabel" x="542.0" y="352.0" text-anchor="end" transform="rotate(-40 542.0 352.0)">GNP dense</text>
-<rect x="496.0" y="252.0" width="16" height="88.0" fill="#2563eb" rx="1"><title>Graphity 2.4.0 · GNP dense: 100%</title></rect>
-<rect x="515.0" y="218.7" width="16" height="121.3" fill="#0d9488" rx="1"><title>Graphity 2.4.0 (reordered) · GNP dense: 138%</title></rect>
-<rect x="534.0" y="334.3" width="16" height="5.7" fill="#16a34a" rx="1"><title>JGraphT · GNP dense: 6.4%</title></rect>
-<rect x="553.0" y="336.6" width="16" height="3.4" fill="#ca8a04" rx="1"><title>Guava · GNP dense: 3.9%</title></rect>
-<rect x="572.0" y="325.9" width="16" height="14.1" fill="#9333ea" rx="1"><title>WebGraph · GNP dense: 16%</title></rect>
+<rect x="496.0" y="266.7" width="16" height="73.3" fill="#2563eb" rx="1"><title>Graphity 3.0.0 · GNP dense: 100%</title></rect>
+<rect x="515.0" y="237.9" width="16" height="102.1" fill="#0d9488" rx="1"><title>Graphity 3.0.0 (reordered) · GNP dense: 139%</title></rect>
+<rect x="534.0" y="335.4" width="16" height="4.6" fill="#16a34a" rx="1"><title>JGraphT · GNP dense: 6.2%</title></rect>
+<rect x="553.0" y="337.3" width="16" height="2.7" fill="#ca8a04" rx="1"><title>Guava · GNP dense: 3.7%</title></rect>
+<rect x="572.0" y="328.7" width="16" height="11.3" fill="#9333ea" rx="1"><title>WebGraph · GNP dense: 15%</title></rect>
 <text class="xlabel" x="652.0" y="352.0" text-anchor="end" transform="rotate(-40 652.0 352.0)">Chain of cliques</text>
-<rect x="606.0" y="252.0" width="16" height="88.0" fill="#2563eb" rx="1"><title>Graphity 2.4.0 · Chain of cliques: 100%</title></rect>
-<rect x="625.0" y="252.6" width="16" height="87.4" fill="#0d9488" rx="1"><title>Graphity 2.4.0 (reordered) · Chain of cliques: 99%</title></rect>
-<rect x="644.0" y="335.2" width="16" height="4.8" fill="#16a34a" rx="1"><title>JGraphT · Chain of cliques: 5.4%</title></rect>
-<rect x="663.0" y="333.4" width="16" height="6.6" fill="#ca8a04" rx="1"><title>Guava · Chain of cliques: 7.5%</title></rect>
-<rect x="682.0" y="334.7" width="16" height="5.3" fill="#9333ea" rx="1"><title>WebGraph · Chain of cliques: 6.0%</title></rect>
+<rect x="606.0" y="266.7" width="16" height="73.3" fill="#2563eb" rx="1"><title>Graphity 3.0.0 · Chain of cliques: 100%</title></rect>
+<rect x="625.0" y="266.7" width="16" height="73.3" fill="#0d9488" rx="1"><title>Graphity 3.0.0 (reordered) · Chain of cliques: 100%</title></rect>
+<rect x="644.0" y="336.4" width="16" height="3.6" fill="#16a34a" rx="1"><title>JGraphT · Chain of cliques: 4.9%</title></rect>
+<rect x="663.0" y="335.0" width="16" height="5.0" fill="#ca8a04" rx="1"><title>Guava · Chain of cliques: 6.8%</title></rect>
+<rect x="682.0" y="336.0" width="16" height="4.0" fill="#9333ea" rx="1"><title>WebGraph · Chain of cliques: 5.5%</title></rect>
 <text class="xlabel" x="762.0" y="352.0" text-anchor="end" transform="rotate(-40 762.0 352.0)">Chain of cliques shfld.</text>
-<rect x="716.0" y="252.0" width="16" height="88.0" fill="#2563eb" rx="1"><title>Graphity 2.4.0 · Chain of cliques shfld.: 100%</title></rect>
-<rect x="735.0" y="226.5" width="16" height="113.5" fill="#0d9488" rx="1"><title>Graphity 2.4.0 (reordered) · Chain of cliques shfld.: 129%</title></rect>
-<rect x="754.0" y="334.5" width="16" height="5.5" fill="#16a34a" rx="1"><title>JGraphT · Chain of cliques shfld.: 6.2%</title></rect>
-<rect x="773.0" y="333.6" width="16" height="6.4" fill="#ca8a04" rx="1"><title>Guava · Chain of cliques shfld.: 7.3%</title></rect>
-<rect x="792.0" y="329.1" width="16" height="10.9" fill="#9333ea" rx="1"><title>WebGraph · Chain of cliques shfld.: 12%</title></rect>
-<line x1="56" y1="252.0" x2="808" y2="252.0" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4 3"/>
+<rect x="716.0" y="266.7" width="16" height="73.3" fill="#2563eb" rx="1"><title>Graphity 3.0.0 · Chain of cliques shfld.: 100%</title></rect>
+<rect x="735.0" y="245.5" width="16" height="94.5" fill="#0d9488" rx="1"><title>Graphity 3.0.0 (reordered) · Chain of cliques shfld.: 129%</title></rect>
+<rect x="754.0" y="335.5" width="16" height="4.5" fill="#16a34a" rx="1"><title>JGraphT · Chain of cliques shfld.: 6.2%</title></rect>
+<rect x="773.0" y="334.7" width="16" height="5.3" fill="#ca8a04" rx="1"><title>Guava · Chain of cliques shfld.: 7.2%</title></rect>
+<rect x="792.0" y="331.0" width="16" height="9.0" fill="#9333ea" rx="1"><title>WebGraph · Chain of cliques shfld.: 12%</title></rect>
+<line x1="56" y1="266.7" x2="808" y2="266.7" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4 3"/>
 </svg>

@@ -11,7 +11,7 @@ Graphity is a Java graph library which keeps graphs in a compact, immutable form
 
 It is built for code analysis and compiler pipelines, with graphs such as abstract syntax trees, control-flow and data-flow graphs, and dependency graphs. More generally, it is built for anywhere you build a graph from your domain model, run analyses on it, and use the results. Every algorithm returns a typed, immutable result with follow-up queries, and runs without recursion, so deep graphs do not overflow the call stack.
 
-On the algorithms covered by [JGraphT](https://jgrapht.org/) and [Guava Graph](https://github.com/google/guava/wiki/GraphsExplained), Graphity is **8 to 79 times faster** and needs **17 to 55 times less memory** per node and edge. [WebGraph](https://webgraph.di.unimi.it/) is a specialist for compressed web crawls of billions of nodes. It beats Graphity on raw memory compactness; on runtime, Graphity is faster across all measured shapes and sizes (**2.1 to 21 times**).
+On the algorithms covered by [JGraphT](https://jgrapht.org/) and [Guava Graph](https://github.com/google/guava/wiki/GraphsExplained), Graphity is **typically 20 times faster**, and 6 to 360 times across all algorithms on graphs of 100,000 nodes and more. It needs **17 to 55 times less memory** per node and edge. [WebGraph](https://webgraph.di.unimi.it/) is a specialist for compressed web crawls of billions of nodes. It beats Graphity on raw memory compactness; on runtime, Graphity is faster across all measured shapes and sizes: **typically 8 times**, and 2.3 to 350 times on graphs of 100,000 nodes and more.
 
 Data on nodes and edges stays in your own arrays, indexed by node ID or edge index, and every transformation tells you how to carry them along. The graph itself stores only structure: 4 bytes per node and per edge, in a compressed sparse row (CSR) layout, which is where speed and footprint come from.
 
@@ -258,10 +258,10 @@ In the charts and reports, **reordered** means the same graph with its nodes num
 
 | Shape            | Graphity | JGraphT         | Guava           | WebGraph        |
 |------------------|---------:|----------------:|----------------:|----------------:|
-| Tree             | 2.161 ms | 41.51 ms (19×)  | 38.09 ms (18×)  | 5.712 ms (2.6×) |
-| GNP sparse       | 4.389 ms | 109.6 ms (25×)  | 87.01 ms (20×)  | 10.30 ms (2.3×) |
-| GNP dense        | 9.265 ms | 446.5 ms (48×)  | 333.1 ms (36×)  | 36.12 ms (3.9×) |
-| Chain of cliques | 3.058 ms | 166.0 ms (54×)  | 108.0 ms (35×)  | 37.02 ms (12×)  |
+| Tree             | 2.074 ms | 41.51 ms (20×)  | 38.09 ms (18×)  | 5.712 ms (2.8×) |
+| GNP sparse       | 4.378 ms | 109.6 ms (25×)  | 87.01 ms (20×)  | 10.30 ms (2.4×) |
+| GNP dense        | 7.713 ms | 446.5 ms (58×)  | 333.1 ms (43×)  | 36.12 ms (4.7×) |
+| Chain of cliques | 3.001 ms | 166.0 ms (55×)  | 108.0 ms (36×)  | 37.02 ms (12×)  |
 
 #### Throughput @ 100k nodes (higher is better)
 
@@ -275,9 +275,9 @@ The graphs come from SNAP (Stanford Network Analysis Project).
 
 | Dataset                                  | Graphity | JGraphT          | Guava            | WebGraph        |
 |------------------------------------------|---------:|-----------------:|-----------------:|----------------:|
-| web-Google (875k nodes, 5.1M edges)      | 57.55 ms | 1266.8 ms (22×)  | 799.0 ms (14×)   | 234.3 ms (4.1×) |
-| wiki-Talk (2.4M nodes, 5M edges)         | 74.37 ms | 1391.8 ms (19×)  | 1466.2 ms (20×)  | 153.2 ms (2.1×) |
-| soc-LiveJournal1 (4.8M nodes, 69M edges) | 1073.8 ms | 22122 ms (21×) | 16631 ms (15×)   | 3864.4 ms (3.6×) |
+| web-Google (875k nodes, 5.1M edges)      | 42.05 ms | 1236.6 ms (29×)  | 793.0 ms (19×)   | 233.7 ms (5.6×) |
+| wiki-Talk (2.4M nodes, 5M edges)         | 62.74 ms | 1288.2 ms (21×)  | 1502.9 ms (24×)  | 151.0 ms (2.4×) |
+| soc-LiveJournal1 (4.8M nodes, 69M edges) | 1049.9 ms | 22560 ms (21×)   | 16286 ms (16×)   | 3931.3 ms (3.7×) |
 
 #### Throughput (higher is better)
 
