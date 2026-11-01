@@ -10,7 +10,7 @@
        inherit either and moves in lockstep with the parent POM by hand (release checklist). -->
   <groupId>com.kobayami</groupId>
   <artifactId>graphity-bom</artifactId>
-  <version>2.4.0</version>
+  <version>3.0.0</version>
   <packaging>pom</packaging>
 
   <name>graphity-bom</name>

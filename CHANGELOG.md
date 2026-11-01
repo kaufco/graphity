@@ -7,20 +7,68 @@ Graphity adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [3.0.0] — unreleased
+## [3.0.0] — 2026-11-01
+
+This major release makes the API consistent and adds what dependency and compiler analyses need
+first. It comes with the guide
+[Solving Graph Problems with Graphity](https://kaufco.github.io/graphity-doc/?lang=java), which has one page
+per problem. Requires JDK 17 or newer.
+
+### Highlights
+
+- **A consistent API.** Every factory validates its input, cost is visible at the call site, names
+  follow one scheme, and what 2.x deprecated is gone.
+- **New analyses.** One concrete cycle, transitive closure and reduction, and a structural hash and
+  diff of graphs.
+- **Modules released together.** `graphity` brings in all of them with one dependency:
+  `graphity-core`, `graphity-controlflow`, `graphity-dot` and `graphity-mermaid`. `graphity-bom`
+  keeps them at one version.
+- **Edges by index.** Every edge result names its edges by edge index, and graphs load from CSR
+  (compressed sparse row) arrays and from a binary format.
+- **Export to DOT (the language of Graphviz) and Mermaid.**
+- **Null safety.** With JSpecify, the whole API says where it allows `null`, for Kotlin and nullness
+  checkers.
+
+### Migrating from 2.x
+
+- **Dependencies.** The control-flow analyses moved to `graphity-controlflow` and its package
+  `com.kobayami.graphity.controlflow` ([Issue #47](../../issues/47)). Depend on `graphity` to get all
+  modules ([Issue #65](../../issues/65)).
+- **Input.** At runtime, `GraphBuilder` validates node references, and every factory validates its
+  input ([Issue #42](../../issues/42), [Issue #43](../../issues/43)). Calls that passed wrong input
+  now throw.
+- **Traversers.** Only the iterative traversers remain, and they are now `DfsTraverser` and
+  `DfsEdgeTraverser`. The name `DfsTraverser` denotes the iterative traverser
+  ([Issue #45](../../issues/45), [Issue #60](../../issues/60)).
+- **Renames and removals.** [Issue #60](../../issues/60) has the table of renamed methods,
+  [Issue #41](../../issues/41) the deprecated API that was removed, and
+  [Issue #44](../../issues/44) what became of `Graph.transposed()` and `rootNodes()`.
+- **Results.** Edge results identify edges by their edge index ([Issue #48](../../issues/48)).
+- **Null.** Nothing in the API is `null` unless its type says `@Nullable`. Kotlin and nullness checkers
+  report a violation at compile time, and the library no longer checks for `null` at runtime
+  ([Issue #59](../../issues/59)).
 
 ### Added
 
 - API
-  - [Issue #46](../../issues/46) - Read access to the CSR arrays for algorithm code
-  - [Issue #49](../../issues/49) - Let GraphBuilder take an Edges list
+  - [Issue #46](../../issues/46) - Read access to the CSR arrays
+  - [Issue #49](../../issues/49) - Let `GraphBuilder` take an `Edges` list
   - [Issue #50](../../issues/50) - Iterate over nodes and edges
-  - [Issue #51](../../issues/51) - Give Graph a bounded toString
-  - [Issue #52](../../issues/52) - Add a structural hash and a diff for graphs
+  - [Issue #51](../../issues/51) - Give `Graph` a bounded `toString`
   - [Issue #53](../../issues/53) - Load graphs from CSR arrays, and add a binary CSR format
+  - [Issue #56](../../issues/56) - Export graphs to DOT and Mermaid
+- Algorithms
+  - [Issue #52](../../issues/52) - Add a structural hash and a diff for graphs
   - [Issue #54](../../issues/54) - Find one cycle
   - [Issue #55](../../issues/55) - Add transitive closure and transitive reduction
-- [Issue #65](../../issues/65) - graphity, one artifact for all modules
+- Documentation
+  - [Issue #57](../../issues/57) - Document how to aggregate edge data
+  - [Issue #58](../../issues/58) - Shorten the README and add a Javadoc overview page
+  - [Issue #63](../../issues/63) - Graphity code examples
+  - [Issue #64](../../issues/64) - Rewritten Javadoc for the whole API
+  - [Issue #66](../../issues/66) - Links from the Javadoc to the guide
+- Infrastructure
+  - [Issue #65](../../issues/65) - graphity, one artifact for all modules
 
 ### Changed
 
@@ -28,24 +76,20 @@ Graphity adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - [Issue #42](../../issues/42) - Validate node references in `GraphBuilder` by default
   - [Issue #43](../../issues/43) - Validate the input of every factory at runtime
   - [Issue #44](../../issues/44) - Remove `Graph.transposed()` and move `rootNodes()` to `Graphs`
-  - [Issue #47](../../issues/47) - Move the control-flow analyses to graphity-controlflow
+  - [Issue #47](../../issues/47) - Move the control-flow analyses to `graphity-controlflow`
   - [Issue #48](../../issues/48) - Identify the edges in results by their edge index
-  - [Issue #59](../../issues/59) - Declare where the API allows null
+  - [Issue #59](../../issues/59) - Null safety with JSpecify
   - [Issue #60](../../issues/60) - Consistent names and stricter input checks
-  - [Issue #62](../../issues/62) - One module per format, and the binary format on Graph
+  - [Issue #62](../../issues/62) - One module per input / output format
 - Infrastructure
   - [Issue #40](../../issues/40) - Build the published artifacts from the tagged commit
-- Documentation
-  - [Issue #57](../../issues/57) - Document how to aggregate edge data
-  - [Issue #58](../../issues/58) - Make the README and the Javadoc show what the library offers at a glance
-  - [Issue #63](../../issues/63) - Graphity code examples
-  - [Issue #64](../../issues/64) - Rewritten Javadoc for the whole API
-  - [Issue #66](../../issues/66) - Links from the Javadoc to the guide
+  - [Issue #67](../../issues/67) - Remove dependency cycles in the core
+  - [Issue #68](../../issues/68) - Faster and stricter build
 
 ### Removed
 
 - API
-  - [Issue #41](../../issues/41) - Remove the API deprecated in 2.x
+  - [Issue #41](../../issues/41) - Remove deprecated API
   - [Issue #45](../../issues/45) - Keep only the iterative traversers
 
 ### Fixed
